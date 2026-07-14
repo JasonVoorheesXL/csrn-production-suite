@@ -1,0 +1,236 @@
+{
+  "classification": "5A",
+  "source": {
+    "provider": "CSRN supervised research seed",
+    "checked_at": "2026-07-11",
+    "verification_status": "candidate",
+    "notes": "Candidate colors for review; processed logos and approved/manual branding are never overwritten."
+  },
+  "schools": [
+    {
+      "official_name": "Brookhaven High School",
+      "primary_color": "#B5121B",
+      "secondary_color": "#0B1F3A",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Navy/red candidate"
+    },
+    {
+      "official_name": "Caledonia High School",
+      "primary_color": "#8D1514",
+      "secondary_color": "#FFFFFF",
+      "accent_color": "#000000",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Preserved when processed logo exists"
+    },
+    {
+      "official_name": "Cleveland Central High School",
+      "primary_color": "#4B2683",
+      "secondary_color": "#F2C94C",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Purple/gold candidate"
+    },
+    {
+      "official_name": "Columbus High School",
+      "primary_color": "#4B2683",
+      "secondary_color": "#F2C94C",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Purple/gold candidate"
+    },
+    {
+      "official_name": "East Central High School",
+      "primary_color": "#003B70",
+      "secondary_color": "#F2C94C",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Navy/gold candidate"
+    },
+    {
+      "official_name": "Florence High School",
+      "primary_color": "#0B1F3A",
+      "secondary_color": "#C9A227",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Navy/gold candidate"
+    },
+    {
+      "official_name": "Holmes County Central High School",
+      "primary_color": "#B5121B",
+      "secondary_color": "#000000",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Red/black candidate"
+    },
+    {
+      "official_name": "Lafayette High School",
+      "primary_color": "#B5121B",
+      "secondary_color": "#C9A227",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Red/gold candidate"
+    },
+    {
+      "official_name": "Lanier High School",
+      "primary_color": "#6D1D2A",
+      "secondary_color": "#FFFFFF",
+      "accent_color": "#808080",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Maroon/white candidate"
+    },
+    {
+      "official_name": "Laurel High School",
+      "primary_color": "#6D1D2A",
+      "secondary_color": "#C9A227",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Maroon/gold candidate"
+    },
+    {
+      "official_name": "Leake Central High School",
+      "primary_color": "#C84A00",
+      "secondary_color": "#1D4E89",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Orange/blue candidate"
+    },
+    {
+      "official_name": "Natchez High School",
+      "primary_color": "#B5121B",
+      "secondary_color": "#17365D",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Red/blue candidate"
+    },
+    {
+      "official_name": "New Hope High School",
+      "primary_color": "#000000",
+      "secondary_color": "#767740",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Preserved when processed logo exists"
+    },
+    {
+      "official_name": "North Pike Senior High School",
+      "primary_color": "#C8102E",
+      "secondary_color": "#0B1F3A",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Red/navy candidate"
+    },
+    {
+      "official_name": "Northeast Jones High School",
+      "primary_color": "#0B1F3A",
+      "secondary_color": "#F2C94C",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Navy/gold candidate"
+    },
+    {
+      "official_name": "Pontotoc High School",
+      "primary_color": "#000000",
+      "secondary_color": "#C9A227",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Black/gold candidate"
+    },
+    {
+      "official_name": "Provine High School",
+      "primary_color": "#145A32",
+      "secondary_color": "#C9A227",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Green/gold candidate"
+    },
+    {
+      "official_name": "Purvis High School",
+      "primary_color": "#4B2683",
+      "secondary_color": "#F2C94C",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Purple/gold candidate"
+    },
+    {
+      "official_name": "South Jones High School",
+      "primary_color": "#B5121B",
+      "secondary_color": "#FFFFFF",
+      "accent_color": "#17365D",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Red/white candidate"
+    },
+    {
+      "official_name": "Stone High School",
+      "primary_color": "#174A7E",
+      "secondary_color": "#C9A227",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Blue/gold candidate"
+    },
+    {
+      "official_name": "Sumrall High School",
+      "primary_color": "#174A7E",
+      "secondary_color": "#C9A227",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Blue/gold candidate"
+    },
+    {
+      "official_name": "Vancleave High School",
+      "primary_color": "#174A7E",
+      "secondary_color": "#C9A227",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Blue/gold candidate"
+    },
+    {
+      "official_name": "Vicksburg High School",
+      "primary_color": "#145A32",
+      "secondary_color": "#C9A227",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Green/gold candidate"
+    },
+    {
+      "official_name": "Wayne County High School",
+      "primary_color": "#E87722",
+      "secondary_color": "#174A7E",
+      "accent_color": "#FFFFFF",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Orange/blue candidate"
+    },
+    {
+      "official_name": "West Point High School",
+      "primary_color": "#155C18",
+      "secondary_color": "#FFFFFF",
+      "accent_color": "#000000",
+      "source_provider": "CSRN supervised research seed",
+      "source_url": "",
+      "notes": "Preserved when processed logo exists"
+    }
+  ]
+}

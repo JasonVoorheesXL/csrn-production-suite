@@ -1,0 +1,28 @@
+[
+  {
+    "id": "jason",
+    "name": "Jason",
+    "primary_role": "Play-by-Play",
+    "producer": true,
+    "social": {
+      "facebook": "",
+      "x": "",
+      "instagram": "",
+      "youtube": "",
+      "website": ""
+    }
+  },
+  {
+    "id": "jordan",
+    "name": "Jordan",
+    "primary_role": "Color Analyst",
+    "producer": false,
+    "social": {
+      "facebook": "",
+      "x": "",
+      "instagram": "",
+      "youtube": "",
+      "website": ""
+    }
+  }
+]

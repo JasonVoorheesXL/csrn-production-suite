@@ -1,0 +1,23 @@
+[
+  {
+    "build": "0018",
+    "release_date": "2026-07-12",
+    "title": "Game Manager & Broadcast Creation",
+    "features": [
+      "Game Manager dashboard",
+      "Broadcast database",
+      "Permanent broadcast IDs",
+      "Automatic school branding and venue population",
+      "Broadcast lifecycle status"
+    ],
+    "database_changes": [
+      "Data/Broadcasts/broadcasts.json",
+      "Broadcast records link schools and venues by permanent IDs"
+    ],
+    "known_issues": [
+      "Schedule import is foundation-only and not yet enabled"
+    ],
+    "test_status": "Packaged for user acceptance",
+    "user_approval": "Pending"
+  }
+]

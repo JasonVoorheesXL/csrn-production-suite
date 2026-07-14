@@ -1,0 +1,4 @@
+CSRN Production Suite
+Version 1.5 Alpha
+Personnel Engine v1 Corrected R2
+Build V1.5A-PERSONNEL1-R2

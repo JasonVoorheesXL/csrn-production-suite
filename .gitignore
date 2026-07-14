@@ -1,0 +1,41 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Runtime
+security.json
+state.json
+*.log
+
+# User data
+Data/Broadcasts/
+Data/Rosters/
+Data/Personnel/
+Data/Schools/
+Data/Settings/
+Data/**/Headshots/
+Data/**/Logos/
+
+# OS
+Thumbs.db
+.DS_Store
+
+.migration-complete.json
+
+# Runtime state
+*.sqlite
+*.db
+*.bak
+*.tmp
+
+# Python cache
+__pycache__/
+*.pyc
+
+# VS Code
+.vscode/
+
+# Windows
+desktop.ini

@@ -1,0 +1,277 @@
+[
+  {
+    "build": "0018",
+    "release_date": "2026-07-12",
+    "title": "Game Manager & Broadcast Creation",
+    "features": [
+      "Game Manager dashboard",
+      "Broadcast database",
+      "Permanent broadcast IDs",
+      "Automatic school branding and venue population",
+      "Broadcast lifecycle status"
+    ],
+    "database_changes": [
+      "Data/Broadcasts/broadcasts.json",
+      "Broadcast records link schools and venues by permanent IDs"
+    ],
+    "known_issues": [
+      "Schedule import is foundation-only and not yet enabled"
+    ],
+    "test_status": "Packaged for user acceptance",
+    "user_approval": "Pending"
+  },
+  {
+    "build": "0018 Corrected R2",
+    "date": "2026-07-12",
+    "features": [
+      "Delete test games in Game Manager",
+      "Current-year season default",
+      "Reliable planned-game selector",
+      "Automatic live status synchronization",
+      "Logo-safe overlay state",
+      "Redesigned full-width scorebug with logos and adaptive team names"
+    ],
+    "bugs_fixed": [
+      "Overlay API removed logo URLs",
+      "Start Broadcast did not reliably refresh linked Game Manager record"
+    ],
+    "known_issues": [
+      "OBS Browser Source must use http://127.0.0.1:5050/overlay and be visible in the configured scorebug scene"
+    ]
+  },
+  {
+    "build": "0018-R3",
+    "release_date": "2026-07-12",
+    "title": "Game Control Stabilization",
+    "features": [
+      "Reliable game deletion",
+      "Broadcast-list refresh",
+      "Down/distance visibility controls",
+      "Clock visibility toggle",
+      "TD/FG/Turnover event hooks",
+      "Mobile live-control focus"
+    ],
+    "database_changes": [
+      "State adds distance, clock_visible, events, and last_event"
+    ],
+    "known_issues": [
+      "Event buttons create trigger hooks only; media assets are assigned in a future build",
+      "Statistician mode remains post-v1"
+    ],
+    "test_status": "Packaged for user acceptance",
+    "user_approval": "Pending"
+  },
+  {
+    "build": "0019-R3",
+    "date": "2026-07-12",
+    "features": [
+      "Game editing",
+      "OBS-only checklist",
+      "Monogram fallback"
+    ],
+    "status": "Phase 2 release candidate"
+  },
+  {
+    "build": "V1.0A-P2-STABLE",
+    "date": "2026-07-12",
+    "features": [
+      "Phase 2 stable baseline",
+      "Game Manager and Command Center workflow",
+      "School, venue, logo and branding databases",
+      "OBS WebSocket and browser-source integration",
+      "Adaptive football scorebug with certified-logo and monogram fallback",
+      "Graphic and camera display modes",
+      "Persistent live and completed broadcast state"
+    ],
+    "database_changes": [
+      "No destructive schema changes from 0019 Corrected R3 Hotfix 6"
+    ],
+    "known_issues": [
+      "Basketball and triple-digit score layout deferred to multi-sport phase",
+      "Statistician mode, archive workflow and media triggers remain future features"
+    ],
+    "test_status": "User-accepted Phase 2 baseline",
+    "user_approval": "Approved"
+  },
+  {
+    "build": "V1.0A-HF1",
+    "version": "Version 1.0 Alpha Hotfix 1",
+    "date": "2026-07-12",
+    "type": "hotfix",
+    "changes": [
+      "Simplified lifecycle",
+      "OBS-only check action",
+      "Scorebug visibility state isolation",
+      "Apply Branding label"
+    ],
+    "status": "packaged"
+  },
+  {
+    "build": "V1.0A-HF2",
+    "version": "Version 1.0 Alpha Hotfix 2",
+    "release_date": "2026-07-12",
+    "title": "OBS Auto-Check and Broadcast Resume",
+    "features": [
+      "Automatic OBS health refresh when loading a broadcast",
+      "Resume completed broadcast",
+      "Reset game data preserves broadcast linkage"
+    ],
+    "database_changes": [],
+    "known_issues": [],
+    "test_status": "Route, JavaScript, compilation, and archive tests passed",
+    "user_approval": "Pending"
+  },
+  {
+    "build": "V1.1A-EVENT1",
+    "version": "Version 1.1 Alpha",
+    "release_date": "2026-07-12",
+    "title": "Event Engine v1",
+    "phase": "Phase 3.1",
+    "type": "feature",
+    "features": [
+      "Functional TD event (+6)",
+      "Functional FG event (+3)",
+      "Turnover possession assignment",
+      "Event confirmation and persistent event history",
+      "Undo integration",
+      "Future graphics/audio/video trigger hooks",
+      "Reserved interview production type"
+    ],
+    "database_changes": [
+      "Live state now stores events, last_event and production_type; backward compatible defaults applied automatically"
+    ],
+    "known_issues": [
+      "Media trigger assignments are placeholders until Graphics and Media engines",
+      "Interview production type is reserved but not yet exposed in Game Manager"
+    ],
+    "test_status": "Python compilation, JavaScript syntax, Flask event route and undo tests passed",
+    "user_approval": "Pending"
+  },
+  {
+    "build": "V1.1A-EVENT1-HF1",
+    "version": "Version 1.1 Alpha \u2014 Event Engine v1 Hotfix 1",
+    "date": "2026-07-12",
+    "summary": "Fixed semantic-version migration discovery so Version 1.0 Alpha Hotfix data is carried forward."
+  },
+  {
+    "build": "V1.2A-GFX1",
+    "version": "Version 1.2 Alpha \u2014 Graphics Engine v1",
+    "date": "2026-07-12",
+    "features": [
+      "Graphics module",
+      "Lower Third Master",
+      "Reusable overlay asset architecture"
+    ],
+    "status": "Development build"
+  },
+  {
+    "build": "V1.3A-ROSTER1",
+    "release_date": "2026-07-13",
+    "title": "Version 1.3 Alpha \u2014 Roster Engine v1",
+    "features": [
+      "Season-based roster database",
+      "Varsity-first workflow with other levels supported",
+      "Editable player records",
+      "Active/Inactive status",
+      "Duplicate jersey-number warnings",
+      "CSV template and import"
+    ],
+    "database_changes": [
+      "Data/Rosters/rosters.json"
+    ],
+    "known_issues": [
+      "Player graphics are not yet connected to roster selection",
+      "Headshot field stores a path or URL; managed image upload comes later"
+    ],
+    "test_status": "API routes, JavaScript syntax, Python compilation, and package integrity verified"
+  },
+  {
+    "build": "V1.3A-ROSTER1-R2",
+    "version": "1.3 Alpha",
+    "name": "Roster Engine v1 Corrected R2",
+    "date": "2026-07-13",
+    "changes": [
+      "Fixed Print Roster schools reference",
+      "Improved readable pronunciation-guide suggestions"
+    ]
+  },
+  {
+    "version": "1.4 Alpha",
+    "build": "V1.4A-PLAYERGRAPHICS1",
+    "title": "Player Graphics Engine v1",
+    "status": "packaged"
+  },
+  {
+    "build": "V1.4A-PLAYERGRAPHICS1-R1",
+    "date": "2026-07-13",
+    "title": "Version 1.4 Alpha \u2014 Player Graphics Engine v1 Corrected R1",
+    "features": [
+      "Player Identification Master UI",
+      "Printable full/preferred names"
+    ],
+    "fixes": [
+      "Version metadata remained at 1.3",
+      "Player Graphics controls were not exposed"
+    ],
+    "status": "Corrected release"
+  },
+  {
+    "version": "1.4 Alpha",
+    "build": "V1.4A-PLAYERGRAPHICS1-R3",
+    "title": "Player Graphics Engine v1 Corrected R3",
+    "changes": [
+      "Local roster headshot upload and storage",
+      "White player text in OBS",
+      "Touchdown label simplified",
+      "Player graphic aligned to scorebug body",
+      "Broken external image fallback"
+    ],
+    "status": "packaged"
+  },
+  {
+    "build": "V1.4A-PLAYERGRAPHICS1-R4",
+    "title": "Player Graphics Engine v1 Corrected R4",
+    "date": "2026-07-13",
+    "features": [
+      "Full player name with preferred name on-air",
+      "Larger event label and readable player details",
+      "Embossed jersey number overlay on headshot",
+      "Positions above school logo",
+      "Enforced white player graphic typography"
+    ],
+    "status": "Ready for user test"
+  },
+  {
+    "build": "V1.4A-PLAYERGRAPHICS1-R5",
+    "title": "Player Graphics Engine v1 Corrected R5",
+    "changes": [
+      "Player card hierarchy refinement",
+      "Conditional sponsor bar",
+      "Team logo watermark",
+      "Larger jersey number and positions"
+    ]
+  },
+  {
+    "build": "V1.4A-PLAYERGRAPHICS2-FINAL",
+    "title": "Player Graphics Engine v2 Final Polish",
+    "date": "2026-07-13",
+    "status": "complete",
+    "notes": [
+      "Dedicated identity panel",
+      "Larger headshot and typography",
+      "Two-line sponsor bar",
+      "Watermark refinement"
+    ]
+  },
+  {
+    "version": "1.5 Alpha",
+    "build": "V1.5A-PERSONNEL1",
+    "title": "Personnel Engine v1",
+    "status": "alpha",
+    "features": [
+      "Personnel database",
+      "Local personnel headshots",
+      "Coach/talent/interview graphics"
+    ]
+  }
+]

@@ -1,0 +1,86 @@
+[
+  {
+    "id": "caledonia",
+    "official_name": "Caledonia High School",
+    "broadcast_name": "Caledonia",
+    "nickname": "Cavaliers",
+    "primary_color": "#800020",
+    "secondary_color": "#BD7B8C",
+    "primary_logo": "/school-logos/caledonia/round-master.png",
+    "alternate_logo": "",
+    "general_social": {
+      "facebook": "",
+      "x": "",
+      "instagram": "",
+      "youtube": "",
+      "website": ""
+    },
+    "venues": [
+      {
+        "id": "caledonia-main",
+        "name": "Caledonia High School",
+        "address1": "",
+        "address2": "",
+        "city": "Caledonia",
+        "state": "MS",
+        "postal_code": "",
+        "weather_radius_miles": 25
+      }
+    ],
+    "programs": {
+      "Football": {
+        "facebook": "",
+        "x": "",
+        "instagram": "",
+        "youtube": "",
+        "website": "",
+        "program_logo": "",
+        "venue_id": "caledonia-main",
+        "notes": ""
+      }
+    },
+    "state": "MS",
+    "classification": "5A",
+    "region": "1",
+    "district": "",
+    "mhsaa_id": "",
+    "source_data": {
+      "provider": "MHSAA",
+      "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+      "retrieved_at": "2026-07-11",
+      "district": "",
+      "cycle": "2025-27",
+      "sport": "Football"
+    },
+    "user_overrides": {},
+    "verification_status": "unverified",
+    "default_broadcast_logo_id": "MS5A-001-primary",
+    "logo_status": "candidate",
+    "logo_metadata": {
+      "source_url": "",
+      "transparent_background_status": "normalized",
+      "approval_status": "candidate",
+      "master_canvas": "1024x1024-round",
+      "scorebug_derivative": "256x256-round",
+      "shape_standard": "round",
+      "safe_area": "circle-90-percent",
+      "original_filename": "test_logo.png",
+      "original_path": "Data/Logos/caledonia/original.png",
+      "round_master_path": "/school-logos/caledonia/round-master.png",
+      "scorebug_path": "/school-logos/caledonia/round-scorebug.png",
+      "extracted_colors": [
+        "#800020",
+        "#BD7B8C"
+      ]
+    },
+    "notes": "",
+    "csrn_id": "MS5A-001",
+    "short_name": "Caledonia",
+    "preferred_scorebug_name": "Caledonia",
+    "city": "Caledonia",
+    "county": "Lowndes",
+    "active": true,
+    "pronunciation_guide": "",
+    "venue_id": "caledonia-main"
+  }
+]

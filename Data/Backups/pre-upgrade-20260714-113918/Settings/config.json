@@ -1,0 +1,61 @@
+{
+  "organization": {
+    "name": "Caledonia Sports Radio Network",
+    "short_name": "CSRN",
+    "logo_path": "static/csrn-logo.png",
+    "primary_color": "#C9203B",
+    "secondary_color": "#000000",
+    "accent_color": "#FFFFFF"
+  },
+  "broadcast_defaults": {
+    "venue": "Caledonia High School",
+    "sport": "Football",
+    "timezone": "America/Chicago",
+    "theme": "CSRN Dark",
+    "home_school_id": "caledonia",
+    "visual_mode": "graphic"
+  },
+  "folders": {
+    "graphics": "Graphics",
+    "assets": "Assets",
+    "obs": "OBS",
+    "broadcast_archive": "Data/Broadcasts",
+    "exports": "Exports",
+    "backups": "Data/Backups"
+  },
+  "obs": {
+    "websocket_enabled": false,
+    "controlled_commands": false,
+    "host": "127.0.0.1",
+    "port": 4455,
+    "password": "",
+    "scene_collection": "CSRN Master",
+    "profile": "CSRN Production",
+    "required_scene": "10.01 - FOOTBALL SCOREBUG",
+    "browser_source": "BRWSR - Football Scorebug",
+    "program_visual_scene": "10.02 - PROGRAM VISUAL",
+    "graphic_source": "IMG - Broadcast Background",
+    "camera_source": "CAM - Primary Camera"
+  },
+  "weather": {
+    "use_home_venue_address": true,
+    "default_alert_radius_miles": 25
+  },
+  "social": {
+    "facebook": "",
+    "youtube": "",
+    "x": "",
+    "website": ""
+  },
+  "application": {
+    "version": "Version 1.5 Alpha \u2014 Personnel Engine v1",
+    "build": "V1.5A-PERSONNEL1-R2",
+    "automatic_backup": true,
+    "auto_save": true,
+    "operator_timeout_hours": 12,
+    "upgrade_manager_enabled": true,
+    "last_migration_status": ""
+  },
+  "build": "V1.4A-PLAYERGRAPHICS2-FINAL",
+  "version": "Version 1.4 Alpha \u2014 Player Graphics Engine v2 Final Polish"
+}

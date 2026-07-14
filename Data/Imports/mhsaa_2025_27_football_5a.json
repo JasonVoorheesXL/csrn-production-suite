@@ -1,0 +1,363 @@
+{
+  "classification": "5A",
+  "cycle": "2025-27",
+  "sport": "Football",
+  "source": {
+    "provider": "MHSAA",
+    "title": "2025-27 Football Regions",
+    "url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+    "checked_at": "2026-07-11"
+  },
+  "schools": [
+    {
+      "official_name": "Brookhaven High School",
+      "broadcast_name": "Brookhaven",
+      "state": "MS",
+      "classification": "5A",
+      "region": "3",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Caledonia High School",
+      "broadcast_name": "Caledonia",
+      "state": "MS",
+      "classification": "5A",
+      "region": "1",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Cleveland Central High School",
+      "broadcast_name": "Cleveland Central",
+      "state": "MS",
+      "classification": "5A",
+      "region": "2",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Columbus High School",
+      "broadcast_name": "Columbus",
+      "state": "MS",
+      "classification": "5A",
+      "region": "1",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "East Central High School",
+      "broadcast_name": "East Central",
+      "state": "MS",
+      "classification": "5A",
+      "region": "4",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Florence High School",
+      "broadcast_name": "Florence",
+      "state": "MS",
+      "classification": "5A",
+      "region": "2",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Holmes County Central High School",
+      "broadcast_name": "Holmes County Central",
+      "state": "MS",
+      "classification": "5A",
+      "region": "2",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Lafayette High School",
+      "broadcast_name": "Lafayette",
+      "state": "MS",
+      "classification": "5A",
+      "region": "1",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Lanier High School",
+      "broadcast_name": "Lanier",
+      "state": "MS",
+      "classification": "5A",
+      "region": "2",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Laurel High School",
+      "broadcast_name": "Laurel",
+      "state": "MS",
+      "classification": "5A",
+      "region": "3",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Leake Central High School",
+      "broadcast_name": "Leake Central",
+      "state": "MS",
+      "classification": "5A",
+      "region": "2",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Natchez High School",
+      "broadcast_name": "Natchez",
+      "state": "MS",
+      "classification": "5A",
+      "region": "3",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "New Hope High School",
+      "broadcast_name": "New Hope",
+      "state": "MS",
+      "classification": "5A",
+      "region": "1",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "North Pike Senior High School",
+      "broadcast_name": "North Pike",
+      "state": "MS",
+      "classification": "5A",
+      "region": "3",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Northeast Jones High School",
+      "broadcast_name": "Northeast Jones",
+      "state": "MS",
+      "classification": "5A",
+      "region": "4",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Pontotoc High School",
+      "broadcast_name": "Pontotoc",
+      "state": "MS",
+      "classification": "5A",
+      "region": "1",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Provine High School",
+      "broadcast_name": "Provine",
+      "state": "MS",
+      "classification": "5A",
+      "region": "2",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Purvis High School",
+      "broadcast_name": "Purvis",
+      "state": "MS",
+      "classification": "5A",
+      "region": "4",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "South Jones High School",
+      "broadcast_name": "South Jones",
+      "state": "MS",
+      "classification": "5A",
+      "region": "3",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Stone High School",
+      "broadcast_name": "Stone",
+      "state": "MS",
+      "classification": "5A",
+      "region": "4",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Sumrall High School",
+      "broadcast_name": "Sumrall",
+      "state": "MS",
+      "classification": "5A",
+      "region": "3",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Vancleave High School",
+      "broadcast_name": "Vancleave",
+      "state": "MS",
+      "classification": "5A",
+      "region": "4",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Vicksburg High School",
+      "broadcast_name": "Vicksburg",
+      "state": "MS",
+      "classification": "5A",
+      "region": "2",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Wayne County High School",
+      "broadcast_name": "Wayne County",
+      "state": "MS",
+      "classification": "5A",
+      "region": "4",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "West Point High School",
+      "broadcast_name": "West Point",
+      "state": "MS",
+      "classification": "5A",
+      "region": "1",
+      "source_data": {
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "retrieved_at": "2026-07-11",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    }
+  ]
+}

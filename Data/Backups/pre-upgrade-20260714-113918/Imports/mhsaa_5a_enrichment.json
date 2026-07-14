@@ -1,0 +1,385 @@
+{
+  "classification": "5A",
+  "source": {
+    "provider": "MHSAA School Directory",
+    "url": "https://www.misshsaa.com/mhsaa-school-directory/",
+    "checked_at": "2026-07-11"
+  },
+  "schools": [
+    {
+      "official_name": "Brookhaven High School",
+      "mascot": "Panthers",
+      "school_address": {
+        "address1": "443 East Monticello Street",
+        "address2": "",
+        "city": "Brookhaven",
+        "state": "MS",
+        "postal_code": "39601"
+      },
+      "phone": "601-833-4498",
+      "website": "https://bhs.brookhavenschools.org/",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Caledonia High School",
+      "mascot": "Cavaliers",
+      "school_address": {
+        "address1": "111 Cavalier Drive",
+        "address2": "",
+        "city": "Caledonia",
+        "state": "MS",
+        "postal_code": "39740"
+      },
+      "phone": "662-356-2001",
+      "website": "https://chs.lowndes.k12.ms.us/",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Cleveland Central High School",
+      "mascot": "Wolves",
+      "school_address": {
+        "address1": "300 W. Sunflower Road",
+        "address2": "",
+        "city": "Cleveland",
+        "state": "MS",
+        "postal_code": "38732"
+      },
+      "phone": "662-843-2460",
+      "website": "https://cchs.cleveland.k12.ms.us/",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Columbus High School",
+      "mascot": "Falcons",
+      "school_address": {
+        "address1": "215 Hemlock Street",
+        "address2": "",
+        "city": "Columbus",
+        "state": "MS",
+        "postal_code": "39702"
+      },
+      "phone": "662-241-7200",
+      "website": "https://columbuscityschoolschs.ss20.sharpschool.com/",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "East Central High School",
+      "mascot": "Hornets",
+      "school_address": {
+        "address1": "5500 Hurley-Wade Road",
+        "address2": "",
+        "city": "Moss Point",
+        "state": "MS",
+        "postal_code": "39562"
+      },
+      "phone": "228-283-3120",
+      "website": "https://echs.jcsd.ms/",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Florence High School",
+      "mascot": "Eagles",
+      "school_address": {
+        "address1": "232 Highway 469 N.",
+        "address2": "",
+        "city": "Florence",
+        "state": "MS",
+        "postal_code": "39073"
+      },
+      "phone": "601-845-2205",
+      "website": "https://fhs.rcsd.ms/",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Holmes County Central High School",
+      "mascot": "Jaguars",
+      "school_address": {
+        "address1": "9749 Brozville Road",
+        "address2": "",
+        "city": "Lexington",
+        "state": "MS",
+        "postal_code": "39095"
+      },
+      "phone": "662-834-2172",
+      "website": "https://www.holmesccsd.org/",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Lafayette High School",
+      "mascot": "Commodores",
+      "school_address": {
+        "address1": "160 Commodore Drive",
+        "address2": "",
+        "city": "Oxford",
+        "state": "MS",
+        "postal_code": "38655"
+      },
+      "phone": "662-234-3614",
+      "website": "https://www.gocommodores.org/o/lhs",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Lanier High School",
+      "mascot": "Bulldogs",
+      "school_address": {
+        "address1": "833 W. Maple Street",
+        "address2": "",
+        "city": "Jackson",
+        "state": "MS",
+        "postal_code": "39203"
+      },
+      "phone": "",
+      "website": "https://lanier.jackson.k12.ms.us/",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Laurel High School",
+      "mascot": "Golden Tornadoes",
+      "school_address": {
+        "address1": "1100 W. 12th Street",
+        "address2": "",
+        "city": "Laurel",
+        "state": "MS",
+        "postal_code": "39440"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Leake Central High School",
+      "mascot": "Gators",
+      "school_address": {
+        "address1": "704 N. Jordan Street",
+        "address2": "",
+        "city": "Carthage",
+        "state": "MS",
+        "postal_code": "39051"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Natchez High School",
+      "mascot": "Bulldogs",
+      "school_address": {
+        "address1": "319 Seargent S. Prentiss Drive",
+        "address2": "",
+        "city": "Natchez",
+        "state": "MS",
+        "postal_code": "39120"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "New Hope High School",
+      "mascot": "Trojans",
+      "school_address": {
+        "address1": "2920 New Hope Road",
+        "address2": "",
+        "city": "Columbus",
+        "state": "MS",
+        "postal_code": "39702"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "North Pike Senior High School",
+      "mascot": "Jaguars",
+      "school_address": {
+        "address1": "1022 Jaguar Trail",
+        "address2": "",
+        "city": "Summit",
+        "state": "MS",
+        "postal_code": "39666"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Northeast Jones High School",
+      "mascot": "Tigers",
+      "school_address": {
+        "address1": "68 Northeast Drive",
+        "address2": "",
+        "city": "Laurel",
+        "state": "MS",
+        "postal_code": "39443"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Pontotoc High School",
+      "mascot": "Warriors",
+      "school_address": {
+        "address1": "123 N. Main Street",
+        "address2": "",
+        "city": "Pontotoc",
+        "state": "MS",
+        "postal_code": "38863"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Provine High School",
+      "mascot": "Rams",
+      "school_address": {
+        "address1": "2400 Robinson Street",
+        "address2": "",
+        "city": "Jackson",
+        "state": "MS",
+        "postal_code": "39209"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Purvis High School",
+      "mascot": "Tornadoes",
+      "school_address": {
+        "address1": "220 School Street",
+        "address2": "",
+        "city": "Purvis",
+        "state": "MS",
+        "postal_code": "39475"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "South Jones High School",
+      "mascot": "Braves",
+      "school_address": {
+        "address1": "313 Anderson Street",
+        "address2": "",
+        "city": "Ellisville",
+        "state": "MS",
+        "postal_code": "39437"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Stone High School",
+      "mascot": "Tomcats",
+      "school_address": {
+        "address1": "400 E. Border Avenue",
+        "address2": "",
+        "city": "Wiggins",
+        "state": "MS",
+        "postal_code": "39577"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Sumrall High School",
+      "mascot": "Bobcats",
+      "school_address": {
+        "address1": "198 Center Avenue",
+        "address2": "",
+        "city": "Sumrall",
+        "state": "MS",
+        "postal_code": "39482"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Vancleave High School",
+      "mascot": "Bulldogs",
+      "school_address": {
+        "address1": "4725 Bulldog Lane",
+        "address2": "",
+        "city": "Vancleave",
+        "state": "MS",
+        "postal_code": "39565"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Vicksburg High School",
+      "mascot": "Gators",
+      "school_address": {
+        "address1": "3701 Drummond Street",
+        "address2": "",
+        "city": "Vicksburg",
+        "state": "MS",
+        "postal_code": "39180"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "Wayne County High School",
+      "mascot": "War Eagles",
+      "school_address": {
+        "address1": "1325 Azalea Drive",
+        "address2": "",
+        "city": "Waynesboro",
+        "state": "MS",
+        "postal_code": "39367"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    },
+    {
+      "official_name": "West Point High School",
+      "mascot": "Green Wave",
+      "school_address": {
+        "address1": "950 S. Eshman Avenue",
+        "address2": "",
+        "city": "West Point",
+        "state": "MS",
+        "postal_code": "39773"
+      },
+      "phone": "",
+      "website": "",
+      "source_url": "https://www.misshsaa.com/mhsaa-school-directory/",
+      "verification_status": "candidate"
+    }
+  ]
+}
