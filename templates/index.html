@@ -585,7 +585,7 @@
           </button>
           <div class="graphics-category-body">
             <article class="graphics-library-item is-available" data-graphic-search="lower third identification guest coach sponsor">
-              <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Lower Third Master</h2><p>Names, interviews, guests, roles, and sponsor-supported identification.</p></div><button onclick="openGraphicsAsset('lowerThirdAsset')">Open</button></div>
+              <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Lower Third Master</h2><p>Names, interviews, guests, roles, and sponsor-supported identification.</p></div><button onclick="openGraphicsAsset('lowerThirdAsset', this)">Open</button></div>
               <div id="lowerThirdAsset" class="graphics-asset-panel hidden">
                 <div class="graphics-workspace">
                   <div class="graphics-editor">
@@ -608,7 +608,7 @@
             </article>
 
             <article class="graphics-library-item is-available" data-graphic-search="player identification profile touchdown player of the game lineup">
-              <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Player Identification Master</h2><p>Roster-driven player profiles, touchdown IDs, and player recognition.</p></div><button onclick="openGraphicsAsset('playerAsset')">Open</button></div>
+              <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Player Identification Master</h2><p>Roster-driven player profiles, touchdown IDs, and player recognition.</p></div><button onclick="openGraphicsAsset('playerAsset', this)">Open</button></div>
               <div id="playerAsset" class="graphics-asset-panel hidden">
                 <div class="graphics-workspace player-graphics-workspace">
                   <div class="graphics-editor"><div class="setup-grid">
@@ -626,7 +626,7 @@
             </article>
 
             <article class="graphics-library-item is-available" data-graphic-search="personnel coach interview official administrator broadcast talent on the call">
-              <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Personnel Identification Master</h2><p>Coaches, talent, administrators, officials, and interview guests.</p></div><button onclick="openGraphicsAsset('personnelAsset')">Open</button></div>
+              <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Personnel Identification Master</h2><p>Coaches, talent, administrators, officials, and interview guests.</p></div><button onclick="openGraphicsAsset('personnelAsset', this)">Open</button></div>
               <div id="personnelAsset" class="graphics-asset-panel hidden">
                 <div class="graphics-workspace player-graphics-workspace">
                   <div class="graphics-editor"><div class="setup-grid">
@@ -939,8 +939,9 @@
     </div>
 
     <footer class="suite-footer">
-      <div>Caledonia Sports Radio Network</div>
-      <div>Version 1.4 Alpha · Player Graphics Engine v2 Final Polish</div>
+      <div><strong>{{ app_product }}</strong></div>
+      <div>{{ app_version }} · Build {{ app_build }}</div>
+      <div>© {{ copyright_year }} {{ copyright_owner }}. All rights reserved.</div>
     </footer>
   </main>
 
@@ -1483,7 +1484,7 @@ async function showPersonnelGraphic(){await api('/api/graphics/personnel',person
 async function hidePersonnelGraphic(){await api('/api/graphics/personnel',{action:'hide'});document.getElementById('personnelGraphicStatus').textContent='Personnel graphic hidden.'}
 async function clearPersonnelGraphic(){await api('/api/graphics/personnel',{action:'clear'});document.getElementById('personnelGraphicStatus').textContent='Personnel graphic cleared.'}
 function toggleGraphicsCategory(button){const category=button.closest('.graphics-category');if(!category)return;category.classList.toggle('collapsed');const b=button.querySelector('b');if(b)b.textContent=category.classList.contains('collapsed')?'+':'−'}
-function openGraphicsAsset(id){const panel=document.getElementById(id);if(!panel)return;const shouldOpen=panel.classList.contains('hidden');document.querySelectorAll('.graphics-asset-panel').forEach(x=>x.classList.add('hidden'));if(shouldOpen){panel.classList.remove('hidden');panel.scrollIntoView({behavior:'smooth',block:'nearest'})}}
+function openGraphicsAsset(id,button){const panel=document.getElementById(id);if(!panel)return;const shouldOpen=panel.classList.contains('hidden');document.querySelectorAll('.graphics-asset-panel').forEach(x=>x.classList.add('hidden'));document.querySelectorAll('.graphics-item-heading > button').forEach(x=>x.textContent='Open');if(shouldOpen){panel.classList.remove('hidden');if(button)button.textContent='Close';panel.scrollIntoView({behavior:'smooth',block:'nearest'})}}
 function filterGraphicsLibrary(){const q=(document.getElementById('graphicsLibrarySearch')?.value||'').trim().toLowerCase();let visible=0;document.querySelectorAll('.graphics-library-item').forEach(item=>{const match=!q||(item.dataset.graphicSearch||item.textContent).toLowerCase().includes(q);item.classList.toggle('hidden',!match);if(match)visible++});document.querySelectorAll('.graphics-category').forEach(cat=>{const matches=[...cat.querySelectorAll('.graphics-library-item')].some(x=>!x.classList.contains('hidden'));cat.classList.toggle('search-hidden',!matches);if(q&&matches){cat.classList.remove('collapsed');const b=cat.querySelector('.graphics-category-header b');if(b)b.textContent='−'}});document.getElementById('graphicsLibraryEmpty')?.classList.toggle('hidden',visible>0)}
 function showModule(module) {
   currentModule = module;

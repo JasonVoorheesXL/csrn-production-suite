@@ -183,3 +183,8 @@ Version 1.6 Alpha — Graphics Library v1
 - Added graphic search, availability states, expandable categories, and reusable asset panels.
 - Moved Lower Third, Player, and Personnel masters into the library without changing their APIs.
 - Added planned placeholders for future graphics.
+
+Version 1.6.1 Alpha — Bug Fix 1
+- Dynamic footer version and build identity from VERSION.txt.
+- Copyright notice for Jason Chrest.
+- Graphics Library Open/Close labels now reflect panel state.

@@ -1,4 +1,4 @@
 CSRN Production Suite
-Version 1.6 Alpha
-Graphics Library v1
-Build V1.6A-GRAPHICSLIB1
+Version 1.6.1 Alpha
+Graphics Library v1 Bug Fix 1
+Build V1.6A-GRAPHICSLIB1-BF1

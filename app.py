@@ -43,6 +43,7 @@ MHSAA_5A_ENRICHMENT_FILE = IMPORTS_DIR / "mhsaa_5a_enrichment.json"
 MHSAA_5A_BRANDING_FILE = IMPORTS_DIR / "mhsaa_5a_branding.json"
 BROADCAST_INDEX_FILE = DATA_DIR / "Broadcasts" / "broadcasts.json"
 BUILD_JOURNAL_FILE = DATA_DIR / "Logs" / "build_journal.json"
+VERSION_FILE = BASE_DIR / "VERSION.txt"
 
 app = Flask(__name__)
 lock = Lock()
@@ -193,6 +194,32 @@ def load_config() -> dict[str, Any]:
 def save_config(config: dict[str, Any]) -> None:
     ensure_data_architecture()
     save_json(CONFIG_FILE, config)
+
+
+
+def application_identity() -> dict[str, str]:
+    """Return package identity from VERSION.txt with safe config fallbacks."""
+    cfg = load_config()
+    version = cfg.get("application", {}).get("version", "Version 1.6 Alpha — Graphics Library v1")
+    build = cfg.get("application", {}).get("build", "V1.6A-GRAPHICSLIB1")
+    product = "CSRN Production Suite"
+    if VERSION_FILE.exists():
+        try:
+            lines = [line.strip() for line in VERSION_FILE.read_text(encoding="utf-8").splitlines() if line.strip()]
+            if lines:
+                product = lines[0]
+            version_line = next((line for line in lines if line.lower().startswith("version ")), "")
+            feature_line = next((line for line in lines if line.lower().endswith("v1") or "library" in line.lower()), "")
+            build_line = next((line for line in lines if line.lower().startswith("build ")), "")
+            if version_line:
+                version = version_line
+                if feature_line and feature_line != version_line:
+                    version = f"{version_line} — {feature_line}"
+            if build_line:
+                build = build_line.removeprefix("Build ").strip()
+        except OSError:
+            pass
+    return {"product": product, "version": version, "build": build}
 
 def diagnostic_status() -> dict[str, Any]:
     cfg = load_config()
@@ -822,7 +849,15 @@ def apply_change(changes: dict[str, Any], save_undo: bool = True) -> dict[str, A
 
 @app.get("/")
 def control_panel():
-    return render_template("index.html")
+    identity = application_identity()
+    return render_template(
+        "index.html",
+        app_product=identity["product"],
+        app_version=identity["version"],
+        app_build=identity["build"],
+        copyright_year=2026,
+        copyright_owner="Jason Chrest",
+    )
 
 @app.get("/overlay")
 def overlay():
