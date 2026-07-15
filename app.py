@@ -186,8 +186,8 @@ def load_config() -> dict[str, Any]:
         else:
             merged[section] = values
     # Application identity always follows the running package, including after migration.
-    merged.setdefault("application", {})["version"] = "Version 1.5 Alpha — Personnel Engine v1"
-    merged["application"]["build"] = "V1.5A-PERSONNEL1-R2"
+    merged.setdefault("application", {})["version"] = "Version 1.6 Alpha — Graphics Library v1"
+    merged["application"]["build"] = "V1.6A-GRAPHICSLIB1"
     return merged
 
 def save_config(config: dict[str, Any]) -> None:
@@ -1705,8 +1705,8 @@ def update_config():
         if section in incoming and isinstance(incoming[section], dict):
             current[section].update(incoming[section])
     # Protect application identity fields.
-    current["application"]["version"] = "Version 1.5 Alpha — Personnel Engine v1"
-    current["application"]["build"] = "V1.5A-PERSONNEL1-R2"
+    current["application"]["version"] = "Version 1.6 Alpha — Graphics Library v1"
+    current["application"]["build"] = "V1.6A-GRAPHICSLIB1"
     save_config(current)
     return jsonify(current)
 

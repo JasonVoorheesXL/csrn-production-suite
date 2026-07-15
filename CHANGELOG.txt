@@ -175,3 +175,11 @@ Version 1.5 Alpha — Personnel Engine v1 Corrected R2
 - Added Coach's Corner and Interview graphic types.
 - Added sponsor preview in Graphics module.
 - Personnel Engine freeze candidate.
+
+
+Version 1.6 Alpha — Graphics Library v1
+- Replaced the long Graphics page with a categorized Graphics Library.
+- Added People, Teams, Game, and Information categories.
+- Added graphic search, availability states, expandable categories, and reusable asset panels.
+- Moved Lower Third, Player, and Personnel masters into the library without changing their APIs.
+- Added planned placeholders for future graphics.

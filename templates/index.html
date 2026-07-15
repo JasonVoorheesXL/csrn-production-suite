@@ -563,72 +563,114 @@
     
 
     <section id="graphicsModule" class="hidden">
-      <section class="panel">
-        <div class="section-heading-row">
+      <section class="panel graphics-library-shell">
+        <div class="section-heading-row graphics-library-header">
           <div>
-            <h1>Graphics Engine</h1>
-            <p>Reusable on-air assets. Lower Third Master is the first production template.</p>
+            <h1>Graphics Library</h1>
+            <p>Find, open, and operate reusable CSRN graphics from one organized workspace.</p>
           </div>
           <button onclick="window.open('/overlay','_blank')">Open Overlay Preview</button>
         </div>
-        <div class="graphics-workspace">
-          <div class="graphics-editor">
-            <h2>Lower Third Master</h2>
-            <div class="setup-grid">
-              <label>Eyebrow / Category<input id="ltEyebrow" maxlength="40" placeholder="COACH'S CORNER"></label>
-              <label>Headline<input id="ltHeadline" maxlength="80" placeholder="Guest or primary headline"></label>
-              <label>Secondary Line<input id="ltSecondary" maxlength="100" placeholder="Title, role, school, or context"></label>
-              <label>Footer / Sponsor<input id="ltFooter" maxlength="100" placeholder="Presented by..."></label>
-              <label>Logo Source<select id="ltLogoSource"><option value="csrn">CSRN</option><option value="home">Home Team</option><option value="visitor">Visitor Team</option><option value="none">None</option></select></label>
-              <label>Accent Color<select id="ltAccentSource" onchange="toggleLowerThirdCustomColor()"><option value="csrn">CSRN Red</option><option value="home">Home Team</option><option value="visitor">Visitor Team</option><option value="custom">Custom</option></select></label>
-              <label id="ltCustomAccentWrap" class="hidden">Custom Accent<input id="ltCustomAccent" type="color" value="#C9203B"></label>
-              <label>Display Duration<select id="ltDuration"><option value="0">Persistent</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label>
-            </div>
-            <div class="button-row graphics-actions">
-              <button class="success" onclick="showLowerThird()">Show / Update</button>
-              <button onclick="hideLowerThird()">Hide</button>
-              <button class="danger" onclick="clearLowerThird()">Clear</button>
-            </div>
-            <div id="lowerThirdStatus" class="status">Lower third is ready.</div>
-          </div>
-          <div class="graphics-preview-card">
-            <h2>Master Preview</h2>
-            <div id="lowerThirdPreview" class="lower-third-preview">
-              <div class="ltp-accent"></div><div class="ltp-logo"><img src="/static/csrn-logo.png" alt=""></div>
-              <div class="ltp-copy"><div id="ltpEyebrow" class="ltp-eyebrow">CSRN</div><div id="ltpHeadline" class="ltp-headline">LOWER THIRD MASTER</div><div id="ltpSecondary" class="ltp-secondary">Reusable broadcast identification graphic</div><div id="ltpFooter" class="ltp-footer"></div></div>
-            </div>
-            <p class="muted">The on-air version animates in from the left and uses the active broadcast's team branding when selected.</p>
+
+        <div class="graphics-library-toolbar">
+          <label class="graphics-search-label">Search Graphics
+            <input id="graphicsLibrarySearch" type="search" placeholder="Search lower third, player, coach, sponsor..." oninput="filterGraphicsLibrary()">
+          </label>
+          <div class="graphics-library-summary"><strong id="graphicsLibraryAvailableCount">3</strong> available · <strong>7</strong> planned</div>
+        </div>
+
+        <div class="graphics-category" data-category="people">
+          <button class="graphics-category-header" type="button" onclick="toggleGraphicsCategory(this)">
+            <span><strong>People</strong><small>Identification and interview graphics</small></span><b>−</b>
+          </button>
+          <div class="graphics-category-body">
+            <article class="graphics-library-item is-available" data-graphic-search="lower third identification guest coach sponsor">
+              <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Lower Third Master</h2><p>Names, interviews, guests, roles, and sponsor-supported identification.</p></div><button onclick="openGraphicsAsset('lowerThirdAsset')">Open</button></div>
+              <div id="lowerThirdAsset" class="graphics-asset-panel hidden">
+                <div class="graphics-workspace">
+                  <div class="graphics-editor">
+                    <div class="setup-grid">
+                      <label>Eyebrow / Category<input id="ltEyebrow" maxlength="40" placeholder="COACH'S CORNER"></label>
+                      <label>Headline<input id="ltHeadline" maxlength="80" placeholder="Guest or primary headline"></label>
+                      <label>Secondary Line<input id="ltSecondary" maxlength="100" placeholder="Title, role, school, or context"></label>
+                      <label>Footer / Sponsor<input id="ltFooter" maxlength="100" placeholder="Presented by..."></label>
+                      <label>Logo Source<select id="ltLogoSource"><option value="csrn">CSRN</option><option value="home">Home Team</option><option value="visitor">Visitor Team</option><option value="none">None</option></select></label>
+                      <label>Accent Color<select id="ltAccentSource" onchange="toggleLowerThirdCustomColor()"><option value="csrn">CSRN Red</option><option value="home">Home Team</option><option value="visitor">Visitor Team</option><option value="custom">Custom</option></select></label>
+                      <label id="ltCustomAccentWrap" class="hidden">Custom Accent<input id="ltCustomAccent" type="color" value="#C9203B"></label>
+                      <label>Display Duration<select id="ltDuration"><option value="0">Persistent</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label>
+                    </div>
+                    <div class="button-row graphics-actions"><button class="success" onclick="showLowerThird()">Show / Update</button><button onclick="hideLowerThird()">Hide</button><button class="danger" onclick="clearLowerThird()">Clear</button></div>
+                    <div id="lowerThirdStatus" class="status">Lower third is ready.</div>
+                  </div>
+                  <div class="graphics-preview-card"><h2>Master Preview</h2><div id="lowerThirdPreview" class="lower-third-preview"><div class="ltp-accent"></div><div class="ltp-logo"><img src="/static/csrn-logo.png" alt=""></div><div class="ltp-copy"><div id="ltpEyebrow" class="ltp-eyebrow">CSRN</div><div id="ltpHeadline" class="ltp-headline">LOWER THIRD MASTER</div><div id="ltpSecondary" class="ltp-secondary">Reusable broadcast identification graphic</div><div id="ltpFooter" class="ltp-footer"></div></div></div><p class="muted">The on-air version uses the active broadcast's branding when selected.</p></div>
+                </div>
+              </div>
+            </article>
+
+            <article class="graphics-library-item is-available" data-graphic-search="player identification profile touchdown player of the game lineup">
+              <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Player Identification Master</h2><p>Roster-driven player profiles, touchdown IDs, and player recognition.</p></div><button onclick="openGraphicsAsset('playerAsset')">Open</button></div>
+              <div id="playerAsset" class="graphics-asset-panel hidden">
+                <div class="graphics-workspace player-graphics-workspace">
+                  <div class="graphics-editor"><div class="setup-grid">
+                    <label>Roster<select id="pgRoster" onchange="loadPlayerGraphicPlayers()"></select></label>
+                    <label>Player<select id="pgPlayer" onchange="renderPlayerGraphicPreview()"></select></label>
+                    <label>Graphic Type<select id="pgType" onchange="renderPlayerGraphicPreview()"><option value="player_id">Player ID</option><option value="touchdown">Touchdown</option><option value="player_of_game">Player of the Game</option><option value="lineup">Starting Lineup ID</option></select></label>
+                    <label>Display Duration<select id="pgDuration"><option value="0">Persistent</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label>
+                    <label>Sponsor Lead-in<select id="pgSponsorLead"><option value="">None</option><option>Sponsored by:</option><option>Presented by:</option><option>Brought to you by:</option><option>In partnership with:</option></select></label>
+                    <label>Sponsor Name<input id="pgSponsorName" placeholder="Optional sponsor"></label>
+                    <label>Sponsor Logo Path / URL<input id="pgSponsorLogo" placeholder="Optional transparent logo"></label>
+                  </div><div class="button-row graphics-actions"><button class="success" onclick="showPlayerGraphic()">Show / Update</button><button onclick="hidePlayerGraphic()">Hide</button><button class="danger" onclick="clearPlayerGraphic()">Clear</button></div><div id="playerGraphicStatus" class="status">Player graphic is ready.</div></div>
+                  <div class="graphics-preview-card"><h2>Player Preview</h2><div id="playerGraphicPreview" class="player-graphic-preview"><div id="pgpSponsorBar" class="pgp-sponsor-bar hidden"><img id="pgpSponsorBarLogo" alt=""><div><span id="pgpSponsorBarLead"></span> <strong id="pgpSponsorBarName"></strong></div></div><div class="pgp-photo"><img id="pgpPhoto" src="/static/csrn-logo.png" alt=""></div><div class="pgp-copy"><img id="pgpWatermark" class="pgp-watermark" src="/static/csrn-logo.png" alt=""><div id="pgpEyebrow" class="pgp-eyebrow">PLAYER PROFILE</div><div id="pgpName" class="pgp-name">SELECT A PLAYER</div><div id="pgpPreferred" class="pgp-preferred"></div><div id="pgpDetails" class="pgp-details"></div></div><div class="pgp-team"><div id="pgpPosition" class="pgp-position"></div><div id="pgpNumber" class="pgp-number"></div></div></div></div>
+                </div>
+              </div>
+            </article>
+
+            <article class="graphics-library-item is-available" data-graphic-search="personnel coach interview official administrator broadcast talent on the call">
+              <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Personnel Identification Master</h2><p>Coaches, talent, administrators, officials, and interview guests.</p></div><button onclick="openGraphicsAsset('personnelAsset')">Open</button></div>
+              <div id="personnelAsset" class="graphics-asset-panel hidden">
+                <div class="graphics-workspace player-graphics-workspace">
+                  <div class="graphics-editor"><div class="setup-grid">
+                    <label>Person<select id="personnelGraphicPerson" onchange="renderPersonnelGraphicPreview()"></select></label>
+                    <label>Graphic Type<select id="personnelGraphicType" onchange="renderPersonnelGraphicPreview()"><option value="coach_id">Coach ID</option><option value="coachs_corner">Coach's Corner</option><option value="interview_guest">Interview</option><option value="broadcast_talent">Broadcast Talent</option><option value="official_id">Official ID</option><option value="administrator">Administrator</option></select></label>
+                    <label>Display Duration<select id="personnelGraphicDuration"><option value="0">Persistent</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label>
+                    <label>Sponsor Lead-in<select id="personnelSponsorLead" onchange="renderPersonnelGraphicPreview()"><option value="">None</option><option>Sponsored by:</option><option>Presented by:</option><option>Brought to you by:</option></select></label>
+                    <label>Sponsor Name<input id="personnelSponsorName" oninput="renderPersonnelGraphicPreview()"></label><label>Sponsor Logo Path / URL<input id="personnelSponsorLogo" oninput="renderPersonnelGraphicPreview()"></label>
+                  </div><div class="button-row graphics-actions"><button class="success" onclick="showPersonnelGraphic()">Show / Update</button><button onclick="hidePersonnelGraphic()">Hide</button><button class="danger" onclick="clearPersonnelGraphic()">Clear</button></div><div id="personnelGraphicStatus" class="status">Personnel graphic is ready.</div></div>
+                  <div class="graphics-preview-card"><h2>Personnel Preview</h2><div id="personnelPreviewSponsor" class="personnel-preview-sponsor hidden"><img id="personnelPreviewSponsorLogo"><div><small id="personnelPreviewSponsorLead"></small><strong id="personnelPreviewSponsorName"></strong></div></div><div id="personnelGraphicPreview" class="personnel-graphic-preview"><div class="personnel-preview-photo"><img id="personnelPreviewPhoto" src="/static/csrn-logo.png"></div><div class="personnel-preview-copy"><div id="personnelPreviewEyebrow" class="pgp-eyebrow">COACH</div><div id="personnelPreviewName" class="pgp-name">SELECT A PERSON</div><div id="personnelPreviewPreferred" class="pgp-preferred"></div><div id="personnelPreviewTitle" class="pgp-details"></div><div id="personnelPreviewOrganization" class="pgp-details"></div></div></div></div>
+                </div>
+              </div>
+            </article>
+
+            <article class="graphics-library-item is-planned" data-graphic-search="interview guest dedicated layout coaches corner"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Interview Layout</h2><p>Dedicated non-game and Coach's Corner interview presentation.</p></div></div></article>
           </div>
         </div>
 
-        <hr class="section-divider">
-        <div class="section-heading-row">
-          <div><h2>Player Identification Master</h2><p class="section-note">Select a roster player and send a reusable CSRN player graphic to air.</p></div>
-        </div>
-        <div class="graphics-workspace player-graphics-workspace">
-          <div class="graphics-editor">
-            <div class="setup-grid">
-              <label>Roster<select id="pgRoster" onchange="loadPlayerGraphicPlayers()"></select></label>
-              <label>Player<select id="pgPlayer" onchange="renderPlayerGraphicPreview()"></select></label>
-              <label>Graphic Type<select id="pgType" onchange="renderPlayerGraphicPreview()"><option value="player_id">Player ID</option><option value="touchdown">Touchdown</option><option value="player_of_game">Player of the Game</option><option value="lineup">Starting Lineup ID</option></select></label>
-              <label>Display Duration<select id="pgDuration"><option value="0">Persistent</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label>
-              <label>Sponsor Lead-in<select id="pgSponsorLead"><option value="">None</option><option>Sponsored by:</option><option>Presented by:</option><option>Brought to you by:</option><option>In partnership with:</option></select></label>
-              <label>Sponsor Name<input id="pgSponsorName" placeholder="Optional sponsor"></label>
-              <label>Sponsor Logo Path / URL<input id="pgSponsorLogo" placeholder="Optional transparent logo"></label>
-            </div>
-            <div class="button-row graphics-actions"><button class="success" onclick="showPlayerGraphic()">Show / Update</button><button onclick="hidePlayerGraphic()">Hide</button><button class="danger" onclick="clearPlayerGraphic()">Clear</button></div>
-            <div id="playerGraphicStatus" class="status">Player graphic is ready.</div>
-          </div>
-          <div class="graphics-preview-card">
-            <h2>Player Preview</h2>
-            <div id="playerGraphicPreview" class="player-graphic-preview">
-              <div id="pgpSponsorBar" class="pgp-sponsor-bar hidden"><img id="pgpSponsorBarLogo" alt=""><div><span id="pgpSponsorBarLead"></span> <strong id="pgpSponsorBarName"></strong></div></div>
-              <div class="pgp-photo"><img id="pgpPhoto" src="/static/csrn-logo.png" alt=""></div>
-              <div class="pgp-copy"><img id="pgpWatermark" class="pgp-watermark" src="/static/csrn-logo.png" alt=""><div id="pgpEyebrow" class="pgp-eyebrow">PLAYER PROFILE</div><div id="pgpName" class="pgp-name">SELECT A PLAYER</div><div id="pgpPreferred" class="pgp-preferred"></div><div id="pgpDetails" class="pgp-details"></div></div>
-              <div class="pgp-team"><div id="pgpPosition" class="pgp-position"></div><div id="pgpNumber" class="pgp-number"></div></div>
-            </div>
+        <div class="graphics-category collapsed" data-category="teams">
+          <button class="graphics-category-header" type="button" onclick="toggleGraphicsCategory(this)"><span><strong>Teams</strong><small>Lineups and team comparisons</small></span><b>+</b></button>
+          <div class="graphics-category-body">
+            <article class="graphics-library-item is-planned" data-graphic-search="starting lineup starters offense defense"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Starting Lineup</h2><p>Roster-driven sequential or full-screen lineup presentation.</p></div></div></article>
+            <article class="graphics-library-item is-planned" data-graphic-search="team comparison matchup"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Team Comparison</h2><p>Side-by-side team information and future statistics.</p></div></div></article>
           </div>
         </div>
+
+        <div class="graphics-category collapsed" data-category="game">
+          <button class="graphics-category-header" type="button" onclick="toggleGraphicsCategory(this)"><span><strong>Game</strong><small>Live game and event graphics</small></span><b>+</b></button>
+          <div class="graphics-category-body">
+            <article class="graphics-library-item is-planned" data-graphic-search="drive summary"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Drive Summary</h2><p>Drive result, plays, yards, time, and scoring outcome.</p></div></div></article>
+            <article class="graphics-library-item is-planned" data-graphic-search="scoring summary"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Scoring Summary</h2><p>Chronological scoring events from the Event Engine.</p></div></div></article>
+            <article class="graphics-library-item is-planned" data-graphic-search="stat leaders statistics"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Stat Leaders</h2><p>Future team and player statistics presentation.</p></div></div></article>
+          </div>
+        </div>
+
+        <div class="graphics-category collapsed" data-category="information">
+          <button class="graphics-category-header" type="button" onclick="toggleGraphicsCategory(this)"><span><strong>Information</strong><small>Sponsors and full-screen messages</small></span><b>+</b></button>
+          <div class="graphics-category-body">
+            <article class="graphics-library-item is-planned" data-graphic-search="sponsor spotlight commercial"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Sponsor Spotlight</h2><p>Reusable sponsor profile and recognition graphic.</p></div></div></article>
+            <article class="graphics-library-item is-planned" data-graphic-search="full screen information breaking news"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Full-Screen Information</h2><p>Announcements, schedules, weather, and general information.</p></div></div></article>
+          </div>
+        </div>
+
+        <div id="graphicsLibraryEmpty" class="empty-state hidden">No graphics match that search.</div>
       </section>
     </section>
 
@@ -756,20 +798,6 @@
         <div id="upgradeResult" class="status"></div>
       </section>
     </section>
-
-
-        <hr class="section-divider">
-        <div class="section-heading-row"><div><h2>Personnel Identification Master</h2><p class="section-note">Reusable coach, talent, administrator, official, and interview guest graphic.</p></div></div>
-        <div class="graphics-workspace player-graphics-workspace">
-          <div class="graphics-editor"><div class="setup-grid">
-            <label>Person<select id="personnelGraphicPerson" onchange="renderPersonnelGraphicPreview()"></select></label>
-            <label>Graphic Type<select id="personnelGraphicType" onchange="renderPersonnelGraphicPreview()"><option value="coach_id">Coach ID</option><option value="coachs_corner">Coach's Corner</option><option value="interview_guest">Interview</option><option value="broadcast_talent">Broadcast Talent</option><option value="official_id">Official ID</option><option value="administrator">Administrator</option></select></label>
-            <label>Display Duration<select id="personnelGraphicDuration"><option value="0">Persistent</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label>
-            <label>Sponsor Lead-in<select id="personnelSponsorLead" onchange="renderPersonnelGraphicPreview()"><option value="">None</option><option>Sponsored by:</option><option>Presented by:</option><option>Brought to you by:</option></select></label>
-            <label>Sponsor Name<input id="personnelSponsorName" oninput="renderPersonnelGraphicPreview()"></label><label>Sponsor Logo Path / URL<input id="personnelSponsorLogo" oninput="renderPersonnelGraphicPreview()"></label>
-          </div><div class="button-row graphics-actions"><button class="success" onclick="showPersonnelGraphic()">Show / Update</button><button onclick="hidePersonnelGraphic()">Hide</button><button class="danger" onclick="clearPersonnelGraphic()">Clear</button></div><div id="personnelGraphicStatus" class="status">Personnel graphic is ready.</div></div>
-          <div class="graphics-preview-card"><h2>Personnel Preview</h2><div id="personnelPreviewSponsor" class="personnel-preview-sponsor hidden"><img id="personnelPreviewSponsorLogo"><div><small id="personnelPreviewSponsorLead"></small><strong id="personnelPreviewSponsorName"></strong></div></div><div id="personnelGraphicPreview" class="personnel-graphic-preview"><div class="personnel-preview-photo"><img id="personnelPreviewPhoto" src="/static/csrn-logo.png"></div><div class="personnel-preview-copy"><div id="personnelPreviewEyebrow" class="pgp-eyebrow">COACH</div><div id="personnelPreviewName" class="pgp-name">SELECT A PERSON</div><div id="personnelPreviewPreferred" class="pgp-preferred"></div><div id="personnelPreviewTitle" class="pgp-details"></div><div id="personnelPreviewOrganization" class="pgp-details"></div></div></div></div>
-        </div>
     <section id="settingsModule" class="hidden">
       <section class="panel settings-panel">
         <h1>Configuration Manager</h1>
@@ -1454,6 +1482,9 @@ function personnelGraphicPayload(action){return {action,personnel_id:document.ge
 async function showPersonnelGraphic(){await api('/api/graphics/personnel',personnelGraphicPayload('show'));document.getElementById('personnelGraphicStatus').textContent='Personnel graphic is on air.'}
 async function hidePersonnelGraphic(){await api('/api/graphics/personnel',{action:'hide'});document.getElementById('personnelGraphicStatus').textContent='Personnel graphic hidden.'}
 async function clearPersonnelGraphic(){await api('/api/graphics/personnel',{action:'clear'});document.getElementById('personnelGraphicStatus').textContent='Personnel graphic cleared.'}
+function toggleGraphicsCategory(button){const category=button.closest('.graphics-category');if(!category)return;category.classList.toggle('collapsed');const b=button.querySelector('b');if(b)b.textContent=category.classList.contains('collapsed')?'+':'−'}
+function openGraphicsAsset(id){const panel=document.getElementById(id);if(!panel)return;const shouldOpen=panel.classList.contains('hidden');document.querySelectorAll('.graphics-asset-panel').forEach(x=>x.classList.add('hidden'));if(shouldOpen){panel.classList.remove('hidden');panel.scrollIntoView({behavior:'smooth',block:'nearest'})}}
+function filterGraphicsLibrary(){const q=(document.getElementById('graphicsLibrarySearch')?.value||'').trim().toLowerCase();let visible=0;document.querySelectorAll('.graphics-library-item').forEach(item=>{const match=!q||(item.dataset.graphicSearch||item.textContent).toLowerCase().includes(q);item.classList.toggle('hidden',!match);if(match)visible++});document.querySelectorAll('.graphics-category').forEach(cat=>{const matches=[...cat.querySelectorAll('.graphics-library-item')].some(x=>!x.classList.contains('hidden'));cat.classList.toggle('search-hidden',!matches);if(q&&matches){cat.classList.remove('collapsed');const b=cat.querySelector('.graphics-category-header b');if(b)b.textContent='−'}});document.getElementById('graphicsLibraryEmpty')?.classList.toggle('hidden',visible>0)}
 function showModule(module) {
   currentModule = module;
   document.getElementById('commandModule').classList.toggle('hidden', module !== 'command');
