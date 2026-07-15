@@ -1,4 +1,2 @@
-CSRN Production Suite
-Version 1.5 Alpha
-Personnel Engine v1 Corrected R2
-Build V1.5A-PERSONNEL1-R2
+Version 1.7 Alpha — Sponsor Engine v1 Corrected R4
+Build V1.7A-SPONSOR1-R4

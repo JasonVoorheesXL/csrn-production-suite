@@ -1,0 +1,10 @@
+CSRN Production Suite — Version 1.7 Alpha Sponsor Engine v1 Corrected R4
+
+Git-safe source update. This package does not include runtime Data, security.json,
+state.json, or migration markers.
+
+Changes:
+- Use Existing cancels the pending duplicate asset record and opens the existing asset.
+- Replace Existing updates the existing asset and cancels the pending duplicate record.
+- Duplicate sponsor names now prompt: Open Existing, Create Anyway, or Cancel.
+- Player event title backing is aligned directly to the title text in preview and OBS.

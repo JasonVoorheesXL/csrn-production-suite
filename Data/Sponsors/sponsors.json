@@ -1,0 +1,24 @@
+[
+  {
+    "id": "sponsor-1784133905-0dafe1",
+    "name": "Next Stage Media",
+    "category": "Local Business",
+    "status": "Active",
+    "contact_name": "",
+    "email": "",
+    "phone": "",
+    "website": "",
+    "contract_start": "2026-07-01",
+    "contract_end": "2026-07-13",
+    "package": "General Sponsor",
+    "lead_ins": [],
+    "asset_id": "asset-1784133882327",
+    "logo_url": "/asset-files/asset-1784133882327-1784133882.jpg",
+    "notes": "",
+    "active": true,
+    "created_at": 1784133905,
+    "updated_at": 1784146970,
+    "effective_status": "Expired",
+    "contract_expired": true
+  }
+]

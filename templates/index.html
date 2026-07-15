@@ -33,6 +33,8 @@
       <button id="navRosters" onclick="showModule('rosters')">Rosters</button>
       <button id="navBroadcasters" onclick="showModule('broadcasters')">Personnel</button>
       <button id="navGraphics" onclick="showModule('graphics')">Graphics</button>
+      <button id="navAssets" onclick="showModule('assets')">Assets</button>
+      <button id="navSponsors" onclick="showModule('sponsors')">Sponsors</button>
       <button id="navOBS" onclick="showModule('obs')">OBS Manager</button>
       <button id="navSettings" onclick="showModule('settings')">Settings</button>
       <button id="navDiagnostics" onclick="showModule('diagnostics')">Diagnostics</button>
@@ -563,73 +565,140 @@
     
 
     <section id="graphicsModule" class="hidden">
-      <section class="panel">
-        <div class="section-heading-row">
+      <section class="panel graphics-library-shell">
+        <div class="section-heading-row graphics-library-header">
           <div>
-            <h1>Graphics Engine</h1>
-            <p>Reusable on-air assets. Lower Third Master is the first production template.</p>
+            <h1>Graphics Library</h1>
+            <p>Find, open, and operate reusable CSRN graphics from one organized workspace.</p>
           </div>
           <button onclick="window.open('/overlay','_blank')">Open Overlay Preview</button>
         </div>
-        <div class="graphics-workspace">
-          <div class="graphics-editor">
-            <h2>Lower Third Master</h2>
-            <div class="setup-grid">
-              <label>Eyebrow / Category<input id="ltEyebrow" maxlength="40" placeholder="COACH'S CORNER"></label>
-              <label>Headline<input id="ltHeadline" maxlength="80" placeholder="Guest or primary headline"></label>
-              <label>Secondary Line<input id="ltSecondary" maxlength="100" placeholder="Title, role, school, or context"></label>
-              <label>Footer / Sponsor<input id="ltFooter" maxlength="100" placeholder="Presented by..."></label>
-              <label>Logo Source<select id="ltLogoSource"><option value="csrn">CSRN</option><option value="home">Home Team</option><option value="visitor">Visitor Team</option><option value="none">None</option></select></label>
-              <label>Accent Color<select id="ltAccentSource" onchange="toggleLowerThirdCustomColor()"><option value="csrn">CSRN Red</option><option value="home">Home Team</option><option value="visitor">Visitor Team</option><option value="custom">Custom</option></select></label>
-              <label id="ltCustomAccentWrap" class="hidden">Custom Accent<input id="ltCustomAccent" type="color" value="#C9203B"></label>
-              <label>Display Duration<select id="ltDuration"><option value="0">Persistent</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label>
-            </div>
-            <div class="button-row graphics-actions">
-              <button class="success" onclick="showLowerThird()">Show / Update</button>
-              <button onclick="hideLowerThird()">Hide</button>
-              <button class="danger" onclick="clearLowerThird()">Clear</button>
-            </div>
-            <div id="lowerThirdStatus" class="status">Lower third is ready.</div>
-          </div>
-          <div class="graphics-preview-card">
-            <h2>Master Preview</h2>
-            <div id="lowerThirdPreview" class="lower-third-preview">
-              <div class="ltp-accent"></div><div class="ltp-logo"><img src="/static/csrn-logo.png" alt=""></div>
-              <div class="ltp-copy"><div id="ltpEyebrow" class="ltp-eyebrow">CSRN</div><div id="ltpHeadline" class="ltp-headline">LOWER THIRD MASTER</div><div id="ltpSecondary" class="ltp-secondary">Reusable broadcast identification graphic</div><div id="ltpFooter" class="ltp-footer"></div></div>
-            </div>
-            <p class="muted">The on-air version animates in from the left and uses the active broadcast's team branding when selected.</p>
+
+        <div class="graphics-library-toolbar">
+          <label class="graphics-search-label">Search Graphics
+            <input id="graphicsLibrarySearch" type="search" placeholder="Search lower third, player, coach, sponsor..." oninput="filterGraphicsLibrary()">
+          </label>
+          <div class="graphics-library-summary"><strong id="graphicsLibraryAvailableCount">3</strong> available · <strong>7</strong> planned</div>
+        </div>
+
+        <div class="graphics-category" data-category="people">
+          <button class="graphics-category-header" type="button" onclick="toggleGraphicsCategory(this)">
+            <span><strong>People</strong><small>Identification and interview graphics</small></span><b>−</b>
+          </button>
+          <div class="graphics-category-body">
+            <article class="graphics-library-item is-available" data-graphic-search="lower third identification guest coach sponsor">
+              <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Lower Third Master</h2><p>Names, interviews, guests, roles, and sponsor-supported identification.</p></div><button onclick="openGraphicsAsset('lowerThirdAsset', this)">Open</button></div>
+              <div id="lowerThirdAsset" class="graphics-asset-panel hidden">
+                <div class="graphics-workspace">
+                  <div class="graphics-editor">
+                    <div class="setup-grid">
+                      <label>Eyebrow / Category<input id="ltEyebrow" maxlength="40" placeholder="COACH'S CORNER"></label>
+                      <label>Headline<input id="ltHeadline" maxlength="80" placeholder="Guest or primary headline"></label>
+                      <label>Secondary Line<input id="ltSecondary" maxlength="100" placeholder="Title, role, school, or context"></label>
+                      <label>Footer / Sponsor<input id="ltFooter" maxlength="100" placeholder="Presented by..."></label>
+                      <label>Logo Source<select id="ltLogoSource"><option value="csrn">CSRN</option><option value="home">Home Team</option><option value="visitor">Visitor Team</option><option value="none">None</option></select></label>
+                      <label>Accent Color<select id="ltAccentSource" onchange="toggleLowerThirdCustomColor()"><option value="csrn">CSRN Red</option><option value="home">Home Team</option><option value="visitor">Visitor Team</option><option value="custom">Custom</option></select></label>
+                      <label id="ltCustomAccentWrap" class="hidden">Custom Accent<input id="ltCustomAccent" type="color" value="#C9203B"></label>
+                      <label>Display Duration<select id="ltDuration"><option value="0">Persistent</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label>
+                    </div>
+                    <div class="button-row graphics-actions"><button class="success" onclick="showLowerThird()">Show / Update</button><button onclick="hideLowerThird()">Hide</button><button class="danger" onclick="clearLowerThird()">Clear</button></div>
+                    <div id="lowerThirdStatus" class="status">Lower third is ready.</div>
+                  </div>
+                  <div class="graphics-preview-card"><h2>Master Preview</h2><div id="lowerThirdPreview" class="lower-third-preview"><div class="ltp-accent"></div><div class="ltp-logo"><img src="/static/csrn-logo.png" alt=""></div><div class="ltp-copy"><div id="ltpEyebrow" class="ltp-eyebrow">CSRN</div><div id="ltpHeadline" class="ltp-headline">LOWER THIRD MASTER</div><div id="ltpSecondary" class="ltp-secondary">Reusable broadcast identification graphic</div><div id="ltpFooter" class="ltp-footer"></div></div></div><p class="muted">The on-air version uses the active broadcast's branding when selected.</p></div>
+                </div>
+              </div>
+            </article>
+
+            <article class="graphics-library-item is-available" data-graphic-search="player identification profile touchdown player of the game lineup">
+              <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Player Identification Master</h2><p>Roster-driven player profiles, touchdown IDs, and player recognition.</p></div><button onclick="openGraphicsAsset('playerAsset', this)">Open</button></div>
+              <div id="playerAsset" class="graphics-asset-panel hidden">
+                <div class="graphics-workspace player-graphics-workspace">
+                  <div class="graphics-editor"><div class="setup-grid">
+                    <label>Roster<select id="pgRoster" onchange="loadPlayerGraphicPlayers()"></select></label>
+                    <label>Player<select id="pgPlayer" onchange="renderPlayerGraphicPreview()"></select></label>
+                    <label>Graphic Type<select id="pgType" onchange="renderPlayerGraphicPreview()"><option value="player_id">Player ID</option><option value="touchdown">Touchdown</option><option value="player_of_game">Player of the Game</option><option value="lineup">Starting Lineup ID</option></select></label>
+                    <label>Display Duration<select id="pgDuration"><option value="0">Persistent</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label>
+                    <label>Sponsor Profile<select id="pgSponsorProfile" class="sponsor-profile-select" onchange="applySponsorProfile('pgSponsorProfile','pgSponsorName','pgSponsorLogo','pgSponsorLead')"><option value="">Manual / None</option></select></label><label>Sponsor Lead-in<select id="pgSponsorLead"><option value="">None</option><option>Sponsored by:</option><option>Presented by:</option><option>Brought to you by:</option><option>In partnership with:</option></select></label>
+                    <label>Sponsor Name<input id="pgSponsorName" placeholder="Optional sponsor"></label>
+                    <label>Sponsor Logo Path / URL<input id="pgSponsorLogo" placeholder="Optional transparent logo"></label>
+                  </div><div class="button-row graphics-actions"><button class="success" onclick="showPlayerGraphic()">Show / Update</button><button onclick="hidePlayerGraphic()">Hide</button><button class="danger" onclick="clearPlayerGraphic()">Clear</button></div><div id="playerGraphicStatus" class="status">Player graphic is ready.</div></div>
+                  <div class="graphics-preview-card"><h2>Player Preview</h2><div id="playerGraphicPreview" class="player-graphic-preview"><div id="pgpSponsorBar" class="pgp-sponsor-bar hidden"><img id="pgpSponsorBarLogo" alt=""><div><span id="pgpSponsorBarLead"></span> <strong id="pgpSponsorBarName"></strong></div></div><div class="pgp-photo"><img id="pgpPhoto" src="/static/csrn-logo.png" alt=""></div><div class="pgp-copy"><img id="pgpWatermark" class="pgp-watermark" src="/static/csrn-logo.png" alt=""><div id="pgpEyebrow" class="pgp-eyebrow">PLAYER PROFILE</div><div id="pgpName" class="pgp-name">SELECT A PLAYER</div><div id="pgpPreferred" class="pgp-preferred"></div><div id="pgpDetails" class="pgp-details"></div></div><div class="pgp-team"><div id="pgpPosition" class="pgp-position"></div><div id="pgpNumber" class="pgp-number"></div></div></div></div>
+                </div>
+              </div>
+            </article>
+
+            <article class="graphics-library-item is-available" data-graphic-search="personnel coach interview official administrator broadcast talent on the call">
+              <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Personnel Identification Master</h2><p>Coaches, talent, administrators, officials, and interview guests.</p></div><button onclick="openGraphicsAsset('personnelAsset', this)">Open</button></div>
+              <div id="personnelAsset" class="graphics-asset-panel hidden">
+                <div class="graphics-workspace player-graphics-workspace">
+                  <div class="graphics-editor"><div class="setup-grid">
+                    <label>Person<select id="personnelGraphicPerson" onchange="renderPersonnelGraphicPreview()"></select></label>
+                    <label>Graphic Type<select id="personnelGraphicType" onchange="renderPersonnelGraphicPreview()"><option value="coach_id">Coach ID</option><option value="coachs_corner">Coach's Corner</option><option value="interview_guest">Interview</option><option value="broadcast_talent">Broadcast Talent</option><option value="official_id">Official ID</option><option value="administrator">Administrator</option></select></label>
+                    <label>Display Duration<select id="personnelGraphicDuration"><option value="0">Persistent</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label>
+                    <label>Sponsor Profile<select id="personnelSponsorProfile" class="sponsor-profile-select" onchange="applySponsorProfile('personnelSponsorProfile','personnelSponsorName','personnelSponsorLogo','personnelSponsorLead')"><option value="">Manual / None</option></select></label><label>Sponsor Lead-in<select id="personnelSponsorLead" onchange="renderPersonnelGraphicPreview()"><option value="">None</option><option>Sponsored by:</option><option>Presented by:</option><option>Brought to you by:</option></select></label>
+                    <label>Sponsor Name<input id="personnelSponsorName" oninput="renderPersonnelGraphicPreview()"></label><label>Sponsor Logo Path / URL<input id="personnelSponsorLogo" oninput="renderPersonnelGraphicPreview()"></label>
+                  </div><div class="button-row graphics-actions"><button class="success" onclick="showPersonnelGraphic()">Show / Update</button><button onclick="hidePersonnelGraphic()">Hide</button><button class="danger" onclick="clearPersonnelGraphic()">Clear</button></div><div id="personnelGraphicStatus" class="status">Personnel graphic is ready.</div></div>
+                  <div class="graphics-preview-card"><h2>Personnel Preview</h2><div id="personnelPreviewSponsor" class="personnel-preview-sponsor hidden"><img id="personnelPreviewSponsorLogo"><div><small id="personnelPreviewSponsorLead"></small><strong id="personnelPreviewSponsorName"></strong></div></div><div id="personnelGraphicPreview" class="personnel-graphic-preview"><div class="personnel-preview-photo"><img id="personnelPreviewPhoto" src="/static/csrn-logo.png"></div><div class="personnel-preview-copy"><div id="personnelPreviewEyebrow" class="pgp-eyebrow">COACH</div><div id="personnelPreviewName" class="pgp-name">SELECT A PERSON</div><div id="personnelPreviewPreferred" class="pgp-preferred"></div><div id="personnelPreviewTitle" class="pgp-details"></div><div id="personnelPreviewOrganization" class="pgp-details"></div></div></div></div>
+                </div>
+              </div>
+            </article>
+
+            <article class="graphics-library-item is-planned" data-graphic-search="interview guest dedicated layout coaches corner"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Interview Layout</h2><p>Dedicated non-game and Coach's Corner interview presentation.</p></div></div></article>
           </div>
         </div>
 
-        <hr class="section-divider">
-        <div class="section-heading-row">
-          <div><h2>Player Identification Master</h2><p class="section-note">Select a roster player and send a reusable CSRN player graphic to air.</p></div>
-        </div>
-        <div class="graphics-workspace player-graphics-workspace">
-          <div class="graphics-editor">
-            <div class="setup-grid">
-              <label>Roster<select id="pgRoster" onchange="loadPlayerGraphicPlayers()"></select></label>
-              <label>Player<select id="pgPlayer" onchange="renderPlayerGraphicPreview()"></select></label>
-              <label>Graphic Type<select id="pgType" onchange="renderPlayerGraphicPreview()"><option value="player_id">Player ID</option><option value="touchdown">Touchdown</option><option value="player_of_game">Player of the Game</option><option value="lineup">Starting Lineup ID</option></select></label>
-              <label>Display Duration<select id="pgDuration"><option value="0">Persistent</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label>
-              <label>Sponsor Lead-in<select id="pgSponsorLead"><option value="">None</option><option>Sponsored by:</option><option>Presented by:</option><option>Brought to you by:</option><option>In partnership with:</option></select></label>
-              <label>Sponsor Name<input id="pgSponsorName" placeholder="Optional sponsor"></label>
-              <label>Sponsor Logo Path / URL<input id="pgSponsorLogo" placeholder="Optional transparent logo"></label>
-            </div>
-            <div class="button-row graphics-actions"><button class="success" onclick="showPlayerGraphic()">Show / Update</button><button onclick="hidePlayerGraphic()">Hide</button><button class="danger" onclick="clearPlayerGraphic()">Clear</button></div>
-            <div id="playerGraphicStatus" class="status">Player graphic is ready.</div>
-          </div>
-          <div class="graphics-preview-card">
-            <h2>Player Preview</h2>
-            <div id="playerGraphicPreview" class="player-graphic-preview">
-              <div id="pgpSponsorBar" class="pgp-sponsor-bar hidden"><img id="pgpSponsorBarLogo" alt=""><div><span id="pgpSponsorBarLead"></span> <strong id="pgpSponsorBarName"></strong></div></div>
-              <div class="pgp-photo"><img id="pgpPhoto" src="/static/csrn-logo.png" alt=""></div>
-              <div class="pgp-copy"><img id="pgpWatermark" class="pgp-watermark" src="/static/csrn-logo.png" alt=""><div id="pgpEyebrow" class="pgp-eyebrow">PLAYER PROFILE</div><div id="pgpName" class="pgp-name">SELECT A PLAYER</div><div id="pgpPreferred" class="pgp-preferred"></div><div id="pgpDetails" class="pgp-details"></div></div>
-              <div class="pgp-team"><div id="pgpPosition" class="pgp-position"></div><div id="pgpNumber" class="pgp-number"></div></div>
-            </div>
+        <div class="graphics-category collapsed" data-category="teams">
+          <button class="graphics-category-header" type="button" onclick="toggleGraphicsCategory(this)"><span><strong>Teams</strong><small>Lineups and team comparisons</small></span><b>+</b></button>
+          <div class="graphics-category-body">
+            <article class="graphics-library-item is-planned" data-graphic-search="starting lineup starters offense defense"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Starting Lineup</h2><p>Roster-driven sequential or full-screen lineup presentation.</p></div></div></article>
+            <article class="graphics-library-item is-planned" data-graphic-search="team comparison matchup"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Team Comparison</h2><p>Side-by-side team information and future statistics.</p></div></div></article>
           </div>
         </div>
+
+        <div class="graphics-category collapsed" data-category="game">
+          <button class="graphics-category-header" type="button" onclick="toggleGraphicsCategory(this)"><span><strong>Game</strong><small>Live game and event graphics</small></span><b>+</b></button>
+          <div class="graphics-category-body">
+            <article class="graphics-library-item is-planned" data-graphic-search="drive summary"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Drive Summary</h2><p>Drive result, plays, yards, time, and scoring outcome.</p></div></div></article>
+            <article class="graphics-library-item is-planned" data-graphic-search="scoring summary"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Scoring Summary</h2><p>Chronological scoring events from the Event Engine.</p></div></div></article>
+            <article class="graphics-library-item is-planned" data-graphic-search="stat leaders statistics"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Stat Leaders</h2><p>Future team and player statistics presentation.</p></div></div></article>
+          </div>
+        </div>
+
+        <div class="graphics-category collapsed" data-category="information">
+          <button class="graphics-category-header" type="button" onclick="toggleGraphicsCategory(this)"><span><strong>Information</strong><small>Sponsors and full-screen messages</small></span><b>+</b></button>
+          <div class="graphics-category-body">
+            <article class="graphics-library-item is-planned" data-graphic-search="sponsor spotlight commercial"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Sponsor Spotlight</h2><p>Reusable sponsor profile and recognition graphic.</p></div></div></article>
+            <article class="graphics-library-item is-planned" data-graphic-search="full screen information breaking news"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Full-Screen Information</h2><p>Announcements, schedules, weather, and general information.</p></div></div></article>
+          </div>
+        </div>
+
+        <div id="graphicsLibraryEmpty" class="empty-state hidden">No graphics match that search.</div>
       </section>
+    </section>
+
+    <section id="assetsModule" class="panel hidden">
+      <div class="section-heading"><div><h1>Asset Manager</h1><p>Central library for logos, headshots, sponsor artwork, backgrounds, audio, video, and documents.</p></div><button class="primary" onclick="newAsset()">Add Asset</button></div>
+      <div class="asset-summary"><div><strong id="assetTotal">0</strong><span>Total Assets</span></div><div><strong id="assetVerified">0</strong><span>Rights Verified</span></div><div><strong id="assetNeedsReview">0</strong><span>Needs Review</span></div></div>
+      <div class="asset-toolbar"><input id="assetSearch" type="search" placeholder="Search assets..." oninput="renderAssets()"><select id="assetCategoryFilter" onchange="renderAssets()"><option value="">All Categories</option><option>School Branding</option><option>Sponsor</option><option>Player</option><option>Personnel</option><option>Broadcast</option><option>Audio</option><option>Video</option><option>Document</option><option>Other</option></select></div>
+      <div class="asset-workspace"><div><div id="assetList" class="asset-list"></div><div id="assetEmpty" class="empty-state hidden">No assets match this view.</div></div>
+      <div id="assetEditor" class="asset-editor hidden"><h2 id="assetEditorTitle">Asset Record</h2><input id="assetId" type="hidden"><div class="setup-grid"><label>Asset Name<input id="assetName" placeholder="Example: Next Stage Media logo"></label><label>Category<select id="assetCategory"><option>School Branding</option><option>Sponsor</option><option>Player</option><option>Personnel</option><option>Broadcast</option><option>Audio</option><option>Video</option><option>Document</option><option>Other</option></select></label><label>Asset Type<select id="assetType"><option>Logo</option><option>Headshot</option><option>Background</option><option>Overlay</option><option>Audio</option><option>Video</option><option>Document</option><option>Other</option></select></label><label>Rights Status<select id="assetRightsStatus"><option>Unverified</option><option>Owned</option><option>Licensed</option><option>Permission Granted</option><option>Public Domain</option><option>Fair Use Review</option></select></label><label>Rights Owner<input id="assetRightsOwner" placeholder="Copyright or permission owner"></label><label>Source URL<input id="assetSourceUrl" placeholder="Original source or permission record"></label><label class="span-2">Local File / URL<div class="headshot-upload-row"><input id="assetFileUrl" placeholder="Local uploaded path or advanced URL"><label class="file-button compact">Upload File<input id="assetUpload" type="file" onchange="uploadAssetFile(this.files[0])"></label></div></label><label class="span-2">Notes<textarea id="assetNotes" rows="4" placeholder="Usage restrictions, license terms, crop notes, or approval details"></textarea></label><label class="check-row"><input id="assetActive" type="checkbox" checked> Active</label></div><div id="assetPreview" class="asset-preview"></div><div class="button-row"><button class="success" onclick="saveAsset()">Save Asset</button><button class="danger" id="deleteAssetButton" onclick="deleteAsset()">Delete</button><button onclick="closeAssetEditor()">Close</button></div><div id="assetMessage" class="status"></div></div></div>
+    </section>
+
+
+    <section id="sponsorsModule" class="panel hidden">
+      <div class="section-heading"><div><h1>Sponsor Engine</h1><p>Manage sponsor profiles, agreements, approved logos, lead-ins, and package assignments.</p></div><button class="primary" onclick="newSponsor()">Add Sponsor</button></div>
+      <div class="sponsor-summary"><div><strong id="sponsorTotal">0</strong><span>Total</span></div><div><strong id="sponsorActive">0</strong><span>Active</span></div><div><strong id="sponsorExpiring">0</strong><span>Expiring Soon</span></div></div>
+      <div class="asset-toolbar"><input id="sponsorSearch" type="search" placeholder="Search sponsors..." oninput="renderSponsors()"><select id="sponsorStatusFilter" onchange="renderSponsors()"><option value="">All Statuses</option><option>Prospect</option><option>Active</option><option>Expired</option><option>Inactive</option></select></div>
+      <div class="asset-workspace"><div><div id="sponsorList" class="asset-list"></div><div id="sponsorEmpty" class="empty-state hidden">No sponsors match this view.</div></div>
+      <div id="sponsorEditor" class="asset-editor hidden"><h2 id="sponsorEditorTitle">Sponsor Profile</h2><input id="sponsorId" type="hidden"><div class="setup-grid">
+        <label>Sponsor Name<input id="sponsorName"></label><label>Category<select id="sponsorCategory"><option>Local Business</option><option>Corporate</option><option>Nonprofit</option><option>Media Partner</option><option>Community Partner</option><option>Other</option></select></label>
+        <label>Status<select id="sponsorStatus"><option>Prospect</option><option>Active</option><option>Expired</option><option>Inactive</option></select></label><label>Package<select id="sponsorPackage"><option>General Sponsor</option><option>Presenting Sponsor</option><option>Pregame Sponsor</option><option>Halftime Sponsor</option><option>Player of the Game</option><option>Coach Interview</option><option>Scorebug Sponsor</option><option>Drive Summary</option><option>Custom</option></select></label>
+        <label>Contact Name<input id="sponsorContact"></label><label>Email<input id="sponsorEmail" type="email"></label><label>Phone<input id="sponsorPhone"></label><label>Website<input id="sponsorWebsite"></label>
+        <label>Contract Start<input id="sponsorStart" type="date"></label><label>Contract End<input id="sponsorEnd" type="date"></label>
+        <label class="span-2">Approved Lead-ins<input id="sponsorLeadIns" placeholder="Presented by:, Sponsored by:, Brought to you by:"></label>
+        <label class="span-2">Logo Asset<select id="sponsorAssetId" onchange="linkSponsorAsset(this.value)"><option value="">No linked asset</option></select></label><label class="span-2">Logo<div class="headshot-upload-row"><input id="sponsorLogoUrl" placeholder="Linked asset URL" readonly><label class="file-button compact">Upload & Register<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange="uploadSponsorLogo(this.files[0])"></label></div></label>
+        <label class="span-2">Notes<textarea id="sponsorNotes" rows="4"></textarea></label><label class="check-row"><input id="sponsorRecordActive" type="checkbox" checked> Available for graphics</label>
+      </div><div id="sponsorPreview" class="asset-preview"></div><div class="button-row"><button class="success" onclick="saveSponsor()">Save Sponsor</button><button class="danger" id="deleteSponsorButton" onclick="deleteSponsor()">Delete</button><button onclick="closeSponsorEditor()">Close</button></div><div id="sponsorMessage" class="status"></div></div></div>
     </section>
 
     <section id="obsModule" class="hidden">
@@ -756,20 +825,6 @@
         <div id="upgradeResult" class="status"></div>
       </section>
     </section>
-
-
-        <hr class="section-divider">
-        <div class="section-heading-row"><div><h2>Personnel Identification Master</h2><p class="section-note">Reusable coach, talent, administrator, official, and interview guest graphic.</p></div></div>
-        <div class="graphics-workspace player-graphics-workspace">
-          <div class="graphics-editor"><div class="setup-grid">
-            <label>Person<select id="personnelGraphicPerson" onchange="renderPersonnelGraphicPreview()"></select></label>
-            <label>Graphic Type<select id="personnelGraphicType" onchange="renderPersonnelGraphicPreview()"><option value="coach_id">Coach ID</option><option value="coachs_corner">Coach's Corner</option><option value="interview_guest">Interview</option><option value="broadcast_talent">Broadcast Talent</option><option value="official_id">Official ID</option><option value="administrator">Administrator</option></select></label>
-            <label>Display Duration<select id="personnelGraphicDuration"><option value="0">Persistent</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label>
-            <label>Sponsor Lead-in<select id="personnelSponsorLead" onchange="renderPersonnelGraphicPreview()"><option value="">None</option><option>Sponsored by:</option><option>Presented by:</option><option>Brought to you by:</option></select></label>
-            <label>Sponsor Name<input id="personnelSponsorName" oninput="renderPersonnelGraphicPreview()"></label><label>Sponsor Logo Path / URL<input id="personnelSponsorLogo" oninput="renderPersonnelGraphicPreview()"></label>
-          </div><div class="button-row graphics-actions"><button class="success" onclick="showPersonnelGraphic()">Show / Update</button><button onclick="hidePersonnelGraphic()">Hide</button><button class="danger" onclick="clearPersonnelGraphic()">Clear</button></div><div id="personnelGraphicStatus" class="status">Personnel graphic is ready.</div></div>
-          <div class="graphics-preview-card"><h2>Personnel Preview</h2><div id="personnelPreviewSponsor" class="personnel-preview-sponsor hidden"><img id="personnelPreviewSponsorLogo"><div><small id="personnelPreviewSponsorLead"></small><strong id="personnelPreviewSponsorName"></strong></div></div><div id="personnelGraphicPreview" class="personnel-graphic-preview"><div class="personnel-preview-photo"><img id="personnelPreviewPhoto" src="/static/csrn-logo.png"></div><div class="personnel-preview-copy"><div id="personnelPreviewEyebrow" class="pgp-eyebrow">COACH</div><div id="personnelPreviewName" class="pgp-name">SELECT A PERSON</div><div id="personnelPreviewPreferred" class="pgp-preferred"></div><div id="personnelPreviewTitle" class="pgp-details"></div><div id="personnelPreviewOrganization" class="pgp-details"></div></div></div></div>
-        </div>
     <section id="settingsModule" class="hidden">
       <section class="panel settings-panel">
         <h1>Configuration Manager</h1>
@@ -894,7 +949,7 @@
       <section class="panel settings-panel">
         <h1>Diagnostics</h1>
         <div id="diagnosticSummary" class="diagnostic-summary"></div>
-        <div id="diagnosticChecks"></div>
+        <div id="diagnosticChecks"></div><h2>Engine Status</h2><div id="diagnosticEngines" class="engine-status-grid"></div>
         <button class="primary" onclick="loadDiagnostics()">Refresh Diagnostics</button>
       </section>
     </section>
@@ -911,11 +966,36 @@
     </div>
 
     <footer class="suite-footer">
-      <div>Caledonia Sports Radio Network</div>
-      <div>Version 1.4 Alpha · Player Graphics Engine v2 Final Polish</div>
+      <div><strong>{{ app_product }}</strong></div>
+      <div>{{ app_version }} · Build {{ app_build }}</div>
+      <div>© {{ copyright_year }} {{ copyright_owner }}. All rights reserved.</div>
     </footer>
   </main>
 
+
+<dialog id="duplicateAssetDialog" class="duplicate-dialog">
+  <form method="dialog">
+    <h2>Duplicate Asset Detected</h2>
+    <p id="duplicateAssetMessage">This file already exists in Asset Manager.</p>
+    <div class="duplicate-actions">
+      <button value="reuse" class="success">Use Existing</button>
+      <button value="replace">Replace Existing</button>
+      <button value="keep">Keep Both</button>
+      <button value="cancel" class="danger">Cancel</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="duplicateSponsorDialog" class="duplicate-dialog">
+  <form method="dialog">
+    <h2>Duplicate Sponsor Name</h2>
+    <p id="duplicateSponsorMessage">A sponsor with this name already exists.</p>
+    <div class="duplicate-actions">
+      <button value="open" class="success">Open Existing</button>
+      <button value="create">Create Anyway</button>
+      <button value="cancel" class="danger">Cancel</button>
+    </div>
+  </form>
+</dialog>
 <script>
 let currentState = null;
 let authenticated = false;
@@ -1357,7 +1437,7 @@ function openRoster(id){currentRoster=rosters.find(r=>r.id===id);if(!currentRost
 async function saveRosterSetup(){const payload={school_id:document.getElementById('rosterSchool').value,sport:document.getElementById('rosterSport').value,season:document.getElementById('rosterSeason').value.trim(),level:document.getElementById('rosterLevel').value,division:document.getElementById('rosterDivision').value};try{const id=document.getElementById('rosterId').value;const result=id?await api(`/api/rosters/${encodeURIComponent(id)}`,payload,'PUT'):await api('/api/rosters',payload);document.getElementById('rosterMessage').textContent='Roster saved.';await loadRosters();openRoster(result.id)}catch(e){document.getElementById('rosterMessage').textContent=e.message==='ROSTER_ALREADY_EXISTS'?'That roster already exists.':e.message}}
 async function deleteRoster(){if(!currentRoster||!confirm('Delete this roster and all player records?'))return;await api(`/api/rosters/${encodeURIComponent(currentRoster.id)}`,null,'DELETE');currentRoster=null;document.getElementById('rosterWorkspace').classList.add('hidden');document.getElementById('rosterEmpty').classList.remove('hidden');await loadRosters()}
 function renderRosterPlayers(){const list=document.getElementById('rosterPlayerList');const players=(currentRoster&&currentRoster.players)||[];list.innerHTML=players.length?players.slice().sort((a,b)=>(Number(a.number)||999)-(Number(b.number)||999)).map(p=>`<button class="roster-player-row ${p.status==='inactive'?'inactive':''}" onclick="editRosterPlayer('${escapeHtml(p.id)}')"><span class="player-number">${escapeHtml(p.number||'—')}</span><span><strong>${escapeHtml(p.preferred_name||`${p.first_name} ${p.last_name}`.trim())}</strong><small>${escapeHtml(p.position||'Position not set')} · ${escapeHtml(p.grade||'Class not set')}</small></span><em>${p.status==='inactive'?'Inactive':'Active'}</em></button>`).join(''):'<div class="muted">No players added.</div>'}
-function newRosterPlayer(){if(!currentRoster){alert('Save the roster first.');return}currentPlayer=null;pronunciationEdited=false;document.getElementById('playerEditor').classList.remove('hidden');['playerId','playerNumber','playerFirst','playerLast','playerPreferred','playerWeight','playerHeadshot','playerPronunciation'].forEach(id=>document.getElementById(id).value='');document.getElementById('playerPosition').value='Athlete';document.getElementById('playerSecondaryPosition').value='';document.getElementById('playerGrade').value='';document.getElementById('playerHeightFeet').value='';document.getElementById('playerHeightInches').value='';document.getElementById('playerStatus').value='active';document.getElementById('playerCaptain').checked=false;document.getElementById('playerStarter').checked=false;document.getElementById('playerPronunciationVerified').checked=false;document.getElementById('playerMessage').textContent='';document.getElementById('playerEditor').scrollIntoView({behavior:'smooth',block:'nearest'})}
+function newRosterPlayer(){if(!currentRoster){alert('Save the roster first.');return}currentPlayer=null;pronunciationEdited=false;document.getElementById('playerEditor').classList.remove('hidden');['playerId','playerNumber','playerFirst','playerLast','playerPreferred','playerWeight','playerHeadshot','playerPronunciation'].forEach(id=>document.getElementById(id).value='');document.getElementById('playerPosition').value='Athlete';document.getElementById('playerSecondaryPosition').value='';document.getElementById('playerGrade').value='';document.getElementById('playerHeightFeet').value='';document.getElementById('playerHeightInches').value='';document.getElementById('playerStatus').value='active';document.getElementById('playerCaptain').checked=false;document.getElementById('playerStarter').checked=false;document.getElementById('playerPronunciationVerified').checked=false;document.getElementById('playerMessage').textContent='';document.getElementById('playerEditor').scrollIntoView({behavior:'smooth',block:'nearest'});setTimeout(()=>document.getElementById('playerNumber').focus(),350)}
 function editRosterPlayer(id){currentPlayer=currentRoster.players.find(p=>p.id===id);if(!currentPlayer)return;pronunciationEdited=!!currentPlayer.pronunciation;document.getElementById('playerEditor').classList.remove('hidden');document.getElementById('playerId').value=currentPlayer.id;document.getElementById('playerNumber').value=currentPlayer.number||'';document.getElementById('playerFirst').value=currentPlayer.first_name||'';document.getElementById('playerLast').value=currentPlayer.last_name||'';document.getElementById('playerPreferred').value=currentPlayer.preferred_name||'';document.getElementById('playerPosition').value=currentPlayer.position||'Athlete';document.getElementById('playerSecondaryPosition').value=currentPlayer.secondary_position||'';document.getElementById('playerGrade').value=currentPlayer.grade||'';const hm=String(currentPlayer.height||'').match(/(\d+)\s*ft\s*(\d+)/i);document.getElementById('playerHeightFeet').value=hm?hm[1]:'';document.getElementById('playerHeightInches').value=hm?hm[2]:'';document.getElementById('playerWeight').value=currentPlayer.weight||'';document.getElementById('playerStatus').value=currentPlayer.status||'active';document.getElementById('playerPronunciation').value=currentPlayer.pronunciation||'';document.getElementById('playerPronunciationVerified').checked=!!currentPlayer.pronunciation_verified;document.getElementById('playerHeadshot').value=currentPlayer.headshot||'';document.getElementById('playerCaptain').checked=!!currentPlayer.captain;document.getElementById('playerStarter').checked=!!currentPlayer.starter;document.getElementById('playerMessage').textContent='';document.getElementById('playerEditor').scrollIntoView({behavior:'smooth',block:'nearest'})}
 function closePlayerEditor(){currentPlayer=null;document.getElementById('playerEditor').classList.add('hidden')}
 async function uploadPlayerHeadshot(file){
@@ -1419,14 +1499,14 @@ async function loadPlayerGraphicsModule(){
   const current=currentState.player_graphic||{}; if(current.roster_id&&playerGraphicRosters.some(r=>r.id===current.roster_id))rs.value=current.roster_id;
   loadPlayerGraphicPlayers();
   ['pgType','pgSponsorLead','pgSponsorName','pgSponsorLogo'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.dataset.pgBound){el.addEventListener('input',renderPlayerGraphicPreview);el.addEventListener('change',renderPlayerGraphicPreview);el.dataset.pgBound='1'}});
-  document.getElementById('pgDuration').value=String(current.duration||0); document.getElementById('pgType').value=current.graphic_type||'player_id';document.getElementById('pgSponsorLead').value=current.sponsor_lead_in||'';document.getElementById('pgSponsorName').value=current.sponsor_name||'';document.getElementById('pgSponsorLogo').value=current.sponsor_logo||'';
+  document.getElementById('pgDuration').value=String(current.duration||0); document.getElementById('pgType').value=current.graphic_type||'player_id';document.getElementById('pgSponsorLead').value=current.sponsor_lead_in||'';document.getElementById('pgSponsorName').value=current.sponsor_name||'';document.getElementById('pgSponsorLogo').value=current.sponsor_logo||'';document.getElementById('pgSponsorProfile').value=current.sponsor_id||'';
   const st=document.getElementById('playerGraphicStatus');st.textContent=current.visible?'Player graphic is ON AIR.':'Player graphic is ready.';st.className=`status ${current.visible?'success':''}`;
 }
 function loadPlayerGraphicPlayers(){const rid=document.getElementById('pgRoster')?.value;const r=playerGraphicRosters.find(x=>x.id===rid);const ps=(r?.players||[]).filter(p=>p.status!=='inactive').slice().sort((a,b)=>(Number(a.number)||999)-(Number(b.number)||999));const sel=document.getElementById('pgPlayer');if(!sel)return;sel.innerHTML=ps.length?ps.map(p=>{const full=[p.first_name,p.last_name].filter(Boolean).join(' ');const label=p.preferred_name?`${p.number||'—'} · ${p.preferred_name} (${full})`:`${p.number||'—'} · ${full}`;return `<option value="${escapeHtml(p.id)}">${escapeHtml(label)}</option>`}).join(''):'<option value="">No active players</option>';const cur=currentState.player_graphic||{};if(cur.player_id&&ps.some(p=>p.id===cur.player_id))sel.value=cur.player_id;renderPlayerGraphicPreview()}
 function playerGraphicSelection(){const r=playerGraphicRosters.find(x=>x.id===document.getElementById('pgRoster')?.value);const p=(r?.players||[]).find(x=>x.id===document.getElementById('pgPlayer')?.value);return {r,p}}
 function playerGraphicEyebrow(){return ({player_id:'PLAYER PROFILE',touchdown:'TOUCHDOWN',player_of_game:'PLAYER OF THE GAME',lineup:'STARTING LINEUP'})[document.getElementById('pgType')?.value]||'PLAYER PROFILE'}
 function renderPlayerGraphicPreview(){const rid=document.getElementById('pgRoster')?.value;const pid=document.getElementById('pgPlayer')?.value;const r=playerGraphicRosters.find(x=>x.id===rid);const p=(r?.players||[]).find(x=>x.id===pid);const preview=document.getElementById('playerGraphicPreview');if(!preview)return;const school=(schools||[]).find(x=>x.id===r?.school_id)||{};const full=p?[p.first_name,p.last_name].filter(Boolean).join(' '):'SELECT A PLAYER';const preferred=p?.preferred_name&&p.preferred_name.toLowerCase()!==full.toLowerCase()?`“${p.preferred_name}”`:'';const logo=school.approved_round_logo_path||school.logo_path||school.logo||'/static/csrn-logo.png';const accent=school.primary_color||'#C9203B';preview.style.setProperty('--pgp-accent',accent);document.getElementById('pgpEyebrow').textContent=playerGraphicEyebrow();document.getElementById('pgpName').textContent=full;document.getElementById('pgpPreferred').textContent=preferred;document.getElementById('pgpNumber').textContent=p?.number||'';document.getElementById('pgpPosition').textContent=[p?.position,p?.secondary_position].filter(Boolean).join(' / ')||'ATHLETE';document.getElementById('pgpDetails').textContent=[p?.grade,p?.height,p?.weight?`${p.weight} LB`:'' ].filter(Boolean).join(' · ');const photo=document.getElementById('pgpPhoto');photo.src=p?.headshot||logo;photo.onerror=()=>{photo.onerror=null;photo.src=logo};const wm=document.getElementById('pgpWatermark');wm.src=logo;wm.onerror=()=>{wm.onerror=null;wm.src='/static/csrn-logo.png'};const sponsorName=document.getElementById('pgSponsorName')?.value.trim()||'';const sponsorLead=document.getElementById('pgSponsorLead')?.value||'Sponsored by:';const sponsorLogoPath=document.getElementById('pgSponsorLogo')?.value.trim()||'';const bar=document.getElementById('pgpSponsorBar');bar.classList.toggle('hidden',!sponsorName);document.getElementById('pgpSponsorBarLead').textContent=sponsorLead;document.getElementById('pgpSponsorBarName').textContent=sponsorName;const sl=document.getElementById('pgpSponsorBarLogo');sl.style.display=sponsorLogoPath?'block':'none';if(sponsorLogoPath)sl.src=sponsorLogoPath;sl.onerror=()=>{sl.style.display='none'}}
-function playerGraphicPayload(action){return {action,roster_id:document.getElementById('pgRoster').value,player_id:document.getElementById('pgPlayer').value,graphic_type:document.getElementById('pgType').value,eyebrow:playerGraphicEyebrow(),duration:Number(document.getElementById('pgDuration').value||0),sponsor_lead_in:document.getElementById('pgSponsorLead').value,sponsor_name:document.getElementById('pgSponsorName').value.trim(),sponsor_logo:document.getElementById('pgSponsorLogo').value.trim(),visible:action==='show'}}
+function playerGraphicPayload(action){return {action,roster_id:document.getElementById('pgRoster').value,player_id:document.getElementById('pgPlayer').value,graphic_type:document.getElementById('pgType').value,eyebrow:playerGraphicEyebrow(),duration:Number(document.getElementById('pgDuration').value||0),sponsor_id:document.getElementById('pgSponsorProfile').value,sponsor_lead_in:document.getElementById('pgSponsorLead').value,sponsor_name:document.getElementById('pgSponsorName').value.trim(),sponsor_logo:document.getElementById('pgSponsorLogo').value.trim(),visible:action==='show'}}
 async function showPlayerGraphic(){if(!document.getElementById('pgPlayer').value){const s=document.getElementById('playerGraphicStatus');s.textContent='Select a player first.';s.className='status error';return}currentState=await api('/api/graphics/player',playerGraphicPayload('show'));render();await loadPlayerGraphicsModule()}
 async function hidePlayerGraphic(){currentState=await api('/api/graphics/player',{action:'hide'});render();await loadPlayerGraphicsModule()}
 async function clearPlayerGraphic(){currentState=await api('/api/graphics/player',{action:'clear'});render();await loadPlayerGraphicsModule()}
@@ -1450,10 +1530,44 @@ function populatePersonnelSchools(){const el=document.getElementById('staffSchoo
 function personnelEyebrow(){const type=document.getElementById('personnelGraphicType')?.value;return ({coach_id:'COACH',coachs_corner:"COACH'S CORNER",broadcast_talent:'ON THE CALL',interview_guest:'INTERVIEW',official_id:'OFFICIAL',administrator:'ADMINISTRATION'})[type]||'PERSONNEL'}
 function renderPersonnelGraphicPreview(){const id=document.getElementById('personnelGraphicPerson')?.value;const p=(broadcasters||[]).find(x=>x.id===id)||{};document.getElementById('personnelPreviewEyebrow').textContent=personnelEyebrow();document.getElementById('personnelPreviewName').textContent=p.full_name||p.name||'SELECT A PERSON';document.getElementById('personnelPreviewPreferred').textContent=p.preferred_name&&p.preferred_name!==(p.full_name||p.name)?`“${p.preferred_name}”`:'';document.getElementById('personnelPreviewTitle').textContent=p.role||p.primary_role||'';document.getElementById('personnelPreviewOrganization').textContent=p.organization||'';const pp=document.getElementById('personnelPreviewPhoto');pp.onerror=()=>{pp.onerror=null;pp.src='/static/csrn-logo.png'};pp.src=p.headshot||'/static/csrn-logo.png';const sponsor=document.getElementById('personnelSponsorName')?.value.trim()||'';const box=document.getElementById('personnelPreviewSponsor');box.classList.toggle('hidden',!sponsor);document.getElementById('personnelPreviewSponsorLead').textContent=document.getElementById('personnelSponsorLead')?.value||'Sponsored by:';document.getElementById('personnelPreviewSponsorName').textContent=sponsor;const logo=document.getElementById('personnelPreviewSponsorLogo');const src=document.getElementById('personnelSponsorLogo')?.value.trim()||'';logo.style.display=src?'block':'none';if(src)logo.src=src}
 function loadPersonnelGraphics(){const el=document.getElementById('personnelGraphicPerson');if(!el)return;const active=(broadcasters||[]).filter(p=>p.status!=='inactive');el.innerHTML=active.length?active.map(p=>`<option value="${escapeHtml(p.id)}">${escapeHtml(p.full_name||p.name)} · ${escapeHtml(p.title||p.role||p.primary_role||'')}</option>`).join(''):'<option value="">No active personnel</option>';renderPersonnelGraphicPreview()}
-function personnelGraphicPayload(action){return {action,personnel_id:document.getElementById('personnelGraphicPerson').value,graphic_type:document.getElementById('personnelGraphicType').value,eyebrow:personnelEyebrow(),duration:Number(document.getElementById('personnelGraphicDuration').value||0),sponsor_lead_in:document.getElementById('personnelSponsorLead').value,sponsor_name:document.getElementById('personnelSponsorName').value.trim(),sponsor_logo:document.getElementById('personnelSponsorLogo').value.trim()}}
-async function showPersonnelGraphic(){await api('/api/graphics/personnel',personnelGraphicPayload('show'));document.getElementById('personnelGraphicStatus').textContent='Personnel graphic is on air.'}
+function personnelGraphicPayload(action){return {action,personnel_id:document.getElementById('personnelGraphicPerson').value,graphic_type:document.getElementById('personnelGraphicType').value,eyebrow:personnelEyebrow(),duration:Number(document.getElementById('personnelGraphicDuration').value||0),sponsor_id:document.getElementById('personnelSponsorProfile').value,sponsor_lead_in:document.getElementById('personnelSponsorLead').value,sponsor_name:document.getElementById('personnelSponsorName').value.trim(),sponsor_logo:document.getElementById('personnelSponsorLogo').value.trim()}}
+async function showPersonnelGraphic(){const r=await api('/api/graphics/personnel',personnelGraphicPayload('show'));document.getElementById('personnelGraphicStatus').textContent=r.sponsor_warning?'Personnel graphic is on air without the expired or inactive sponsor.':'Personnel graphic is on air.';if(r.sponsor_warning){document.getElementById('personnelSponsorProfile').value='';document.getElementById('personnelSponsorName').value='';document.getElementById('personnelSponsorLogo').value='';document.getElementById('personnelSponsorLead').value='';renderPersonnelGraphicPreview()}}
 async function hidePersonnelGraphic(){await api('/api/graphics/personnel',{action:'hide'});document.getElementById('personnelGraphicStatus').textContent='Personnel graphic hidden.'}
 async function clearPersonnelGraphic(){await api('/api/graphics/personnel',{action:'clear'});document.getElementById('personnelGraphicStatus').textContent='Personnel graphic cleared.'}
+function toggleGraphicsCategory(button){const category=button.closest('.graphics-category');if(!category)return;category.classList.toggle('collapsed');const b=button.querySelector('b');if(b)b.textContent=category.classList.contains('collapsed')?'+':'−'}
+function openGraphicsAsset(id,button){const panel=document.getElementById(id);if(!panel)return;const shouldOpen=panel.classList.contains('hidden');document.querySelectorAll('.graphics-asset-panel').forEach(x=>x.classList.add('hidden'));document.querySelectorAll('.graphics-item-heading > button').forEach(x=>x.textContent='Open');if(shouldOpen){panel.classList.remove('hidden');if(button)button.textContent='Close';panel.scrollIntoView({behavior:'smooth',block:'nearest'})}}
+function filterGraphicsLibrary(){const q=(document.getElementById('graphicsLibrarySearch')?.value||'').trim().toLowerCase();let visible=0;document.querySelectorAll('.graphics-library-item').forEach(item=>{const match=!q||(item.dataset.graphicSearch||item.textContent).toLowerCase().includes(q);item.classList.toggle('hidden',!match);if(match)visible++});document.querySelectorAll('.graphics-category').forEach(cat=>{const matches=[...cat.querySelectorAll('.graphics-library-item')].some(x=>!x.classList.contains('hidden'));cat.classList.toggle('search-hidden',!matches);if(q&&matches){cat.classList.remove('collapsed');const b=cat.querySelector('.graphics-category-header b');if(b)b.textContent='−'}});document.getElementById('graphicsLibraryEmpty')?.classList.toggle('hidden',visible>0)}
+let assetRecords=[];let selectedAsset=null;
+async function loadAssets(){const data=await api('/api/assets');assetRecords=data.assets||[];renderAssets()}
+function assetIsVerified(a){return ['Owned','Licensed','Permission Granted','Public Domain'].includes(a.rights_status)}
+function renderAssets(){const q=(document.getElementById('assetSearch')?.value||'').toLowerCase(),cat=document.getElementById('assetCategoryFilter')?.value||'';const rows=assetRecords.filter(a=>(!cat||a.category===cat)&&(!q||[a.name,a.category,a.asset_type,a.rights_owner,a.rights_status].join(' ').toLowerCase().includes(q))).sort((a,b)=>a.category.localeCompare(b.category)||a.name.localeCompare(b.name));document.getElementById('assetTotal').textContent=assetRecords.length;document.getElementById('assetVerified').textContent=assetRecords.filter(assetIsVerified).length;document.getElementById('assetNeedsReview').textContent=assetRecords.filter(a=>!assetIsVerified(a)).length;document.getElementById('assetEmpty').classList.toggle('hidden',rows.length>0);document.getElementById('assetList').innerHTML=rows.map(a=>`<button class="asset-card" onclick="editAsset('${escapeHtml(a.id)}')"><span class="asset-thumb">${a.file_url&&/\.(png|jpe?g|webp|gif|svg)(\?|$)/i.test(a.file_url)?`<img src="${escapeHtml(a.file_url)}" onerror="this.style.display='none'">`:'ASSET'}</span><span><strong>${escapeHtml(a.name)}</strong><small>${escapeHtml(a.category)} · ${escapeHtml(a.asset_type)}</small></span><span class="asset-rights ${assetIsVerified(a)?'verified':'review'}">${escapeHtml(a.rights_status)}</span></button>`).join('')}
+function newAsset(){selectedAsset=null;document.getElementById('assetEditor').classList.remove('hidden');document.getElementById('assetEditorTitle').textContent='New Asset';['assetId','assetName','assetRightsOwner','assetSourceUrl','assetFileUrl','assetNotes'].forEach(id=>document.getElementById(id).value='');document.getElementById('assetCategory').value='Sponsor';document.getElementById('assetType').value='Logo';document.getElementById('assetRightsStatus').value='Unverified';document.getElementById('assetActive').checked=true;document.getElementById('deleteAssetButton').classList.add('hidden');renderAssetPreview();document.getElementById('assetEditor').scrollIntoView({behavior:'smooth',block:'nearest'});setTimeout(()=>document.getElementById('assetName').focus(),350)}
+function editAsset(id){selectedAsset=assetRecords.find(a=>a.id===id);if(!selectedAsset)return;document.getElementById('assetEditor').classList.remove('hidden');document.getElementById('assetEditorTitle').textContent='Edit Asset';document.getElementById('assetId').value=selectedAsset.id;document.getElementById('assetName').value=selectedAsset.name||'';document.getElementById('assetCategory').value=selectedAsset.category||'Other';document.getElementById('assetType').value=selectedAsset.asset_type||'Other';document.getElementById('assetRightsStatus').value=selectedAsset.rights_status||'Unverified';document.getElementById('assetRightsOwner').value=selectedAsset.rights_owner||'';document.getElementById('assetSourceUrl').value=selectedAsset.source_url||'';document.getElementById('assetFileUrl').value=selectedAsset.file_url||'';document.getElementById('assetNotes').value=selectedAsset.notes||'';document.getElementById('assetActive').checked=selectedAsset.active!==false;document.getElementById('deleteAssetButton').classList.remove('hidden');renderAssetPreview();document.getElementById('assetEditor').scrollIntoView({behavior:'smooth',block:'nearest'})}
+function assetPayload(){return{name:document.getElementById('assetName').value.trim(),category:document.getElementById('assetCategory').value,asset_type:document.getElementById('assetType').value,rights_status:document.getElementById('assetRightsStatus').value,rights_owner:document.getElementById('assetRightsOwner').value.trim(),source_url:document.getElementById('assetSourceUrl').value.trim(),file_url:document.getElementById('assetFileUrl').value.trim(),notes:document.getElementById('assetNotes').value.trim(),active:document.getElementById('assetActive').checked}}
+async function saveAsset(){const payload=assetPayload();if(!payload.name){document.getElementById('assetMessage').textContent='Asset name is required.';document.getElementById('assetName').focus();return null}const id=document.getElementById('assetId').value;const data=await api(id?`/api/assets/${encodeURIComponent(id)}`:'/api/assets',payload,id?'PUT':'POST');selectedAsset=data.asset;document.getElementById('assetId').value=selectedAsset.id;document.getElementById('deleteAssetButton').classList.remove('hidden');document.getElementById('assetMessage').textContent='Asset saved.';await loadAssets();editAsset(selectedAsset.id);return selectedAsset}
+async function deleteAsset(){const id=document.getElementById('assetId').value;if(!id||!confirm('Delete this asset record?'))return;await api(`/api/assets/${encodeURIComponent(id)}`,null,'DELETE');closeAssetEditor();await loadAssets()}
+async function duplicateAssetChoice(asset){const dialog=document.getElementById('duplicateAssetDialog');const message=document.getElementById('duplicateAssetMessage');message.textContent=`${asset?.name||'This file'} already exists in Asset Manager. Choose how to continue.`;return new Promise(resolve=>{const handler=()=>{dialog.removeEventListener('close',handler);resolve(dialog.returnValue||'cancel')};dialog.addEventListener('close',handler);dialog.showModal()})}
+async function duplicateSponsorChoice(sponsor){const dialog=document.getElementById('duplicateSponsorDialog');const message=document.getElementById('duplicateSponsorMessage');message.textContent=`A sponsor named “${sponsor?.name||'this sponsor'}” already exists. Choose how to continue.`;return new Promise(resolve=>{const handler=()=>{dialog.removeEventListener('close',handler);resolve(dialog.returnValue||'cancel')};dialog.addEventListener('close',handler);dialog.showModal()})}
+async function uploadAssetFile(file){if(!file)return;const message=document.getElementById('assetMessage');try{let id=document.getElementById('assetId').value;if(!document.getElementById('assetName').value.trim()){const derived=String(file.name||'Asset').replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').trim();document.getElementById('assetName').value=derived||'Uploaded Asset'}if(!id){const saved=await saveAsset();id=saved?.id||document.getElementById('assetId').value;if(!id)return}async function send(action='prompt'){const form=new FormData();form.append('asset',file);form.append('duplicate_action',action);return fetch(`/api/assets/${encodeURIComponent(id)}/upload`,{method:'POST',body:form,credentials:'same-origin'})}message.textContent='Uploading file…';let response=await send();let data=await response.json().catch(()=>({}));if(response.status===409&&data.error==='DUPLICATE_ASSET'){const action=await duplicateAssetChoice(data.duplicate_asset);if(action==='cancel'){message.textContent='Upload cancelled.';return}response=await send(action);data=await response.json().catch(()=>({}))}if(response.status===401)throw new Error('Authentication required');if(!response.ok)throw new Error(data.error||'Upload failed');await loadAssets();const resolved=data.asset||data.duplicate_asset||assetRecords.find(a=>a.id===id);if(data.pending_asset_removed&&resolved?.id){message.textContent=data.duplicate_reused?'Existing asset selected; new asset creation cancelled.':'Existing asset replaced; new asset creation cancelled.';editAsset(resolved.id);return}document.getElementById('assetFileUrl').value=data.file_url||'';message.textContent=data.duplicate_kept?'Duplicate retained as a separate asset.':'File uploaded and stored locally.';selectedAsset=assetRecords.find(a=>a.id===id);renderAssetPreview()}catch(error){message.textContent=error.message||'Upload failed.'}}
+function renderAssetPreview(){const box=document.getElementById('assetPreview');if(!box)return;const url=document.getElementById('assetFileUrl')?.value.trim()||'';const type=document.getElementById('assetType')?.value||'';if(url&&['Logo','Headshot','Background','Overlay'].includes(type))box.innerHTML=`<img src="${escapeHtml(url)}" onerror="this.parentElement.textContent='Preview unavailable'">`;else box.textContent=url?'File stored: '+url:'No file attached.'}
+function closeAssetEditor(){document.getElementById('assetEditor').classList.add('hidden');selectedAsset=null}
+
+let sponsorRecords=[];let sponsorLogoAssets=[];let selectedSponsor=null;
+async function loadSponsors(){const data=await api('/api/sponsors');sponsorRecords=data.sponsors||[];sponsorLogoAssets=data.logo_assets||[];renderSponsors();populateSponsorGraphicSelectors();populateSponsorAssetSelector()}
+function renderSponsors(){const q=(document.getElementById('sponsorSearch')?.value||'').toLowerCase(),status=document.getElementById('sponsorStatusFilter')?.value||'';const rows=sponsorRecords.filter(s=>(!status||(s.effective_status||s.status)===status)&&(!q||[s.name,s.category,s.package,s.contact_name].join(' ').toLowerCase().includes(q))).sort((a,b)=>a.name.localeCompare(b.name));document.getElementById('sponsorTotal').textContent=sponsorRecords.length;document.getElementById('sponsorActive').textContent=sponsorRecords.filter(s=>(s.effective_status||s.status)==='Active'&&s.active!==false).length;const now=Date.now(),soon=now+45*86400000;document.getElementById('sponsorExpiring').textContent=sponsorRecords.filter(s=>s.contract_end&&new Date(s.contract_end).getTime()>=now&&new Date(s.contract_end).getTime()<=soon).length;document.getElementById('sponsorEmpty').classList.toggle('hidden',rows.length>0);document.getElementById('sponsorList').innerHTML=rows.map(s=>`<button class="asset-card" onclick="editSponsor('${escapeHtml(s.id)}')"><span class="asset-thumb">${s.logo_url?`<img src="${escapeHtml(s.logo_url)}" onerror="this.style.display='none'">`:'SP'}</span><span><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.package)} · ${escapeHtml(s.effective_status||s.status)}</small></span><span class="asset-rights ${(s.effective_status||s.status)==='Active'?'verified':'review'}">${escapeHtml(s.effective_status||s.status)}</span></button>`).join('')}
+function newSponsor(){selectedSponsor=null;const editor=document.getElementById('sponsorEditor');editor.classList.remove('hidden');document.getElementById('sponsorEditorTitle').textContent='New Sponsor';['sponsorId','sponsorName','sponsorContact','sponsorEmail','sponsorPhone','sponsorWebsite','sponsorStart','sponsorEnd','sponsorLeadIns','sponsorLogoUrl','sponsorNotes'].forEach(id=>document.getElementById(id).value='');document.getElementById('sponsorAssetId').value='';document.getElementById('sponsorCategory').value='Local Business';document.getElementById('sponsorStatus').value='Prospect';document.getElementById('sponsorPackage').value='General Sponsor';document.getElementById('sponsorRecordActive').checked=true;document.getElementById('deleteSponsorButton').classList.add('hidden');renderSponsorPreview();editor.classList.add('editor-attention');editor.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>{document.getElementById('sponsorName').focus();editor.classList.remove('editor-attention')},450)}
+function editSponsor(id){selectedSponsor=sponsorRecords.find(s=>s.id===id);if(!selectedSponsor)return;document.getElementById('sponsorEditor').classList.remove('hidden');document.getElementById('sponsorEditorTitle').textContent='Edit Sponsor';const map={sponsorId:'id',sponsorName:'name',sponsorContact:'contact_name',sponsorEmail:'email',sponsorPhone:'phone',sponsorWebsite:'website',sponsorStart:'contract_start',sponsorEnd:'contract_end',sponsorLogoUrl:'logo_url',sponsorNotes:'notes'};Object.entries(map).forEach(([id,key])=>document.getElementById(id).value=selectedSponsor[key]||'');document.getElementById('sponsorCategory').value=selectedSponsor.category||'Local Business';document.getElementById('sponsorStatus').value=selectedSponsor.status||'Prospect';document.getElementById('sponsorPackage').value=selectedSponsor.package||'General Sponsor';document.getElementById('sponsorLeadIns').value=(selectedSponsor.lead_ins||[]).join(', ');document.getElementById('sponsorRecordActive').checked=selectedSponsor.active!==false;populateSponsorAssetSelector();document.getElementById('sponsorAssetId').value=selectedSponsor.asset_id||'';document.getElementById('deleteSponsorButton').classList.remove('hidden');renderSponsorPreview()}
+function sponsorPayload(){return{name:document.getElementById('sponsorName').value.trim(),category:document.getElementById('sponsorCategory').value,status:document.getElementById('sponsorStatus').value,package:document.getElementById('sponsorPackage').value,contact_name:document.getElementById('sponsorContact').value.trim(),email:document.getElementById('sponsorEmail').value.trim(),phone:document.getElementById('sponsorPhone').value.trim(),website:document.getElementById('sponsorWebsite').value.trim(),contract_start:document.getElementById('sponsorStart').value,contract_end:document.getElementById('sponsorEnd').value,lead_ins:document.getElementById('sponsorLeadIns').value.split(',').map(x=>x.trim()).filter(Boolean),asset_id:document.getElementById('sponsorAssetId').value,logo_url:document.getElementById('sponsorLogoUrl').value.trim(),notes:document.getElementById('sponsorNotes').value.trim(),active:document.getElementById('sponsorRecordActive').checked}}
+async function saveSponsor(confirmDuplicate=false){const p=sponsorPayload();if(!p.name){document.getElementById('sponsorMessage').textContent='Sponsor name is required.';return null}if(confirmDuplicate)p.confirm_duplicate=true;const id=document.getElementById('sponsorId').value;try{const data=await api(id?`/api/sponsors/${encodeURIComponent(id)}`:'/api/sponsors',p,id?'PUT':'POST');selectedSponsor=data.sponsor;document.getElementById('sponsorId').value=selectedSponsor.id;document.getElementById('sponsorMessage').textContent='Sponsor saved.';await loadSponsors();editSponsor(selectedSponsor.id);return selectedSponsor}catch(error){if(error.data?.error==='DUPLICATE_SPONSOR'){const existing=error.data.duplicate_sponsor;const action=await duplicateSponsorChoice(existing);if(action==='open'){await loadSponsors();editSponsor(existing.id);document.getElementById('sponsorMessage').textContent='Opened the existing sponsor record.';return existing}if(action==='create')return saveSponsor(true);document.getElementById('sponsorMessage').textContent='Sponsor creation cancelled.';return null}throw error}}
+async function deleteSponsor(){const id=document.getElementById('sponsorId').value;if(!id||!confirm('Delete this sponsor?'))return;await api(`/api/sponsors/${encodeURIComponent(id)}`,null,'DELETE');closeSponsorEditor();await loadSponsors()}
+async function uploadSponsorLogo(file){if(!file)return;let id=document.getElementById('sponsorId').value;if(!id){const saved=await saveSponsor();id=saved?.id;if(!id)return}async function send(action='prompt'){const fd=new FormData();fd.append('logo',file);fd.append('duplicate_action',action);return fetch(`/api/sponsors/${encodeURIComponent(id)}/logo`,{method:'POST',body:fd})}let r=await send(),d=await r.json();if(r.status===409&&d.error==='DUPLICATE_ASSET'){const action=await duplicateAssetChoice(d.duplicate_asset);if(action==='cancel'){document.getElementById('sponsorMessage').textContent='Upload cancelled.';return}r=await send(action);d=await r.json()}if(!r.ok)throw new Error(d.error||'Upload failed');document.getElementById('sponsorLogoUrl').value=d.logo_url;document.getElementById('sponsorMessage').textContent=d.duplicate_reused?'Existing matching asset reused and linked.':'Logo uploaded, registered in Asset Manager, and linked.';await loadAssets();await loadSponsors();document.getElementById('sponsorAssetId').value=d.asset?.id||'';renderSponsorPreview()}
+function populateSponsorAssetSelector(){const sel=document.getElementById('sponsorAssetId');if(!sel)return;const current=sel.value;sel.innerHTML='<option value="">No linked asset</option>'+sponsorLogoAssets.map(a=>`<option value="${escapeHtml(a.id)}">${escapeHtml(a.name)}</option>`).join('');sel.value=current}
+async function linkSponsorAsset(assetId){const sponsorId=document.getElementById('sponsorId').value;if(!sponsorId){document.getElementById('sponsorMessage').textContent='Save the sponsor before linking an existing asset.';return}const data=await api(`/api/sponsors/${encodeURIComponent(sponsorId)}/asset`,{asset_id:assetId},'PUT');document.getElementById('sponsorLogoUrl').value=data.sponsor?.logo_url||'';document.getElementById('sponsorMessage').textContent=assetId?'Existing Asset Manager logo linked.':'Logo asset unlinked.';await loadSponsors();renderSponsorPreview()}
+function renderSponsorPreview(){const box=document.getElementById('sponsorPreview');if(!box)return;const url=document.getElementById('sponsorLogoUrl')?.value.trim()||'';box.innerHTML=url?`<img src="${escapeHtml(url)}" onerror="this.parentElement.textContent='Preview unavailable'">`:'No logo attached.'}
+function closeSponsorEditor(){document.getElementById('sponsorEditor').classList.add('hidden');selectedSponsor=null}
+function populateSponsorGraphicSelectors(){const active=sponsorRecords.filter(s=>(s.effective_status||s.status)==='Active'&&s.active!==false);document.querySelectorAll('.sponsor-profile-select').forEach(sel=>{const stateId=sel.id==='pgSponsorProfile'?(currentState.player_graphic?.sponsor_id||''):(currentState.personnel_graphic?.sponsor_id||'');const desired=sel.value||stateId;sel.innerHTML='<option value="">Manual / None</option>'+active.map(s=>`<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('');const valid=active.some(s=>s.id===desired);sel.value=valid?desired:'';if(desired&&!valid){if(sel.id==='pgSponsorProfile'){document.getElementById('pgSponsorName').value='';document.getElementById('pgSponsorLogo').value='';document.getElementById('pgSponsorLead').value='';renderPlayerGraphicPreview()}else{document.getElementById('personnelSponsorName').value='';document.getElementById('personnelSponsorLogo').value='';document.getElementById('personnelSponsorLead').value='';renderPersonnelGraphicPreview()}}});}
+function applySponsorProfile(selectId,nameId,logoId,leadId){const id=document.getElementById(selectId)?.value;const s=sponsorRecords.find(x=>x.id===id);if(!s){document.getElementById(nameId).value='';document.getElementById(logoId).value='';document.getElementById(leadId).value='';if(selectId==='pgSponsorProfile')renderPlayerGraphicPreview();else renderPersonnelGraphicPreview();return}document.getElementById(nameId).value=s.name||'';document.getElementById(logoId).value=s.logo_url||'';const lead=(s.lead_ins||[])[0]||'Presented by:';document.getElementById(leadId).value=lead;if(selectId==='pgSponsorProfile')renderPlayerGraphicPreview();else renderPersonnelGraphicPreview()}
+
 function showModule(module) {
   currentModule = module;
   document.getElementById('commandModule').classList.toggle('hidden', module !== 'command');
@@ -1462,6 +1576,8 @@ function showModule(module) {
   document.getElementById('rostersModule').classList.toggle('hidden', module !== 'rosters');
   document.getElementById('broadcastersModule').classList.toggle('hidden', module !== 'broadcasters');
   document.getElementById('graphicsModule').classList.toggle('hidden', module !== 'graphics');
+  document.getElementById('assetsModule').classList.toggle('hidden', module !== 'assets');
+  document.getElementById('sponsorsModule').classList.toggle('hidden', module !== 'sponsors');
   document.getElementById('obsModule').classList.toggle('hidden', module !== 'obs');
   document.getElementById('upgradeModule').classList.add('hidden');
   document.getElementById('settingsModule').classList.toggle('hidden', module !== 'settings');
@@ -1472,6 +1588,8 @@ function showModule(module) {
   document.getElementById('navRosters').classList.toggle('nav-active', module === 'rosters');
   document.getElementById('navBroadcasters').classList.toggle('nav-active', module === 'broadcasters');
   document.getElementById('navGraphics').classList.toggle('nav-active', module === 'graphics');
+  document.getElementById('navAssets').classList.toggle('nav-active', module === 'assets');
+  document.getElementById('navSponsors').classList.toggle('nav-active', module === 'sponsors');
   document.getElementById('navOBS').classList.toggle('nav-active', module === 'obs');
   document.getElementById('navSettings').classList.toggle('nav-active', module === 'settings');
   document.getElementById('navDiagnostics').classList.toggle('nav-active', module === 'diagnostics');
@@ -1480,7 +1598,9 @@ function showModule(module) {
   if (module === 'schools') loadSchools();
   if (module === 'rosters') loadRosters();
   if (module === 'broadcasters') {loadBroadcasters().then(()=>{populatePersonnelSchools();loadPersonnelGraphics()});}
-  if (module === 'graphics') loadGraphicsModule();
+  if (module === 'graphics') {loadGraphicsModule();loadSponsors();}
+  if (module === 'assets') loadAssets();
+  if (module === 'sponsors') loadSponsors();
   if (module === 'obs') loadOBSStatus();
   if (module === 'settings') loadConfig();
   if (module === 'diagnostics') loadDiagnostics();
@@ -1628,6 +1748,7 @@ async function loadDiagnostics() {
     `<span>${check[1] ? '✓' : '✕'} ${check[0]}</span><small>${obs.error || ''}</small></div>`
   ).join('');
   document.getElementById('diagnosticChecks').innerHTML = fileChecks + obsChecks;
+  document.getElementById('diagnosticEngines').innerHTML=(d.engines||[]).map(e=>`<div class="engine-status-card"><strong>${escapeHtml(e.name)}</strong><span>${escapeHtml(e.version)}</span><b>${escapeHtml(e.status)}</b></div>`).join('');
 }
 
 
@@ -1838,6 +1959,7 @@ async function editSchool(id) {
 function newSchool() {
   populateSchoolForm(emptySchool());
   document.getElementById('schoolMessage').textContent = 'Creating a new school record.';
+  const field=document.getElementById('schoolOfficialName'); field.scrollIntoView({behavior:'smooth',block:'center'}); setTimeout(()=>field.focus(),350);
 }
 
 function collectSchool() {
@@ -2164,6 +2286,7 @@ function newBroadcaster() {
   populateBroadcasterForm(emptyBroadcaster());
   personnelPronunciationEdited=false;
   document.getElementById('broadcasterMessage').textContent = 'Creating a new staff record.';
+  const field=document.getElementById('staffName'); field.scrollIntoView({behavior:'smooth',block:'center'}); setTimeout(()=>field.focus(),350);
 }
 
 function editBroadcaster(id) {

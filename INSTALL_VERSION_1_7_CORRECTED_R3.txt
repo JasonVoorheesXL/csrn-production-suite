@@ -1,0 +1,11 @@
+CSRN Production Suite — Version 1.7 Alpha Sponsor Engine v1 Corrected R3
+
+Git-safe source update. Copy these files into the repository root while preserving local Data, security.json, state.json, and .migration-complete.json.
+
+Key corrections:
+- Revalidates linked sponsors every time a Player or Personnel graphic is shown.
+- Clears expired/inactive linked sponsors instead of retaining stale optional sponsor text.
+- Unified duplicate-asset handling in Asset Manager and Sponsor Engine.
+- Replaced typed-letter duplicate prompt with a button-based dialog.
+- Lightened the event-title backing band for improved red-title contrast.
+- Added modest spacing between two-digit jersey numbers while retaining the condensed metallic treatment.
