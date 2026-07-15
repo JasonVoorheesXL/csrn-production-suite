@@ -1,4 +1,2 @@
-CSRN Production Suite
-Version 1.6.1 Alpha
-Graphics Library v1 Bug Fix 1
-Build V1.6A-GRAPHICSLIB1-BF1
+Version 1.6.2 Alpha — Asset Manager v1 Corrected R2
+Build V1.6A-ASSETMGR1-R2

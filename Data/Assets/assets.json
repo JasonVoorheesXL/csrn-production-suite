@@ -1,0 +1,28 @@
+[
+  {
+    "id": "asset-1784081691094",
+    "name": "Next Stage Media",
+    "category": "Sponsor",
+    "asset_type": "Logo",
+    "file_url": "/asset-files/asset-1784081691094-1784081691.jpg",
+    "source_url": "",
+    "rights_status": "Permission Granted",
+    "rights_owner": "Next Stage Media",
+    "notes": "",
+    "active": true,
+    "updated_at": 1784081708
+  },
+  {
+    "id": "asset-1784081787706",
+    "name": "Kyle Behrens Headshot",
+    "category": "Player",
+    "asset_type": "Headshot",
+    "file_url": "/asset-files/asset-1784081787706-1784081787.jpg",
+    "source_url": "",
+    "rights_status": "Permission Granted",
+    "rights_owner": "",
+    "notes": "",
+    "active": true,
+    "updated_at": 1784081798
+  }
+]

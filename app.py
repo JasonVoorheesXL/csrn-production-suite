@@ -35,6 +35,8 @@ BROADCASTERS_FILE = DATA_DIR / "Settings" / "broadcasters.json"
 ROSTERS_FILE = DATA_DIR / "Rosters" / "rosters.json"
 HEADSHOTS_DIR = DATA_DIR / "Rosters" / "Headshots"
 PERSONNEL_HEADSHOTS_DIR = DATA_DIR / "Personnel" / "Headshots"
+ASSETS_FILE = DATA_DIR / "Assets" / "assets.json"
+ASSET_UPLOAD_DIR = DATA_DIR / "Assets" / "Files"
 VENUES_FILE = DATA_DIR / "Venues" / "venues.json"
 LOGOS_FILE = DATA_DIR / "Logos" / "logos.json"
 IMPORTS_DIR = DATA_DIR / "Imports"
@@ -165,10 +167,11 @@ LOCKOUT_SECONDS = 60
 
 
 def ensure_data_architecture() -> None:
-    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Statistics", "Logs", "Backups", "Settings"):
+    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Statistics", "Logs", "Backups", "Settings"):
         (DATA_DIR / name).mkdir(parents=True, exist_ok=True)
     HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     PERSONNEL_HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+    ASSET_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 def load_config() -> dict[str, Any]:
     ensure_data_architecture()
@@ -187,8 +190,8 @@ def load_config() -> dict[str, Any]:
         else:
             merged[section] = values
     # Application identity always follows the running package, including after migration.
-    merged.setdefault("application", {})["version"] = "Version 1.6 Alpha — Graphics Library v1"
-    merged["application"]["build"] = "V1.6A-GRAPHICSLIB1"
+    merged.setdefault("application", {})["version"] = "Version 1.6.2 Alpha — Asset Manager v1"
+    merged["application"]["build"] = "V1.6A-ASSETMGR1"
     return merged
 
 def save_config(config: dict[str, Any]) -> None:
@@ -200,8 +203,8 @@ def save_config(config: dict[str, Any]) -> None:
 def application_identity() -> dict[str, str]:
     """Return package identity from VERSION.txt with safe config fallbacks."""
     cfg = load_config()
-    version = cfg.get("application", {}).get("version", "Version 1.6 Alpha — Graphics Library v1")
-    build = cfg.get("application", {}).get("build", "V1.6A-GRAPHICSLIB1")
+    version = cfg.get("application", {}).get("version", "Version 1.6.2 Alpha — Asset Manager v1")
+    build = cfg.get("application", {}).get("build", "V1.6A-ASSETMGR1")
     product = "CSRN Production Suite"
     if VERSION_FILE.exists():
         try:
@@ -357,6 +360,36 @@ def load_venues() -> list[dict[str, Any]]:
 
 def save_venues(items: list[dict[str, Any]]) -> None:
     save_json(VENUES_FILE, items)
+
+def load_assets() -> list[dict[str, Any]]:
+    ensure_data_architecture()
+    if not ASSETS_FILE.exists():
+        save_json(ASSETS_FILE, [])
+        return []
+    try:
+        data = json.loads(ASSETS_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    return data if isinstance(data, list) else data.get("assets", [])
+
+def save_assets(items: list[dict[str, Any]]) -> None:
+    save_json(ASSETS_FILE, items)
+
+def clean_asset_record(incoming: dict[str, Any], existing_id: str = "") -> dict[str, Any]:
+    category = str(incoming.get("category", "Other")).strip() or "Other"
+    return {
+        "id": existing_id or str(incoming.get("id", "")).strip() or f"asset-{int(time.time()*1000)}",
+        "name": str(incoming.get("name", "")).strip(),
+        "category": category,
+        "asset_type": str(incoming.get("asset_type", "Other")).strip() or "Other",
+        "file_url": str(incoming.get("file_url", "")).strip(),
+        "source_url": str(incoming.get("source_url", "")).strip(),
+        "rights_status": str(incoming.get("rights_status", "Unverified")).strip() or "Unverified",
+        "rights_owner": str(incoming.get("rights_owner", "")).strip(),
+        "notes": str(incoming.get("notes", "")).strip(),
+        "active": bool(incoming.get("active", True)),
+        "updated_at": int(time.time()),
+    }
 
 def load_logos() -> list[dict[str, Any]]:
     ensure_data_architecture()
@@ -858,6 +891,62 @@ def control_panel():
         copyright_year=2026,
         copyright_owner="Jason Chrest",
     )
+
+@app.get("/api/assets")
+@require_auth
+def api_assets_list():
+    return jsonify({"assets": load_assets()})
+
+@app.post("/api/assets")
+@require_auth
+def api_assets_create():
+    incoming = request.get_json(silent=True) or {}
+    record = clean_asset_record(incoming)
+    if not record["name"]:
+        return jsonify({"error": "Asset name is required."}), 400
+    items = load_assets(); items.append(record); save_assets(items)
+    return jsonify({"asset": record})
+
+@app.put("/api/assets/<asset_id>")
+@require_auth
+def api_assets_update(asset_id: str):
+    incoming = request.get_json(silent=True) or {}
+    items = load_assets(); found = False
+    for index, item in enumerate(items):
+        if str(item.get("id")) == asset_id:
+            items[index] = clean_asset_record({**item, **incoming}, asset_id); found = True; break
+    if not found: return jsonify({"error": "Asset not found."}), 404
+    save_assets(items); return jsonify({"asset": items[index]})
+
+@app.delete("/api/assets/<asset_id>")
+@require_auth
+def api_assets_delete(asset_id: str):
+    items = load_assets(); remaining = [x for x in items if str(x.get("id")) != asset_id]
+    if len(remaining) == len(items): return jsonify({"error": "Asset not found."}), 404
+    save_assets(remaining); return jsonify({"ok": True})
+
+@app.post("/api/assets/<asset_id>/upload")
+@require_auth
+def api_asset_upload(asset_id: str):
+    upload = request.files.get("asset")
+    if not upload or not upload.filename: return jsonify({"error": "Choose a file to upload."}), 400
+    suffix = Path(upload.filename).suffix.lower()
+    allowed = {".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif", ".mp4", ".webm", ".mp3", ".wav", ".pdf"}
+    if suffix not in allowed: return jsonify({"error": "Unsupported asset file type."}), 400
+    safe_id = re.sub(r"[^A-Za-z0-9_-]+", "-", asset_id).strip("-") or "asset"
+    filename = f"{safe_id}-{int(time.time())}{suffix}"
+    target = ASSET_UPLOAD_DIR / filename; upload.save(target)
+    url = f"/asset-files/{filename}"
+    items = load_assets(); found = False
+    for item in items:
+        if str(item.get("id")) == asset_id:
+            item["file_url"] = url; item["updated_at"] = int(time.time()); found = True; break
+    if not found: return jsonify({"error": "Save the asset record before uploading."}), 404
+    save_assets(items); return jsonify({"file_url": url})
+
+@app.get("/asset-files/<filename>")
+def asset_file(filename: str):
+    return send_from_directory(ASSET_UPLOAD_DIR, filename)
 
 @app.get("/overlay")
 def overlay():
@@ -1740,8 +1829,8 @@ def update_config():
         if section in incoming and isinstance(incoming[section], dict):
             current[section].update(incoming[section])
     # Protect application identity fields.
-    current["application"]["version"] = "Version 1.6 Alpha — Graphics Library v1"
-    current["application"]["build"] = "V1.6A-GRAPHICSLIB1"
+    current["application"]["version"] = "Version 1.6.2 Alpha — Asset Manager v1"
+    current["application"]["build"] = "V1.6A-ASSETMGR1"
     save_config(current)
     return jsonify(current)
 
