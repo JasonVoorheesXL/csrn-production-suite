@@ -39,3 +39,7 @@ __pycache__/
 
 # Windows
 desktop.ini
+
+# Local runtime databases
+Data/Assets/
+Data/Sponsors/

@@ -1,2 +1,2 @@
-Version 1.7 Alpha — Sponsor Engine v1 Corrected R4
-Build V1.7A-SPONSOR1-R4
+Version 1.6.2 Alpha — Asset Manager v1 Corrected R2
+Build V1.6A-ASSETMGR1-R2

@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 import io
 import json
-import hashlib
 import os
 import re
 import secrets
@@ -11,7 +10,6 @@ import socket
 import time
 from functools import wraps
 from pathlib import Path
-from datetime import date
 from threading import Lock
 from typing import Any, Callable
 from urllib.parse import urlparse, quote
@@ -39,8 +37,6 @@ HEADSHOTS_DIR = DATA_DIR / "Rosters" / "Headshots"
 PERSONNEL_HEADSHOTS_DIR = DATA_DIR / "Personnel" / "Headshots"
 ASSETS_FILE = DATA_DIR / "Assets" / "assets.json"
 ASSET_UPLOAD_DIR = DATA_DIR / "Assets" / "Files"
-SPONSORS_FILE = DATA_DIR / "Sponsors" / "sponsors.json"
-SPONSOR_UPLOAD_DIR = DATA_DIR / "Sponsors" / "Logos"
 VENUES_FILE = DATA_DIR / "Venues" / "venues.json"
 LOGOS_FILE = DATA_DIR / "Logos" / "logos.json"
 IMPORTS_DIR = DATA_DIR / "Imports"
@@ -55,8 +51,6 @@ app = Flask(__name__)
 lock = Lock()
 obs_status_lock = Lock()
 upgrade_lock = Lock()
-for _path in (SPONSORS_FILE.parent, SPONSOR_UPLOAD_DIR):
-    _path.mkdir(parents=True, exist_ok=True)
 last_upgrade_report: dict[str, Any] = {
     "status": "NOT_RUN",
     "source_build": "",
@@ -126,7 +120,7 @@ DEFAULT_STATE: dict[str, Any] = {
     "personnel_graphic": {
         "visible": False, "personnel_id": "", "graphic_type": "coach_id", "full_name": "", "display_name": "",
         "title": "", "role": "", "organization": "", "headshot": "", "logo": "", "accent": "#C9203B",
-        "eyebrow": "COACH", "sponsor_id": "", "sponsor_lead_in": "", "sponsor_name": "", "sponsor_logo": "", "duration": 0,
+        "eyebrow": "COACH", "sponsor_lead_in": "", "sponsor_name": "", "sponsor_logo": "", "duration": 0,
         "expires_at": 0, "updated_at": 0
     },
     "player_graphic": {
@@ -148,7 +142,6 @@ DEFAULT_STATE: dict[str, Any] = {
         "team_name": "",
         "team_color": "#C9203B",
         "eyebrow": "PLAYER PROFILE",
-        "sponsor_id": "",
         "sponsor_lead_in": "",
         "sponsor_name": "",
         "sponsor_logo": "",
@@ -174,12 +167,11 @@ LOCKOUT_SECONDS = 60
 
 
 def ensure_data_architecture() -> None:
-    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings"):
+    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Statistics", "Logs", "Backups", "Settings"):
         (DATA_DIR / name).mkdir(parents=True, exist_ok=True)
     HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     PERSONNEL_HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     ASSET_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    SPONSOR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 def load_config() -> dict[str, Any]:
     ensure_data_architecture()
@@ -198,8 +190,8 @@ def load_config() -> dict[str, Any]:
         else:
             merged[section] = values
     # Application identity always follows the running package, including after migration.
-    merged.setdefault("application", {})["version"] = "Version 1.7 Alpha — Sponsor Engine v1"
-    merged["application"]["build"] = "V1.7A-SPONSOR1"
+    merged.setdefault("application", {})["version"] = "Version 1.6.2 Alpha — Asset Manager v1"
+    merged["application"]["build"] = "V1.6A-ASSETMGR1"
     return merged
 
 def save_config(config: dict[str, Any]) -> None:
@@ -211,8 +203,8 @@ def save_config(config: dict[str, Any]) -> None:
 def application_identity() -> dict[str, str]:
     """Return package identity from VERSION.txt with safe config fallbacks."""
     cfg = load_config()
-    version = cfg.get("application", {}).get("version", "Version 1.7 Alpha — Sponsor Engine v1")
-    build = cfg.get("application", {}).get("build", "V1.7A-SPONSOR1")
+    version = cfg.get("application", {}).get("version", "Version 1.6.2 Alpha — Asset Manager v1")
+    build = cfg.get("application", {}).get("build", "V1.6A-ASSETMGR1")
     product = "CSRN Production Suite"
     if VERSION_FILE.exists():
         try:
@@ -258,15 +250,6 @@ def diagnostic_status() -> dict[str, Any]:
         "config_file": str(CONFIG_FILE),
         "data_folder": str(DATA_DIR),
         "obs": copy.deepcopy(last_obs_status),
-        "engines": [
-            {"name":"Roster Engine","version":"v1.1","status":"Healthy" if ROSTERS_FILE.exists() else "Needs Attention"},
-            {"name":"Personnel Engine","version":"v1.0","status":"Healthy" if BROADCASTERS_FILE.exists() else "Needs Attention"},
-            {"name":"Graphics Engine","version":"v2.1","status":"Healthy"},
-            {"name":"Graphics Library","version":"v1.0","status":"Healthy"},
-            {"name":"Asset Manager","version":"v1.0","status":"Healthy" if ASSETS_FILE.parent.exists() else "Needs Attention"},
-            {"name":"Sponsor Engine","version":"v1.0","status":"Healthy" if SPONSORS_FILE.parent.exists() else "Needs Attention"},
-        ],
-        "channels": {"primary_graphics":"Healthy","scorebug":"Healthy"},
     }
 
 
@@ -392,109 +375,6 @@ def load_assets() -> list[dict[str, Any]]:
 def save_assets(items: list[dict[str, Any]]) -> None:
     save_json(ASSETS_FILE, items)
 
-def asset_by_id(asset_id: str) -> dict[str, Any] | None:
-    return next((item for item in load_assets() if str(item.get("id")) == str(asset_id)), None)
-
-def asset_file_hash(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-def sponsor_logo_assets() -> list[dict[str, Any]]:
-    return [item for item in load_assets() if item.get("active", True) and item.get("category") == "Sponsor" and item.get("asset_type") == "Logo"]
-
-def sponsor_contract_state(record: dict[str, Any]) -> str:
-    """Return the effective sponsor status without destroying the operator's stored intent."""
-    end = str(record.get("contract_end", "")).strip()
-    if end:
-        try:
-            if date.fromisoformat(end[:10]) < date.today():
-                return "Expired"
-        except ValueError:
-            pass
-    return str(record.get("status", "Prospect"))
-
-def load_sponsors() -> list[dict[str, Any]]:
-    data = load_json(SPONSORS_FILE, [])
-    items = data if isinstance(data, list) else data.get("sponsors", [])
-    for item in items:
-        item["effective_status"] = sponsor_contract_state(item)
-        item["contract_expired"] = item["effective_status"] == "Expired"
-    return items
-
-def save_sponsors(items: list[dict[str, Any]]) -> None:
-    save_json(SPONSORS_FILE, items)
-
-def clean_sponsor_record(data: dict[str, Any], sponsor_id: str | None = None) -> dict[str, Any]:
-    data = {k: v for k, v in data.items() if k not in {"effective_status", "contract_expired"}}
-    now = int(time.time())
-    lead_ins = data.get("lead_ins", [])
-    if isinstance(lead_ins, str):
-        lead_ins = [x.strip() for x in lead_ins.split(",") if x.strip()]
-    return {
-        "id": sponsor_id or str(data.get("id") or f"sponsor-{now}-{secrets.token_hex(3)}"),
-        "name": str(data.get("name", "")).strip()[:160],
-        "category": str(data.get("category", "Local Business"))[:80],
-        "status": str(data.get("status", "Prospect"))[:40],
-        "contact_name": str(data.get("contact_name", "")).strip()[:160],
-        "email": str(data.get("email", "")).strip()[:200],
-        "phone": str(data.get("phone", "")).strip()[:80],
-        "website": str(data.get("website", "")).strip()[:300],
-        "contract_start": str(data.get("contract_start", ""))[:20],
-        "contract_end": str(data.get("contract_end", ""))[:20],
-        "package": str(data.get("package", "General Sponsor"))[:120],
-        "lead_ins": lead_ins[:12],
-        "asset_id": str(data.get("asset_id", ""))[:120],
-        "logo_url": str(data.get("logo_url", ""))[:500],
-        "notes": str(data.get("notes", ""))[:3000],
-        "active": bool(data.get("active", True)),
-        "created_at": int(data.get("created_at", now) or now),
-        "updated_at": now,
-    }
-
-
-def active_sponsor_by_id(sponsor_id: str) -> dict[str, Any] | None:
-    """Return a sponsor only when it is active and its contract is currently valid."""
-    sponsor_id = str(sponsor_id or "").strip()
-    if not sponsor_id:
-        return None
-    sponsor = next((item for item in load_sponsors() if str(item.get("id")) == sponsor_id), None)
-    if not sponsor:
-        return None
-    if sponsor.get("active", True) is False or sponsor_contract_state(sponsor) != "Active":
-        return None
-    asset = asset_by_id(str(sponsor.get("asset_id", "")))
-    if asset and asset.get("active", True) and asset.get("file_url"):
-        sponsor = dict(sponsor)
-        sponsor["logo_url"] = asset.get("file_url", "")
-    return sponsor
-
-def apply_sponsor_to_graphic(graphic: dict[str, Any], incoming: dict[str, Any]) -> str:
-    """Resolve a linked sponsor at render time and clear stale expired sponsor data."""
-    sponsor_id = str(incoming.get("sponsor_id", graphic.get("sponsor_id", "")) or "").strip()
-    graphic["sponsor_id"] = sponsor_id
-    if sponsor_id:
-        sponsor = active_sponsor_by_id(sponsor_id)
-        if not sponsor:
-            graphic["sponsor_id"] = ""
-            graphic["sponsor_name"] = ""
-            graphic["sponsor_logo"] = ""
-            graphic["sponsor_lead_in"] = ""
-            return "SPONSOR_EXPIRED_OR_INACTIVE"
-        graphic["sponsor_name"] = str(sponsor.get("name", ""))[:240]
-        graphic["sponsor_logo"] = str(sponsor.get("logo_url", ""))[:500]
-        lead_ins = sponsor.get("lead_ins", [])
-        graphic["sponsor_lead_in"] = str((lead_ins[0] if lead_ins else incoming.get("sponsor_lead_in") or "Presented by:"))[:120]
-        return ""
-    # Manual sponsorship remains available, but cannot silently retain a previously linked sponsor.
-    graphic["sponsor_name"] = str(incoming.get("sponsor_name", graphic.get("sponsor_name", "")) or "")[:240]
-    graphic["sponsor_logo"] = str(incoming.get("sponsor_logo", graphic.get("sponsor_logo", "")) or "")[:500]
-    graphic["sponsor_lead_in"] = str(incoming.get("sponsor_lead_in", graphic.get("sponsor_lead_in", "")) or "")[:120]
-    return ""
-
-
 def clean_asset_record(incoming: dict[str, Any], existing_id: str = "") -> dict[str, Any]:
     category = str(incoming.get("category", "Other")).strip() or "Other"
     return {
@@ -508,9 +388,6 @@ def clean_asset_record(incoming: dict[str, Any], existing_id: str = "") -> dict[
         "rights_owner": str(incoming.get("rights_owner", "")).strip(),
         "notes": str(incoming.get("notes", "")).strip(),
         "active": bool(incoming.get("active", True)),
-        "sha256": str(incoming.get("sha256", "")).strip(),
-        "original_filename": str(incoming.get("original_filename", "")).strip(),
-        "created_at": int(incoming.get("created_at", int(time.time())) or int(time.time())),
         "updated_at": int(time.time()),
     }
 
@@ -1015,137 +892,6 @@ def control_panel():
         copyright_owner="Jason Chrest",
     )
 
-@app.get("/api/sponsors")
-@require_auth
-def api_sponsors_list():
-    assets = {str(item.get("id")): item for item in load_assets()}
-    sponsors = load_sponsors()
-    for sponsor in sponsors:
-        linked = assets.get(str(sponsor.get("asset_id", "")))
-        if linked and linked.get("file_url"):
-            sponsor["logo_url"] = linked.get("file_url", "")
-            sponsor["asset_name"] = linked.get("name", "")
-    return jsonify({"sponsors": sponsors, "logo_assets": sponsor_logo_assets()})
-
-@app.post("/api/sponsors")
-@require_auth
-def api_sponsors_create():
-    incoming = request.get_json(silent=True) or {}
-    record = clean_sponsor_record(incoming)
-    if not record["name"]:
-        return jsonify({"error": "Sponsor name is required."}), 400
-    items = load_sponsors()
-    duplicate = next((x for x in items if str(x.get("name", "")).strip().casefold() == record["name"].casefold()), None)
-    if duplicate and not bool(incoming.get("confirm_duplicate", False)):
-        return jsonify({"error": "DUPLICATE_SPONSOR", "duplicate_sponsor": duplicate}), 409
-    items.append(record); save_sponsors(items)
-    return jsonify({"sponsor": record})
-
-@app.put("/api/sponsors/<sponsor_id>")
-@require_auth
-def api_sponsors_update(sponsor_id: str):
-    incoming = request.get_json(silent=True) or {}
-    items = load_sponsors()
-    candidate_name = str(incoming.get("name", "")).strip()
-    duplicate = next((x for x in items if str(x.get("id")) != sponsor_id and candidate_name and str(x.get("name", "")).strip().casefold() == candidate_name.casefold()), None)
-    if duplicate and not bool(incoming.get("confirm_duplicate", False)):
-        return jsonify({"error": "DUPLICATE_SPONSOR", "duplicate_sponsor": duplicate}), 409
-    for index, item in enumerate(items):
-        if str(item.get("id")) == sponsor_id:
-            items[index] = clean_sponsor_record({**item, **incoming}, sponsor_id)
-            save_sponsors(items)
-            return jsonify({"sponsor": items[index]})
-    return jsonify({"error": "Sponsor not found."}), 404
-
-@app.delete("/api/sponsors/<sponsor_id>")
-@require_auth
-def api_sponsors_delete(sponsor_id: str):
-    items = load_sponsors(); remaining = [x for x in items if str(x.get("id")) != sponsor_id]
-    if len(remaining) == len(items):
-        return jsonify({"error": "Sponsor not found."}), 404
-    save_sponsors(remaining); return jsonify({"ok": True})
-
-@app.post("/api/sponsors/<sponsor_id>/logo")
-@require_auth
-def api_sponsor_logo(sponsor_id: str):
-    upload = request.files.get("logo")
-    if not upload or not upload.filename:
-        return jsonify({"error": "Choose a logo file."}), 400
-    suffix = Path(upload.filename).suffix.lower()
-    if suffix not in {".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif"}:
-        return jsonify({"error": "Unsupported logo type."}), 400
-    duplicate_action = str(request.form.get("duplicate_action", "prompt")).lower()
-    sponsors = load_sponsors()
-    sponsor = next((item for item in sponsors if str(item.get("id")) == sponsor_id), None)
-    if not sponsor:
-        return jsonify({"error": "Save the sponsor first."}), 404
-    ASSET_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    temp = ASSET_UPLOAD_DIR / f".upload-{secrets.token_hex(8)}{suffix}"
-    upload.save(temp)
-    sha256 = asset_file_hash(temp)
-    assets = load_assets()
-    existing = next((item for item in assets if item.get("sha256") == sha256 and item.get("active", True)), None)
-    if existing and duplicate_action == "prompt":
-        temp.unlink(missing_ok=True)
-        return jsonify({"error": "DUPLICATE_ASSET", "duplicate_asset": existing}), 409
-    if existing and duplicate_action == "reuse":
-        temp.unlink(missing_ok=True)
-        asset = existing
-    elif existing and duplicate_action == "replace":
-        current_url = str(existing.get("file_url", ""))
-        current_name = current_url.rsplit('/', 1)[-1] if current_url.startswith('/asset-files/') else ''
-        if current_name:
-            target = ASSET_UPLOAD_DIR / current_name
-        else:
-            target = ASSET_UPLOAD_DIR / f"{existing['id']}{suffix}"
-        temp.replace(target)
-        existing.update({
-            "file_url": f"/asset-files/{target.name}", "sha256": sha256,
-            "original_filename": upload.filename, "updated_at": int(time.time())
-        })
-        save_assets(assets)
-        asset = existing
-    else:
-        asset_id = f"asset-{int(time.time()*1000)}-{secrets.token_hex(2)}"
-        filename = f"{asset_id}{suffix}"
-        target = ASSET_UPLOAD_DIR / filename
-        temp.replace(target)
-        asset = clean_asset_record({
-            "id": asset_id, "name": f"{sponsor.get('name','Sponsor')} Logo",
-            "category": "Sponsor", "asset_type": "Logo",
-            "file_url": f"/asset-files/{filename}", "rights_status": "Unverified",
-            "rights_owner": sponsor.get("name", ""),
-            "notes": "Created automatically from Sponsor Engine upload.",
-            "sha256": sha256, "original_filename": upload.filename, "active": True,
-        }, asset_id)
-        assets.append(asset); save_assets(assets)
-    sponsor["asset_id"] = asset.get("id", "")
-    sponsor["logo_url"] = asset.get("file_url", "")
-    sponsor["updated_at"] = int(time.time())
-    save_sponsors(sponsors)
-    return jsonify({"logo_url": sponsor["logo_url"], "asset": asset, "duplicate_reused": bool(existing and duplicate_action == "reuse"), "sponsor": sponsor})
-
-@app.put("/api/sponsors/<sponsor_id>/asset")
-@require_auth
-def api_sponsor_asset_link(sponsor_id: str):
-    asset_id = str((request.get_json(silent=True) or {}).get("asset_id", "")).strip()
-    asset = asset_by_id(asset_id) if asset_id else None
-    if asset_id and (not asset or asset.get("category") != "Sponsor" or asset.get("asset_type") != "Logo"):
-        return jsonify({"error": "Choose a valid Sponsor Logo asset."}), 400
-    sponsors = load_sponsors()
-    for sponsor in sponsors:
-        if str(sponsor.get("id")) == sponsor_id:
-            sponsor["asset_id"] = asset_id
-            sponsor["logo_url"] = asset.get("file_url", "") if asset else ""
-            sponsor["updated_at"] = int(time.time())
-            save_sponsors(sponsors)
-            return jsonify({"sponsor": sponsor, "asset": asset})
-    return jsonify({"error": "Sponsor not found."}), 404
-
-@app.get("/sponsor-logos/<filename>")
-def sponsor_logo_file(filename: str):
-    return send_from_directory(SPONSOR_UPLOAD_DIR, filename)
-
 @app.get("/api/assets")
 @require_auth
 def api_assets_list():
@@ -1187,40 +933,16 @@ def api_asset_upload(asset_id: str):
     suffix = Path(upload.filename).suffix.lower()
     allowed = {".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif", ".mp4", ".webm", ".mp3", ".wav", ".pdf"}
     if suffix not in allowed: return jsonify({"error": "Unsupported asset file type."}), 400
-    duplicate_action = str(request.form.get("duplicate_action", "prompt")).lower()
     safe_id = re.sub(r"[^A-Za-z0-9_-]+", "-", asset_id).strip("-") or "asset"
-    temp = ASSET_UPLOAD_DIR / f".upload-{secrets.token_hex(8)}{suffix}"
-    upload.save(temp)
-    sha256 = asset_file_hash(temp)
-    items = load_assets(); found = False
-    current = next((x for x in items if str(x.get("id")) == asset_id), None)
-    if not current:
-        temp.unlink(missing_ok=True)
-        return jsonify({"error": "Save the asset record before uploading."}), 404
-    duplicate = next((x for x in items if str(x.get("id")) != asset_id and x.get("sha256") == sha256 and x.get("active", True)), None)
-    if duplicate and duplicate_action == "prompt":
-        temp.unlink(missing_ok=True)
-        return jsonify({"error": "DUPLICATE_ASSET", "duplicate_asset": duplicate}), 409
-    if duplicate and duplicate_action == "reuse":
-        temp.unlink(missing_ok=True)
-        items = [x for x in items if str(x.get("id")) != asset_id]
-        save_assets(items)
-        return jsonify({"file_url": duplicate.get("file_url", ""), "asset": duplicate, "duplicate_asset": duplicate, "duplicate_reused": True, "pending_asset_removed": True})
-    if duplicate and duplicate_action == "replace":
-        existing_url = str(duplicate.get("file_url", ""))
-        existing_name = existing_url.rsplit("/", 1)[-1] if existing_url.startswith("/asset-files/") else f"{duplicate['id']}{suffix}"
-        target = ASSET_UPLOAD_DIR / existing_name
-        temp.replace(target)
-        duplicate.update({"file_url": f"/asset-files/{target.name}", "sha256": sha256, "original_filename": upload.filename, "updated_at": int(time.time())})
-        items = [x for x in items if str(x.get("id")) != asset_id]
-        save_assets(items)
-        return jsonify({"file_url": duplicate["file_url"], "asset": duplicate, "duplicate_asset": duplicate, "duplicate_replaced": True, "pending_asset_removed": True})
     filename = f"{safe_id}-{int(time.time())}{suffix}"
-    target = ASSET_UPLOAD_DIR / filename
-    temp.replace(target)
-    current.update({"file_url": f"/asset-files/{filename}", "sha256": sha256, "original_filename": upload.filename, "updated_at": int(time.time())})
-    save_assets(items)
-    return jsonify({"file_url": current["file_url"], "duplicate_asset": duplicate, "duplicate_kept": bool(duplicate)})
+    target = ASSET_UPLOAD_DIR / filename; upload.save(target)
+    url = f"/asset-files/{filename}"
+    items = load_assets(); found = False
+    for item in items:
+        if str(item.get("id")) == asset_id:
+            item["file_url"] = url; item["updated_at"] = int(time.time()); found = True; break
+    if not found: return jsonify({"error": "Save the asset record before uploading."}), 404
+    save_assets(items); return jsonify({"file_url": url})
 
 @app.get("/asset-files/<filename>")
 def asset_file(filename: str):
@@ -2107,8 +1829,8 @@ def update_config():
         if section in incoming and isinstance(incoming[section], dict):
             current[section].update(incoming[section])
     # Protect application identity fields.
-    current["application"]["version"] = "Version 1.7 Alpha — Sponsor Engine v1"
-    current["application"]["build"] = "V1.7A-SPONSOR1"
+    current["application"]["version"] = "Version 1.6.2 Alpha — Asset Manager v1"
+    current["application"]["build"] = "V1.6A-ASSETMGR1"
     save_config(current)
     return jsonify(current)
 
@@ -2468,17 +2190,6 @@ def upload_player_headshot(roster_id: str, player_id: str):
     save_rosters(rosters)
     return jsonify({"headshot": url, "player": player})
 
-
-def activate_primary_graphic(state: dict[str, Any], active: str) -> None:
-    """Only one primary identification graphic may be visible at a time."""
-    mapping = {"lower_third": "lower_third", "player": "player_graphic", "personnel": "personnel_graphic"}
-    for channel, key in mapping.items():
-        if channel != active:
-            item = dict(state.get(key) or {})
-            item["visible"] = False; item["expires_at"] = 0
-            state[key] = item
-    state["primary_graphic_channel"] = active
-
 @app.post("/api/graphics/lower-third")
 @require_auth
 def update_lower_third():
@@ -2504,7 +2215,6 @@ def update_lower_third():
                 lower["visible"] = False
                 lower["expires_at"] = 0
             elif action in {"show", "update"}:
-                activate_primary_graphic(state, "lower_third")
                 lower["visible"] = bool(data.get("visible", action == "show"))
                 if lower["visible"] and lower["duration"] > 0:
                     lower["expires_at"] = int(time.time()) + lower["duration"]
@@ -2529,10 +2239,9 @@ def update_player_graphic():
             graphic = copy.deepcopy(DEFAULT_STATE["player_graphic"])
         else:
             graphic = defaults
-            for key in ("graphic_type", "roster_id", "player_id", "eyebrow"):
+            for key in ("graphic_type", "roster_id", "player_id", "eyebrow", "sponsor_lead_in", "sponsor_name", "sponsor_logo"):
                 if key in data:
                     graphic[key] = str(data.get(key, ""))[:240]
-            sponsor_warning = apply_sponsor_to_graphic(graphic, data)
             roster_id = str(data.get("roster_id", graphic.get("roster_id", ""))).strip()
             player_id = str(data.get("player_id", graphic.get("player_id", ""))).strip()
             roster = next((r for r in load_rosters() if str(r.get("id")) == roster_id), None)
@@ -2567,7 +2276,6 @@ def update_player_graphic():
             elif action in {"show", "update"}:
                 if not graphic.get("player_id"):
                     return jsonify({"error": "PLAYER_REQUIRED"}), 400
-                activate_primary_graphic(state, "player")
                 graphic["visible"] = bool(data.get("visible", action == "show"))
                 if graphic["visible"] and graphic["duration"] > 0:
                     graphic["expires_at"] = int(time.time()) + graphic["duration"]
@@ -2576,10 +2284,7 @@ def update_player_graphic():
             graphic["updated_at"] = int(time.time())
         state["player_graphic"] = graphic
         save_state(state)
-    response = public_state(state)
-    if locals().get("sponsor_warning"):
-        response["sponsor_warning"] = sponsor_warning
-    return jsonify(response)
+    return jsonify(public_state(state))
 
 @app.post("/api/graphics/personnel")
 @require_auth
@@ -2596,22 +2301,18 @@ def update_personnel_graphic():
                 identity=broadcast_identity(school,"Football") if school else {}
                 full=str(person.get("full_name") or person.get("name") or "").strip(); preferred=str(person.get("preferred_name","")).strip() or full
                 graphic.update({"personnel_id":pid,"full_name":full,"display_name":preferred,"title":str(person.get("title") or person.get("role") or ""),"role":str(person.get("role", "")),"organization":str(person.get("organization") or school.get("broadcast_name") or school.get("official_name") or ""),"headshot":str(person.get("headshot","")),"logo":str(identity.get("logo") or "/static/csrn-logo.png"),"accent":str(identity.get("primary_color") or "#C9203B")})
-            for key in ("graphic_type","eyebrow"):
+            for key in ("graphic_type","eyebrow","sponsor_lead_in","sponsor_name","sponsor_logo"):
                 if key in data: graphic[key]=str(data.get(key,""))[:240]
-            sponsor_warning=apply_sponsor_to_graphic(graphic,data)
             try: graphic["duration"]=max(0,min(120,int(data.get("duration",graphic.get("duration",0)) or 0)))
             except: graphic["duration"]=0
             if action=="hide": graphic["visible"]=False; graphic["expires_at"]=0
             elif action in {"show","update"}:
                 if not graphic.get("personnel_id"): return jsonify({"error":"PERSONNEL_REQUIRED"}),400
-                activate_primary_graphic(state, "personnel")
                 graphic["visible"]=True
                 graphic["expires_at"]=int(time.time())+graphic["duration"] if graphic["duration"] else 0
             graphic["updated_at"]=int(time.time())
         state["personnel_graphic"]=graphic; save_state(state)
-    response=public_state(state)
-    if locals().get("sponsor_warning"): response["sponsor_warning"]=sponsor_warning
-    return jsonify(response)
+    return jsonify(public_state(state))
 
 @app.post("/api/event-trigger")
 @require_auth
