@@ -1,0 +1,199 @@
+{
+  "packages": [
+    {
+      "id": "pkg-1784162299114",
+      "name": "New Hope @ Caledonia",
+      "broadcast_id": "FB-2026-5A-W01-003",
+      "status": "Planning",
+      "roster_ids": [
+        "caledonia-football-2026-varsity-boys"
+      ],
+      "personnel_ids": [
+        "jason",
+        "jordan"
+      ],
+      "sponsor_ids": [
+        "sponsor-1784133905-0dafe1"
+      ],
+      "graphics_profile": "Radio Game",
+      "notes": "",
+      "locked": false,
+      "updated_at": 1784166403,
+      "created_at": 1784162299,
+      "health": {
+        "score": 100,
+        "ready": true,
+        "checks": [
+          {
+            "key": "broadcast",
+            "label": "Broadcast",
+            "ok": true,
+            "note": "Linked game record found."
+          },
+          {
+            "key": "schools",
+            "label": "Schools",
+            "ok": true,
+            "note": "Home and visitor schools linked."
+          },
+          {
+            "key": "rosters",
+            "label": "Rosters",
+            "ok": true,
+            "note": "At least one roster linked."
+          },
+          {
+            "key": "personnel",
+            "label": "Personnel",
+            "ok": true,
+            "note": "Broadcast personnel linked."
+          },
+          {
+            "key": "sponsors",
+            "label": "Sponsors",
+            "ok": true,
+            "note": "Active sponsors verified."
+          },
+          {
+            "key": "graphics",
+            "label": "Graphics",
+            "ok": true,
+            "note": "Graphics profile configured."
+          },
+          {
+            "key": "obs",
+            "label": "OBS",
+            "ok": true,
+            "note": "OBS profile and required scene configured."
+          }
+        ]
+      },
+      "lineups": {
+        "home": {
+          "offense": {
+            "formation_name": "Spread",
+            "roster_id": "caledonia-football-2026-varsity-boys",
+            "slots": [
+              {
+                "id": "slot-1784166321892-0",
+                "position": "QB",
+                "player_id": "1-darquez-williams"
+              },
+              {
+                "id": "slot-1784166321892-1",
+                "position": "RB",
+                "player_id": "17-darrius-triplett"
+              },
+              {
+                "id": "slot-1784166321892-2",
+                "position": "WR",
+                "player_id": "3-curtavious-johnson"
+              },
+              {
+                "id": "slot-1784166321892-3",
+                "position": "WR",
+                "player_id": ""
+              },
+              {
+                "id": "slot-1784166321892-4",
+                "position": "Slot",
+                "player_id": ""
+              },
+              {
+                "id": "slot-1784166321892-5",
+                "position": "TE",
+                "player_id": ""
+              },
+              {
+                "id": "slot-1784166321892-6",
+                "position": "LT",
+                "player_id": "66-antwuan-adkins"
+              },
+              {
+                "id": "slot-1784166321892-7",
+                "position": "LG",
+                "player_id": ""
+              },
+              {
+                "id": "slot-1784166321892-8",
+                "position": "C",
+                "player_id": ""
+              },
+              {
+                "id": "slot-1784166321892-9",
+                "position": "RG",
+                "player_id": ""
+              },
+              {
+                "id": "slot-1784166321892-10",
+                "position": "RT",
+                "player_id": ""
+              }
+            ]
+          },
+          "defense": {
+            "formation_name": "4-3",
+            "roster_id": "caledonia-football-2026-varsity-boys",
+            "slots": [
+              {
+                "id": "slot-1784166224384-0",
+                "position": "DE",
+                "player_id": "1-darquez-williams"
+              },
+              {
+                "id": "slot-1784166224384-1",
+                "position": "DT",
+                "player_id": "3-curtavious-johnson"
+              },
+              {
+                "id": "slot-1784166224384-2",
+                "position": "DT",
+                "player_id": "66-antwuan-adkins"
+              },
+              {
+                "id": "slot-1784166224384-3",
+                "position": "DE",
+                "player_id": ""
+              },
+              {
+                "id": "slot-1784166224384-4",
+                "position": "LB",
+                "player_id": ""
+              },
+              {
+                "id": "slot-1784166224384-5",
+                "position": "LB",
+                "player_id": ""
+              },
+              {
+                "id": "slot-1784166224384-6",
+                "position": "LB",
+                "player_id": ""
+              },
+              {
+                "id": "slot-1784166224384-7",
+                "position": "CB",
+                "player_id": ""
+              },
+              {
+                "id": "slot-1784166224384-8",
+                "position": "CB",
+                "player_id": ""
+              },
+              {
+                "id": "slot-1784166224384-9",
+                "position": "S",
+                "player_id": ""
+              },
+              {
+                "id": "slot-1784166224384-10",
+                "position": "S",
+                "player_id": ""
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

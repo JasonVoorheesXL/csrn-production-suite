@@ -1,5 +1,0 @@
-CSRN Production Suite — Version 1.7 Alpha Sponsor Engine v1 Corrected R2
-
-Git-safe source update: copy package contents into the repository root and replace application files. Runtime Data, security, state, and migration files are not included.
-
-After installation, hard-refresh Chrome and refresh the OBS Browser Source.
