@@ -1,3 +1,9 @@
+Version 1.9 Alpha — Broadcast Automation Engine v1
+- Guided touchdown workflow with scorer, play type, conditional passer, and optional statistician yardage.
+- Guided turnover workflow with turnover type and optional defensive touchdown.
+- Automatic player touchdown graphic with configurable duration.
+- Human-readable event descriptions and linked Undo restoration.
+
 Version 1.8 Alpha — Broadcast Package Engine v1 Corrected R2
 - Normalized wrapped Sponsor API responses for Broadcast Package option loading and saving.
 - Added defensive normalization for package, broadcast, roster, and personnel API results.
@@ -57,3 +63,21 @@ Version 1.8 Alpha — Corrected R3 · Lineup Manager v1
 - Added add, remove, reorder, and player assignment controls for lineup slots.
 - Lineups reference linked rosters and do not modify master roster records.
 - Package loading now exposes lineup state for future Starting Lineup graphics.
+
+Version 1.9 Alpha — Broadcast Automation Engine v1 Corrected R1
+- Added jersey-number-first roster lookup with manual-player fallback.
+- Added duplicate-number selection support.
+- Added XP and two-point conversion automation.
+- Added guided field-goal workflow.
+- Added context-aware offensive and defensive position display.
+- Abbreviated Athlete to ATH and constrained position labels.
+- Added passer and yardage details to event history descriptions.
+
+Version 1.9 Alpha — Broadcast Automation Engine v1 Corrected R2
+- Replaced spinner-style jersey inputs with scrollable 0–99 jersey pickers.
+- Locked background scrolling while automation dialogs are open.
+- Added sticky modal actions and full internal modal scrolling.
+- Allowed full event descriptions to wrap in Event History.
+- Added passer and yardage play details to automated player graphics.
+- Corrected two-point conversion graphic labeling.
+- Made ticker speed settings visibly distinct and applied full event descriptions to the viewer ticker.
