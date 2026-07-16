@@ -1,2 +1,4 @@
-Version 1.6.2 Alpha — Asset Manager v1 Corrected R2
-Build V1.6A-ASSETMGR1-R2
+CSRN Production Suite
+Version 1.8 Alpha — Broadcast Package Engine v1 Corrected R3 · Lineup Manager v1
+Build V1.8A-PACKAGE1-R3-LINEUP1
+Copyright © 2026 Jason Chrest. All rights reserved.

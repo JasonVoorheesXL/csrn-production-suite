@@ -1,1 +1,0 @@
-Git-safe source update. Copy contents into repository root; runtime Data files are not included.

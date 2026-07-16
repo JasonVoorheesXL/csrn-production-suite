@@ -1,3 +1,19 @@
+Version 1.8 Alpha — Broadcast Package Engine v1 Corrected R2
+- Normalized wrapped Sponsor API responses for Broadcast Package option loading and saving.
+- Added defensive normalization for package, broadcast, roster, and personnel API results.
+- Restored bright CSRN scarlet event titles with a controlled black shadow on the aligned lighter title band.
+
+Version 1.8 Alpha — Broadcast Package Engine v1 Corrected R1
+- Fixed Broadcast Packages module initialization so existing Game Manager broadcasts populate immediately.
+- Preserved broadcast-driven package prefill for name and roster suggestions.
+- Removed legacy per-correction installation notes from release packaging.
+
+Version 1.7 Alpha — Sponsor Engine v1 Corrected R1
+- Sponsor logos link to Asset Manager records.
+- Sponsor uploads auto-register or reuse matching assets.
+- Added Sponsor Logo asset selector and SHA-256 duplicate detection.
+- Added restrained title halo and narrower jersey-number treatment.
+
 Version 1.6.2 Alpha — Asset Manager v1 Corrected R2
 
 - Fixed JPG, JPEG, PNG, WEBP, SVG, GIF and media uploads in Asset Manager.
@@ -5,3 +21,39 @@ Version 1.6.2 Alpha — Asset Manager v1 Corrected R2
 - Fixed Asset Manager create, update and delete API calls.
 - Reduced red-title trim to a thin approximately 1 px edge.
 - Changed player position and jersey number treatment to CSRN-style light silver-gray.
+
+Version 1.7 Alpha — Sponsor Engine v1
+- Sponsor profiles, agreements, approved logos, packages, and graphic assignment.
+- Primary graphics channel prevents Lower Third, Player ID, and Personnel ID overlap.
+- Engine Status diagnostics.
+- Restored CSRN silver player identity styling and refined red title readability.
+
+
+Version 1.7 Alpha — Sponsor Engine v1 Corrected R2
+- Added sponsor contract expiration enforcement for graphic selection.
+- Added duplicate sponsor-logo actions: reuse, replace, or keep both.
+- Added universal scroll-and-focus behavior to key Add workflows.
+- Finalized CSRN metallic typography for event titles, positions, and jersey numbers.
+- Added broadcast design, icon library, and engine architecture standards.
+
+
+## Corrected R4
+- Corrected duplicate asset reuse/replace control flow.
+- Added duplicate sponsor-name warning workflow.
+- Aligned the player event title band directly to the event title.
+
+
+VERSION 1.8 ALPHA — BROADCAST PACKAGE ENGINE V1
+- Added centralized broadcast package records.
+- Added package health validation for broadcasts, schools, rosters, personnel, sponsors, graphics, and OBS.
+- Added one-click package loading into Command Center state.
+- Added duplicate, lock, notes, status, and graphics profile controls.
+- Added package dashboard and readiness score.
+
+Version 1.8 Alpha — Corrected R3 · Lineup Manager v1
+- Added package-level Starting Lineup Manager.
+- Added editable offense, defense, and special-teams formation groups.
+- Added formation presets with fully editable position labels.
+- Added add, remove, reorder, and player assignment controls for lineup slots.
+- Lineups reference linked rosters and do not modify master roster records.
+- Package loading now exposes lineup state for future Starting Lineup graphics.
