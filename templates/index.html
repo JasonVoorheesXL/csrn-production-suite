@@ -177,7 +177,7 @@
           <div class="button-row score-buttons">
             <button onclick="score('home', -1)">−1</button><button onclick="score('home', 1)">+1</button><button onclick="score('home', 2)">+2</button><button onclick="score('home', 3)">+3</button><button onclick="score('home', 6)">+6</button>
           </div>
-          <div class="button-row event-buttons"><button onclick="triggerEvent('home','TD')">TD</button><button onclick="triggerEvent('home','FG')">FG</button><button onclick="triggerEvent('home','TURNOVER')">Turnover</button></div>
+          <div class="button-row event-buttons"><button onclick="openAutomationEvent('home','TD')">TD</button><button onclick="openAutomationEvent('home','FG')">FG</button><button onclick="openAutomationEvent('home','XP')">XP</button><button onclick="openAutomationEvent('home','2PT')">2PT</button><button onclick="openAutomationEvent('home','TURNOVER')">Turnover</button></div>
         </article>
 
         <article class="team-card">
@@ -186,7 +186,7 @@
           <div class="button-row score-buttons">
             <button onclick="score('visitor', -1)">−1</button><button onclick="score('visitor', 1)">+1</button><button onclick="score('visitor', 2)">+2</button><button onclick="score('visitor', 3)">+3</button><button onclick="score('visitor', 6)">+6</button>
           </div>
-          <div class="button-row event-buttons"><button onclick="triggerEvent('visitor','TD')">TD</button><button onclick="triggerEvent('visitor','FG')">FG</button><button onclick="triggerEvent('visitor','TURNOVER')">Turnover</button></div>
+          <div class="button-row event-buttons"><button onclick="openAutomationEvent('visitor','TD')">TD</button><button onclick="openAutomationEvent('visitor','FG')">FG</button><button onclick="openAutomationEvent('visitor','XP')">XP</button><button onclick="openAutomationEvent('visitor','2PT')">2PT</button><button onclick="openAutomationEvent('visitor','TURNOVER')">Turnover</button></div>
         </article>
       </div>
 
@@ -247,7 +247,7 @@
       </section>
 
       <section class="panel compact event-engine-panel live-operator-controls">
-        <div class="section-heading"><div><h3>Event Engine</h3><p class="section-note">TD and FG update the score. Turnover assigns possession to the selected team. Undo reverses the last event.</p></div><span class="phase-badge" id="eventEngineBadge">READY</span></div>
+        <div class="section-heading"><div><h3>Event Engine</h3><p class="section-note">TD and Turnover use guided automation. Quick Mode captures the essential call; Statistician Mode adds yardage. Undo reverses the complete linked event.</p></div><span class="phase-badge" id="eventEngineBadge">READY</span></div>
         <div id="eventConfirmation" class="status">No events recorded.</div>
         <div class="ticker-controls">
           <button id="tickerToggle" onclick="setState('ticker_visible',!Boolean(currentState.ticker_visible))">Hide Viewer Ticker</button>
@@ -993,6 +993,43 @@
       </div>
     </div>
 
+    <div id="automationEventModal" class="event-confirm-modal hidden" role="dialog" aria-modal="true" aria-labelledby="automationEventTitle">
+      <div class="event-confirm-sheet automation-event-sheet">
+        <div class="section-heading compact"><div><h2 id="automationEventTitle">Touchdown</h2><p id="automationEventTeam" class="section-note"></p></div><span class="phase-badge">AUTOMATION</span></div>
+        <input id="automationEventTeamKey" type="hidden"><input id="automationEventType" type="hidden"><input id="automationRosterId" type="hidden">
+        <div id="automationTouchdownFields" class="automation-fields">
+          <label>Scorer Jersey #<select id="automationScorerNumber" class="jersey-picker" onchange="resolveAutomationNumber('scorer')"></select></label>
+          <label>Play Type<select id="automationPlayType" onchange="automationPlayTypeChanged()"><option value="rush">Rush</option><option value="reception">Reception</option><option value="return">Return</option><option value="other">Other</option></select></label>
+          <label id="automationPasserWrap" class="hidden">QB / Passer Jersey #<select id="automationPasserNumber" class="jersey-picker" onchange="resolveAutomationNumber('passer')"></select></label>
+        </div>
+        <div id="automationKickFields" class="automation-fields hidden">
+          <label>Kicker Jersey #<select id="automationKickerNumber" class="jersey-picker" onchange="resolveAutomationNumber('kicker')"></select></label>
+        </div>
+        <div id="automationTurnoverFields" class="automation-fields hidden">
+          <label>Turnover Type<select id="automationTurnoverType" onchange="automationTurnoverTypeChanged()"><option value="interception">Interception</option><option value="fumble_recovery">Fumble Recovery</option><option value="downs">Turnover on Downs</option><option value="other">Other</option></select></label>
+          <label>Player Jersey #<select id="automationTurnoverNumber" class="jersey-picker" onchange="resolveAutomationNumber('turnover')"></select></label>
+          <label class="automation-check"><input id="automationTurnoverTd" type="checkbox"> TD on return</label>
+        </div>
+        <div id="automationMatchPanel" class="automation-match-panel hidden"></div>
+        <div id="automationManualPlayer" class="automation-manual-player hidden">
+          <strong>Player not found on linked roster</strong>
+          <p class="section-note">Use a temporary player identity for this event. You can update the name later.</p>
+          <div class="automation-fields">
+            <label>Display Name<input id="automationManualName" type="text" placeholder="Defaults to Team Name + number"></label>
+            <label>Position<input id="automationManualPosition" type="text" maxlength="8" value="ATH"></label>
+          </div>
+        </div>
+        <label class="automation-check"><input id="automationStatisticianMode" type="checkbox" onchange="automationStatisticianChanged()"> Statistician Mode</label>
+        <label id="automationYardsWrap" class="hidden">Yards<input id="automationYards" type="number" min="0" max="999" inputmode="numeric" placeholder="Optional"></label>
+        <label>Graphic Duration<select id="automationGraphicDuration"><option value="0">Do not auto-show</option><option value="5">5 seconds</option><option value="8" selected>8 seconds</option><option value="10">10 seconds</option><option value="15">15 seconds</option></select></label>
+        <div id="automationEventMessage" class="status"></div>
+        <div class="button-row">
+          <button type="button" onclick="closeAutomationEvent()">Cancel</button>
+          <button type="button" class="primary" onclick="confirmAutomationEvent()">Confirm Event</button>
+        </div>
+      </div>
+    </div>
+
     <footer class="suite-footer">
       <div><strong>{{ app_product }}</strong></div>
       <div>{{ app_version }} · Build {{ app_build }}</div>
@@ -1245,17 +1282,68 @@ function confirmEventAction(message){
   });
 }
 
+let automationEventRosters=[];
+let automationResolved={scorer:null,passer:null,kicker:null,turnover:null};
+function automationPlayerLabel(p){const full=[p.first_name,p.last_name].filter(Boolean).join(' ');return `${p.number||'—'} · ${p.preferred_name||full}`}
+function automationTeamRoster(team){const schoolId=team==='home'?currentState.home_school_id:currentState.visitor_school_id;return automationEventRosters.find(r=>String(r.school_id)===String(schoolId)&&String(r.sport||'Football').toLowerCase()==='football')||automationEventRosters.find(r=>String(r.school_id)===String(schoolId))}
+function automationRosterPlayers(){const roster=automationTeamRoster(document.getElementById('automationEventTeamKey').value);return (roster?.players||[]).filter(p=>p.status!=='inactive')}
+function automationInputFor(role){return document.getElementById({scorer:'automationScorerNumber',passer:'automationPasserNumber',kicker:'automationKickerNumber',turnover:'automationTurnoverNumber'}[role])}
+function populateAutomationJerseyPickers(){const rosterNums=[...new Set(automationRosterPlayers().map(p=>String(p.number||'').trim()).filter(Boolean))].sort((a,b)=>(Number(a)||0)-(Number(b)||0));const remaining=Array.from({length:100},(_,i)=>String(i)).filter(n=>!rosterNums.includes(n));const options=['<option value="">Select jersey number…</option>',...rosterNums.map(n=>`<option value="${escapeHtml(n)}">#${escapeHtml(n)} · roster</option>`),...remaining.map(n=>`<option value="${n}">#${n}</option>`)].join('');['scorer','passer','kicker','turnover'].forEach(role=>{const el=automationInputFor(role);if(el)el.innerHTML=options;});}
+function preferredPosition(player, context){if(!player)return 'ATH';const primary=String(player.position||'').trim();const secondary=String(player.secondary_position||'').trim();let pos=context==='defense'?(secondary||primary):(primary||secondary);if(/^athlete$/i.test(pos))pos='ATH';if(pos.includes('/'))pos=pos.split('/')[0].trim();return pos||'ATH'}
+function resolveAutomationNumber(role){
+  const input=automationInputFor(role),num=String(input?.value||'').trim(),panel=document.getElementById('automationMatchPanel'),manual=document.getElementById('automationManualPlayer');
+  automationResolved[role]=null;panel.classList.add('hidden');panel.innerHTML='';manual.classList.add('hidden');
+  if(!num)return;
+  const matches=automationRosterPlayers().filter(p=>String(p.number||'').replace(/^0+/,'')===num.replace(/^0+/,''));
+  if(matches.length===1){automationResolved[role]=matches[0];panel.innerHTML=`<strong>Matched:</strong> ${escapeHtml(automationPlayerLabel(matches[0]))}`;panel.classList.remove('hidden');return;}
+  if(matches.length>1){
+    const context=(document.getElementById('automationEventType').value==='TURNOVER'&&document.getElementById('automationTurnoverTd').checked)?'defense':'offense';
+    matches.sort((a,b)=>Number(Boolean(preferredPosition(b,context)))-Number(Boolean(preferredPosition(a,context))));
+    panel.innerHTML=`<strong>Multiple players wear #${escapeHtml(num)}.</strong><div class="automation-duplicate-players">${matches.map((p,i)=>`<button type="button" onclick="chooseAutomationPlayer('${role}',${i})">${escapeHtml(automationPlayerLabel(p))} · ${escapeHtml(preferredPosition(p,context))}</button>`).join('')}</div>`;
+    panel.dataset.matches=JSON.stringify(matches);panel.classList.remove('hidden');return;
+  }
+  const teamName=document.getElementById('automationEventTeam').textContent||'Team';
+  document.getElementById('automationManualName').placeholder=`${teamName} ${num}`;document.getElementById('automationManualPosition').value='ATH';manual.classList.remove('hidden');
+}
+function chooseAutomationPlayer(role,index){const panel=document.getElementById('automationMatchPanel');const matches=JSON.parse(panel.dataset.matches||'[]');automationResolved[role]=matches[index]||null;panel.innerHTML=`<strong>Selected:</strong> ${escapeHtml(automationPlayerLabel(automationResolved[role]||{}))}`;}
+async function openAutomationEvent(team,event){
+  try{automationEventRosters=await api('/api/rosters')}catch(e){automationEventRosters=[]}
+  const roster=automationTeamRoster(team);document.getElementById('automationRosterId').value=roster?.id||'';
+  document.getElementById('automationEventTeamKey').value=team;document.getElementById('automationEventType').value=event;
+  const teamName=team==='home'?currentState.home_team:currentState.visitor_team;
+  const titles={TD:'Touchdown',FG:'Field Goal',XP:'Extra Point','2PT':'Two-Point Conversion',TURNOVER:'Turnover'};
+  document.getElementById('automationEventTitle').textContent=titles[event]||event;document.getElementById('automationEventTeam').textContent=teamName;
+  document.getElementById('automationTouchdownFields').classList.toggle('hidden',!['TD','2PT'].includes(event));
+  document.getElementById('automationKickFields').classList.toggle('hidden',!['FG','XP'].includes(event));
+  document.getElementById('automationTurnoverFields').classList.toggle('hidden',event!=='TURNOVER');
+  ['automationScorerNumber','automationPasserNumber','automationKickerNumber','automationTurnoverNumber','automationManualName'].forEach(id=>document.getElementById(id).value='');
+  automationResolved={scorer:null,passer:null,kicker:null,turnover:null};document.getElementById('automationMatchPanel').classList.add('hidden');document.getElementById('automationManualPlayer').classList.add('hidden');
+  document.getElementById('automationPlayType').value='rush';document.getElementById('automationTurnoverType').value='interception';document.getElementById('automationTurnoverTd').checked=false;document.getElementById('automationStatisticianMode').checked=false;document.getElementById('automationYards').value='';document.getElementById('automationGraphicDuration').value='8';document.getElementById('automationEventMessage').textContent='';
+  populateAutomationJerseyPickers();automationPlayTypeChanged();automationTurnoverTypeChanged();automationStatisticianChanged();document.body.classList.add('automation-modal-open');document.getElementById('automationEventModal').classList.remove('hidden');
+}
+function closeAutomationEvent(){document.getElementById('automationEventModal').classList.add('hidden');document.body.classList.remove('automation-modal-open')}
+function automationPlayTypeChanged(){document.getElementById('automationPasserWrap').classList.toggle('hidden',document.getElementById('automationPlayType').value!=='reception')}
+function automationTurnoverTypeChanged(){const downs=document.getElementById('automationTurnoverType').value==='downs';const cb=document.getElementById('automationTurnoverTd');cb.disabled=downs;if(downs)cb.checked=false;resolveAutomationNumber('turnover')}
+function automationStatisticianChanged(){const event=document.getElementById('automationEventType').value;document.getElementById('automationYardsWrap').classList.toggle('hidden',!document.getElementById('automationStatisticianMode').checked||event==='XP')}
+function automationManualPayload(role){const input=automationInputFor(role),number=String(input?.value||'').trim();if(!number||automationResolved[role])return null;const teamName=document.getElementById('automationEventTeam').textContent||'Team';return {number,name:document.getElementById('automationManualName').value.trim()||`${teamName} ${number}`,position:document.getElementById('automationManualPosition').value.trim()||'ATH'}}
+async function confirmAutomationEvent(){
+  const event=document.getElementById('automationEventType').value,team=document.getElementById('automationEventTeamKey').value;
+  const role=event==='TURNOVER'?'turnover':(['FG','XP'].includes(event)?'kicker':'scorer');resolveAutomationNumber(role);
+  const payload={team,event,roster_id:document.getElementById('automationRosterId').value,statistician_mode:document.getElementById('automationStatisticianMode').checked,yards:document.getElementById('automationStatisticianMode').checked?document.getElementById('automationYards').value:'',graphic_duration:Number(document.getElementById('automationGraphicDuration').value||0)};
+  if(['TD','2PT'].includes(event)){payload.player_id=automationResolved.scorer?.id||'';payload.manual_player=automationManualPayload('scorer');payload.play_type=document.getElementById('automationPlayType').value;payload.passer_id=payload.play_type==='reception'?(automationResolved.passer?.id||''):'';payload.manual_passer=payload.play_type==='reception'?automationManualPayload('passer'):null;}
+  else if(['FG','XP'].includes(event)){payload.player_id=automationResolved.kicker?.id||'';payload.manual_player=automationManualPayload('kicker');payload.play_type='kick';}
+  else{payload.turnover_type=document.getElementById('automationTurnoverType').value;payload.player_id=automationResolved.turnover?.id||'';payload.manual_player=automationManualPayload('turnover');payload.return_td=document.getElementById('automationTurnoverTd').checked;}
+  const msg=document.getElementById('automationEventMessage');msg.textContent='Recording event…';
+  try{const result=await api('/api/event-trigger',payload);currentState=result.state;render();closeAutomationEvent();const confirmation=document.getElementById('eventConfirmation');confirmation.textContent=result.message||result.trigger?.description||'Event recorded.';confirmation.className='status success'}catch(e){msg.textContent=e.message||'Unable to record event.';msg.className='status error'}
+}
+
 async function triggerEvent(team,event){
   const label={TD:'Touchdown',FG:'Field Goal',TURNOVER:'Turnover'}[event]||event;
   const teamName=team==='home'?currentState.home_team:currentState.visitor_team;
   const approved=await confirmEventAction(`${label} — ${teamName}?`);
   if(!approved) return;
-  const result=await api('/api/event-trigger',{team,event});
-  currentState=result.state;
-  render();
-  const confirmation=document.getElementById('eventConfirmation');
-  confirmation.textContent=result.message||`${label}: ${teamName}`;
-  confirmation.className='status success';
+  const result=await api('/api/event-trigger',{team,event}); currentState=result.state; render();
+  const confirmation=document.getElementById('eventConfirmation'); confirmation.textContent=result.message||`${label}: ${teamName}`; confirmation.className='status success';
 }
 
 async function setState(key, value) {
@@ -1408,11 +1496,11 @@ function render() {
       const delta=ev.score_delta?` +${ev.score_delta}`:'';
       const quarter=ev.quarter?`Q${escapeHtml(String(ev.quarter).replace(/^Q/i,''))}`:'';
       const undone=ev.undone?' <em class="event-undone">UNDONE</em>':'';
-      const icon={TD:'🏈',FG:'🥅',TURNOVER:'↔'}[String(ev.event||'').toUpperCase()]||'•';
+      const icon={TD:'🏈',FG:'🥅',XP:'1','2PT':'2',TURNOVER:'↔'}[String(ev.event||'').toUpperCase()]||'•';
       const score=ev.after?`${Number(ev.after.home_score||0)}–${Number(ev.after.visitor_score||0)}`:'';
       const identity=ev.team==='home'?(currentState.home_identity||{}):(currentState.visitor_identity||{});
       const color=identity.primary_color||'#ffffff';
-      return `<div class="event-log-row${ev.undone?' is-undone':''}"><strong><b class="event-icon">${icon}</b> ${escapeHtml(ev.label||ev.event)}${undone}</strong><span style="--event-team-color:${escapeHtml(color)}"><b class="event-team-name">${escapeHtml(ev.team_name||ev.team)}</b>${delta}${score?` <small class="event-score">${score}</small>`:''}</span><time>${quarter}${quarter&&when?' · ':''}${when}</time></div>`;
+      return `<div class="event-log-row${ev.undone?' is-undone':''}"><strong><b class="event-icon">${icon}</b> ${escapeHtml(ev.label||ev.event)}${undone}</strong><span style="--event-team-color:${escapeHtml(color)}"><b class="event-team-name">${escapeHtml(ev.description||ev.team_name||ev.team)}</b>${delta}${score?` <small class="event-score">${score}</small>`:''}</span><time>${quarter}${quarter&&when?' · ':''}${when}</time></div>`;
     }).join(''):'<div class="section-note">No events recorded.</div>';
   }
   const confirmation=document.getElementById('eventConfirmation');

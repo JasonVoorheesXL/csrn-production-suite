@@ -148,6 +148,7 @@ DEFAULT_STATE: dict[str, Any] = {
         "team_logo": "",
         "team_name": "",
         "team_color": "#C9203B",
+        "play_detail": "",
         "eyebrow": "PLAYER PROFILE",
         "sponsor_id": "",
         "sponsor_lead_in": "",
@@ -2729,13 +2730,87 @@ def update_personnel_graphic():
     if locals().get("sponsor_warning"): response["sponsor_warning"]=sponsor_warning
     return jsonify(response)
 
+
+def automation_player(roster_id: str, player_id: str):
+    roster = next((r for r in load_rosters() if str(r.get("id")) == str(roster_id)), None)
+    player = next((p for p in (roster or {}).get("players", []) if str(p.get("id")) == str(player_id)), None)
+    return roster, player
+
+def player_display(player):
+    if not player:
+        return ""
+    full = " ".join([str(player.get("first_name", "")).strip(), str(player.get("last_name", "")).strip()]).strip()
+    return str(player.get("preferred_name", "")).strip() or full
+
+
+def normalize_position(value):
+    value = str(value or "").strip()
+    if value.lower() == "athlete":
+        return "ATH"
+    return value or "ATH"
+
+
+def event_position(player, defensive=False):
+    if not player:
+        return "ATH"
+    primary = normalize_position(player.get("position"))
+    secondary = normalize_position(player.get("secondary_position")) if player.get("secondary_position") else ""
+    value = (secondary or primary) if defensive else (primary or secondary)
+    if "/" in value:
+        value = value.split("/", 1)[0].strip()
+    return value or "ATH"
+
+
+def manual_automation_player(data, team_name):
+    if not isinstance(data, dict) or not str(data.get("number", "")).strip():
+        return None
+    number = str(data.get("number", "")).strip()
+    name = str(data.get("name", "")).strip() or f"{team_name} {number}"
+    parts = name.split(" ", 1)
+    return {
+        "id": "",
+        "number": number,
+        "preferred_name": name,
+        "first_name": parts[0] if parts else name,
+        "last_name": parts[1] if len(parts) > 1 else "",
+        "position": normalize_position(data.get("position")),
+        "secondary_position": "",
+        "grade": "",
+        "height": "",
+        "weight": "",
+        "headshot": "",
+        "manual": True,
+    }
+
+def show_automation_player_graphic(state, roster, player, graphic_type, duration, defensive=False, eyebrow="", play_detail=""):
+    if not roster or not player or duration <= 0:
+        return
+    school = next((sc for sc in load_schools() if str(sc.get("id")) == str(roster.get("school_id"))), {})
+    identity = broadcast_identity(school, str(roster.get("sport", "Football"))) if school else {}
+    full_name = " ".join([str(player.get("first_name", "")).strip(), str(player.get("last_name", "")).strip()]).strip()
+    graphic = copy.deepcopy(DEFAULT_STATE["player_graphic"])
+    graphic.update({
+        "visible": True, "graphic_type": graphic_type, "eyebrow": eyebrow or ("TOUCHDOWN" if graphic_type == "touchdown" else "PLAYER PROFILE"),
+        "roster_id": str(roster.get("id", "")), "player_id": str(player.get("id", "")), "school_id": str(roster.get("school_id", "")),
+        "full_name": full_name, "display_name": player_display(player), "number": str(player.get("number", "")),
+        "position": event_position(player, defensive=defensive), "secondary_position": "",
+        "grade": str(player.get("grade", "")), "height": str(player.get("height", "")), "weight": str(player.get("weight", "")),
+        "headshot": str(player.get("headshot", "")), "team_logo": str(identity.get("logo", "")),
+        "team_name": str(school.get("broadcast_name") or school.get("official_name") or ""),
+        "team_color": str(identity.get("primary_color") or school.get("primary_color") or "#C9203B"),
+        "play_detail": str(play_detail or ""),
+        "duration": duration, "expires_at": int(time.time()) + duration, "updated_at": int(time.time()),
+    })
+    activate_primary_graphic(state, "player")
+    state["player_graphic"] = graphic
+
 @app.post("/api/event-trigger")
 @require_auth
 def event_trigger():
-    data = request.get_json(force=True)
+    data = request.get_json(force=True) or {}
     team = str(data.get("team", "")).lower()
     event = str(data.get("event", "")).upper()
-    if team not in {"home", "visitor"} or event not in {"TD", "FG", "TURNOVER"}:
+    if team not in {"home", "visitor"} or event not in {"TD", "FG", "XP", "2PT", "TURNOVER"}:
         return jsonify({"error": "INVALID_EVENT"}), 400
     with lock:
         state = load_state()
@@ -2743,57 +2818,72 @@ def event_trigger():
             return jsonify({"error": "NO_ACTIVE_BROADCAST"}), 409
         push_history(state)
         score_key = "home_score" if team == "home" else "visitor_score"
-        before = {
-            "home_score": int(state.get("home_score", 0)),
-            "visitor_score": int(state.get("visitor_score", 0)),
-            "possession": state.get("possession", "home"),
-        }
-        delta = 6 if event == "TD" else 3 if event == "FG" else 0
+        before = {"home_score": int(state.get("home_score", 0)), "visitor_score": int(state.get("visitor_score", 0)), "possession": state.get("possession", "home"), "player_graphic": copy.deepcopy(state.get("player_graphic") or {})}
+        return_td = bool(data.get("return_td")) and str(data.get("turnover_type", "")) != "downs"
+        delta = 6 if event == "TD" or (event == "TURNOVER" and return_td) else 3 if event == "FG" else 2 if event == "2PT" else 1 if event == "XP" else 0
         if delta:
             state[score_key] = max(0, int(state.get(score_key, 0)) + delta)
-        if event == "TURNOVER":
-            state["possession"] = team
+        if event == "TURNOVER": state["possession"] = team
         if state.get("status") != "live":
-            state["status"] = "live"
-            state["broadcast_phase"] = "live"
-            update_linked_broadcast_status(state.get("broadcast_id", ""), "live")
+            state["status"] = "live"; state["broadcast_phase"] = "live"; update_linked_broadcast_status(state.get("broadcast_id", ""), "live")
         team_name = state.get("home_team") if team == "home" else state.get("visitor_team")
-        label = {"TD": "Touchdown", "FG": "Field Goal", "TURNOVER": "Turnover"}[event]
+        roster, player = automation_player(str(data.get("roster_id", "")), str(data.get("player_id", "")))
+        _, passer = automation_player(str(data.get("roster_id", "")), str(data.get("passer_id", "")))
+        player = player or manual_automation_player(data.get("manual_player"), team_name)
+        passer = passer or manual_automation_player(data.get("manual_passer"), team_name)
+        if player and not roster:
+            roster = {
+                "id": "",
+                "school_id": state.get("home_school_id") if team == "home" else state.get("visitor_school_id"),
+                "sport": "Football",
+                "players": [],
+            }
+        scorer_name, passer_name = player_display(player), player_display(passer)
+        yards = str(data.get("yards", "")).strip() if bool(data.get("statistician_mode")) else ""
+        play_type = str(data.get("play_type", "")).lower()
+        turnover_type = str(data.get("turnover_type", "")).lower()
+        if event in {"TD", "2PT"}:
+            conversion = event == "2PT"
+            label = "Two-Point Conversion" if conversion else "Touchdown"
+            event_phrase = "two-point conversion" if conversion else "touchdown"
+            if play_type == "reception":
+                description = f"{scorer_name or team_name} {event_phrase} reception" + (f" from {passer_name}" if passer_name else "")
+            elif play_type == "rush":
+                description = f"{scorer_name or team_name} {event_phrase} run"
+            elif play_type == "return":
+                description = f"{scorer_name or team_name} {event_phrase} return"
+            else:
+                description = f"{scorer_name or team_name} {event_phrase}"
+            if yards:
+                description = f"{yards}-yard {description[0].lower() + description[1:]}"
+        elif event == "TURNOVER":
+            kind = {"interception":"Interception","fumble_recovery":"Fumble recovery","downs":"Turnover on downs","other":"Turnover"}.get(turnover_type,"Turnover")
+            label = "Defensive Touchdown" if return_td else kind
+            description = f"{scorer_name or team_name} {kind.lower()}" + (" returned for a touchdown" if return_td else "")
+            if yards and return_td:
+                description = f"{yards}-yard {description.lower()}"
+        elif event == "FG":
+            label = "Field Goal"
+            description = f"{scorer_name or team_name} field goal"
+            if yards:
+                description = f"{yards}-yard field goal by {scorer_name or team_name}"
+        else:
+            label = "Extra Point"
+            description = f"Extra point by {scorer_name or team_name}"
+        duration = max(0, min(30, int(data.get("graphic_duration", 0) or 0)))
+        if (event in {"TD", "2PT"} or return_td) and player:
+            graphic_eyebrow = "TWO-POINT CONVERSION" if event == "2PT" else "DEFENSIVE TOUCHDOWN" if return_td else "TOUCHDOWN"
+            show_automation_player_graphic(state, roster, player, "two_point" if event == "2PT" else "touchdown", duration, defensive=(event == "TURNOVER" and return_td), eyebrow=graphic_eyebrow, play_detail=description)
         payload = {
-            "id": f"EV-{int(time.time() * 1000)}",
-            "team": team,
-            "team_name": team_name,
-            "event": event,
-            "label": label,
-            "score_delta": delta,
-            "created_at": int(time.time()),
-            "quarter": str(state.get("quarter", "1") or "1"),
-            "broadcast_id": state.get("broadcast_id", ""),
-            "before": before,
-            "after": {
-                "home_score": int(state.get("home_score", 0)),
-                "visitor_score": int(state.get("visitor_score", 0)),
-                "possession": state.get("possession", "home"),
-            },
-            "media_trigger": {
-                "key": f"{event.lower()}_{team}",
-                "assigned": False,
-                "graphics": None,
-                "audio": None,
-                "video": None,
-            },
+            "id": f"EV-{int(time.time()*1000)}", "team": team, "team_name": team_name, "event": event, "label": label,
+            "description": description, "score_delta": delta, "created_at": int(time.time()), "quarter": str(state.get("quarter", "1") or "1"),
+            "broadcast_id": state.get("broadcast_id", ""), "before": before,
+            "after": {"home_score": int(state.get("home_score",0)), "visitor_score": int(state.get("visitor_score",0)), "possession": state.get("possession","home")},
+            "automation": {"mode": "statistician" if bool(data.get("statistician_mode")) else "quick", "play_type": play_type, "turnover_type": turnover_type, "player_id": str(data.get("player_id", "")), "passer_id": str(data.get("passer_id", "")), "manual_player": data.get("manual_player"), "manual_passer": data.get("manual_passer"), "yards": yards, "return_td": return_td, "graphic_duration": duration},
+            "media_trigger": {"key": f"{event.lower()}_{team}", "assigned": bool(player and duration), "graphics": "player_touchdown" if player and duration else None, "audio": None, "video": None},
         }
-        state["last_event"] = payload
-        events = list(state.get("events") or [])
-        events.append(payload)
-        state["events"] = events[-200:]
-        save_state(state)
-    return jsonify({
-        "state": public_state(state),
-        "trigger": payload,
-        "media_assigned": False,
-        "message": f"{label}: {team_name}" + (f" (+{delta})" if delta else " — possession updated"),
-    })
+        state["last_event"] = payload; events=list(state.get("events") or []); events.append(payload); state["events"] = events[-200:]; save_state(state)
+    return jsonify({"state": public_state(state), "trigger": payload, "media_assigned": bool(payload["media_trigger"]["assigned"]), "message": description + (f" (+{delta})" if delta else "")})
 
 @app.post("/api/toggle-scorebug")
 @require_auth
@@ -2900,6 +2990,8 @@ def undo():
             state["home_score"] = int(before.get("home_score", state.get("home_score", 0)))
             state["visitor_score"] = int(before.get("visitor_score", state.get("visitor_score", 0)))
             state["possession"] = before.get("possession", state.get("possession", "home"))
+            if "player_graphic" in before:
+                state["player_graphic"] = copy.deepcopy(before.get("player_graphic") or DEFAULT_STATE["player_graphic"])
             target["undone"] = True
             target["undone_at"] = int(time.time())
             state["events"] = events
