@@ -1,0 +1,1 @@
+The bundled qrcode Python package is version 8.2 and is included solely to generate local, offline connection QR codes. It is distributed under the BSD license in LICENSE.

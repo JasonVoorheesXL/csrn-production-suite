@@ -1,2 +1,2 @@
-Version 1.9 Alpha — Broadcast Automation Engine v1 Corrected R2
-Build V1.9A-AUTOMATION1-R2
+Version 1.12.1c Hotfix — Statistician State Synchronization
+Build V1.12.1C-STATE-SYNC

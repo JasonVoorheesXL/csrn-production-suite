@@ -16,9 +16,11 @@ from threading import Lock
 from typing import Any, Callable
 from urllib.parse import urlparse, quote
 
-from flask import Flask, jsonify, render_template, request, session, send_from_directory
+from flask import Flask, jsonify, render_template, request, session, send_from_directory, Response
 from werkzeug.security import check_password_hash, generate_password_hash
 from PIL import Image, ImageChops
+import qrcode
+import qrcode.image.svg
 from obs_client import (
     OBSConnectionError,
     set_program_visual_mode,
@@ -108,6 +110,11 @@ DEFAULT_STATE: dict[str, Any] = {
     "history": [],
     "events": [],
     "last_event": {},
+    "next_play_number": 1,
+    "ball_spot": "",
+    "correction_log": [],
+    "game_data_authority": "broadcaster",
+    "statistician_enabled": False,
     "ticker_visible": True,
     "ticker_speed": "normal",
     "production_type": "game",
@@ -200,8 +207,8 @@ def load_config() -> dict[str, Any]:
         else:
             merged[section] = values
     # Application identity always follows the running package, including after migration.
-    merged.setdefault("application", {})["version"] = "Version 1.8 Alpha — Broadcast Package Engine v1 Corrected R3 · Lineup Manager v1"
-    merged["application"]["build"] = "V1.8A-PACKAGE1-R3-LINEUP1"
+    merged.setdefault("application", {})["version"] = "Version 1.12.1b Hotfix — Operator Workflow Cleanup"
+    merged["application"]["build"] = "V1.12.1B-UI-CLEANUP"
     return merged
 
 def save_config(config: dict[str, Any]) -> None:
@@ -213,8 +220,8 @@ def save_config(config: dict[str, Any]) -> None:
 def application_identity() -> dict[str, str]:
     """Return package identity from VERSION.txt with safe config fallbacks."""
     cfg = load_config()
-    version = cfg.get("application", {}).get("version", "Version 1.8 Alpha — Broadcast Package Engine v1 Corrected R3 · Lineup Manager v1")
-    build = cfg.get("application", {}).get("build", "V1.8A-PACKAGE1-R3-LINEUP1")
+    version = cfg.get("application", {}).get("version", "Version 1.12.1b Hotfix — Operator Workflow Cleanup")
+    build = cfg.get("application", {}).get("build", "V1.12.1B-UI-CLEANUP")
     product = "CSRN Production Suite"
     if VERSION_FILE.exists():
         try:
@@ -941,6 +948,12 @@ def normalize_state(state: dict[str, Any]) -> dict[str, Any]:
     if merged.get("possession") not in {"home", "visitor"}:
         merged["possession"] = "home"
     merged.setdefault("history", [])
+    merged.setdefault("events", [])
+    merged.setdefault("correction_log", [])
+    merged["next_play_number"] = max(1, int(merged.get("next_play_number", 1) or 1))
+    if merged.get("game_data_authority") not in {"broadcaster", "statistician"}:
+        merged["game_data_authority"] = "broadcaster"
+    merged["statistician_enabled"] = merged.get("game_data_authority") == "statistician"
     return merged
 
 def load_json(path: Path, default: dict[str, Any]) -> dict[str, Any]:
@@ -2224,8 +2237,8 @@ def update_config():
         if section in incoming and isinstance(incoming[section], dict):
             current[section].update(incoming[section])
     # Protect application identity fields.
-    current["application"]["version"] = "Version 1.8 Alpha — Broadcast Package Engine v1 Corrected R3 · Lineup Manager v1"
-    current["application"]["build"] = "V1.8A-PACKAGE1-R3-LINEUP1"
+    current["application"]["version"] = "Version 1.10 Alpha — Statistics Engine v1"
+    current["application"]["build"] = "V1.10A-STATS1"
     save_config(current)
     return jsonify(current)
 
@@ -2526,6 +2539,9 @@ def update_score():
         return jsonify({"error": "INVALID_SCORE_REQUEST"}), 400
     with lock:
         state = load_state()
+        source = str(data.get("source", "broadcaster") or "broadcaster").lower()
+        if not game_data_source_allowed(state, source):
+            return authority_rejection(state)
         push_history(state)
         key = "home_score" if team == "home" else "visitor_score"
         state[key] = max(0, int(state.get(key, 0)) + delta)
@@ -2539,9 +2555,14 @@ def update_score():
 @app.post("/api/set")
 @require_auth
 def set_value():
-    data = request.get_json(force=True)
+    data = request.get_json(force=True) or {}
     allowed = {"quarter", "down", "distance", "clock_visible", "possession", "scorebug_visible", "broadcast_phase", "ticker_visible", "ticker_speed"}
+    game_data_fields = {"quarter", "down", "distance", "possession"}
     changes = {k: v for k, v in data.items() if k in allowed}
+    state = load_state()
+    source = str(data.get("source", "broadcaster") or "broadcaster").lower()
+    if game_data_fields.intersection(changes) and not game_data_source_allowed(state, source):
+        return authority_rejection(state)
     return jsonify(apply_change(changes))
 
 
@@ -2804,26 +2825,259 @@ def show_automation_player_graphic(state, roster, player, graphic_type, duration
     activate_primary_graphic(state, "player")
     state["player_graphic"] = graphic
 
+
+
+def build_statistics(state: dict[str, Any]) -> dict[str, Any]:
+    """Derive a scoring/statistics report from structured automation events."""
+    events = [e for e in list(state.get("events") or []) if not e.get("undone")]
+    broadcast_id = str(state.get("broadcast_id", ""))
+    if broadcast_id:
+        events = [e for e in events if not e.get("broadcast_id") or str(e.get("broadcast_id")) == broadcast_id]
+
+    teams = {
+        "home": {
+            "name": str(state.get("home_team") or "Home"),
+            "score": int(state.get("home_score", 0) or 0),
+            "touchdowns": 0, "field_goals": 0, "extra_points": 0,
+            "two_point_conversions": 0, "turnovers_gained": 0,
+        },
+        "visitor": {
+            "name": str(state.get("visitor_team") or "Visitor"),
+            "score": int(state.get("visitor_score", 0) or 0),
+            "touchdowns": 0, "field_goals": 0, "extra_points": 0,
+            "two_point_conversions": 0, "turnovers_gained": 0,
+        },
+    }
+    players: dict[str, dict[str, Any]] = {}
+    scoring_summary = []
+
+    def player_row(team_key: str, name: str, number: str) -> dict[str, Any] | None:
+        name = str(name or "").strip()
+        number = str(number or "").strip()
+        if not name and not number:
+            return None
+        display = name or f"{teams.get(team_key, {}).get('name', 'Team')} {number}"
+        key = f"{team_key}|{number}|{display.lower()}"
+        if key not in players:
+            players[key] = {
+                "team": team_key,
+                "team_name": teams.get(team_key, {}).get("name", ""),
+                "name": display,
+                "number": number,
+                "touchdowns": 0, "passing_touchdowns": 0,
+                "field_goals": 0, "extra_points": 0,
+                "two_point_conversions": 0, "points": 0,
+            }
+        return players[key]
+
+    for event in events:
+        team = str(event.get("team", ""))
+        if team not in teams:
+            continue
+        code = str(event.get("event", "")).upper()
+        automation = event.get("automation") if isinstance(event.get("automation"), dict) else {}
+        delta = int(event.get("score_delta", 0) or 0)
+        return_td = bool(automation.get("return_td"))
+        if code == "TD" or (code == "TURNOVER" and return_td):
+            teams[team]["touchdowns"] += 1
+        elif code == "FG":
+            teams[team]["field_goals"] += 1
+        elif code == "XP":
+            teams[team]["extra_points"] += 1
+        elif code == "2PT":
+            teams[team]["two_point_conversions"] += 1
+        if code == "TURNOVER":
+            teams[team]["turnovers_gained"] += 1
+
+        scorer = player_row(team, automation.get("player_name", ""), automation.get("player_number", ""))
+        if scorer:
+            scorer["points"] += delta
+            if code == "TD" or (code == "TURNOVER" and return_td): scorer["touchdowns"] += 1
+            elif code == "FG": scorer["field_goals"] += 1
+            elif code == "XP": scorer["extra_points"] += 1
+            elif code == "2PT": scorer["two_point_conversions"] += 1
+        if str(automation.get("play_type", "")).lower() == "reception" and code in {"TD", "2PT"}:
+            passer = player_row(team, automation.get("passer_name", ""), automation.get("passer_number", ""))
+            if passer and code == "TD": passer["passing_touchdowns"] += 1
+
+        if delta:
+            after = event.get("after") if isinstance(event.get("after"), dict) else {}
+            scoring_summary.append({
+                "quarter": str(event.get("quarter", "")),
+                "team": team,
+                "team_name": teams[team]["name"],
+                "label": str(event.get("label") or code),
+                "description": str(event.get("description") or event.get("label") or code),
+                "points": delta,
+                "home_score": int(after.get("home_score", 0) or 0),
+                "visitor_score": int(after.get("visitor_score", 0) or 0),
+                "created_at": int(event.get("created_at", 0) or 0),
+            })
+
+    player_rows = sorted(players.values(), key=lambda p: (-int(p["points"]), p["team_name"], int(p["number"]) if str(p["number"]).isdigit() else 999, p["name"]))
+    return {
+        "broadcast_id": broadcast_id,
+        "sport": str(state.get("sport") or "Football"),
+        "season": state.get("season", ""),
+        "date": state.get("date", ""),
+        "venue": state.get("venue", ""),
+        "quarter": str(state.get("quarter", "")),
+        "status": str(state.get("status", "")),
+        "teams": teams,
+        "players": player_rows,
+        "scoring_summary": scoring_summary,
+        "event_count": len(events),
+        "scoring_event_count": len(scoring_summary),
+        "generated_at": int(time.time()),
+        "note": "Statistics are derived from events entered through Broadcast Automation. Unentered plays are not included.",
+    }
+
+
+PENALTY_RULES: dict[tuple[str, str], dict[str, Any]] = {
+    ("Offensive", "Holding"): {"yards": 10, "replay_down": True},
+    ("Offensive", "False Start"): {"yards": 5, "replay_down": True, "dead_ball": True},
+    ("Offensive", "Illegal Motion"): {"yards": 5, "replay_down": True},
+    ("Offensive", "Illegal Formation"): {"yards": 5, "replay_down": True},
+    ("Offensive", "Delay of Game"): {"yards": 5, "replay_down": True},
+    ("Offensive", "Intentional Grounding"): {"yards": 5, "loss_of_down": True},
+    ("Offensive", "Personal Foul"): {"yards": 15, "replay_down": True},
+    ("Offensive", "Unsportsmanlike Conduct"): {"yards": 15, "replay_down": True},
+    ("Defensive", "Holding"): {"yards": 10, "automatic_first_down": True},
+    ("Defensive", "Pass Interference"): {"yards": 15, "automatic_first_down": True},
+    ("Defensive", "Roughing the Passer"): {"yards": 15, "automatic_first_down": True},
+    ("Defensive", "Personal Foul"): {"yards": 15, "automatic_first_down": True},
+    ("Defensive", "Unsportsmanlike Conduct"): {"yards": 15, "automatic_first_down": True},
+    ("Defensive", "Offside"): {"yards": 5, "replay_down": True},
+    ("Defensive", "Encroachment"): {"yards": 5, "replay_down": True, "dead_ball": True},
+    ("Special Teams", "Kick Catch Interference"): {"yards": 15, "automatic_first_down": False},
+    ("Special Teams", "Illegal Block"): {"yards": 10},
+    ("Special Teams", "Running Into Kicker"): {"yards": 5},
+    ("Special Teams", "Roughing Kicker"): {"yards": 15, "automatic_first_down": True},
+}
+
+def int_distance(value: Any, fallback: int = 10) -> int:
+    try:
+        return max(1, min(99, int(str(value))))
+    except (TypeError, ValueError):
+        return fallback
+
+def advance_down(down: str) -> str:
+    return {"1st": "2nd", "2nd": "3rd", "3rd": "4th", "4th": "1st"}.get(str(down), str(down) or "1st")
+
+def correction_entry(kind: str, operator: str, before: dict[str, Any], after: dict[str, Any], event_id: str = "", note: str = "") -> dict[str, Any]:
+    return {
+        "id": f"COR-{int(time.time()*1000)}", "kind": kind, "operator": operator,
+        "event_id": event_id, "before": before, "after": after, "note": note,
+        "created_at": int(time.time()),
+    }
+
+def append_correction(state: dict[str, Any], entry: dict[str, Any]) -> None:
+    rows = list(state.get("correction_log") or [])
+    rows.append(entry)
+    state["correction_log"] = rows[-500:]
+
+def apply_penalty_enforcement(state: dict[str, Any], category: str, name: str, yards: int, outcome: str) -> dict[str, Any]:
+    result = {"applied": False, "rule": {}, "down": state.get("down", "1st"), "distance": state.get("distance", "10")}
+    if outcome != "accepted":
+        return result
+    rule = copy.deepcopy(PENALTY_RULES.get((category, name), {}))
+    if not rule:
+        rule = {"yards": yards}
+        if category == "Offensive": rule["replay_down"] = True
+        if category == "Defensive" and yards >= 15: rule["automatic_first_down"] = True
+    enforced_yards = max(0, yards if yards is not None else int(rule.get("yards", 0)))
+    if rule.get("automatic_first_down"):
+        state["down"] = "1st"; state["distance"] = "10"
+    elif category == "Offensive":
+        state["distance"] = str(min(99, int_distance(state.get("distance"), 10) + enforced_yards))
+        if rule.get("loss_of_down"):
+            state["down"] = advance_down(str(state.get("down", "1st")))
+    elif category == "Defensive":
+        remaining = int_distance(state.get("distance"), 10) - enforced_yards
+        if remaining <= 0:
+            state["down"] = "1st"; state["distance"] = "10"
+        else:
+            state["distance"] = str(remaining)
+    result.update({"applied": True, "rule": rule, "down": state.get("down"), "distance": state.get("distance"), "yards": enforced_yards})
+    return result
+
+def local_addresses() -> list[str]:
+    addresses: set[str] = set()
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if ip and not ip.startswith("127."):
+                addresses.add(ip)
+    except OSError:
+        pass
+    primary = local_ip()
+    if primary and not primary.startswith("127."):
+        addresses.add(primary)
+    return sorted(addresses)
+
+@app.get("/api/statistics")
+@require_auth
+def statistics_report():
+    return jsonify(build_statistics(load_state()))
+
+def game_data_source_allowed(state: dict[str, Any], source: str) -> bool:
+    authority = str(state.get("game_data_authority", "broadcaster") or "broadcaster").lower()
+    source = str(source or "broadcaster").lower()
+    return source == authority
+
+def authority_rejection(state: dict[str, Any]):
+    authority = str(state.get("game_data_authority", "broadcaster") or "broadcaster")
+    return jsonify({"error": "CONTROL_SOURCE_LOCKED", "authority": authority, "message": f"Game data is controlled by the {authority} console."}), 409
+
+@app.post("/api/control-source")
+@require_auth
+def set_control_source():
+    data = request.get_json(force=True) or {}
+    authority = str(data.get("authority", "")).lower()
+    if authority not in {"broadcaster", "statistician"}:
+        return jsonify({"error": "INVALID_CONTROL_SOURCE"}), 400
+    with lock:
+        state = load_state()
+        push_history(state)
+        state["game_data_authority"] = authority
+        state["statistician_enabled"] = authority == "statistician"
+        state["control_source_updated_at"] = int(time.time())
+        save_state(state)
+    return jsonify(public_state(state))
+
 @app.post("/api/event-trigger")
 @require_auth
 def event_trigger():
     data = request.get_json(force=True) or {}
     team = str(data.get("team", "")).lower()
     event = str(data.get("event", "")).upper()
-    if team not in {"home", "visitor"} or event not in {"TD", "FG", "XP", "2PT", "TURNOVER"}:
+    if team not in {"home", "visitor"} or event not in {"TD", "FG", "XP", "2PT", "TURNOVER", "FIRST_DOWN", "PENALTY", "EJECTION"}:
         return jsonify({"error": "INVALID_EVENT"}), 400
     with lock:
         state = load_state()
         if not state.get("broadcast_id"):
             return jsonify({"error": "NO_ACTIVE_BROADCAST"}), 409
+        source = str(data.get("source", "broadcaster") or "broadcaster").lower()
+        if not game_data_source_allowed(state, source):
+            return authority_rejection(state)
         push_history(state)
         score_key = "home_score" if team == "home" else "visitor_score"
-        before = {"home_score": int(state.get("home_score", 0)), "visitor_score": int(state.get("visitor_score", 0)), "possession": state.get("possession", "home"), "player_graphic": copy.deepcopy(state.get("player_graphic") or {})}
+        before = {"home_score": int(state.get("home_score", 0)), "visitor_score": int(state.get("visitor_score", 0)), "possession": state.get("possession", "home"), "down": state.get("down", "1st"), "distance": state.get("distance", "10"), "ball_spot": state.get("ball_spot", ""), "quarter": state.get("quarter", "1"), "player_graphic": copy.deepcopy(state.get("player_graphic") or {})}
         return_td = bool(data.get("return_td")) and str(data.get("turnover_type", "")) != "downs"
         delta = 6 if event == "TD" or (event == "TURNOVER" and return_td) else 3 if event == "FG" else 2 if event == "2PT" else 1 if event == "XP" else 0
         if delta:
             state[score_key] = max(0, int(state.get(score_key, 0)) + delta)
         if event == "TURNOVER": state["possession"] = team
+        if event == "FIRST_DOWN":
+            state["down"] = "1st"
+            state["distance"] = "10"
+        penalty_enforcement = {}
+        if event == "PENALTY":
+            pcat = str(data.get("penalty_category", "") or "")
+            pname = str(data.get("penalty_name", "Penalty") or "Penalty")
+            poutcome = str(data.get("penalty_outcome", "accepted") or "accepted").lower()
+            pyards = max(0, min(99, int(data.get("penalty_yards", 0) or 0)))
+            penalty_enforcement = apply_penalty_enforcement(state, pcat, pname, pyards, poutcome)
         if state.get("status") != "live":
             state["status"] = "live"; state["broadcast_phase"] = "live"; update_linked_broadcast_status(state.get("broadcast_id", ""), "live")
         team_name = state.get("home_team") if team == "home" else state.get("visitor_team")
@@ -2862,6 +3116,32 @@ def event_trigger():
             description = f"{scorer_name or team_name} {kind.lower()}" + (" returned for a touchdown" if return_td else "")
             if yards and return_td:
                 description = f"{yards}-yard {description.lower()}"
+        elif event == "FIRST_DOWN":
+            label = "1st Down"
+            method = str(data.get("first_down_method", "manual") or "manual").title()
+            description = f"{team_name} first down" + (f" ({method})" if method != "Manual" else "")
+        elif event == "PENALTY":
+            penalty_name = str(data.get("penalty_name", "Penalty") or "Penalty")
+            penalty_yards = str(data.get("penalty_yards", "") or "").strip()
+            penalty_category = str(data.get("penalty_category", "") or "").strip()
+            penalty_outcome = str(data.get("penalty_outcome", "accepted") or "accepted").lower()
+            label = "Flag Picked Up" if penalty_outcome == "flag_picked_up" else "Offsetting Penalties" if penalty_outcome == "offset" else "Penalty Declined" if penalty_outcome == "declined" else "Penalty"
+            if penalty_outcome == "flag_picked_up":
+                description = f"Flag picked up — no penalty on {team_name}"
+            elif penalty_outcome == "offset":
+                description = "Offsetting penalties — replay down"
+            elif penalty_outcome == "declined":
+                description = f"Penalty declined, {team_name}" + (f" — {penalty_name}" if penalty_name else "")
+            else:
+                description = f"Penalty, {team_name}" + (f", {penalty_yards} yards" if penalty_yards else "") + (f" — {penalty_name}" if penalty_name else "")
+                if penalty_category:
+                    description += f" ({penalty_category})"
+        elif event == "EJECTION":
+            person_type = str(data.get("ejection_person_type", "Player") or "Player")
+            person_name = str(data.get("ejection_person_name", "") or "").strip()
+            reason = str(data.get("ejection_reason", "Other") or "Other")
+            label = f"{person_type} Ejected"
+            description = f"{person_type} ejected" + (f": {person_name}" if person_name else f" — {team_name}") + (f" ({reason})" if reason else "")
         elif event == "FG":
             label = "Field Goal"
             description = f"{scorer_name or team_name} field goal"
@@ -2874,16 +3154,107 @@ def event_trigger():
         if (event in {"TD", "2PT"} or return_td) and player:
             graphic_eyebrow = "TWO-POINT CONVERSION" if event == "2PT" else "DEFENSIVE TOUCHDOWN" if return_td else "TOUCHDOWN"
             show_automation_player_graphic(state, roster, player, "two_point" if event == "2PT" else "touchdown", duration, defensive=(event == "TURNOVER" and return_td), eyebrow=graphic_eyebrow, play_detail=description)
+        play_number = int(state.get("next_play_number", 1) or 1)
+        state["next_play_number"] = play_number + 1
         payload = {
-            "id": f"EV-{int(time.time()*1000)}", "team": team, "team_name": team_name, "event": event, "label": label,
+            "id": f"EV-{int(time.time()*1000)}", "play_number": play_number, "team": team, "team_name": team_name, "event": event, "label": label,
             "description": description, "score_delta": delta, "created_at": int(time.time()), "quarter": str(state.get("quarter", "1") or "1"),
-            "broadcast_id": state.get("broadcast_id", ""), "before": before,
-            "after": {"home_score": int(state.get("home_score",0)), "visitor_score": int(state.get("visitor_score",0)), "possession": state.get("possession","home")},
-            "automation": {"mode": "statistician" if bool(data.get("statistician_mode")) else "quick", "play_type": play_type, "turnover_type": turnover_type, "player_id": str(data.get("player_id", "")), "passer_id": str(data.get("passer_id", "")), "manual_player": data.get("manual_player"), "manual_passer": data.get("manual_passer"), "yards": yards, "return_td": return_td, "graphic_duration": duration},
+            "broadcast_id": state.get("broadcast_id", ""), "before": before, "source": source,
+            "first_down_method": str(data.get("first_down_method", "") or ""),
+            "penalty": {"category": str(data.get("penalty_category", "") or ""), "name": str(data.get("penalty_name", "") or ""), "yards": str(data.get("penalty_yards", "") or ""), "outcome": str(data.get("penalty_outcome", "accepted") or "accepted"), "enforcement": penalty_enforcement},
+            "ejection": {"person_type": str(data.get("ejection_person_type", "") or ""), "person_name": str(data.get("ejection_person_name", "") or ""), "reason": str(data.get("ejection_reason", "") or "")},
+            "after": {"home_score": int(state.get("home_score",0)), "visitor_score": int(state.get("visitor_score",0)), "possession": state.get("possession","home"), "down": state.get("down","1st"), "distance": state.get("distance","10"), "ball_spot": state.get("ball_spot", ""), "quarter": state.get("quarter", "1")},
+            "automation": {"mode": "statistician" if bool(data.get("statistician_mode")) else "quick", "play_type": play_type, "turnover_type": turnover_type, "player_id": str(data.get("player_id", "")), "player_name": scorer_name, "player_number": str(player.get("number", "")) if player else "", "passer_id": str(data.get("passer_id", "")), "passer_name": passer_name, "passer_number": str(passer.get("number", "")) if passer else "", "manual_player": data.get("manual_player"), "manual_passer": data.get("manual_passer"), "yards": yards, "return_td": return_td, "graphic_duration": duration},
             "media_trigger": {"key": f"{event.lower()}_{team}", "assigned": bool(player and duration), "graphics": "player_touchdown" if player and duration else None, "audio": None, "video": None},
         }
         state["last_event"] = payload; events=list(state.get("events") or []); events.append(payload); state["events"] = events[-200:]; save_state(state)
     return jsonify({"state": public_state(state), "trigger": payload, "media_assigned": bool(payload["media_trigger"]["assigned"]), "message": description + (f" (+{delta})" if delta else "")})
+
+
+@app.post("/api/game-correction")
+@require_auth
+def game_correction():
+    data = request.get_json(force=True) or {}
+    with lock:
+        state = load_state()
+        source = str(data.get("source", "statistician") or "statistician").lower()
+        if not game_data_source_allowed(state, source):
+            return authority_rejection(state)
+        before = {k: copy.deepcopy(state.get(k)) for k in ("down", "distance", "ball_spot", "possession", "quarter")}
+        down = str(data.get("down", state.get("down", "1st")))
+        if down not in {"1st", "2nd", "3rd", "4th", "Off"}: return jsonify({"error":"INVALID_DOWN"}), 400
+        possession = str(data.get("possession", state.get("possession", "home")))
+        if possession not in {"home", "visitor"}: return jsonify({"error":"INVALID_POSSESSION"}), 400
+        state["down"] = down
+        state["distance"] = "Off" if down == "Off" else str(max(1, min(99, int(data.get("distance", int_distance(state.get("distance"),10)) or 10))))
+        state["ball_spot"] = str(data.get("ball_spot", state.get("ball_spot", "")))[:40]
+        state["possession"] = possession
+        state["quarter"] = str(data.get("quarter", state.get("quarter", "1")))[:10]
+        after = {k: copy.deepcopy(state.get(k)) for k in before}
+        append_correction(state, correction_entry("quick_correction", source, before, after, note=str(data.get("note", ""))[:200]))
+        save_state(state)
+    return jsonify(public_state(state))
+
+@app.post("/api/events/<event_id>/edit")
+@require_auth
+def edit_event(event_id: str):
+    data = request.get_json(force=True) or {}
+    with lock:
+        state = load_state()
+        source = str(data.get("source", "statistician") or "statistician").lower()
+        if not game_data_source_allowed(state, source): return authority_rejection(state)
+        events = list(state.get("events") or [])
+        event = next((row for row in events if row.get("id") == event_id), None)
+        if not event: return jsonify({"error":"EVENT_NOT_FOUND"}), 404
+        before = copy.deepcopy(event)
+        if "yards" in data:
+            yards = str(max(-99, min(99, int(data.get("yards", 0) or 0))))
+            event.setdefault("automation", {})["yards"] = yards
+            desc = str(event.get("description", ""))
+            desc = re.sub(r"^-?\\d+-yard\\s+", "", desc, flags=re.I)
+            if yards not in {"", "0"}: event["description"] = f"{yards}-yard {desc[0].lower()+desc[1:] if desc else 'play'}"
+        for field in ("description", "quarter"):
+            if field in data: event[field] = str(data.get(field, ""))[:300]
+        after_state = event.setdefault("after", {})
+        for field in ("down", "distance", "ball_spot", "possession"):
+            if field in data: after_state[field] = str(data.get(field, ""))[:40]
+        if "down" in data: state["down"] = after_state["down"]
+        if "distance" in data: state["distance"] = after_state["distance"]
+        if "ball_spot" in data: state["ball_spot"] = after_state["ball_spot"]
+        if "possession" in data and after_state["possession"] in {"home","visitor"}: state["possession"] = after_state["possession"]
+        append_correction(state, correction_entry("event_edit", source, before, copy.deepcopy(event), event_id, str(data.get("note", ""))[:200]))
+        state["events"] = events
+        state["last_event"] = event
+        save_state(state)
+    return jsonify({"state": public_state(state), "event": event})
+
+@app.get("/api/corrections")
+@require_auth
+def corrections_report():
+    state = load_state()
+    return jsonify(list(reversed(state.get("correction_log") or [])))
+
+@app.get("/api/connection-info")
+@require_auth
+def connection_info():
+    addresses = local_addresses()
+    return jsonify({
+        "port": 5050,
+        "addresses": [{"ip": ip, "url": f"http://{ip}:5050"} for ip in addresses],
+        "localhost": "http://127.0.0.1:5050",
+        "guidance": "For USB tethering, connect the phone by USB, enable USB tethering, then refresh this panel and use the newly listed address from the second device. Some phones cannot browse back to the laptop while serving as the tethering device; use a separate statistician phone/tablet when that occurs.",
+    })
+
+@app.get("/api/connection-qr")
+@require_auth
+def connection_qr():
+    url = str(request.args.get("url", "") or "")
+    if not re.match(r"^https?://", url):
+        return jsonify({"error": "INVALID_URL"}), 400
+    image = qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage, box_size=8, border=2)
+    stream = io.BytesIO()
+    image.save(stream)
+    return Response(stream.getvalue(), mimetype="image/svg+xml", headers={"Cache-Control": "no-store"})
 
 @app.post("/api/toggle-scorebug")
 @require_auth
@@ -2990,6 +3361,11 @@ def undo():
             state["home_score"] = int(before.get("home_score", state.get("home_score", 0)))
             state["visitor_score"] = int(before.get("visitor_score", state.get("visitor_score", 0)))
             state["possession"] = before.get("possession", state.get("possession", "home"))
+            state["down"] = before.get("down", state.get("down", "1st"))
+            state["distance"] = before.get("distance", state.get("distance", "10"))
+            state["ball_spot"] = before.get("ball_spot", state.get("ball_spot", ""))
+            state["quarter"] = before.get("quarter", state.get("quarter", "1"))
+            append_correction(state, correction_entry("undo", "operator", target.get("after") or {}, before, target.get("id", ""), f"Undid {target.get('label', target.get('event', 'event'))}"))
             if "player_graphic" in before:
                 state["player_graphic"] = copy.deepcopy(before.get("player_graphic") or DEFAULT_STATE["player_graphic"])
             target["undone"] = True

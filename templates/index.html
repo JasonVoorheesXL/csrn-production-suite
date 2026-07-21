@@ -21,6 +21,7 @@
         <div class="subhead" id="matchup">Secure Access</div>
         <div class="header-actions">
           <div id="phaseBadge" class="phase-badge phase-pregame hidden">PREGAME</div>
+          <button id="switchConsoleButton" class="small-button hidden" onclick="openConnectionRoleModal()">Switch Console</button>
           <button id="headerLogout" class="small-button header-logout hidden" onclick="logout()">Log Out</button>
         </div>
       </div>
@@ -28,6 +29,8 @@
 
     <nav id="moduleNav" class="module-nav hidden">
       <button id="navCommand" class="nav-active" onclick="showModule('command')">Command Center</button>
+      <button id="navStatistician" onclick="showModule('statistician')">Statistician</button>
+      <button id="navStatistics" onclick="showModule('statistics')">Statistics</button>
       <button id="navPackages" onclick="showModule('packages')">Broadcast Packages</button>
       <button id="navGames" onclick="showModule('games')">Game Manager</button>
       <button id="navSchools" onclick="showModule('schools')">School Database</button>
@@ -155,13 +158,14 @@
       </section>
       <section class="panel compact readiness-panel">
         <h2>Broadcast Readiness</h2>
-        <div class="setup-grid">
-          <label>Select Broadcast
+        <div class="setup-grid readiness-grid">
+          <label class="broadcast-selector-label">Select Broadcast
             <select id="plannedBroadcastSelect"></select>
+            <span class="field-hint">Choose the game or program you want to load into Command Center.</span>
           </label>
           <div class="button-row readiness-actions">
             <button onclick="loadSelectedBroadcast()">Load Broadcast</button>
-            <button onclick="populatePlannedBroadcasts()">Refresh Broadcast List</button>
+            <button onclick="populatePlannedBroadcasts()">Refresh Broadcast</button>
             <button onclick="checkOBSReadiness()">Check OBS</button>
             <button id="startBroadcastButton" class="success" onclick="startBroadcast()">Start Broadcast</button>
             <button onclick="window.open('/overlay','_blank')">Open Overlay Preview</button>
@@ -170,14 +174,26 @@
         <div id="readinessSummary" class="status">Select a broadcast, then use Check OBS when needed.</div>
         <div id="readinessList" class="readiness-list"></div>
       </section>
-      <div class="score-grid live-operator-controls">
+      <section class="panel compact command-connection-panel">
+        <div class="section-heading compact"><div><h3>Connect Phones &amp; Tablets</h3><p class="section-note">Scan the QR code after changing Wi-Fi, hotspot, or USB tethering.</p></div><button onclick="loadBroadcastConnectionInfo()">Refresh Network</button></div>
+        <div class="connection-manager-grid">
+          <div id="broadcastConnectionQr" class="connection-qr"><span>Loading QR code…</span></div>
+          <div><div id="broadcastConnectionStatus" class="status">Detecting the current network address.</div><div class="access-key"><span>Local Access</span><code>http://127.0.0.1:5050</code></div><div id="broadcastConnectionAddresses" class="connection-addresses"></div></div>
+        </div>
+      </section>
+      <section class="panel compact authority-panel">
+        <div class="section-heading compact"><div><h3>Game Data Control</h3><p class="section-note">Only one console may publish game data.</p></div><span id="authorityBadge" class="phase-badge">BROADCASTER</span></div>
+        <div class="button-row"><button id="enableStatisticianButton" onclick="setControlSource('statistician')">Enable Statistician Console</button><button id="broadcasterTakeoverButton" class="warning hidden" onclick="setControlSource('broadcaster')">Broadcaster Takeover</button></div>
+        <div id="authorityMessage" class="status">Broadcaster controls are active.</div>
+      </section>
+      <div id="broadcasterGameDataControls" class="score-grid live-operator-controls">
         <article class="team-card">
           <h2 id="homeName">HOME</h2>
           <div class="score" id="homeScore">0</div>
           <div class="button-row score-buttons">
             <button onclick="score('home', -1)">−1</button><button onclick="score('home', 1)">+1</button><button onclick="score('home', 2)">+2</button><button onclick="score('home', 3)">+3</button><button onclick="score('home', 6)">+6</button>
           </div>
-          <div class="button-row event-buttons"><button onclick="openAutomationEvent('home','TD')">TD</button><button onclick="openAutomationEvent('home','FG')">FG</button><button onclick="openAutomationEvent('home','XP')">XP</button><button onclick="openAutomationEvent('home','2PT')">2PT</button><button onclick="openAutomationEvent('home','TURNOVER')">Turnover</button></div>
+          <div class="button-row event-buttons"><button onclick="openAutomationEvent('home','TD')">TD</button><button onclick="openAutomationEvent('home','FG')">FG</button><button onclick="openAutomationEvent('home','XP')">XP</button><button onclick="openAutomationEvent('home','2PT')">2PT</button><button onclick="openAutomationEvent('home','TURNOVER')">Turnover</button><button onclick="recordFirstDown('home','broadcaster')">1st Down</button><button onclick="openPenalty('home','broadcaster')">Penalty Caledonia</button></div>
         </article>
 
         <article class="team-card">
@@ -186,7 +202,7 @@
           <div class="button-row score-buttons">
             <button onclick="score('visitor', -1)">−1</button><button onclick="score('visitor', 1)">+1</button><button onclick="score('visitor', 2)">+2</button><button onclick="score('visitor', 3)">+3</button><button onclick="score('visitor', 6)">+6</button>
           </div>
-          <div class="button-row event-buttons"><button onclick="openAutomationEvent('visitor','TD')">TD</button><button onclick="openAutomationEvent('visitor','FG')">FG</button><button onclick="openAutomationEvent('visitor','XP')">XP</button><button onclick="openAutomationEvent('visitor','2PT')">2PT</button><button onclick="openAutomationEvent('visitor','TURNOVER')">Turnover</button></div>
+          <div class="button-row event-buttons"><button onclick="openAutomationEvent('visitor','TD')">TD</button><button onclick="openAutomationEvent('visitor','FG')">FG</button><button onclick="openAutomationEvent('visitor','XP')">XP</button><button onclick="openAutomationEvent('visitor','2PT')">2PT</button><button onclick="openAutomationEvent('visitor','TURNOVER')">Turnover</button><button onclick="recordFirstDown('visitor','broadcaster')">1st Down</button><button onclick="openPenalty('visitor','broadcaster')">Penalty Visitor</button></div>
         </article>
       </div>
 
@@ -973,6 +989,49 @@
       </section>
     </section>
 
+
+
+    <section id="statisticianModule" class="hidden">
+      <section class="panel statistician-console">
+        <div class="section-heading-row"><div><h1>Statistician Console</h1><p class="section-note">Authoritative game-data entry when enabled.</p></div><span id="statisticianAuthorityBadge" class="phase-badge">DISABLED</span></div>
+        <div id="statisticianStatus" class="status">Enable the Statistician Console from Command Center.</div>
+        <div class="statistician-scoreboard"><article><span id="statHomeName">HOME</span><strong id="statHomeScore">0</strong></article><div><b id="statDownDistance">1st & 10</b><span id="statQuarter">Q1</span></div><article><span id="statVisitorName">VISITOR</span><strong id="statVisitorScore">0</strong></article></div>
+        <div id="statisticianControls" class="statistician-controls">
+          <article class="team-card"><h2 id="statHomeHeader">HOME</h2><div class="button-row event-buttons"><button onclick="openAutomationEventFromStatistician('home','TD')">TD</button><button onclick="openAutomationEventFromStatistician('home','FG')">FG</button><button onclick="openAutomationEventFromStatistician('home','XP')">XP</button><button onclick="openAutomationEventFromStatistician('home','2PT')">2PT</button><button onclick="openAutomationEventFromStatistician('home','TURNOVER')">Turnover</button><button onclick="recordFirstDown('home','statistician')">1st Down</button><button onclick="openPenalty('home','statistician')">Penalty</button></div></article>
+          <article class="team-card"><h2 id="statVisitorHeader">VISITOR</h2><div class="button-row event-buttons"><button onclick="openAutomationEventFromStatistician('visitor','TD')">TD</button><button onclick="openAutomationEventFromStatistician('visitor','FG')">FG</button><button onclick="openAutomationEventFromStatistician('visitor','XP')">XP</button><button onclick="openAutomationEventFromStatistician('visitor','2PT')">2PT</button><button onclick="openAutomationEventFromStatistician('visitor','TURNOVER')">Turnover</button><button onclick="recordFirstDown('visitor','statistician')">1st Down</button><button onclick="openPenalty('visitor','statistician')">Penalty</button></div></article>
+        </div>
+        <div class="statistician-action-bar"><button class="warning" onclick="undo()">Undo Last Event</button><button onclick="openQuickCorrection()">Quick Correct Game State</button><button onclick="openEjection()">Record Ejection</button></div>
+        <h2>Possession</h2><div id="statPossessionButtons" class="button-row statistician-state-buttons"><button data-value="home" onclick="setStateFrom('possession','home','statistician')">Home</button><button data-value="visitor" onclick="setStateFrom('possession','visitor','statistician')">Visitor</button></div>
+        <h2>Down & Distance</h2><div id="statDownButtons" class="button-row statistician-state-buttons"><button data-value="1st" onclick="setStateFrom('down','1st','statistician')">1st</button><button data-value="2nd" onclick="setStateFrom('down','2nd','statistician')">2nd</button><button data-value="3rd" onclick="setStateFrom('down','3rd','statistician')">3rd</button><button data-value="4th" onclick="setStateFrom('down','4th','statistician')">4th</button><select id="statDistance" onchange="setStateFrom('distance',this.value,'statistician')"></select></div>
+        <section class="statistician-register"><div class="section-heading-row"><div><h2>Play Register</h2><p class="section-note">Click Edit to correct yards, description, or resulting game state.</p></div><button onclick="renderStatisticianRegister()">Refresh</button></div><div id="statisticianEventRegister" class="event-log"></div></section>
+        <section class="connection-panel"><div class="section-heading-row"><div><h2>Mobile / USB Connection</h2><p class="section-note">Addresses are detected from active laptop network adapters.</p></div><button onclick="loadConnectionInfo()">Refresh Addresses</button></div><div id="connectionInfo" class="status">Refresh after enabling hotspot or USB tethering.</div><div id="connectionAddresses" class="connection-addresses"></div></section>
+        <section><h2>Correction Log</h2><div id="correctionLog" class="correction-log"></div></section>
+      </section>
+    </section>
+
+    <section id="statisticsModule" class="hidden">
+      <section class="panel statistics-panel">
+        <div class="section-heading-row">
+          <div><h1>Statistics Engine</h1><p class="section-note">Automation-derived scoring statistics and game report.</p></div>
+          <div class="button-row"><button onclick="loadStatistics()">Refresh</button><button class="primary" onclick="printStatisticsReport()">Print / Save PDF</button></div>
+        </div>
+        <div id="statisticsStatus" class="status">Load a broadcast to generate statistics.</div>
+        <div id="statisticsScoreboard" class="statistics-scoreboard"></div>
+        <div class="statistics-summary-grid">
+          <article class="statistics-card"><strong id="statisticsEventCount">0</strong><span>Recorded Events</span></article>
+          <article class="statistics-card"><strong id="statisticsScoringCount">0</strong><span>Scoring Plays</span></article>
+          <article class="statistics-card"><strong id="statisticsPlayerCount">0</strong><span>Players Credited</span></article>
+        </div>
+        <h2>Team Scoring Summary</h2>
+        <div id="statisticsTeamTotals" class="statistics-team-totals"></div>
+        <h2>Player Scoring</h2>
+        <div class="table-scroll"><table class="statistics-table"><thead><tr><th>Team</th><th>#</th><th>Player</th><th>TD</th><th>Pass TD</th><th>FG</th><th>XP</th><th>2PT</th><th>Points</th></tr></thead><tbody id="statisticsPlayers"></tbody></table></div>
+        <h2>Scoring Plays</h2>
+        <div id="statisticsScoringPlays" class="statistics-scoring-plays"></div>
+        <p id="statisticsNote" class="section-note"></p>
+      </section>
+    </section>
+
     <section id="diagnosticsModule" class="hidden">
       <section class="panel settings-panel">
         <h1>Diagnostics</h1>
@@ -991,6 +1050,53 @@
           <button id="eventConfirmAccept" type="button" class="primary">Confirm</button>
         </div>
       </div>
+    </div>
+
+
+    <div id="penaltyModal" class="event-confirm-modal hidden" role="dialog" aria-modal="true">
+      <div class="event-confirm-sheet automation-event-sheet">
+        <div class="section-heading compact"><div><h2>Penalty</h2><p id="penaltyTeamLabel" class="section-note"></p></div><span class="phase-badge">GAME DATA</span></div>
+        <input id="penaltyTeam" type="hidden"><input id="penaltySource" type="hidden">
+        <label>Unit<select id="penaltyCategory" onchange="populatePenaltyOptions()"><option value="Offensive">Offensive</option><option value="Defensive">Defensive</option><option value="Special Teams">Special Teams</option><option value="General">General / Other</option></select></label>
+        <label>Penalty<select id="penaltyName" onchange="penaltySelectionChanged()"></select></label>
+        <label>Yards<input id="penaltyYards" type="number" min="0" max="99" inputmode="numeric"></label>
+        <label>Ruling<select id="penaltyOutcome"><option value="accepted">Accepted / Enforced</option><option value="declined">Declined</option><option value="offset">Offsetting Penalties</option><option value="flag_picked_up">Flag Picked Up — No Penalty</option></select></label>
+        <div id="penaltyMessage" class="status"></div>
+        <div class="button-row"><button onclick="closePenalty()">Cancel</button><button class="primary" onclick="submitPenalty()">Record Penalty</button></div>
+      </div>
+    </div>
+
+    <div id="quickCorrectionModal" class="event-confirm-modal hidden" role="dialog" aria-modal="true">
+      <div class="event-confirm-sheet automation-event-sheet"><h2>Quick Correct Game State</h2>
+        <div class="setup-grid"><label>Down<select id="correctDown"><option>1st</option><option>2nd</option><option>3rd</option><option>4th</option><option>Off</option></select></label><label>Distance<input id="correctDistance" type="number" min="1" max="99"></label><label>Ball Spot<input id="correctBallSpot" placeholder="Example: Visitor 42"></label><label>Possession<select id="correctPossession"><option value="home">Home</option><option value="visitor">Visitor</option></select></label><label>Quarter<input id="correctQuarter" maxlength="10"></label></div>
+        <label>Correction Note<input id="correctNote" placeholder="Optional reason"></label><div id="correctMessage" class="status"></div>
+        <div class="button-row"><button onclick="closeQuickCorrection()">Cancel</button><button class="primary" onclick="submitQuickCorrection()">Apply Correction</button></div>
+      </div>
+    </div>
+
+    <div id="connectionRoleModal" class="event-confirm-modal hidden" role="dialog" aria-modal="true">
+      <div class="event-confirm-sheet connection-role-sheet">
+        <h2>Choose Console</h2>
+        <p class="section-note">Select how this phone or tablet will be used.</p>
+        <div class="connection-role-grid">
+          <button class="primary" onclick="chooseConnectionRole('command')">Broadcaster</button>
+          <button onclick="chooseConnectionRole('statistician')">Statistician</button>
+          <button onclick="chooseConnectionRole('statistics')">Read-Only Monitor</button>
+        </div>
+        <button class="wide" onclick="closeConnectionRoleModal()">Close</button>
+      </div>
+    </div>
+
+    <div id="editEventModal" class="event-confirm-modal hidden" role="dialog" aria-modal="true">
+      <div class="event-confirm-sheet automation-event-sheet"><h2>Edit Play / Event</h2><input id="editEventId" type="hidden">
+        <label>Description<input id="editEventDescription"></label><div class="setup-grid"><label>Yards<input id="editEventYards" type="number" min="-99" max="99"></label><label>Quarter<input id="editEventQuarter"></label><label>Resulting Down<select id="editEventDown"><option value="">No change</option><option>1st</option><option>2nd</option><option>3rd</option><option>4th</option><option>Off</option></select></label><label>Resulting Distance<input id="editEventDistance" type="number" min="1" max="99"></label><label>Ball Spot<input id="editEventBallSpot"></label><label>Possession<select id="editEventPossession"><option value="">No change</option><option value="home">Home</option><option value="visitor">Visitor</option></select></label></div>
+        <label>Correction Note<input id="editEventNote" placeholder="Example: entered 17 yards instead of 27"></label><div id="editEventMessage" class="status"></div>
+        <div class="button-row"><button onclick="closeEditEvent()">Cancel</button><button class="primary" onclick="submitEventEdit()">Save Edit</button></div>
+      </div>
+    </div>
+
+    <div id="ejectionModal" class="event-confirm-modal hidden" role="dialog" aria-modal="true">
+      <div class="event-confirm-sheet"><h2>Record Ejection</h2><div class="setup-grid"><label>Team<select id="ejectionTeam"><option value="home">Home</option><option value="visitor">Visitor</option></select></label><label>Person<select id="ejectionPersonType"><option>Player</option><option>Head Coach</option><option>Assistant Coach</option><option>Team Personnel</option><option>Other</option></select></label><label>Name / Jersey<input id="ejectionPersonName"></label><label>Reason<select id="ejectionReason"><option>Fighting</option><option>Unsportsmanlike Conduct</option><option>Second Unsportsmanlike</option><option>Targeting</option><option>Leaving Bench Area</option><option>Other</option></select></label></div><div id="ejectionMessage" class="status"></div><div class="button-row"><button onclick="closeEjection()">Cancel</button><button class="primary" onclick="submitEjection()">Record Ejection</button></div></div>
     </div>
 
     <div id="automationEventModal" class="event-confirm-modal hidden" role="dialog" aria-modal="true" aria-labelledby="automationEventTitle">
@@ -1076,6 +1182,7 @@ async function initializeAuthenticatedApp() {
   moveSetupPanelToGameManager();
   showModule('command');
   appInitialized = true;
+  handleConnectionLanding();
 }
 
 async function api(path, body = null, method = null) {
@@ -1259,8 +1366,32 @@ async function createBroadcast() {
   }
 }
 
+
+let automationEventSource='broadcaster';
+const penaltyCatalog={
+  Offensive:[['False Start',5],['Holding',10],['Illegal Formation',5],['Illegal Motion',5],['Illegal Shift',5],['Delay of Game',5],['Intentional Grounding',5],['Ineligible Receiver Downfield',5],['Personal Foul',15],['Unsportsmanlike Conduct',15]],
+  Defensive:[['Offside',5],['Encroachment',5],['Holding',10],['Pass Interference',15],['Roughing the Passer',15],['Face Mask',15],['Personal Foul',15],['Unsportsmanlike Conduct',15]],
+  'Special Teams':[['Kick Catch Interference',15],['Illegal Block',10],['Holding',10],['Running Into the Kicker',5],['Roughing the Kicker',15],['Personal Foul',15]],
+  General:[['Delay of Game',5],['Sideline Warning',0],['Unsportsmanlike Conduct',15],['Other',0]]
+};
+async function setControlSource(authority){currentState=await api('/api/control-source',{authority});render()}
+function gameDataLockedFor(source){return (currentState?.game_data_authority||'broadcaster')!==source}
+async function refreshAuthoritativeGameState(){
+  try { currentState = await api('/api/state'); } catch (e) { /* keep mutation response state if refresh is unavailable */ }
+  render();
+  renderStatisticianRegister();
+}
+async function setStateFrom(key,value,source){try{currentState=await api('/api/set',{[key]:value,source});await refreshAuthoritativeGameState()}catch(e){alert(e.data?.message||e.message)}}
+async function recordFirstDown(team,source){try{const result=await api('/api/event-trigger',{team,event:'FIRST_DOWN',source,first_down_method:'manual'});currentState=result.state;await refreshAuthoritativeGameState()}catch(e){alert(e.data?.message||e.message)}}
+function openPenalty(team,source){if(gameDataLockedFor(source)){alert(`Game data is controlled by the ${currentState.game_data_authority} console.`);return}document.getElementById('penaltyTeam').value=team;document.getElementById('penaltySource').value=source;document.getElementById('penaltyTeamLabel').textContent=team==='home'?currentState.home_team:currentState.visitor_team;document.getElementById('penaltyCategory').value=source==='statistician'?'Offensive':'General';populatePenaltyOptions();document.getElementById('penaltyModal').classList.remove('hidden')}
+function closePenalty(){document.getElementById('penaltyModal').classList.add('hidden')}
+function populatePenaltyOptions(){const cat=document.getElementById('penaltyCategory').value;document.getElementById('penaltyName').innerHTML=(penaltyCatalog[cat]||[]).map(([n,y])=>`<option value="${escapeHtml(n)}" data-yards="${y}">${escapeHtml(n)}</option>`).join('');penaltySelectionChanged()}
+function penaltySelectionChanged(){const opt=document.getElementById('penaltyName').selectedOptions[0];document.getElementById('penaltyYards').value=opt?.dataset.yards||0}
+async function submitPenalty(){const payload={team:document.getElementById('penaltyTeam').value,event:'PENALTY',source:document.getElementById('penaltySource').value,penalty_category:document.getElementById('penaltyCategory').value,penalty_name:document.getElementById('penaltyName').value,penalty_yards:document.getElementById('penaltyYards').value,penalty_outcome:document.getElementById('penaltyOutcome').value};try{const result=await api('/api/event-trigger',payload);currentState=result.state;closePenalty();render();renderStatisticianRegister()}catch(e){document.getElementById('penaltyMessage').textContent=e.data?.message||e.message}}
+async function openAutomationEventFromStatistician(team,event){automationEventSource='statistician';await openAutomationEvent(team,event)}
+
 async function score(team, delta) {
-  currentState = await api('/api/score', {team, delta});
+  currentState = await api('/api/score', {team, delta, source:'broadcaster'});
   render();
 }
 function confirmEventAction(message){
@@ -1288,7 +1419,8 @@ function automationPlayerLabel(p){const full=[p.first_name,p.last_name].filter(B
 function automationTeamRoster(team){const schoolId=team==='home'?currentState.home_school_id:currentState.visitor_school_id;return automationEventRosters.find(r=>String(r.school_id)===String(schoolId)&&String(r.sport||'Football').toLowerCase()==='football')||automationEventRosters.find(r=>String(r.school_id)===String(schoolId))}
 function automationRosterPlayers(){const roster=automationTeamRoster(document.getElementById('automationEventTeamKey').value);return (roster?.players||[]).filter(p=>p.status!=='inactive')}
 function automationInputFor(role){return document.getElementById({scorer:'automationScorerNumber',passer:'automationPasserNumber',kicker:'automationKickerNumber',turnover:'automationTurnoverNumber'}[role])}
-function populateAutomationJerseyPickers(){const rosterNums=[...new Set(automationRosterPlayers().map(p=>String(p.number||'').trim()).filter(Boolean))].sort((a,b)=>(Number(a)||0)-(Number(b)||0));const remaining=Array.from({length:100},(_,i)=>String(i)).filter(n=>!rosterNums.includes(n));const options=['<option value="">Select jersey number…</option>',...rosterNums.map(n=>`<option value="${escapeHtml(n)}">#${escapeHtml(n)} · roster</option>`),...remaining.map(n=>`<option value="${n}">#${n}</option>`)].join('');['scorer','passer','kicker','turnover'].forEach(role=>{const el=automationInputFor(role);if(el)el.innerHTML=options;});}
+function automationShortName(player){const first=String(player?.first_name||'').trim(),last=String(player?.last_name||'').trim(),preferred=String(player?.preferred_name||'').trim();if(last)return `${first?first.charAt(0)+'. ':''}${last}`;return preferred||first||'Roster player'}
+function populateAutomationJerseyPickers(){const players=automationRosterPlayers();const byNumber={};players.forEach(p=>{const n=String(p.number||'').trim();if(n)(byNumber[n]||(byNumber[n]=[])).push(p)});const rosterNums=Object.keys(byNumber).sort((a,b)=>(Number(a)||0)-(Number(b)||0));const remaining=Array.from({length:100},(_,i)=>String(i)).filter(n=>!rosterNums.includes(n));const options=['<option value="">Select jersey number…</option>',...rosterNums.map(n=>{const names=byNumber[n].map(automationShortName);const label=names.length>2?`${names.slice(0,2).join(' / ')} +${names.length-2}`:names.join(' / ');return `<option value="${escapeHtml(n)}">#${escapeHtml(n)} · ${escapeHtml(label)}</option>`}),...remaining.map(n=>`<option value="${n}">#${n}</option>`)].join('');['scorer','passer','kicker','turnover'].forEach(role=>{const el=automationInputFor(role);if(el)el.innerHTML=options;});}
 function preferredPosition(player, context){if(!player)return 'ATH';const primary=String(player.position||'').trim();const secondary=String(player.secondary_position||'').trim();let pos=context==='defense'?(secondary||primary):(primary||secondary);if(/^athlete$/i.test(pos))pos='ATH';if(pos.includes('/'))pos=pos.split('/')[0].trim();return pos||'ATH'}
 function resolveAutomationNumber(role){
   const input=automationInputFor(role),num=String(input?.value||'').trim(),panel=document.getElementById('automationMatchPanel'),manual=document.getElementById('automationManualPlayer');
@@ -1307,6 +1439,8 @@ function resolveAutomationNumber(role){
 }
 function chooseAutomationPlayer(role,index){const panel=document.getElementById('automationMatchPanel');const matches=JSON.parse(panel.dataset.matches||'[]');automationResolved[role]=matches[index]||null;panel.innerHTML=`<strong>Selected:</strong> ${escapeHtml(automationPlayerLabel(automationResolved[role]||{}))}`;}
 async function openAutomationEvent(team,event){
+  if(automationEventSource!=='statistician') automationEventSource='broadcaster';
+  if(gameDataLockedFor(automationEventSource)){alert(`Game data is controlled by the ${currentState.game_data_authority} console.`);automationEventSource='broadcaster';return}
   try{automationEventRosters=await api('/api/rosters')}catch(e){automationEventRosters=[]}
   const roster=automationTeamRoster(team);document.getElementById('automationRosterId').value=roster?.id||'';
   document.getElementById('automationEventTeamKey').value=team;document.getElementById('automationEventType').value=event;
@@ -1321,7 +1455,7 @@ async function openAutomationEvent(team,event){
   document.getElementById('automationPlayType').value='rush';document.getElementById('automationTurnoverType').value='interception';document.getElementById('automationTurnoverTd').checked=false;document.getElementById('automationStatisticianMode').checked=false;document.getElementById('automationYards').value='';document.getElementById('automationGraphicDuration').value='8';document.getElementById('automationEventMessage').textContent='';
   populateAutomationJerseyPickers();automationPlayTypeChanged();automationTurnoverTypeChanged();automationStatisticianChanged();document.body.classList.add('automation-modal-open');document.getElementById('automationEventModal').classList.remove('hidden');
 }
-function closeAutomationEvent(){document.getElementById('automationEventModal').classList.add('hidden');document.body.classList.remove('automation-modal-open')}
+function closeAutomationEvent(){document.getElementById('automationEventModal').classList.add('hidden');document.body.classList.remove('automation-modal-open');automationEventSource='broadcaster'}
 function automationPlayTypeChanged(){document.getElementById('automationPasserWrap').classList.toggle('hidden',document.getElementById('automationPlayType').value!=='reception')}
 function automationTurnoverTypeChanged(){const downs=document.getElementById('automationTurnoverType').value==='downs';const cb=document.getElementById('automationTurnoverTd');cb.disabled=downs;if(downs)cb.checked=false;resolveAutomationNumber('turnover')}
 function automationStatisticianChanged(){const event=document.getElementById('automationEventType').value;document.getElementById('automationYardsWrap').classList.toggle('hidden',!document.getElementById('automationStatisticianMode').checked||event==='XP')}
@@ -1329,7 +1463,7 @@ function automationManualPayload(role){const input=automationInputFor(role),numb
 async function confirmAutomationEvent(){
   const event=document.getElementById('automationEventType').value,team=document.getElementById('automationEventTeamKey').value;
   const role=event==='TURNOVER'?'turnover':(['FG','XP'].includes(event)?'kicker':'scorer');resolveAutomationNumber(role);
-  const payload={team,event,roster_id:document.getElementById('automationRosterId').value,statistician_mode:document.getElementById('automationStatisticianMode').checked,yards:document.getElementById('automationStatisticianMode').checked?document.getElementById('automationYards').value:'',graphic_duration:Number(document.getElementById('automationGraphicDuration').value||0)};
+  const payload={team,event,source:automationEventSource,roster_id:document.getElementById('automationRosterId').value,statistician_mode:document.getElementById('automationStatisticianMode').checked,yards:document.getElementById('automationStatisticianMode').checked?document.getElementById('automationYards').value:'',graphic_duration:Number(document.getElementById('automationGraphicDuration').value||0)};
   if(['TD','2PT'].includes(event)){payload.player_id=automationResolved.scorer?.id||'';payload.manual_player=automationManualPayload('scorer');payload.play_type=document.getElementById('automationPlayType').value;payload.passer_id=payload.play_type==='reception'?(automationResolved.passer?.id||''):'';payload.manual_passer=payload.play_type==='reception'?automationManualPayload('passer'):null;}
   else if(['FG','XP'].includes(event)){payload.player_id=automationResolved.kicker?.id||'';payload.manual_player=automationManualPayload('kicker');payload.play_type='kick';}
   else{payload.turnover_type=document.getElementById('automationTurnoverType').value;payload.player_id=automationResolved.turnover?.id||'';payload.manual_player=automationManualPayload('turnover');payload.return_td=document.getElementById('automationTurnoverTd').checked;}
@@ -1347,7 +1481,7 @@ async function triggerEvent(team,event){
 }
 
 async function setState(key, value) {
-  currentState = await api('/api/set', {[key]: value});
+  currentState = await api('/api/set', {[key]: value, source:'broadcaster'});
   render();
 }
 
@@ -1409,9 +1543,66 @@ async function newBroadcast() {
   render();
 }
 
+
+function openQuickCorrection(){if(gameDataLockedFor('statistician')){alert('Statistician authority must be active.');return}document.getElementById('correctDown').value=currentState.down||'1st';document.getElementById('correctDistance').value=currentState.distance==='Off'?10:(currentState.distance||10);document.getElementById('correctBallSpot').value=currentState.ball_spot||'';document.getElementById('correctPossession').value=currentState.possession||'home';document.getElementById('correctQuarter').value=currentState.quarter||'1';document.getElementById('correctNote').value='';document.getElementById('quickCorrectionModal').classList.remove('hidden')}
+function closeQuickCorrection(){document.getElementById('quickCorrectionModal').classList.add('hidden')}
+async function submitQuickCorrection(){try{currentState=await api('/api/game-correction',{source:'statistician',down:document.getElementById('correctDown').value,distance:document.getElementById('correctDistance').value,ball_spot:document.getElementById('correctBallSpot').value,possession:document.getElementById('correctPossession').value,quarter:document.getElementById('correctQuarter').value,note:document.getElementById('correctNote').value});closeQuickCorrection();await refreshAuthoritativeGameState();loadCorrections()}catch(e){document.getElementById('correctMessage').textContent=e.data?.message||e.message}}
+function openEditEvent(id){const ev=(currentState.events||[]).find(e=>e.id===id);if(!ev)return;document.getElementById('editEventId').value=id;document.getElementById('editEventDescription').value=ev.description||'';document.getElementById('editEventYards').value=ev.automation?.yards||'';document.getElementById('editEventQuarter').value=ev.quarter||'';document.getElementById('editEventDown').value=ev.after?.down||'';document.getElementById('editEventDistance').value=ev.after?.distance||'';document.getElementById('editEventBallSpot').value=ev.after?.ball_spot||'';document.getElementById('editEventPossession').value=ev.after?.possession||'';document.getElementById('editEventNote').value='';document.getElementById('editEventModal').classList.remove('hidden')}
+function closeEditEvent(){document.getElementById('editEventModal').classList.add('hidden')}
+async function submitEventEdit(){const payload={source:'statistician',description:document.getElementById('editEventDescription').value,yards:document.getElementById('editEventYards').value,quarter:document.getElementById('editEventQuarter').value,note:document.getElementById('editEventNote').value};for(const [key,id] of [['down','editEventDown'],['distance','editEventDistance'],['ball_spot','editEventBallSpot'],['possession','editEventPossession']]){const v=document.getElementById(id).value;if(v!=='')payload[key]=v}try{const result=await api(`/api/events/${encodeURIComponent(document.getElementById('editEventId').value)}/edit`,payload);currentState=result.state;closeEditEvent();await refreshAuthoritativeGameState();loadCorrections()}catch(e){document.getElementById('editEventMessage').textContent=e.data?.message||e.message}}
+function openEjection(){if(gameDataLockedFor('statistician')){alert('Statistician authority must be active.');return}document.getElementById('ejectionModal').classList.remove('hidden')}
+function closeEjection(){document.getElementById('ejectionModal').classList.add('hidden')}
+async function submitEjection(){const payload={team:document.getElementById('ejectionTeam').value,event:'EJECTION',source:'statistician',ejection_person_type:document.getElementById('ejectionPersonType').value,ejection_person_name:document.getElementById('ejectionPersonName').value,ejection_reason:document.getElementById('ejectionReason').value};try{const result=await api('/api/event-trigger',payload);currentState=result.state;closeEjection();await refreshAuthoritativeGameState()}catch(e){document.getElementById('ejectionMessage').textContent=e.data?.message||e.message}}
+function renderStatisticianRegister(){const el=document.getElementById('statisticianEventRegister');if(!el)return;const events=(currentState.events||[]).slice().reverse();el.innerHTML=events.length?events.map(ev=>`<div class="event-log-row${ev.undone?' is-undone':''}"><strong>Play ${escapeHtml(ev.play_number||'—')} · ${escapeHtml(ev.label||ev.event)}</strong><span>${escapeHtml(ev.description||'')}</span><div class="button-row"><time>Q${escapeHtml(ev.quarter||'—')}</time>${!ev.undone?`<button onclick="openEditEvent('${escapeHtml(ev.id)}')">Edit</button>`:''}</div></div>`).join(''):'<div class="section-note">No plays or events recorded.</div>'}
+async function loadCorrections(){const el=document.getElementById('correctionLog');if(!el)return;try{const rows=await api('/api/corrections');el.innerHTML=rows.length?rows.slice(0,30).map(r=>`<article><strong>${escapeHtml(String(r.kind||'Correction').replaceAll('_',' '))}</strong><span>${escapeHtml(r.note||r.event_id||'Game state corrected')}</span><time>${new Date((r.created_at||0)*1000).toLocaleString()}</time></article>`).join(''):'<div class="section-note">No corrections recorded.</div>'}catch(e){el.textContent=e.message}}
+async function loadConnectionInfo(){const status=document.getElementById('connectionInfo'),list=document.getElementById('connectionAddresses');try{const info=await api('/api/connection-info');status.textContent=info.guidance;status.className='status success';list.innerHTML=(info.addresses||[]).map(row=>`<article><strong>${escapeHtml(row.url)}</strong><button onclick="navigator.clipboard?.writeText('${escapeHtml(row.url)}')">Copy</button></article>`).join('')||'<div class="section-note">No external adapter address detected. Enable hotspot or USB tethering, then refresh.</div>'}catch(e){status.textContent=e.message;status.className='status error'}}
+
+function preferredConnectionAddress(rows){
+  const usable=(rows||[]).filter(row=>row && row.ip && !String(row.ip).startsWith('127.'));
+  return usable.find(row=>String(row.ip).startsWith('172.20.10.')) || usable[0] || null;
+}
+async function loadBroadcastConnectionInfo(){
+  const status=document.getElementById('broadcastConnectionStatus');
+  const list=document.getElementById('broadcastConnectionAddresses');
+  const qr=document.getElementById('broadcastConnectionQr');
+  if(!status||!list||!qr)return;
+  try{
+    const info=await api('/api/connection-info');
+    const rows=info.addresses||[];
+    const preferred=preferredConnectionAddress(rows);
+    if(!preferred){
+      status.textContent='No external address detected. Connect the laptop to Wi-Fi, hotspot, or USB tethering, then refresh.';
+      status.className='status error';
+      qr.innerHTML='<span>No QR code available</span>';
+      list.innerHTML='';
+      return;
+    }
+    const connectUrl=preferred.url+'/?connect=1';
+    status.textContent=`Network Access: ${preferred.url}. Use this address on phones and tablets connected to the same network.`;
+    status.className='status success';
+    qr.innerHTML=`<img src="/api/connection-qr?url=${encodeURIComponent(connectUrl)}&t=${Date.now()}" alt="CSRN connection QR code"><strong>Scan to connect</strong>`;
+    list.innerHTML=rows.map(row=>`<article class="${row.ip===preferred.ip?'recommended-address':''}"><div><small>${row.ip===preferred.ip?'NETWORK ACCESS · RECOMMENDED':'NETWORK ACCESS · AVAILABLE'}</small><strong>${escapeHtml(row.url)}</strong></div><button onclick="copyConnectionAddress('${escapeHtml(row.url)}')">Copy</button></article>`).join('');
+  }catch(e){status.textContent=e.message;status.className='status error';qr.innerHTML='<span>Unable to generate QR code</span>'}
+}
+async function copyConnectionAddress(url){
+  try{await navigator.clipboard.writeText(url)}catch(e){window.prompt('Copy this address:',url)}
+}
+function handleConnectionLanding(){
+  const params=new URLSearchParams(window.location.search);
+  if(params.get('connect')==='1'){document.getElementById('connectionRoleModal')?.classList.remove('hidden')}
+}
+function chooseConnectionRole(module){
+  closeConnectionRoleModal();
+  showModule(module);
+  const clean=window.location.pathname;
+  window.history.replaceState({},document.title,clean);
+}
+function openConnectionRoleModal(){document.getElementById('connectionRoleModal')?.classList.remove('hidden')}
+function closeConnectionRoleModal(){document.getElementById('connectionRoleModal')?.classList.add('hidden')}
+
 async function undo() {
   currentState = await api('/api/undo', {});
-  render();
+  await refreshAuthoritativeGameState();
 }
 
 function markActive(containerId, value) {
@@ -1445,6 +1636,7 @@ function render() {
   document.getElementById('controlPanel').classList.toggle('review-mode', created && currentState.status === 'completed');
   document.getElementById('phaseBadge').classList.toggle('hidden', !created);
   document.getElementById('headerLogout').classList.toggle('hidden', !authenticated);
+  const switchConsoleButton=document.getElementById('switchConsoleButton'); if(switchConsoleButton) switchConsoleButton.classList.toggle('hidden', !authenticated);
   document.getElementById('moduleNav').classList.toggle('hidden', !authenticated);
 
   if (!created) {
@@ -1460,6 +1652,22 @@ function render() {
   document.getElementById('visitorPossessionButton').textContent = `${currentState.visitor_team} ▶`;
   document.getElementById('homeScore').textContent = currentState.home_score;
   document.getElementById('visitorScore').textContent = currentState.visitor_score;
+  const authority=currentState.game_data_authority||'broadcaster';
+  const statActive=authority==='statistician';
+  const authorityBadge=document.getElementById('authorityBadge'); if(authorityBadge){authorityBadge.textContent=statActive?'STATISTICIAN':'BROADCASTER';authorityBadge.classList.toggle('onair',statActive)}
+  const authorityMessage=document.getElementById('authorityMessage'); if(authorityMessage) authorityMessage.textContent=statActive?'Statistician Console has priority. Broadcaster game-data controls are locked.':'Broadcaster game-data controls are active.';
+  const broadcasterControls=document.getElementById('broadcasterGameDataControls'); if(broadcasterControls){broadcasterControls.classList.toggle('controls-locked',statActive);broadcasterControls.querySelectorAll('button').forEach(b=>b.disabled=statActive)}
+  const enableButton=document.getElementById('enableStatisticianButton'); if(enableButton) enableButton.classList.toggle('hidden',statActive);
+  const takeoverButton=document.getElementById('broadcasterTakeoverButton'); if(takeoverButton) takeoverButton.classList.toggle('hidden',!statActive);
+  const statBadge=document.getElementById('statisticianAuthorityBadge'); if(statBadge) statBadge.textContent=statActive?'ACTIVE':'DISABLED';
+  const statStatus=document.getElementById('statisticianStatus'); if(statStatus) statStatus.textContent=statActive?'Statistician Console is the authoritative game-data source.':'Enable this console from Command Center before entering game data.';
+  const statControls=document.getElementById('statisticianControls'); if(statControls){statControls.classList.toggle('controls-locked',!statActive);statControls.querySelectorAll('button').forEach(b=>b.disabled=!statActive)}
+  renderStatisticianRegister();
+  [['statHomeName',currentState.home_team],['statVisitorName',currentState.visitor_team],['statHomeHeader',currentState.home_team],['statVisitorHeader',currentState.visitor_team],['statHomeScore',currentState.home_score],['statVisitorScore',currentState.visitor_score],['statQuarter',`Q${currentState.quarter}`],['statDownDistance',`${currentState.down} & ${currentState.distance}`]].forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.textContent=v});
+  const statDistance=document.getElementById('statDistance');if(statDistance){if(!statDistance.options.length){statDistance.innerHTML=['Off',...Array.from({length:99},(_,i)=>String(i+1))].map(v=>`<option>${v}</option>`).join('')}statDistance.value=String(currentState.distance||'10')}
+  markActive('statPossessionButtons', currentState.possession);
+  markActive('statDownButtons', currentState.down);
+
   markActive('quarterButtons', currentState.quarter);
   markActive('downButtons', currentState.down);
   const ds=document.getElementById('distanceSelect'); if(ds) ds.value=String(currentState.distance ?? 'Off');
@@ -1496,7 +1704,7 @@ function render() {
       const delta=ev.score_delta?` +${ev.score_delta}`:'';
       const quarter=ev.quarter?`Q${escapeHtml(String(ev.quarter).replace(/^Q/i,''))}`:'';
       const undone=ev.undone?' <em class="event-undone">UNDONE</em>':'';
-      const icon={TD:'🏈',FG:'🥅',XP:'1','2PT':'2',TURNOVER:'↔'}[String(ev.event||'').toUpperCase()]||'•';
+      const icon={TD:'🏈',FG:'🥅',XP:'1','2PT':'2',TURNOVER:'↔',FIRST_DOWN:'1D',PENALTY:'⚑'}[String(ev.event||'').toUpperCase()]||'•';
       const score=ev.after?`${Number(ev.after.home_score||0)}–${Number(ev.after.visitor_score||0)}`:'';
       const identity=ev.team==='home'?(currentState.home_identity||{}):(currentState.visitor_identity||{});
       const color=identity.primary_color||'#ffffff';
@@ -1698,6 +1906,8 @@ function showModule(module) {
   document.getElementById('obsModule').classList.toggle('hidden', module !== 'obs');
   document.getElementById('upgradeModule').classList.add('hidden');
   document.getElementById('settingsModule').classList.toggle('hidden', module !== 'settings');
+  document.getElementById('statisticianModule').classList.toggle('hidden', module !== 'statistician');
+  document.getElementById('statisticsModule').classList.toggle('hidden', module !== 'statistics');
   document.getElementById('diagnosticsModule').classList.toggle('hidden', module !== 'diagnostics');
   document.getElementById('navCommand').classList.toggle('nav-active', module === 'command');
   document.getElementById('navPackages').classList.toggle('nav-active', module === 'packages');
@@ -1710,10 +1920,12 @@ function showModule(module) {
   document.getElementById('navSponsors').classList.toggle('nav-active', module === 'sponsors');
   document.getElementById('navOBS').classList.toggle('nav-active', module === 'obs');
   document.getElementById('navSettings').classList.toggle('nav-active', module === 'settings');
+  document.getElementById('navStatistician').classList.toggle('nav-active', module === 'statistician');
+  document.getElementById('navStatistics').classList.toggle('nav-active', module === 'statistics');
   document.getElementById('navDiagnostics').classList.toggle('nav-active', module === 'diagnostics');
   if (module === 'packages') loadPackages();
   if (module === 'games') { moveSetupPanelToGameManager(); loadGameManager(); }
-  if (module === 'command') { document.getElementById('setupPanel').classList.add('hidden'); populatePlannedBroadcasts(); if(currentState&&currentState.broadcast_id) refreshReadiness(); else renderNeutralReadiness(); }
+  if (module === 'command') { document.getElementById('setupPanel').classList.add('hidden'); populatePlannedBroadcasts(); loadBroadcastConnectionInfo(); if(currentState&&currentState.broadcast_id) refreshReadiness(); else renderNeutralReadiness(); }
   if (module === 'schools') loadSchools();
   if (module === 'rosters') loadRosters();
   if (module === 'broadcasters') {loadBroadcasters().then(()=>{populatePersonnelSchools();loadPersonnelGraphics()});}
@@ -1722,6 +1934,8 @@ function showModule(module) {
   if (module === 'sponsors') loadSponsors();
   if (module === 'obs') loadOBSStatus();
   if (module === 'settings') loadConfig();
+  if (module === 'statistics') loadStatistics();
+  if (module === 'statistician') { renderStatisticianRegister(); loadCorrections(); loadConnectionInfo(); }
   if (module === 'diagnostics') loadDiagnostics();
 }
 
@@ -2866,6 +3080,35 @@ async function startBroadcast(){
   }
   const result=await api('/api/start-broadcast',{});
   currentState=result.state||result; render(); await loadGameManager(); await populatePlannedBroadcasts();
+}
+
+
+let statisticsData=null;
+function statNum(value){return Number(value||0).toLocaleString()}
+async function loadStatistics(){
+  const status=document.getElementById('statisticsStatus');
+  try{
+    statisticsData=await api('/api/statistics');
+    const home=statisticsData.teams?.home||{},visitor=statisticsData.teams?.visitor||{};
+    status.textContent=`${home.name||'Home'} vs ${visitor.name||'Visitor'} · ${statisticsData.status||'not started'}`;status.className='status success';
+    document.getElementById('statisticsEventCount').textContent=statNum(statisticsData.event_count);
+    document.getElementById('statisticsScoringCount').textContent=statNum(statisticsData.scoring_event_count);
+    document.getElementById('statisticsPlayerCount').textContent=statNum((statisticsData.players||[]).length);
+    document.getElementById('statisticsScoreboard').innerHTML=`<div><span>${escapeHtml(home.name||'Home')}</span><strong>${statNum(home.score)}</strong></div><div><span>${escapeHtml(visitor.name||'Visitor')}</span><strong>${statNum(visitor.score)}</strong></div>`;
+    document.getElementById('statisticsTeamTotals').innerHTML=['home','visitor'].map(key=>{const t=statisticsData.teams?.[key]||{};return `<article><h3>${escapeHtml(t.name||key)}</h3><dl><div><dt>Touchdowns</dt><dd>${statNum(t.touchdowns)}</dd></div><div><dt>Field Goals</dt><dd>${statNum(t.field_goals)}</dd></div><div><dt>Extra Points</dt><dd>${statNum(t.extra_points)}</dd></div><div><dt>2PT</dt><dd>${statNum(t.two_point_conversions)}</dd></div><div><dt>Turnovers Gained</dt><dd>${statNum(t.turnovers_gained)}</dd></div></dl></article>`}).join('');
+    document.getElementById('statisticsPlayers').innerHTML=(statisticsData.players||[]).map(p=>`<tr><td>${escapeHtml(p.team_name)}</td><td>${escapeHtml(p.number||'—')}</td><td>${escapeHtml(p.name)}</td><td>${statNum(p.touchdowns)}</td><td>${statNum(p.passing_touchdowns)}</td><td>${statNum(p.field_goals)}</td><td>${statNum(p.extra_points)}</td><td>${statNum(p.two_point_conversions)}</td><td><strong>${statNum(p.points)}</strong></td></tr>`).join('')||'<tr><td colspan="9">No player scoring has been recorded.</td></tr>';
+    document.getElementById('statisticsScoringPlays').innerHTML=(statisticsData.scoring_summary||[]).map(play=>`<article><span>Q${escapeHtml(play.quarter||'—')}</span><div><strong>${escapeHtml(play.team_name)} · ${escapeHtml(play.label)}</strong><p>${escapeHtml(play.description)}</p></div><b>${statNum(play.home_score)}–${statNum(play.visitor_score)}</b></article>`).join('')||'<div class="section-note">No scoring plays recorded.</div>';
+    document.getElementById('statisticsNote').textContent=statisticsData.note||'';
+  }catch(error){status.textContent=error.message||'Unable to load statistics.';status.className='status error'}
+}
+function printStatisticsReport(){
+  if(!statisticsData){loadStatistics().then(printStatisticsReport);return}
+  const home=statisticsData.teams?.home||{},visitor=statisticsData.teams?.visitor||{};
+  const teamRows=['home','visitor'].map(k=>{const t=statisticsData.teams?.[k]||{};return `<tr><td>${escapeHtml(t.name)}</td><td>${t.score||0}</td><td>${t.touchdowns||0}</td><td>${t.field_goals||0}</td><td>${t.extra_points||0}</td><td>${t.two_point_conversions||0}</td><td>${t.turnovers_gained||0}</td></tr>`}).join('');
+  const playerRows=(statisticsData.players||[]).map(p=>`<tr><td>${escapeHtml(p.team_name)}</td><td>${escapeHtml(p.number||'')}</td><td>${escapeHtml(p.name)}</td><td>${p.touchdowns||0}</td><td>${p.passing_touchdowns||0}</td><td>${p.field_goals||0}</td><td>${p.extra_points||0}</td><td>${p.two_point_conversions||0}</td><td>${p.points||0}</td></tr>`).join('');
+  const plays=(statisticsData.scoring_summary||[]).map(p=>`<tr><td>Q${escapeHtml(p.quarter)}</td><td>${escapeHtml(p.team_name)}</td><td>${escapeHtml(p.description)}</td><td>${p.home_score}–${p.visitor_score}</td></tr>`).join('');
+  const w=window.open('','_blank');if(!w)return;
+  w.document.write(`<!doctype html><html><head><title>CSRN Game Statistics</title><style>body{font-family:Arial,sans-serif;margin:32px;color:#111}h1{margin-bottom:4px}.score{font-size:28px;font-weight:800;margin:18px 0}table{width:100%;border-collapse:collapse;margin:12px 0 28px}th,td{border:1px solid #aaa;padding:7px;text-align:left}th{background:#eee}.note{font-size:12px;color:#555}@media print{button{display:none}}</style></head><body><h1>CSRN Game Statistics</h1><div>${escapeHtml(statisticsData.date||'')} · ${escapeHtml(statisticsData.venue||'')}</div><div class="score">${escapeHtml(home.name)} ${home.score||0} — ${visitor.score||0} ${escapeHtml(visitor.name)}</div><h2>Team Summary</h2><table><tr><th>Team</th><th>Score</th><th>TD</th><th>FG</th><th>XP</th><th>2PT</th><th>TO Gained</th></tr>${teamRows}</table><h2>Player Scoring</h2><table><tr><th>Team</th><th>#</th><th>Player</th><th>TD</th><th>Pass TD</th><th>FG</th><th>XP</th><th>2PT</th><th>Pts</th></tr>${playerRows||'<tr><td colspan="9">No player scoring recorded.</td></tr>'}</table><h2>Scoring Plays</h2><table><tr><th>Quarter</th><th>Team</th><th>Play</th><th>Score</th></tr>${plays||'<tr><td colspan="4">No scoring plays recorded.</td></tr>'}</table><p class="note">${escapeHtml(statisticsData.note||'')}</p><button onclick="window.print()">Print / Save PDF</button></body></html>`);w.document.close();w.focus();
 }
 
 </script>

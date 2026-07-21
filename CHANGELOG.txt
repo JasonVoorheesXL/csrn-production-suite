@@ -1,83 +1,55 @@
-Version 1.9 Alpha — Broadcast Automation Engine v1
-- Guided touchdown workflow with scorer, play type, conditional passer, and optional statistician yardage.
-- Guided turnover workflow with turnover type and optional defensive touchdown.
-- Automatic player touchdown graphic with configurable duration.
-- Human-readable event descriptions and linked Undo restoration.
+Version 1.12.1c Hotfix — Statistician State Synchronization
 
-Version 1.8 Alpha — Broadcast Package Engine v1 Corrected R2
-- Normalized wrapped Sponsor API responses for Broadcast Package option loading and saving.
-- Added defensive normalization for package, broadcast, roster, and personnel API results.
-- Restored bright CSRN scarlet event titles with a controlled black shadow on the aligned lighter title band.
+- Fixed Statistician Current Down highlighting by restoring the missing control-group ID and button values.
+- Added a shared authoritative game-state refresh after Statistician mutations.
+- First Down, manual state changes, Undo, Quick Correct, event edits, and ejections now refresh the Statistician display and active highlights immediately.
+- Preserved all 1.12.1a networking and 1.12.1b operator workflow changes.
 
-Version 1.8 Alpha — Broadcast Package Engine v1 Corrected R1
-- Fixed Broadcast Packages module initialization so existing Game Manager broadcasts populate immediately.
-- Preserved broadcast-driven package prefill for name and roster suggestions.
-- Removed legacy per-correction installation notes from release packaging.
+Version 1.12.1b Hotfix — Operator Workflow Cleanup
 
-Version 1.7 Alpha — Sponsor Engine v1 Corrected R1
-- Sponsor logos link to Asset Manager records.
-- Sponsor uploads auto-register or reuse matching assets.
-- Added Sponsor Logo asset selector and SHA-256 duplicate detection.
-- Added restrained title halo and narrower jersey-number treatment.
+- Added Switch Console access from authenticated destination pages.
+- Added active highlighting to Statistician possession and down controls.
+- Renamed connection labels to Local Access and Network Access.
+- Shortened Refresh Broadcast List to Refresh Broadcast.
+- Improved Broadcast Readiness alignment and selector guidance.
+- Improved event-button wrapping for Turnover and Penalty controls.
+- Preserved all Version 1.12.1a networking and QR behavior.
 
-Version 1.6.2 Alpha — Asset Manager v1 Corrected R2
+CSRN Production Suite — Version 1.12.1a Hotfix — Broadcast Network Manager
 
-- Fixed JPG, JPEG, PNG, WEBP, SVG, GIF and media uploads in Asset Manager.
-- Asset name now derives automatically from the selected filename when blank.
-- Fixed Asset Manager create, update and delete API calls.
-- Reduced red-title trim to a thin approximately 1 px edge.
-- Changed player position and jersey number treatment to CSRN-style light silver-gray.
+ADDED
+- Automatic current IPv4 address detection for local Wi-Fi, iPhone hotspot, Ethernet, and USB tethering.
+- Command Center QR code for connecting phones and tablets to the current address.
+- Broadcaster, Statistician, and Read-Only Monitor role selection after scanning.
+- Refresh Network and Copy Address controls.
 
-Version 1.7 Alpha — Sponsor Engine v1
-- Sponsor profiles, agreements, approved logos, packages, and graphic assignment.
-- Primary graphics channel prevents Lower Third, Player ID, and Personnel ID overlap.
-- Engine Status diagnostics.
-- Restored CSRN silver player identity styling and refined red title readability.
+CHANGED
+- Statistician and Statistics navigation moved beside Command Center.
+- Button text sizing and wrapping adjusted conservatively.
 
+BASELINE
+- Built directly from the validated Version 1.12 Alpha Game Control Engine v1 source update.
+- No play-entry, clock-control, ticker-expiration, or event-regeneration changes are included in this focused hotfix.
 
-Version 1.7 Alpha — Sponsor Engine v1 Corrected R2
-- Added sponsor contract expiration enforcement for graphic selection.
-- Added duplicate sponsor-logo actions: reuse, replace, or keep both.
-- Added universal scroll-and-focus behavior to key Add workflows.
-- Finalized CSRN metallic typography for event titles, positions, and jersey numbers.
-- Added broadcast design, icon library, and engine architecture standards.
+CSRN Production Suite — Version 1.12 Alpha
+Game Control Engine v1
 
+ADDED
+- Rules-driven penalty enforcement foundation with accepted, declined, offsetting, and flag-picked-up rulings.
+- Statistician Undo control.
+- Quick correction controls for down, distance, ball spot, possession, and quarter.
+- Permanent play numbers and editable play/event register.
+- Event editing for yards, description, quarter, and resulting game state.
+- Correction audit log.
+- Cross-sport player/coach ejection events.
+- Mobile and USB-tether connection diagnostics with active local addresses.
 
-## Corrected R4
-- Corrected duplicate asset reuse/replace control flow.
-- Added duplicate sponsor-name warning workflow.
-- Aligned the player event title band directly to the event title.
+CHANGED
+- Statistics scoreboard now lists both team names on the left and scores on the right.
+- Undo now restores down, distance, ball spot, possession, and quarter when available.
+- Offensive and defensive penalties can automatically update down and distance.
 
-
-VERSION 1.8 ALPHA — BROADCAST PACKAGE ENGINE V1
-- Added centralized broadcast package records.
-- Added package health validation for broadcasts, schools, rosters, personnel, sponsors, graphics, and OBS.
-- Added one-click package loading into Command Center state.
-- Added duplicate, lock, notes, status, and graphics profile controls.
-- Added package dashboard and readiness score.
-
-Version 1.8 Alpha — Corrected R3 · Lineup Manager v1
-- Added package-level Starting Lineup Manager.
-- Added editable offense, defense, and special-teams formation groups.
-- Added formation presets with fully editable position labels.
-- Added add, remove, reorder, and player assignment controls for lineup slots.
-- Lineups reference linked rosters and do not modify master roster records.
-- Package loading now exposes lineup state for future Starting Lineup graphics.
-
-Version 1.9 Alpha — Broadcast Automation Engine v1 Corrected R1
-- Added jersey-number-first roster lookup with manual-player fallback.
-- Added duplicate-number selection support.
-- Added XP and two-point conversion automation.
-- Added guided field-goal workflow.
-- Added context-aware offensive and defensive position display.
-- Abbreviated Athlete to ATH and constrained position labels.
-- Added passer and yardage details to event history descriptions.
-
-Version 1.9 Alpha — Broadcast Automation Engine v1 Corrected R2
-- Replaced spinner-style jersey inputs with scrollable 0–99 jersey pickers.
-- Locked background scrolling while automation dialogs are open.
-- Added sticky modal actions and full internal modal scrolling.
-- Allowed full event descriptions to wrap in Event History.
-- Added passer and yardage play details to automated player graphics.
-- Corrected two-point conversion graphic labeling.
-- Made ticker speed settings visibly distinct and applied full event descriptions to the viewer ticker.
+LIMITATIONS
+- This is an NFHS-oriented enforcement foundation, not yet a complete rulebook implementation.
+- Half-the-distance, spot fouls, multiple live-ball fouls, and complex enforcement require statistician quick correction.
+- Event editing recalculates event-derived statistics and can correct current state; full downstream drive reconstruction remains planned.
