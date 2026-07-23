@@ -31,6 +31,9 @@ from obs_client import (
 from upgrade_manager import inspect_candidate, migrate
 from persistence_engine import JsonPersistenceEngine
 from core_repositories import ConfigurationRepository, StateRepository, SecurityRepository
+from school_repository import SchoolRepository
+
+# Phase 3.1: SchoolRepository integrated
 
 BASE_DIR = Path(__file__).resolve().parent
 STATE_FILE = BASE_DIR / "state.json"
@@ -418,29 +421,20 @@ def ensure_school_schema(school: dict[str, Any], schools: list[dict[str, Any]]) 
     metadata["scorebug_derivative"] = "256x256-round"
     return school
 
+SCHOOL_REPOSITORY = SchoolRepository(
+    CORE_PERSISTENCE,
+    SCHOOLS_FILE,
+    school_normalizer=ensure_school_schema,
+    collection_normalizer=reconcile_5a_csrn_ids,
+)
+
 def load_schools() -> list[dict[str, Any]]:
     ensure_data_architecture()
-    if not SCHOOLS_FILE.exists():
-        save_json(SCHOOLS_FILE, {"schools": []})
-    raw = load_json(SCHOOLS_FILE, {"schools": []})
-    if isinstance(raw, list):
-        schools = raw
-    else:
-        schools = raw.get("schools", [])
-    if not isinstance(schools, list):
-        return []
-    changed = reconcile_5a_csrn_ids(schools)
-    for school in schools:
-        before = json.dumps(school, sort_keys=True)
-        ensure_school_schema(school, schools)
-        changed = changed or before != json.dumps(school, sort_keys=True)
-    if changed:
-        save_schools(schools)
-    return schools
+    return SCHOOL_REPOSITORY.load()
 
 def save_schools(schools: list[dict[str, Any]]) -> None:
     ensure_data_architecture()
-    SCHOOLS_FILE.write_text(json.dumps(schools, indent=2), encoding="utf-8")
+    SCHOOL_REPOSITORY.save(schools)
 
 
 def load_venues() -> list[dict[str, Any]]:
