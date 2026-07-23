@@ -33,6 +33,7 @@ from persistence_engine import JsonPersistenceEngine
 from core_repositories import ConfigurationRepository, StateRepository, SecurityRepository
 from school_repository import SchoolRepository
 from roster_repository import RosterRepository
+from sponsor_repository import SponsorRepository
 
 # Phase 3.2: RosterRepository integrated
 
@@ -488,17 +489,26 @@ def sponsor_contract_state(record: dict[str, Any]) -> str:
             pass
     return str(record.get("status", "Prospect"))
 
+SPONSOR_REPOSITORY = SponsorRepository(
+    CORE_PERSISTENCE,
+    SPONSORS_FILE,
+)
+
+
 def load_sponsors() -> list[dict[str, Any]]:
-    data = load_json(SPONSORS_FILE, [])
-    items = data if isinstance(data, list) else data.get("sponsors", [])
+    ensure_data_architecture()
+    items = SPONSOR_REPOSITORY.load()
+
     for item in items:
         item["effective_status"] = sponsor_contract_state(item)
         item["contract_expired"] = item["effective_status"] == "Expired"
+
     return items
 
-def save_sponsors(items: list[dict[str, Any]]) -> None:
-    save_json(SPONSORS_FILE, items)
 
+def save_sponsors(items: list[dict[str, Any]]) -> None:
+    ensure_data_architecture()
+    SPONSOR_REPOSITORY.save(items)
 def clean_sponsor_record(data: dict[str, Any], sponsor_id: str | None = None) -> dict[str, Any]:
     data = {k: v for k, v in data.items() if k not in {"effective_status", "contract_expired"}}
     now = int(time.time())
