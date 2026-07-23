@@ -46,11 +46,24 @@ def validate_rosters(data: Any) -> bool:
 
 
 class RosterStore:
-    """Roster-specific persistence with destructive-write protection."""
+    """Roster-specific persistence with destructive-write protection.
 
-    def __init__(self, path: Path, backup_root: Path) -> None:
-        self.path = Path(path)
-        self.engine = JsonPersistenceEngine(backup_root=Path(backup_root))
+    Accepts either a shared JsonPersistenceEngine plus a path, or a path plus a
+    backup root. The shared-engine form is used by the v1.13 runtime so roster
+    backups and quarantine behavior match the rest of the application.
+    """
+
+    def __init__(
+        self,
+        engine_or_path: JsonPersistenceEngine | Path,
+        path_or_backup_root: Path,
+    ) -> None:
+        if isinstance(engine_or_path, JsonPersistenceEngine):
+            self.engine = engine_or_path
+            self.path = Path(path_or_backup_root)
+        else:
+            self.path = Path(engine_or_path)
+            self.engine = JsonPersistenceEngine(backup_root=Path(path_or_backup_root))
 
     def load(
         self,
