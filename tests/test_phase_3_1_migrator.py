@@ -14,7 +14,18 @@ spec.loader.exec_module(module)
 
 
 def sample_source() -> str:
-    return f'''from core_repositories import ConfigurationRepository, StateRepository, SecurityRepository\n\n{module.REPOSITORY_ANCHOR}\n\ndef reconcile_5a_csrn_ids(schools):\n    return False\n\ndef ensure_school_schema(school, schools):\n    return school\n\n{module.LOAD_OLD}\n'''
+    return f'''from core_repositories import ConfigurationRepository, StateRepository, SecurityRepository
+
+{module.REPOSITORY_ANCHOR}
+
+def reconcile_5a_csrn_ids(schools):
+    return False
+
+def ensure_school_schema(school, schools):
+    return school
+
+{module.LOAD_OLD}
+'''
 
 
 def test_transform_integrates_repository() -> None:
@@ -24,6 +35,13 @@ def test_transform_integrates_repository() -> None:
     assert "return SCHOOL_REPOSITORY.load()" in updated
     assert "SCHOOL_REPOSITORY.save(schools)" in updated
     assert "SCHOOLS_FILE.write_text" not in updated
+
+
+def test_repository_is_initialized_after_normalizers() -> None:
+    updated = module.transform(sample_source())
+    repository_position = updated.index("SCHOOL_REPOSITORY = SchoolRepository")
+    assert updated.index("def reconcile_5a_csrn_ids") < repository_position
+    assert updated.index("def ensure_school_schema") < repository_position
 
 
 def test_transform_is_idempotent() -> None:
