@@ -34,6 +34,11 @@ from core_repositories import ConfigurationRepository, StateRepository, Security
 from school_repository import SchoolRepository
 from roster_repository import RosterRepository
 from sponsor_repository import SponsorRepository
+from venue_repository import VenueRepository
+
+# Phase 3.4: VenueRepository integrated
+
+# Phase 3.3: SponsorRepository integrated
 
 # Phase 3.2: RosterRepository integrated
 
@@ -219,8 +224,8 @@ CONFIG_REPOSITORY = ConfigurationRepository(
     CONFIG_FILE,
     DEFAULT_CONFIG,
     runtime_identity={
-        "version": "Version 1.13.0-alpha.3i — Sponsor Repository Integration",
-        "build": "V1.13A3I-SPONSOR-REPOSITORY",
+        "version": "Version 1.13.0-alpha.3j — Venue Repository Integration",
+        "build": "V1.13A3J-VENUE-REPOSITORY",
     },
 )
 STATE_REPOSITORY = StateRepository(CORE_PERSISTENCE, STATE_FILE, DEFAULT_STATE)
@@ -243,8 +248,8 @@ def save_config(config: dict[str, Any]) -> None:
 def application_identity() -> dict[str, str]:
     """Return package identity from VERSION.txt with safe config fallbacks."""
     cfg = load_config()
-    version = cfg.get("application", {}).get("version", "Version 1.13.0-alpha.3i — Sponsor Repository Integration")
-    build = cfg.get("application", {}).get("build", "V1.13A3I-SPONSOR-REPOSITORY")
+    version = cfg.get("application", {}).get("version", "Version 1.13.0-alpha.3j — Venue Repository Integration")
+    build = cfg.get("application", {}).get("build", "V1.13A3J-VENUE-REPOSITORY")
     product = "CSRN Production Suite"
     if VERSION_FILE.exists():
         try:
@@ -441,15 +446,20 @@ def save_schools(schools: list[dict[str, Any]]) -> None:
     SCHOOL_REPOSITORY.save(schools)
 
 
+VENUE_REPOSITORY = VenueRepository(
+    CORE_PERSISTENCE,
+    VENUES_FILE,
+)
+
+
 def load_venues() -> list[dict[str, Any]]:
     ensure_data_architecture()
-    if not VENUES_FILE.exists():
-        save_json(VENUES_FILE, [])
-    data = load_json(VENUES_FILE, [])
-    return data if isinstance(data, list) else data.get("venues", [])
+    return VENUE_REPOSITORY.load()
+
 
 def save_venues(items: list[dict[str, Any]]) -> None:
-    save_json(VENUES_FILE, items)
+    ensure_data_architecture()
+    VENUE_REPOSITORY.save(items)
 
 def load_assets() -> list[dict[str, Any]]:
     ensure_data_architecture()
