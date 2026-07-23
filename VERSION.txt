@@ -1,2 +1,1 @@
-Version 1.12.1c Hotfix — Statistician State Synchronization
-Build V1.12.1C-STATE-SYNC
+1.13.0-alpha.3h
