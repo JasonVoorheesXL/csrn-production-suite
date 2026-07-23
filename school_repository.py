@@ -4,7 +4,7 @@ import copy
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
-from persistence_engine import JsonPersistenceEngine, PersistencePolicy
+from persistence_engine import DataCorruptionError, JsonPersistenceEngine, PersistencePolicy
 
 
 SchoolNormalizer = Callable[[dict[str, Any], list[dict[str, Any]]], dict[str, Any]]
@@ -96,14 +96,36 @@ class SchoolRepository:
             raise SchoolRepositoryValidationError("School records failed validation after normalization.")
         return normalized, changed
 
-    def load(self) -> list[dict[str, Any]]:
-        payload = self.engine.load(
+    def _initialize_empty_database(self) -> list[dict[str, Any]]:
+        """Replace an unrecoverable invalid database with a valid empty payload.
+
+        JsonPersistenceEngine quarantines the damaged source before raising
+        DataCorruptionError. At that point there is no recoverable backup, so a
+        forced save of the canonical empty list is safe and prevents application
+        startup from failing while preserving the damaged copy for diagnostics.
+        """
+        empty: list[dict[str, Any]] = []
+        self.engine.save(
             self.path,
-            [],
+            empty,
             validator=self.validate_payload,
-            create_if_missing=True,
-            restore_recovered_file=True,
+            policy=self.policy,
+            force=True,
         )
+        return empty
+
+    def load(self) -> list[dict[str, Any]]:
+        try:
+            payload = self.engine.load(
+                self.path,
+                [],
+                validator=self.validate_payload,
+                create_if_missing=True,
+                restore_recovered_file=True,
+            )
+        except DataCorruptionError:
+            payload = self._initialize_empty_database()
+
         items = self._extract(payload)
         normalized, changed = self._normalize(items)
         if changed:
