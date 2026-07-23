@@ -34,6 +34,11 @@ from core_repositories import ConfigurationRepository, StateRepository, Security
 from school_repository import SchoolRepository
 from roster_repository import RosterRepository
 from sponsor_repository import SponsorRepository
+from venue_repository import VenueRepository
+
+# Phase 3.4: VenueRepository integrated
+
+# Phase 3.3: SponsorRepository integrated
 
 # Phase 3.2: RosterRepository integrated
 
@@ -441,15 +446,20 @@ def save_schools(schools: list[dict[str, Any]]) -> None:
     SCHOOL_REPOSITORY.save(schools)
 
 
+VENUE_REPOSITORY = VenueRepository(
+    CORE_PERSISTENCE,
+    VENUES_FILE,
+)
+
+
 def load_venues() -> list[dict[str, Any]]:
     ensure_data_architecture()
-    if not VENUES_FILE.exists():
-        save_json(VENUES_FILE, [])
-    data = load_json(VENUES_FILE, [])
-    return data if isinstance(data, list) else data.get("venues", [])
+    return VENUE_REPOSITORY.load()
+
 
 def save_venues(items: list[dict[str, Any]]) -> None:
-    save_json(VENUES_FILE, items)
+    ensure_data_architecture()
+    VENUE_REPOSITORY.save(items)
 
 def load_assets() -> list[dict[str, Any]]:
     ensure_data_architecture()
