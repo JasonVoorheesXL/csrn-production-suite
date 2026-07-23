@@ -184,7 +184,7 @@
       <section class="panel compact authority-panel">
         <div class="section-heading compact"><div><h3>Game Data Control</h3><p class="section-note">Only one console may publish game data.</p></div><span id="authorityBadge" class="phase-badge">BROADCASTER</span></div>
         <div class="button-row"><button id="enableStatisticianButton" onclick="setControlSource('statistician')">Enable Statistician Console</button><button id="broadcasterTakeoverButton" class="warning hidden" onclick="setControlSource('broadcaster')">Broadcaster Takeover</button></div>
-        <div id="authorityMessage" class="status">Broadcaster controls are active.</div>
+        <div id="authorityMessage" class="status authority-status-banner">Broadcaster controls are active.</div>
       </section>
       <div id="broadcasterGameDataControls" class="score-grid live-operator-controls">
         <article class="team-card">
@@ -206,7 +206,8 @@
         </article>
       </div>
 
-      <section class="panel compact live-operator-controls">
+      <section id="broadcasterStateControls" class="panel compact live-operator-controls">
+        <div id="broadcasterStateLockNotice" class="status authority-lock-notice hidden">Statistician Control is active. Broadcaster game-data controls are locked; clock visibility remains available.</div>
         <h3>Possession</h3>
         <div class="button-row possession" id="possessionButtons">
           <button id="homePossessionButton" data-value="home" onclick="setState('possession','home')">HOME POSSESSION</button>
@@ -267,7 +268,9 @@
         <div id="eventConfirmation" class="status">No events recorded.</div>
         <div class="ticker-controls">
           <button id="tickerToggle" onclick="setState('ticker_visible',!Boolean(currentState.ticker_visible))">Hide Viewer Ticker</button>
-          <label>Scroll Speed<select id="tickerSpeed" onchange="setState('ticker_speed',this.value)"><option value="slow">Slow</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label>
+          <label>Scroll Speed<select id="tickerSpeed" onchange="setState('ticker_speed',this.value)"><option value="very_slow">Very Slow</option><option value="slow">Slow</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label>
+          <label>Pause Between Loops<select id="tickerPause" onchange="setState('ticker_pause',Number(this.value))"><option value="0">None</option><option value="1">1 second</option><option value="2">2 seconds</option><option value="3">3 seconds</option><option value="5">5 seconds</option></select></label>
+          <p class="section-note ticker-help">Speed is distance-based, so short and long ticker messages travel at a consistent reading pace.</p>
         </div>
         <div id="eventLog" class="event-log"></div>
       </section>
@@ -997,13 +1000,18 @@
         <div id="statisticianStatus" class="status">Enable the Statistician Console from Command Center.</div>
         <div class="statistician-scoreboard"><article><span id="statHomeName">HOME</span><strong id="statHomeScore">0</strong></article><div><b id="statDownDistance">1st & 10</b><span id="statQuarter">Q1</span></div><article><span id="statVisitorName">VISITOR</span><strong id="statVisitorScore">0</strong></article></div>
         <div id="statisticianControls" class="statistician-controls">
-          <article class="team-card"><h2 id="statHomeHeader">HOME</h2><div class="button-row event-buttons"><button onclick="openAutomationEventFromStatistician('home','TD')">TD</button><button onclick="openAutomationEventFromStatistician('home','FG')">FG</button><button onclick="openAutomationEventFromStatistician('home','XP')">XP</button><button onclick="openAutomationEventFromStatistician('home','2PT')">2PT</button><button onclick="openAutomationEventFromStatistician('home','TURNOVER')">Turnover</button><button onclick="recordFirstDown('home','statistician')">1st Down</button><button onclick="openPenalty('home','statistician')">Penalty</button></div></article>
-          <article class="team-card"><h2 id="statVisitorHeader">VISITOR</h2><div class="button-row event-buttons"><button onclick="openAutomationEventFromStatistician('visitor','TD')">TD</button><button onclick="openAutomationEventFromStatistician('visitor','FG')">FG</button><button onclick="openAutomationEventFromStatistician('visitor','XP')">XP</button><button onclick="openAutomationEventFromStatistician('visitor','2PT')">2PT</button><button onclick="openAutomationEventFromStatistician('visitor','TURNOVER')">Turnover</button><button onclick="recordFirstDown('visitor','statistician')">1st Down</button><button onclick="openPenalty('visitor','statistician')">Penalty</button></div></article>
+          <article class="team-card"><h2 id="statHomeHeader">HOME</h2><div class="button-row event-buttons"><button class="success" onclick="openPlayEntry('home','run')">Run</button><button class="success" onclick="openPlayEntry('home','pass')">Pass</button><button onclick="openPlayEntry('home','kickoff')">Kickoff</button><button onclick="openPlayEntry('home','punt')">Punt</button><button onclick="openAutomationEventFromStatistician('home','TD')">TD</button><button onclick="openAutomationEventFromStatistician('home','FG')">FG</button><button onclick="openAutomationEventFromStatistician('home','XP')">XP</button><button onclick="openAutomationEventFromStatistician('home','2PT')">2PT</button><button onclick="openAutomationEventFromStatistician('home','TURNOVER')">Turnover</button><button onclick="recordFirstDown('home','statistician')">1st Down</button><button onclick="openPenalty('home','statistician')">Penalty</button></div></article>
+          <article class="team-card"><h2 id="statVisitorHeader">VISITOR</h2><div class="button-row event-buttons"><button class="success" onclick="openPlayEntry('visitor','run')">Run</button><button class="success" onclick="openPlayEntry('visitor','pass')">Pass</button><button onclick="openPlayEntry('visitor','kickoff')">Kickoff</button><button onclick="openPlayEntry('visitor','punt')">Punt</button><button onclick="openAutomationEventFromStatistician('visitor','TD')">TD</button><button onclick="openAutomationEventFromStatistician('visitor','FG')">FG</button><button onclick="openAutomationEventFromStatistician('visitor','XP')">XP</button><button onclick="openAutomationEventFromStatistician('visitor','2PT')">2PT</button><button onclick="openAutomationEventFromStatistician('visitor','TURNOVER')">Turnover</button><button onclick="recordFirstDown('visitor','statistician')">1st Down</button><button onclick="openPenalty('visitor','statistician')">Penalty</button></div></article>
         </div>
         <div class="statistician-action-bar"><button class="warning" onclick="undo()">Undo Last Event</button><button onclick="openQuickCorrection()">Quick Correct Game State</button><button onclick="openEjection()">Record Ejection</button></div>
         <h2>Possession</h2><div id="statPossessionButtons" class="button-row statistician-state-buttons"><button data-value="home" onclick="setStateFrom('possession','home','statistician')">Home</button><button data-value="visitor" onclick="setStateFrom('possession','visitor','statistician')">Visitor</button></div>
         <h2>Down & Distance</h2><div id="statDownButtons" class="button-row statistician-state-buttons"><button data-value="1st" onclick="setStateFrom('down','1st','statistician')">1st</button><button data-value="2nd" onclick="setStateFrom('down','2nd','statistician')">2nd</button><button data-value="3rd" onclick="setStateFrom('down','3rd','statistician')">3rd</button><button data-value="4th" onclick="setStateFrom('down','4th','statistician')">4th</button><select id="statDistance" onchange="setStateFrom('distance',this.value,'statistician')"></select></div>
-        <section class="statistician-register"><div class="section-heading-row"><div><h2>Play Register</h2><p class="section-note">Click Edit to correct yards, description, or resulting game state.</p></div><button onclick="renderStatisticianRegister()">Refresh</button></div><div id="statisticianEventRegister" class="event-log"></div></section>
+        <section class="rules-control-grid">
+          <article class="rules-card"><h2>Drive Direction</h2><p class="section-note">Select the direction the team with possession is driving.</p><div class="button-row drive-direction-buttons"><button id="driveDirLeft" onclick="setDriveDirection('left')">←</button><button id="driveDirRight" onclick="setDriveDirection('right')">→</button></div></article>
+          <article class="rules-card"><h2>Game Clock</h2><div id="gameClockReadout" class="game-clock-readout">12:00</div><div id="gameClockStatus" class="clock-status">STOPPED</div><div class="button-row"><button class="success" onclick="clockAction('start')">Start</button><button class="danger" onclick="clockAction('stop')">Stop</button><button onclick="adjustClock(-10)">−10</button><button onclick="adjustClock(-1)">−1</button><button onclick="adjustClock(1)">+1</button><button onclick="adjustClock(10)">+10</button><button onclick="setClockDialog()">Set</button><button onclick="clockAction('reset',{seconds:720})">Reset 12:00</button><button onclick="toggleClockVisibility()">Show / Hide</button></div></article>
+          <article class="rules-card"><h2>Game Context</h2><div id="rulesContext" class="rules-context">Set possession, down, distance and ball spot.</div></article>
+        </section>
+        <section class="statistician-register"><div class="section-heading-row"><div><h2>Play Register</h2><p class="section-note">Alpha.3 rules-driven canonical gamebook. Select a play to inspect its structured record; use Edit to correct the linked event.</p></div><button onclick="renderStatisticianRegister()">Refresh</button></div><div class="play-register-layout"><div id="statisticianEventRegister" class="event-log play-register-list"></div><aside id="playDetailPanel" class="play-detail-panel"><div class="section-note">Select a play to view details.</div></aside></div></section>
         <section class="connection-panel"><div class="section-heading-row"><div><h2>Mobile / USB Connection</h2><p class="section-note">Addresses are detected from active laptop network adapters.</p></div><button onclick="loadConnectionInfo()">Refresh Addresses</button></div><div id="connectionInfo" class="status">Refresh after enabling hotspot or USB tethering.</div><div id="connectionAddresses" class="connection-addresses"></div></section>
         <section><h2>Correction Log</h2><div id="correctionLog" class="correction-log"></div></section>
       </section>
@@ -1041,6 +1049,42 @@
       </section>
     </section>
 
+    <div id="playEntryModal" class="event-confirm-modal hidden" role="dialog" aria-modal="true" aria-labelledby="playEntryTitle">
+      <div class="event-confirm-sheet play-entry-sheet">
+        <div class="section-heading-row"><div><h2 id="playEntryTitle">Record Play</h2><p id="playEntryContext" class="section-note"></p></div><button onclick="closePlayEntry()">Close</button></div>
+        <input id="playEntryTeam" type="hidden"><input id="playEntryType" type="hidden">
+        <section class="field-spotter" aria-label="Ball spot selector">
+          <div id="playDriveIndicator" class="drive-indicator">TEAM →</div>
+          <div class="field-axis"><span>LEFT GOAL</span><span>50</span><span>RIGHT GOAL</span></div>
+          <div class="spot-control start-spot-control"><div><strong>Start Spot</strong><span id="playStartSpotLabel">50</span></div><div id="playStartDirectionBadge" class="slider-direction-badge">TEAM →</div><input id="playStartCoord" type="range" min="0" max="100" step="1" value="50" disabled><button id="unlockStartSpot" type="button" onclick="toggleStartSpotCorrection()">Correct Start Spot</button></div>
+          <div id="playLandingSpotWrap" class="spot-control hidden"><div><strong>Landed / Caught Spot</strong><span id="playLandingSpotLabel">50</span></div><div id="playLandingDirectionBadge" class="slider-direction-badge">TEAM →</div><input id="playLandingCoord" type="range" min="0" max="100" step="1" value="50"></div>
+          <div class="spot-control"><div><strong>End Spot</strong><span id="playEndSpotLabel">50</span></div><div id="playEndDirectionBadge" class="slider-direction-badge">TEAM →</div><input id="playEndCoord" type="range" min="0" max="100" step="1" value="50"></div>
+          <div class="spot-nudges"><button type="button" onclick="nudgeSpot('end',-1)">End −1</button><button type="button" onclick="nudgeSpot('end',1)">End +1</button></div>
+        </section>
+        <div class="play-entry-grid">
+          <label id="playBallCarrierWrap">Ball Carrier Jersey<input id="playBallCarrier" inputmode="numeric" placeholder="#" oninput="resolvePlayEntryPlayer('player')"><small id="playBallCarrierResolved" class="jersey-resolution"></small></label>
+          <label id="playPasserWrap">Passer Jersey<input id="playPasser" inputmode="numeric" placeholder="#" oninput="resolvePlayEntryPlayer('passer')"><small id="playPasserResolved" class="jersey-resolution"></small></label>
+          <label id="playReceiverWrap">Receiver Jersey<input id="playReceiver" inputmode="numeric" placeholder="#" oninput="resolvePlayEntryPlayer('receiver')"><small id="playReceiverResolved" class="jersey-resolution"></small></label>
+          <label id="playSackerWrap">Sack By — Defender Jersey<input id="playSacker" inputmode="numeric" placeholder="#" oninput="resolvePlayEntryPlayer('sacker')"><small id="playSackerResolved" class="jersey-resolution"></small></label>
+          <label id="playPassOutcomeWrap">Pass Result<select id="playPassOutcome" onchange="playOutcomeChanged()"><option value="complete">Complete</option><option value="incomplete">Incomplete</option><option value="interception">Interception</option><option value="sack">Sack</option><option value="spike">Spike</option></select></label>
+          <label id="playKickerWrap">Kicker / Punter Jersey<input id="playKicker" inputmode="numeric" placeholder="#" oninput="resolvePlayEntryPlayer('kicker')"><small id="playKickerResolved" class="jersey-resolution"></small></label>
+          <label id="playReturnerWrap">Returner Jersey<input id="playReturner" inputmode="numeric" placeholder="#" oninput="resolvePlayEntryPlayer('returner')"><small id="playReturnerResolved" class="jersey-resolution"></small></label>
+        </div>
+        <div class="play-option-grid">
+          <label id="playKneelWrap"><input id="playKneel" type="checkbox"> Kneel</label>
+          <label><input id="playFumble" type="checkbox" onchange="document.getElementById('playFumbleLost').disabled=!this.checked"> Fumble</label>
+          <label><input id="playFumbleLost" type="checkbox" disabled> Fumble lost</label>
+          <label><input id="playOutOfBounds" type="checkbox"> Out of bounds</label>
+          <label id="playTouchbackWrap"><input id="playTouchback" type="checkbox"> Touchback</label>
+          <label id="playFairCatchWrap"><input id="playFairCatch" type="checkbox"> Fair catch</label>
+          <label id="playBlockedWrap"><input id="playBlocked" type="checkbox"> Blocked</label>
+        </div>
+        <label>Notes<input id="playNotes" placeholder="Optional"></label>
+        <div id="playEntryPreview" class="status">Choose the end spot; yardage and game state will be calculated automatically.</div>
+        <div class="button-row"><button class="primary" onclick="submitPlayEntry()">Record Play</button><button onclick="closePlayEntry()">Cancel</button></div>
+        <div id="playEntryMessage" class="status"></div>
+      </div>
+    </div>
     <div id="eventConfirmModal" class="event-confirm-modal hidden" role="dialog" aria-modal="true" aria-labelledby="eventConfirmTitle">
       <div class="event-confirm-sheet">
         <h2 id="eventConfirmTitle">Confirm Event</h2>
@@ -1089,7 +1133,16 @@
 
     <div id="editEventModal" class="event-confirm-modal hidden" role="dialog" aria-modal="true">
       <div class="event-confirm-sheet automation-event-sheet"><h2>Edit Play / Event</h2><input id="editEventId" type="hidden">
-        <label>Description<input id="editEventDescription"></label><div class="setup-grid"><label>Yards<input id="editEventYards" type="number" min="-99" max="99"></label><label>Quarter<input id="editEventQuarter"></label><label>Resulting Down<select id="editEventDown"><option value="">No change</option><option>1st</option><option>2nd</option><option>3rd</option><option>4th</option><option>Off</option></select></label><label>Resulting Distance<input id="editEventDistance" type="number" min="1" max="99"></label><label>Ball Spot<input id="editEventBallSpot"></label><label>Possession<select id="editEventPossession"><option value="">No change</option><option value="home">Home</option><option value="visitor">Visitor</option></select></label></div>
+        <label>Description<input id="editEventDescription"></label>
+        <section class="field-spotter edit-field-spotter" aria-label="Edit play ball spots">
+          <div id="editDriveIndicator" class="drive-indicator">TEAM →</div>
+          <div class="field-axis"><span>LEFT GOAL</span><span>50</span><span>RIGHT GOAL</span></div>
+          <div class="spot-control"><div><strong>Start Spot</strong><span id="editStartSpotLabel">50</span></div><input id="editStartCoord" type="range" min="0" max="100" step="1" value="50"></div>
+          <div class="spot-control"><div><strong>End / Ball Spot</strong><span id="editEndSpotLabel">50</span></div><input id="editEndCoord" type="range" min="0" max="100" step="1" value="50"></div>
+          <div class="spot-nudges"><button type="button" onclick="nudgeEditSpot('start',-1)">Start −1</button><button type="button" onclick="nudgeEditSpot('start',1)">Start +1</button><button type="button" onclick="nudgeEditSpot('end',-1)">End −1</button><button type="button" onclick="nudgeEditSpot('end',1)">End +1</button></div>
+        </section>
+        <div id="editCalculatedSummary" class="status">Calculated yardage will update from the selected spots.</div>
+        <div class="setup-grid"><label>Yards<input id="editEventYards" type="number" min="-99" max="99"></label><label>Quarter<input id="editEventQuarter"></label><label>Resulting Down<select id="editEventDown"><option value="">No change</option><option>1st</option><option>2nd</option><option>3rd</option><option>4th</option><option>Off</option></select></label><label>Resulting Distance<input id="editEventDistance" type="number" min="1" max="99"></label><label>Possession<select id="editEventPossession"><option value="">No change</option><option value="home">Home</option><option value="visitor">Visitor</option></select></label></div>
         <label>Correction Note<input id="editEventNote" placeholder="Example: entered 17 yards instead of 27"></label><div id="editEventMessage" class="status"></div>
         <div class="button-row"><button onclick="closeEditEvent()">Cancel</button><button class="primary" onclick="submitEventEdit()">Save Edit</button></div>
       </div>
@@ -1374,25 +1427,107 @@ const penaltyCatalog={
   'Special Teams':[['Kick Catch Interference',15],['Illegal Block',10],['Holding',10],['Running Into the Kicker',5],['Roughing the Kicker',15],['Personal Foul',15]],
   General:[['Delay of Game',5],['Sideline Warning',0],['Unsportsmanlike Conduct',15],['Other',0]]
 };
-async function setControlSource(authority){currentState=await api('/api/control-source',{authority});render()}
+const GameStateManager={
+  async refresh(){
+    try { currentState=await api('/api/state'); } catch(e) { /* retain last confirmed mutation response */ }
+    render();
+    renderStatisticianRegister();
+    return currentState;
+  },
+  async mutate(path,payload={},method='POST',extract=null){
+    const result=await api(path,payload,method);
+    const nextState=extract?extract(result):result;
+    if(nextState&&typeof nextState==='object')currentState=nextState;
+    // Mutation responses are authoritative. Avoid a second /api/state request and
+    // duplicate full render after every operator action.
+    render();
+    renderStatisticianRegister();
+    return result;
+  }
+};
+async function setControlSource(authority){try{await GameStateManager.mutate('/api/control-source',{authority})}catch(e){alert(e.data?.message||e.message)}}
 function gameDataLockedFor(source){return (currentState?.game_data_authority||'broadcaster')!==source}
-async function refreshAuthoritativeGameState(){
-  try { currentState = await api('/api/state'); } catch (e) { /* keep mutation response state if refresh is unavailable */ }
-  render();
-  renderStatisticianRegister();
-}
-async function setStateFrom(key,value,source){try{currentState=await api('/api/set',{[key]:value,source});await refreshAuthoritativeGameState()}catch(e){alert(e.data?.message||e.message)}}
-async function recordFirstDown(team,source){try{const result=await api('/api/event-trigger',{team,event:'FIRST_DOWN',source,first_down_method:'manual'});currentState=result.state;await refreshAuthoritativeGameState()}catch(e){alert(e.data?.message||e.message)}}
+async function refreshAuthoritativeGameState(){return GameStateManager.refresh()}
+async function setStateFrom(key,value,source){try{await GameStateManager.mutate('/api/set',{[key]:value,source})}catch(e){alert(e.data?.message||e.message)}}
+async function recordFirstDown(team,source){try{await GameStateManager.mutate('/api/event-trigger',{team,event:'FIRST_DOWN',source,first_down_method:'manual'},'POST',result=>result.state)}catch(e){alert(e.data?.message||e.message)}}
 function openPenalty(team,source){if(gameDataLockedFor(source)){alert(`Game data is controlled by the ${currentState.game_data_authority} console.`);return}document.getElementById('penaltyTeam').value=team;document.getElementById('penaltySource').value=source;document.getElementById('penaltyTeamLabel').textContent=team==='home'?currentState.home_team:currentState.visitor_team;document.getElementById('penaltyCategory').value=source==='statistician'?'Offensive':'General';populatePenaltyOptions();document.getElementById('penaltyModal').classList.remove('hidden')}
 function closePenalty(){document.getElementById('penaltyModal').classList.add('hidden')}
 function populatePenaltyOptions(){const cat=document.getElementById('penaltyCategory').value;document.getElementById('penaltyName').innerHTML=(penaltyCatalog[cat]||[]).map(([n,y])=>`<option value="${escapeHtml(n)}" data-yards="${y}">${escapeHtml(n)}</option>`).join('');penaltySelectionChanged()}
 function penaltySelectionChanged(){const opt=document.getElementById('penaltyName').selectedOptions[0];document.getElementById('penaltyYards').value=opt?.dataset.yards||0}
 async function submitPenalty(){const payload={team:document.getElementById('penaltyTeam').value,event:'PENALTY',source:document.getElementById('penaltySource').value,penalty_category:document.getElementById('penaltyCategory').value,penalty_name:document.getElementById('penaltyName').value,penalty_yards:document.getElementById('penaltyYards').value,penalty_outcome:document.getElementById('penaltyOutcome').value};try{const result=await api('/api/event-trigger',payload);currentState=result.state;closePenalty();render();renderStatisticianRegister()}catch(e){document.getElementById('penaltyMessage').textContent=e.data?.message||e.message}}
+function coordFromSpot(s){const text=String(s||'').trim().toUpperCase();if(['LEFT GOAL','HOME GOAL','0'].includes(text))return 0;if(['RIGHT GOAL','VISITOR GOAL','100'].includes(text))return 100;if(text==='50')return 50;let m=text.match(/^(LEFT|HOME)\s+(\d{1,2})$/);if(m)return Number(m[2]);m=text.match(/^(RIGHT|VISITOR)\s+(\d{1,2})$/);if(m)return 100-Number(m[2]);const n=Number(text);return Number.isFinite(n)?Math.max(0,Math.min(100,n)):50}
+function spotFromCoord(coord){const c=Math.max(0,Math.min(100,Math.round(Number(coord)||0)));if(c===0)return'LEFT GOAL';if(c===100)return'RIGHT GOAL';if(c===50)return'50';return c<50?`LEFT ${c}`:`RIGHT ${100-c}`}
+function playDirectionText(){const team=document.getElementById('playEntryTeam')?.value||currentState?.possession||'home';const teamName=team==='home'?currentState?.home_team:currentState?.visitor_team;const configured=(team==='home'?currentState?.home_abbreviation:currentState?.visitor_abbreviation)||'';const abbr=configured.trim()||(teamName||team).split(/\s+/).map(x=>x[0]).join('').slice(0,4).toUpperCase();const left=currentState?.[team+'_direction']==='left';return left?`← ${abbr}`:`${abbr} →`}
+function updateSliderDirectionBadge(which){const id=which==='start'?'playStartCoord':which==='landing'?'playLandingCoord':'playEndCoord';const badgeId=which==='start'?'playStartDirectionBadge':which==='landing'?'playLandingDirectionBadge':'playEndDirectionBadge';const el=document.getElementById(id),badge=document.getElementById(badgeId);if(!el||!badge)return;badge.textContent=playDirectionText();badge.style.setProperty('--spot-pct',`${Math.max(0,Math.min(100,Number(el.value)||0))}%`)}
+function setSpotControl(which,coord){const id=which==='start'?'playStartCoord':which==='landing'?'playLandingCoord':'playEndCoord';const label=which==='start'?'playStartSpotLabel':which==='landing'?'playLandingSpotLabel':'playEndSpotLabel';const el=document.getElementById(id);if(!el)return;el.value=Math.max(0,Math.min(100,Math.round(Number(coord)||0)));document.getElementById(label).textContent=spotFromCoord(el.value);updateSliderDirectionBadge(which)}
+function toggleStartSpotCorrection(){const el=document.getElementById('playStartCoord');el.disabled=!el.disabled;document.getElementById('unlockStartSpot').textContent=el.disabled?'Correct Start Spot':'Lock Start Spot'}
+function nudgeSpot(which,delta){const id=which==='start'?'playStartCoord':which==='landing'?'playLandingCoord':'playEndCoord';const el=document.getElementById(id);setSpotControl(which,Number(el.value)+delta);updatePlayPreview()}
+
+let playEntryRosters=[];
+async function ensurePlayEntryRosters(force=false){
+  if(playEntryRosters.length&&!force)return playEntryRosters;
+  try{playEntryRosters=await api('/api/rosters')}catch(e){playEntryRosters=[]}
+  return playEntryRosters;
+}
+function playRosterForTeam(team){
+  const schoolId=team==='home'?currentState?.home_school_id:currentState?.visitor_school_id;
+  const teamName=team==='home'?currentState?.home_team:currentState?.visitor_team;
+  const linked=new Set((currentState?.package_roster_ids||[]).map(String));
+  const base=(playEntryRosters||[]).filter(r=>{
+    const schoolMatch=schoolId?String(r.school_id||'')===String(schoolId):String(r.school_name||'').toLowerCase()===String(teamName||'').toLowerCase();
+    const sportMatch=!currentState?.sport||!r.sport||String(r.sport||'').toLowerCase()===String(currentState.sport||'').toLowerCase();
+    return schoolMatch&&sportMatch;
+  });
+  const candidates=linked.size?base.filter(r=>linked.has(String(r.id))):base;
+  const usable=candidates.length?candidates:base;
+  const wantedLevel=String(currentState?.level||'Varsity').toLowerCase();
+  return usable.find(r=>String(r.level||'').toLowerCase()===wantedLevel)||usable.find(r=>String(r.level||'').toLowerCase()==='varsity')||usable[0]||null;
+}
+function playerDisplayName(p){return String(p?.preferred_name||`${p?.first_name||''} ${p?.last_name||''}`.trim()).trim()}
+function resolveRosterPlayer(team,number){
+  const n=String(number||'').trim();if(!n)return null;
+  const roster=playRosterForTeam(team);if(!roster)return null;
+  return (roster.players||[]).find(p=>p.status!=='inactive'&&String(p.number||'').trim()===n)||null;
+}
+function resolvePlayEntryPlayer(role){
+  const map={player:['playBallCarrier','playBallCarrierResolved'],passer:['playPasser','playPasserResolved'],receiver:['playReceiver','playReceiverResolved'],sacker:['playSacker','playSackerResolved'],kicker:['playKicker','playKickerResolved'],returner:['playReturner','playReturnerResolved']};
+  const pair=map[role];if(!pair)return;const input=document.getElementById(pair[0]),out=document.getElementById(pair[1]);if(!input||!out)return;
+  const offense=document.getElementById('playEntryTeam')?.value||currentState?.possession||'home';
+  const team=role==='sacker'||role==='returner'? (offense==='home'?'visitor':'home') : offense;
+  const number=input.value.trim();if(!number){out.textContent='';out.className='jersey-resolution';return}
+  const player=resolveRosterPlayer(team,number);
+  if(player){out.textContent=`#${number} — ${playerDisplayName(player)}`;out.className='jersey-resolution resolved'}
+  else{out.textContent=`#${number} — Not found on active roster`;out.className='jersey-resolution unresolved'}
+}
+function refreshPlayEntryPlayerResolutions(){['player','passer','receiver','sacker','kicker','returner'].forEach(resolvePlayEntryPlayer)}
+async function openPlayEntry(team,kind){
+  if(gameDataLockedFor('statistician')){alert(`Game data is controlled by the ${currentState.game_data_authority} console.`);return}
+  await ensurePlayEntryRosters(false);
+  document.getElementById('playEntryTeam').value=team;document.getElementById('playEntryType').value=kind;
+  const teamName=team==='home'?currentState.home_team:currentState.visitor_team;document.getElementById('playEntryTitle').textContent=`${kind[0].toUpperCase()+kind.slice(1)} — ${teamName}`;
+  const dir=currentState[team+'_direction']==='left'?'←':'→';const abbr=(team==='home'?currentState.home_abbreviation:currentState.visitor_abbreviation)||teamName.split(/\s+/).map(x=>x[0]).join('').slice(0,4).toUpperCase();document.getElementById('playDriveIndicator').textContent=dir==='←'?`${dir} ${abbr}`:`${abbr} ${dir}`;document.getElementById('playEntryContext').textContent=`${currentState.down||'1st'} & ${currentState.distance||'10'} · ${spotFromCoord(coordFromSpot(currentState.ball_spot||'50'))} · Drive ${dir}`;
+  const inherited=coordFromSpot(currentState.ball_spot||'50');const teamDirection=currentState[team+'_direction']==='left'?-1:1;const startCoord=kind==='kickoff'?(teamDirection===1?40:60):inherited;setSpotControl('start',startCoord);setSpotControl('landing',startCoord);setSpotControl('end',startCoord);document.getElementById('playStartCoord').disabled=true;document.getElementById('unlockStartSpot').textContent='Correct Start Spot';
+  ['playBallCarrier','playPasser','playReceiver','playSacker','playKicker','playReturner','playNotes'].forEach(id=>document.getElementById(id).value='');['playBallCarrierResolved','playPasserResolved','playReceiverResolved','playSackerResolved','playKickerResolved','playReturnerResolved'].forEach(id=>{const el=document.getElementById(id);if(el){el.textContent='';el.className='jersey-resolution'}});
+  ['playKneel','playFumble','playFumbleLost','playOutOfBounds','playTouchback','playFairCatch','playBlocked'].forEach(id=>document.getElementById(id).checked=false);document.getElementById('playFumbleLost').disabled=true;
+  const show=(id,on)=>document.getElementById(id).classList.toggle('hidden',!on);
+  show('playBallCarrierWrap',kind==='run');show('playKneelWrap',kind==='run');show('playPasserWrap',kind==='pass');show('playReceiverWrap',kind==='pass');show('playSackerWrap',false);show('playPassOutcomeWrap',kind==='pass');show('playKickerWrap',['kickoff','punt'].includes(kind));show('playReturnerWrap',['kickoff','punt'].includes(kind));show('playLandingSpotWrap',['kickoff','punt'].includes(kind));show('playTouchbackWrap',['kickoff','punt'].includes(kind));show('playFairCatchWrap',kind==='punt');show('playBlockedWrap',kind==='punt');
+  document.getElementById('playPassOutcome').value='complete';playOutcomeChanged();document.getElementById('playEntryModal').classList.remove('hidden');['playStartCoord','playLandingCoord','playEndCoord'].forEach(id=>document.getElementById(id).oninput=()=>{setSpotControl(id.includes('Start')?'start':id.includes('Landing')?'landing':'end',document.getElementById(id).value);updatePlayPreview()});updatePlayPreview();
+}
+function closePlayEntry(){document.getElementById('playEntryModal').classList.add('hidden')}
+function playOutcomeChanged(){const kind=document.getElementById('playEntryType').value;const o=document.getElementById('playPassOutcome').value;document.getElementById('playReceiverWrap').classList.toggle('hidden',!(kind==='pass'&&o==='complete'));document.getElementById('playSackerWrap').classList.toggle('hidden',!(kind==='pass'&&o==='sack'));document.getElementById('playEndCoord').disabled=kind==='pass'&&['incomplete','spike'].includes(o);if(kind==='pass'&&['incomplete','spike'].includes(o))setSpotControl('end',document.getElementById('playStartCoord').value);updatePlayPreview()}
+function updatePlayPreview(){const kind=document.getElementById('playEntryType').value,team=document.getElementById('playEntryTeam').value;const dir=currentState?.[team+'_direction']==='left'?-1:1;const s=Number(document.getElementById('playStartCoord').value),e=Number(document.getElementById('playEndCoord').value),l=Number(document.getElementById('playLandingCoord').value);let text=`Calculated result: ${(e-s)*dir} yards.`;if(['kickoff','punt'].includes(kind))text=`Kick distance: ${Math.abs(l-s)} yards · Return: ${Math.max(0,(e-l)*(-dir))} yards.`;document.getElementById('playEntryPreview').textContent=text+' Down, distance, first down and scoring will be derived automatically.'}
+async function submitPlayEntry(){const kind=document.getElementById('playEntryType').value;const entryTeam=document.getElementById('playEntryTeam').value;const defenseTeam=entryTeam==='home'?'visitor':'home';const named=(team,id)=>{const p=resolveRosterPlayer(team,document.getElementById(id).value);return p?playerDisplayName(p):''};const payload={team:entryTeam,play_type:kind,player_name:named(entryTeam,'playBallCarrier'),passer_name:named(entryTeam,'playPasser'),receiver_name:named(entryTeam,'playReceiver'),sacker_name:named(defenseTeam,'playSacker'),kicker_name:named(entryTeam,'playKicker'),returner_name:named(defenseTeam,'playReturner'),start_spot:spotFromCoord(document.getElementById('playStartCoord').value),landing_spot:spotFromCoord(document.getElementById('playLandingCoord').value),end_spot:spotFromCoord(document.getElementById('playEndCoord').value),player_number:document.getElementById('playBallCarrier').value,passer_number:document.getElementById('playPasser').value,receiver_number:kind==='pass'?document.getElementById('playReceiver').value:'',sacker_number:document.getElementById('playSacker').value,kicker_number:document.getElementById('playKicker').value,returner_number:document.getElementById('playReturner').value,pass_outcome:document.getElementById('playPassOutcome').value,kneel:document.getElementById('playKneel').checked,fumble:document.getElementById('playFumble').checked,fumble_lost:document.getElementById('playFumbleLost').checked,out_of_bounds:document.getElementById('playOutOfBounds').checked,touchback:document.getElementById('playTouchback').checked,fair_catch:document.getElementById('playFairCatch').checked,blocked:document.getElementById('playBlocked').checked,notes:document.getElementById('playNotes').value};try{await GameStateManager.mutate('/api/rules-play',payload,'POST',r=>r.state);closePlayEntry()}catch(e){document.getElementById('playEntryMessage').textContent=e.data?.message||e.message}}
+async function setDriveDirection(direction){const team=currentState.possession==='visitor'?'visitor':'home';try{await GameStateManager.mutate('/api/field-direction',{team,direction})}catch(e){alert(e.data?.message||e.message)}}
+async function setFieldDirection(home_direction){return setDriveDirection(home_direction)}
+async function clockAction(action,extra={}){try{await GameStateManager.mutate('/api/clock-control',{action,...extra})}catch(e){alert(e.data?.message||e.message)}}
+async function adjustClock(delta){return clockAction('adjust',{delta})}
+async function setClockDialog(){const current=Number(currentState.clock_seconds??720),m=Math.floor(current/60),s=current%60;const raw=prompt('Set game clock (MM:SS)',`${m}:${String(s).padStart(2,'0')}`);if(raw===null)return;const parts=raw.split(':').map(Number);if(parts.length!==2||parts.some(Number.isNaN)){alert('Use MM:SS.');return}await clockAction('set',{seconds:Math.max(0,parts[0]*60+parts[1])})}
+async function toggleClockVisibility(){try{await GameStateManager.mutate('/api/clock-control',{action:'set',seconds:Number(currentState.clock_seconds??720),visible:!Boolean(currentState.clock_visible)})}catch(e){alert(e.data?.message||e.message)}}
+
 async function openAutomationEventFromStatistician(team,event){automationEventSource='statistician';await openAutomationEvent(team,event)}
 
 async function score(team, delta) {
-  currentState = await api('/api/score', {team, delta, source:'broadcaster'});
-  render();
+  try{await GameStateManager.mutate('/api/score',{team,delta,source:'broadcaster'})}catch(e){alert(e.data?.message||e.message)}
 }
 function confirmEventAction(message){
   return new Promise(resolve=>{
@@ -1481,8 +1616,7 @@ async function triggerEvent(team,event){
 }
 
 async function setState(key, value) {
-  currentState = await api('/api/set', {[key]: value, source:'broadcaster'});
-  render();
+  try{await GameStateManager.mutate('/api/set',{[key]:value,source:'broadcaster'})}catch(e){alert(e.data?.message||e.message)}
 }
 
 async function toggleScorebug() {
@@ -1547,13 +1681,20 @@ async function newBroadcast() {
 function openQuickCorrection(){if(gameDataLockedFor('statistician')){alert('Statistician authority must be active.');return}document.getElementById('correctDown').value=currentState.down||'1st';document.getElementById('correctDistance').value=currentState.distance==='Off'?10:(currentState.distance||10);document.getElementById('correctBallSpot').value=currentState.ball_spot||'';document.getElementById('correctPossession').value=currentState.possession||'home';document.getElementById('correctQuarter').value=currentState.quarter||'1';document.getElementById('correctNote').value='';document.getElementById('quickCorrectionModal').classList.remove('hidden')}
 function closeQuickCorrection(){document.getElementById('quickCorrectionModal').classList.add('hidden')}
 async function submitQuickCorrection(){try{currentState=await api('/api/game-correction',{source:'statistician',down:document.getElementById('correctDown').value,distance:document.getElementById('correctDistance').value,ball_spot:document.getElementById('correctBallSpot').value,possession:document.getElementById('correctPossession').value,quarter:document.getElementById('correctQuarter').value,note:document.getElementById('correctNote').value});closeQuickCorrection();await refreshAuthoritativeGameState();loadCorrections()}catch(e){document.getElementById('correctMessage').textContent=e.data?.message||e.message}}
-function openEditEvent(id){const ev=(currentState.events||[]).find(e=>e.id===id);if(!ev)return;document.getElementById('editEventId').value=id;document.getElementById('editEventDescription').value=ev.description||'';document.getElementById('editEventYards').value=ev.automation?.yards||'';document.getElementById('editEventQuarter').value=ev.quarter||'';document.getElementById('editEventDown').value=ev.after?.down||'';document.getElementById('editEventDistance').value=ev.after?.distance||'';document.getElementById('editEventBallSpot').value=ev.after?.ball_spot||'';document.getElementById('editEventPossession').value=ev.after?.possession||'';document.getElementById('editEventNote').value='';document.getElementById('editEventModal').classList.remove('hidden')}
+function setEditSpot(which,coord){const id=which==='start'?'editStartCoord':'editEndCoord';const label=which==='start'?'editStartSpotLabel':'editEndSpotLabel';const el=document.getElementById(id);el.value=Math.max(0,Math.min(100,Math.round(Number(coord)||0)));document.getElementById(label).textContent=spotFromCoord(el.value);updateEditCalculation()}
+function nudgeEditSpot(which,delta){const el=document.getElementById(which==='start'?'editStartCoord':'editEndCoord');setEditSpot(which,Number(el.value)+delta)}
+function updateEditCalculation(){const ev=(currentState.events||[]).find(e=>e.id===document.getElementById('editEventId').value);if(!ev)return;const team=ev.team||currentState.possession||'home';const dir=currentState?.[team+'_direction']==='left'?-1:1;const yards=(Number(document.getElementById('editEndCoord').value)-Number(document.getElementById('editStartCoord').value))*dir;document.getElementById('editEventYards').value=yards;document.getElementById('editCalculatedSummary').textContent=`Calculated result: ${yards} yards · Ball at ${spotFromCoord(document.getElementById('editEndCoord').value)}`}
+function openEditEvent(id){const ev=(currentState.events||[]).find(e=>e.id===id);if(!ev)return;const play=(currentState.plays||[]).find(p=>p.event_id===id||p.play_id===ev.play_id)||{};document.getElementById('editEventId').value=id;document.getElementById('editEventDescription').value=ev.description||'';document.getElementById('editEventQuarter').value=ev.quarter||'';document.getElementById('editEventDown').value=ev.after?.down||'';document.getElementById('editEventDistance').value=ev.after?.distance||'';document.getElementById('editEventPossession').value=ev.after?.possession||'';document.getElementById('editEventNote').value='';const team=ev.team||play.offense||'home';const teamName=team==='home'?currentState.home_team:currentState.visitor_team;const abbr=(team==='home'?currentState.home_abbreviation:currentState.visitor_abbreviation)||teamName.split(/\s+/).map(x=>x[0]).join('').slice(0,4).toUpperCase();const arrow=currentState?.[team+'_direction']==='left'?'←':'→';document.getElementById('editDriveIndicator').textContent=arrow==='←'?`${arrow} ${abbr}`:`${abbr} ${arrow}`;setEditSpot('start',coordFromSpot(play.ball_spot||ev.before?.ball_spot||currentState.ball_spot||'50'));setEditSpot('end',coordFromSpot(play.end_spot||ev.after?.ball_spot||currentState.ball_spot||'50'));document.getElementById('editStartCoord').oninput=()=>setEditSpot('start',document.getElementById('editStartCoord').value);document.getElementById('editEndCoord').oninput=()=>setEditSpot('end',document.getElementById('editEndCoord').value);document.getElementById('editEventModal').classList.remove('hidden');updateEditCalculation()}
 function closeEditEvent(){document.getElementById('editEventModal').classList.add('hidden')}
-async function submitEventEdit(){const payload={source:'statistician',description:document.getElementById('editEventDescription').value,yards:document.getElementById('editEventYards').value,quarter:document.getElementById('editEventQuarter').value,note:document.getElementById('editEventNote').value};for(const [key,id] of [['down','editEventDown'],['distance','editEventDistance'],['ball_spot','editEventBallSpot'],['possession','editEventPossession']]){const v=document.getElementById(id).value;if(v!=='')payload[key]=v}try{const result=await api(`/api/events/${encodeURIComponent(document.getElementById('editEventId').value)}/edit`,payload);currentState=result.state;closeEditEvent();await refreshAuthoritativeGameState();loadCorrections()}catch(e){document.getElementById('editEventMessage').textContent=e.data?.message||e.message}}
+async function submitEventEdit(){const payload={source:'statistician',description:document.getElementById('editEventDescription').value,yards:document.getElementById('editEventYards').value,start_spot:spotFromCoord(document.getElementById('editStartCoord').value),end_spot:spotFromCoord(document.getElementById('editEndCoord').value),ball_spot:spotFromCoord(document.getElementById('editEndCoord').value),quarter:document.getElementById('editEventQuarter').value,note:document.getElementById('editEventNote').value};for(const [key,id] of [['down','editEventDown'],['distance','editEventDistance'],['possession','editEventPossession']]){const v=document.getElementById(id).value;if(v!=='')payload[key]=v}try{const result=await api(`/api/events/${encodeURIComponent(document.getElementById('editEventId').value)}/edit`,payload);currentState=result.state;closeEditEvent();await refreshAuthoritativeGameState();loadCorrections()}catch(e){document.getElementById('editEventMessage').textContent=e.data?.message||e.message}}
 function openEjection(){if(gameDataLockedFor('statistician')){alert('Statistician authority must be active.');return}document.getElementById('ejectionModal').classList.remove('hidden')}
 function closeEjection(){document.getElementById('ejectionModal').classList.add('hidden')}
 async function submitEjection(){const payload={team:document.getElementById('ejectionTeam').value,event:'EJECTION',source:'statistician',ejection_person_type:document.getElementById('ejectionPersonType').value,ejection_person_name:document.getElementById('ejectionPersonName').value,ejection_reason:document.getElementById('ejectionReason').value};try{const result=await api('/api/event-trigger',payload);currentState=result.state;closeEjection();await refreshAuthoritativeGameState()}catch(e){document.getElementById('ejectionMessage').textContent=e.data?.message||e.message}}
-function renderStatisticianRegister(){const el=document.getElementById('statisticianEventRegister');if(!el)return;const events=(currentState.events||[]).slice().reverse();el.innerHTML=events.length?events.map(ev=>`<div class="event-log-row${ev.undone?' is-undone':''}"><strong>Play ${escapeHtml(ev.play_number||'—')} · ${escapeHtml(ev.label||ev.event)}</strong><span>${escapeHtml(ev.description||'')}</span><div class="button-row"><time>Q${escapeHtml(ev.quarter||'—')}</time>${!ev.undone?`<button onclick="openEditEvent('${escapeHtml(ev.id)}')">Edit</button>`:''}</div></div>`).join(''):'<div class="section-note">No plays or events recorded.</div>'}
+let selectedPlayId='';
+function selectPlay(playId){selectedPlayId=playId;renderStatisticianRegister();}
+function resolvedPlayDisplay(play){if(!play)return play;const p={...play};const team=p.offense==='visitor'?'visitor':'home';const defense=team==='home'?'visitor':'home';const fill=(role,side)=>{const nk=`${role}_number`,namek=`${role}_name`;if(p[nk]&&!p[namek]){const found=resolveRosterPlayer(side,p[nk]);if(found)p[namek]=playerDisplayName(found)}};[['player',team],['passer',team],['receiver',team],['kicker',team],['returner',defense],['sacker',defense]].forEach(([r,t])=>fill(r,t));const y=p.yards??'';if(String(p.play_type||'').toLowerCase()==='run'&&p.player_number&&p.player_name){p.result=`#${p.player_number} ${p.player_name} ${p.kneel?'kneel':'run'} for ${y} yards${p.touchdown?', touchdown':p.first_down?', first down':''}`;}else if(String(p.play_type||'').toLowerCase()==='pass'&&String(p.pass_outcome||'complete').toLowerCase()==='complete'&&p.receiver_number&&p.receiver_name){const passer=[p.passer_number?`#${p.passer_number}`:'',p.passer_name||''].filter(Boolean).join(' ');p.result=`${passer} complete to #${p.receiver_number} ${p.receiver_name} for ${y} yards${p.touchdown?', touchdown':''}`.trim();}return p;}
+function renderPlayDetail(play){play=resolvedPlayDisplay(play);const panel=document.getElementById('playDetailPanel');if(!panel)return;if(!play){panel.innerHTML='<div class="section-note">Select a play to view details.</div>';return;}const flag=v=>v?'Yes':'No';panel.innerHTML=`<div class="play-detail-heading"><div><span class="section-note">Canonical Play Record</span><h3>Play ${escapeHtml(play.play_number||'—')}</h3><code>${escapeHtml(play.play_id||'')}</code></div>${play.undone?'<span class="status-pill warning">Undone</span>':''}</div><dl class="play-detail-grid"><dt>Quarter</dt><dd>${escapeHtml(play.quarter||'—')}</dd><dt>Clock</dt><dd>${escapeHtml(play.clock||'Not entered')}</dd><dt>Offense</dt><dd>${escapeHtml(play.offense_name||play.offense||'—')}</dd><dt>Defense</dt><dd>${escapeHtml(play.defense_name||play.defense||'—')}</dd><dt>Down & Distance</dt><dd>${escapeHtml(play.down||'—')} & ${escapeHtml(play.distance||'—')}</dd><dt>Ball Spot</dt><dd>${escapeHtml(play.ball_spot||'Not entered')}</dd><dt>Play Type</dt><dd>${escapeHtml(play.play_type||'—')}</dd><dt>Yards</dt><dd>${escapeHtml(play.yards===''?'Not entered':play.yards)}</dd><dt>First Down</dt><dd>${flag(play.first_down)}</dd><dt>Touchdown</dt><dd>${flag(play.touchdown)}</dd><dt>Turnover</dt><dd>${flag(play.turnover)}</dd><dt>Safety</dt><dd>${flag(play.safety)}</dd><dt>Created By</dt><dd>${escapeHtml(play.created_by||'—')}</dd></dl><div class="play-result"><strong>Result</strong><p>${escapeHtml(play.result||'No result recorded.')}</p></div>${play.notes?`<div class="play-result"><strong>Notes</strong><p>${escapeHtml(play.notes)}</p></div>`:''}`}
+function renderStatisticianRegister(){const el=document.getElementById('statisticianEventRegister');if(!el)return;const plays=(currentState.plays||[]).slice().reverse().map(resolvedPlayDisplay);if(plays.length&&!selectedPlayId)selectedPlayId=plays[0].play_id;el.innerHTML=plays.length?plays.map(play=>{const ev=(currentState.events||[]).find(e=>e.id===play.event_id);return `<div class="event-log-row play-register-row${play.undone?' is-undone':''}${play.play_id===selectedPlayId?' is-selected':''}" onclick="selectPlay('${escapeHtml(play.play_id)}')"><strong>Play ${escapeHtml(play.play_number||'—')} · ${escapeHtml(play.label||play.play_type||'Play')}</strong><span>${escapeHtml(play.result||'')}</span><div class="button-row"><time>Q${escapeHtml(play.quarter||'—')}</time>${ev&&!play.undone?`<button onclick="event.stopPropagation();openEditEvent('${escapeHtml(ev.id)}')">Edit</button>`:''}</div></div>`}).join(''):'<div class="section-note">No plays recorded.</div>';renderPlayDetail(plays.find(p=>p.play_id===selectedPlayId)||plays[0]||null)}
 async function loadCorrections(){const el=document.getElementById('correctionLog');if(!el)return;try{const rows=await api('/api/corrections');el.innerHTML=rows.length?rows.slice(0,30).map(r=>`<article><strong>${escapeHtml(String(r.kind||'Correction').replaceAll('_',' '))}</strong><span>${escapeHtml(r.note||r.event_id||'Game state corrected')}</span><time>${new Date((r.created_at||0)*1000).toLocaleString()}</time></article>`).join(''):'<div class="section-note">No corrections recorded.</div>'}catch(e){el.textContent=e.message}}
 async function loadConnectionInfo(){const status=document.getElementById('connectionInfo'),list=document.getElementById('connectionAddresses');try{const info=await api('/api/connection-info');status.textContent=info.guidance;status.className='status success';list.innerHTML=(info.addresses||[]).map(row=>`<article><strong>${escapeHtml(row.url)}</strong><button onclick="navigator.clipboard?.writeText('${escapeHtml(row.url)}')">Copy</button></article>`).join('')||'<div class="section-note">No external adapter address detected. Enable hotspot or USB tethering, then refresh.</div>'}catch(e){status.textContent=e.message;status.className='status error'}}
 
@@ -1657,11 +1798,18 @@ function render() {
   const authorityBadge=document.getElementById('authorityBadge'); if(authorityBadge){authorityBadge.textContent=statActive?'STATISTICIAN':'BROADCASTER';authorityBadge.classList.toggle('onair',statActive)}
   const authorityMessage=document.getElementById('authorityMessage'); if(authorityMessage) authorityMessage.textContent=statActive?'Statistician Console has priority. Broadcaster game-data controls are locked.':'Broadcaster game-data controls are active.';
   const broadcasterControls=document.getElementById('broadcasterGameDataControls'); if(broadcasterControls){broadcasterControls.classList.toggle('controls-locked',statActive);broadcasterControls.querySelectorAll('button').forEach(b=>b.disabled=statActive)}
+  const broadcasterStateControls=document.getElementById('broadcasterStateControls');
+  if(broadcasterStateControls){
+    broadcasterStateControls.classList.toggle('controls-locked',statActive);
+    broadcasterStateControls.querySelectorAll('#possessionButtons button,#downButtons button,#quarterButtons button').forEach(b=>b.disabled=statActive);
+    const distance=broadcasterStateControls.querySelector('#distanceSelect'); if(distance) distance.disabled=statActive;
+    const notice=document.getElementById('broadcasterStateLockNotice'); if(notice) notice.classList.toggle('hidden',!statActive);
+  }
   const enableButton=document.getElementById('enableStatisticianButton'); if(enableButton) enableButton.classList.toggle('hidden',statActive);
   const takeoverButton=document.getElementById('broadcasterTakeoverButton'); if(takeoverButton) takeoverButton.classList.toggle('hidden',!statActive);
   const statBadge=document.getElementById('statisticianAuthorityBadge'); if(statBadge) statBadge.textContent=statActive?'ACTIVE':'DISABLED';
   const statStatus=document.getElementById('statisticianStatus'); if(statStatus) statStatus.textContent=statActive?'Statistician Console is the authoritative game-data source.':'Enable this console from Command Center before entering game data.';
-  const statControls=document.getElementById('statisticianControls'); if(statControls){statControls.classList.toggle('controls-locked',!statActive);statControls.querySelectorAll('button').forEach(b=>b.disabled=!statActive)}
+  const statControls=document.getElementById('statisticianControls'); if(statControls){statControls.classList.toggle('controls-locked',!statActive);statControls.querySelectorAll('button,select,input').forEach(el=>el.disabled=!statActive)}
   renderStatisticianRegister();
   [['statHomeName',currentState.home_team],['statVisitorName',currentState.visitor_team],['statHomeHeader',currentState.home_team],['statVisitorHeader',currentState.visitor_team],['statHomeScore',currentState.home_score],['statVisitorScore',currentState.visitor_score],['statQuarter',`Q${currentState.quarter}`],['statDownDistance',`${currentState.down} & ${currentState.distance}`]].forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.textContent=v});
   const statDistance=document.getElementById('statDistance');if(statDistance){if(!statDistance.options.length){statDistance.innerHTML=['Off',...Array.from({length:99},(_,i)=>String(i+1))].map(v=>`<option>${v}</option>`).join('')}statDistance.value=String(currentState.distance||'10')}
@@ -1725,7 +1873,11 @@ function render() {
   const tickerToggle=document.getElementById('tickerToggle');
   if(tickerToggle) tickerToggle.textContent=currentState.ticker_visible===false?'Show Viewer Ticker':'Hide Viewer Ticker';
   const tickerSpeed=document.getElementById('tickerSpeed');
-  if(tickerSpeed) tickerSpeed.value=currentState.ticker_speed||'normal';
+  if(tickerSpeed) tickerSpeed.value=currentState.ticker_speed||'slow';
+  const tickerPause=document.getElementById('tickerPause'); if(tickerPause) tickerPause.value=String(currentState.ticker_pause??2);
+  const sec=Number(currentState.clock_seconds??720), clock=document.getElementById('gameClockReadout'); if(clock)clock.textContent=`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`; const cs=document.getElementById('gameClockStatus');if(cs){cs.textContent=currentState.clock_running?'RUNNING':'STOPPED';cs.classList.toggle('running',Boolean(currentState.clock_running))}
+  const driveTeam=currentState.possession==='visitor'?'visitor':'home',driveDir=currentState[driveTeam+'_direction'];const ddr=document.getElementById('driveDirRight'),ddl=document.getElementById('driveDirLeft');if(ddr)ddr.classList.toggle('active',driveDir==='right');if(ddl)ddl.classList.toggle('active',driveDir==='left');
+  const ctx=document.getElementById('rulesContext');if(ctx){const d=String(currentState.distance||'10');const spot=currentState.ball_spot||'50';const red=/VISITOR ([1-9]|1\d|20)$/.test(spot)||/HOME ([1-9]|1\d|20)$/.test(spot);ctx.textContent=`${currentState.down||'1st'} & ${d} · Ball: ${spot} · ${currentState.possession==='home'?currentState.home_team:currentState.visitor_team}${currentState.down==='4th'?' · FOURTH DOWN':''}${d==='Goal'?' · GOAL TO GO':''}${red?' · RED ZONE':''}`;}
 
   const rs=document.getElementById('readinessSummary'); if(rs) rs.dataset.broadcastStatus=currentState.status||'planned';
   const startButton=document.getElementById('startBroadcastButton'); if(startButton){startButton.disabled=currentState.status==='completed'; startButton.title=currentState.status==='completed'?'Completed broadcasts open in review mode.':'';}
@@ -3095,21 +3247,32 @@ async function loadStatistics(){
     document.getElementById('statisticsScoringCount').textContent=statNum(statisticsData.scoring_event_count);
     document.getElementById('statisticsPlayerCount').textContent=statNum((statisticsData.players||[]).length);
     document.getElementById('statisticsScoreboard').innerHTML=`<div><span>${escapeHtml(home.name||'Home')}</span><strong>${statNum(home.score)}</strong></div><div><span>${escapeHtml(visitor.name||'Visitor')}</span><strong>${statNum(visitor.score)}</strong></div>`;
-    document.getElementById('statisticsTeamTotals').innerHTML=['home','visitor'].map(key=>{const t=statisticsData.teams?.[key]||{};return `<article><h3>${escapeHtml(t.name||key)}</h3><dl><div><dt>Touchdowns</dt><dd>${statNum(t.touchdowns)}</dd></div><div><dt>Field Goals</dt><dd>${statNum(t.field_goals)}</dd></div><div><dt>Extra Points</dt><dd>${statNum(t.extra_points)}</dd></div><div><dt>2PT</dt><dd>${statNum(t.two_point_conversions)}</dd></div><div><dt>Turnovers Gained</dt><dd>${statNum(t.turnovers_gained)}</dd></div></dl></article>`}).join('');
+    document.getElementById('statisticsTeamTotals').innerHTML=['home','visitor'].map(key=>{const t=statisticsData.teams?.[key]||{};return `<article><h3>${escapeHtml(t.name||key)}</h3><dl><div><dt>Touchdowns</dt><dd>${statNum(t.touchdowns)}</dd></div><div><dt>Field Goals</dt><dd>${statNum(t.field_goals)}</dd></div><div><dt>Extra Points</dt><dd>${statNum(t.extra_points)}</dd></div><div><dt>2PT</dt><dd>${statNum(t.two_point_conversions)}</dd></div><div><dt>Turnovers Gained</dt><dd>${statNum(t.turnovers_gained)}</dd></div><div><dt>Rush</dt><dd>${statNum(t.rushing_attempts)}–${statNum(t.rushing_yards)} yds</dd></div><div><dt>Pass</dt><dd>${statNum(t.completions)}/${statNum(t.pass_attempts)}–${statNum(t.passing_yards)} yds</dd></div><div><dt>Total Offense</dt><dd>${statNum(t.total_yards)} yds</dd></div><div><dt>Yards / Play</dt><dd>${t.yards_per_play||0}</dd></div></dl></article>`}).join('');
     document.getElementById('statisticsPlayers').innerHTML=(statisticsData.players||[]).map(p=>`<tr><td>${escapeHtml(p.team_name)}</td><td>${escapeHtml(p.number||'—')}</td><td>${escapeHtml(p.name)}</td><td>${statNum(p.touchdowns)}</td><td>${statNum(p.passing_touchdowns)}</td><td>${statNum(p.field_goals)}</td><td>${statNum(p.extra_points)}</td><td>${statNum(p.two_point_conversions)}</td><td><strong>${statNum(p.points)}</strong></td></tr>`).join('')||'<tr><td colspan="9">No player scoring has been recorded.</td></tr>';
     document.getElementById('statisticsScoringPlays').innerHTML=(statisticsData.scoring_summary||[]).map(play=>`<article><span>Q${escapeHtml(play.quarter||'—')}</span><div><strong>${escapeHtml(play.team_name)} · ${escapeHtml(play.label)}</strong><p>${escapeHtml(play.description)}</p></div><b>${statNum(play.home_score)}–${statNum(play.visitor_score)}</b></article>`).join('')||'<div class="section-note">No scoring plays recorded.</div>';
     document.getElementById('statisticsNote').textContent=statisticsData.note||'';
   }catch(error){status.textContent=error.message||'Unable to load statistics.';status.className='status error'}
 }
+function displayTeamName(value){const v=String(value||'').trim();if(v==='home')return statisticsData?.teams?.home?.name||currentState?.home_team||'Home';if(v==='visitor')return statisticsData?.teams?.visitor?.name||currentState?.visitor_team||'Visitor';return v||''}
 function printStatisticsReport(){
   if(!statisticsData){loadStatistics().then(printStatisticsReport);return}
   const home=statisticsData.teams?.home||{},visitor=statisticsData.teams?.visitor||{};
-  const teamRows=['home','visitor'].map(k=>{const t=statisticsData.teams?.[k]||{};return `<tr><td>${escapeHtml(t.name)}</td><td>${t.score||0}</td><td>${t.touchdowns||0}</td><td>${t.field_goals||0}</td><td>${t.extra_points||0}</td><td>${t.two_point_conversions||0}</td><td>${t.turnovers_gained||0}</td></tr>`}).join('');
+  const teamRows=['home','visitor'].map(k=>{const t=statisticsData.teams?.[k]||{};return `<tr><td>${escapeHtml(t.name)}</td><td>${t.score||0}</td><td>${t.touchdowns||0}</td><td>${t.field_goals||0}</td><td>${t.extra_points||0}</td><td>${t.two_point_conversions||0}</td><td>${t.turnovers_gained||0}</td><td>${t.rushing_attempts||0}–${t.rushing_yards||0}</td><td>${t.completions||0}/${t.pass_attempts||0}–${t.passing_yards||0}</td><td>${t.total_yards||0}</td><td>${t.yards_per_play||0}</td></tr>`}).join('');
   const playerRows=(statisticsData.players||[]).map(p=>`<tr><td>${escapeHtml(p.team_name)}</td><td>${escapeHtml(p.number||'')}</td><td>${escapeHtml(p.name)}</td><td>${p.touchdowns||0}</td><td>${p.passing_touchdowns||0}</td><td>${p.field_goals||0}</td><td>${p.extra_points||0}</td><td>${p.two_point_conversions||0}</td><td>${p.points||0}</td></tr>`).join('');
+  const playRegister=(statisticsData.play_register||[]).map(p=>`<tr><td>${p.play_number||''}</td><td>Q${escapeHtml(p.quarter||'')}</td><td>${escapeHtml(p.clock||'')}</td><td>${escapeHtml(p.down||'')} & ${escapeHtml(p.distance||'')}</td><td>${escapeHtml(displayTeamName(p.offense_name||p.offense||''))}</td><td>${escapeHtml(p.play_type||'')}</td><td>${escapeHtml(p.result||'')}</td><td>${escapeHtml(String(p.yards??''))}</td></tr>`).join('');
   const plays=(statisticsData.scoring_summary||[]).map(p=>`<tr><td>Q${escapeHtml(p.quarter)}</td><td>${escapeHtml(p.team_name)}</td><td>${escapeHtml(p.description)}</td><td>${p.home_score}–${p.visitor_score}</td></tr>`).join('');
   const w=window.open('','_blank');if(!w)return;
-  w.document.write(`<!doctype html><html><head><title>CSRN Game Statistics</title><style>body{font-family:Arial,sans-serif;margin:32px;color:#111}h1{margin-bottom:4px}.score{font-size:28px;font-weight:800;margin:18px 0}table{width:100%;border-collapse:collapse;margin:12px 0 28px}th,td{border:1px solid #aaa;padding:7px;text-align:left}th{background:#eee}.note{font-size:12px;color:#555}@media print{button{display:none}}</style></head><body><h1>CSRN Game Statistics</h1><div>${escapeHtml(statisticsData.date||'')} · ${escapeHtml(statisticsData.venue||'')}</div><div class="score">${escapeHtml(home.name)} ${home.score||0} — ${visitor.score||0} ${escapeHtml(visitor.name)}</div><h2>Team Summary</h2><table><tr><th>Team</th><th>Score</th><th>TD</th><th>FG</th><th>XP</th><th>2PT</th><th>TO Gained</th></tr>${teamRows}</table><h2>Player Scoring</h2><table><tr><th>Team</th><th>#</th><th>Player</th><th>TD</th><th>Pass TD</th><th>FG</th><th>XP</th><th>2PT</th><th>Pts</th></tr>${playerRows||'<tr><td colspan="9">No player scoring recorded.</td></tr>'}</table><h2>Scoring Plays</h2><table><tr><th>Quarter</th><th>Team</th><th>Play</th><th>Score</th></tr>${plays||'<tr><td colspan="4">No scoring plays recorded.</td></tr>'}</table><p class="note">${escapeHtml(statisticsData.note||'')}</p><button onclick="window.print()">Print / Save PDF</button></body></html>`);w.document.close();w.focus();
+  w.document.write(`<!doctype html><html><head><title>CSRN Game Statistics</title><style>body{font-family:Arial,sans-serif;margin:32px;color:#111}h1{margin-bottom:4px}.score{font-size:28px;font-weight:800;margin:18px 0}table{width:100%;border-collapse:collapse;margin:12px 0 28px}th,td{border:1px solid #aaa;padding:7px;text-align:left}th{background:#eee}.note{font-size:12px;color:#555}@media print{button{display:none}}</style></head><body><h1>CSRN Game Statistics</h1><div>${escapeHtml(statisticsData.date||'')} · ${escapeHtml(statisticsData.venue||'')}</div><div class="score">${escapeHtml(home.name)} ${home.score||0} — ${visitor.score||0} ${escapeHtml(visitor.name)}</div><h2>Team Summary</h2><table><tr><th>Team</th><th>Score</th><th>TD</th><th>FG</th><th>XP</th><th>2PT</th><th>TO Gained</th><th>Rush</th><th>Pass</th><th>Total Yds</th><th>Y/P</th></tr>${teamRows}</table><h2>Player Scoring</h2><table><tr><th>Team</th><th>#</th><th>Player</th><th>TD</th><th>Pass TD</th><th>FG</th><th>XP</th><th>2PT</th><th>Pts</th></tr>${playerRows||'<tr><td colspan="9">No player scoring recorded.</td></tr>'}</table><h2>Scoring Plays</h2><table><tr><th>Quarter</th><th>Team</th><th>Play</th><th>Score</th></tr>${plays||'<tr><td colspan="4">No scoring plays recorded.</td></tr>'}</table><h2>Play Register</h2><table><tr><th>Play</th><th>Quarter</th><th>Clock</th><th>Down & Distance</th><th>Offense</th><th>Type</th><th>Result</th><th>Yards</th></tr>${playRegister||'<tr><td colspan="8">No plays recorded.</td></tr>'}</table><p class="note">${escapeHtml(statisticsData.note||'')}</p><button onclick="window.print()">Print / Save PDF</button></body></html>`);w.document.close();w.focus();
 }
+
+// Keep the operator clock visibly moving between authoritative refreshes.
+setInterval(()=>{
+  if(!currentState?.clock_running)return;
+  const next=Math.max(0,Number(currentState.clock_seconds||0)-1);
+  currentState.clock_seconds=next;
+  const clock=document.getElementById('gameClockReadout');if(clock)clock.textContent=`${Math.floor(next/60)}:${String(next%60).padStart(2,'0')}`;
+  if(next===0){currentState.clock_running=false;const status=document.getElementById('gameClockStatus');if(status){status.textContent='STOPPED';status.classList.remove('running')}}
+},1000);
 
 </script>
 </body>

@@ -801,3 +801,29 @@ body.automation-modal-open{overflow:hidden!important}.automation-event-sheet{max
 .header-actions #switchConsoleButton{white-space:nowrap}
 @media(max-width:1050px){.readiness-grid{grid-template-columns:1fr}.readiness-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.readiness-actions button:last-child{grid-column:1/-1}}
 @media(max-width:760px){.header-actions #switchConsoleButton{display:inline-flex}.readiness-actions{grid-template-columns:1fr}.readiness-actions button:last-child{grid-column:auto}.access-key{align-items:flex-start;flex-direction:column}.statistician-state-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.statistician-state-buttons select{grid-column:1/-1}}
+
+/* Version 1.13.0-alpha.1 — authority and ticker foundation */
+.authority-status-banner{border-left:4px solid #c9203b;font-weight:800}.authority-lock-notice{margin:0 0 14px;border-left:4px solid #f0b429}.controls-locked{opacity:.68}.controls-locked button:disabled,.controls-locked select:disabled,.controls-locked input:disabled{cursor:not-allowed;filter:saturate(.35);opacity:.55}.ticker-controls .ticker-help{flex-basis:100%;margin:0}.ticker-controls label select{margin-top:5px}
+
+/* Version 1.13.0-alpha.2 — Play Register Foundation */
+.play-register-layout{display:grid;grid-template-columns:minmax(320px,1.15fr) minmax(300px,.85fr);gap:16px;align-items:start}.play-register-list{max-height:620px;overflow:auto;padding-right:4px}.play-register-row{cursor:pointer;transition:border-color .15s ease,background .15s ease,transform .15s ease}.play-register-row:hover{transform:translateY(-1px)}.play-register-row.is-selected{border-color:var(--scarlet,#c9203b);background:rgba(201,32,59,.12)}.play-detail-panel{position:sticky;top:12px;min-height:280px;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:rgba(12,14,18,.72);padding:16px}.play-detail-heading{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px}.play-detail-heading h3{margin:3px 0}.play-detail-heading code{font-size:.78rem;opacity:.75;word-break:break-all}.play-detail-grid{display:grid;grid-template-columns:minmax(110px,.8fr) minmax(130px,1.2fr);gap:8px 12px;margin:0}.play-detail-grid dt{font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;opacity:.62}.play-detail-grid dd{margin:0;font-weight:700}.play-result{margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.1)}.play-result p{margin:6px 0 0;line-height:1.45}.status-pill.warning{display:inline-flex;padding:4px 8px;border-radius:999px;background:rgba(235,166,35,.15);border:1px solid rgba(235,166,35,.45)}@media(max-width:900px){.play-register-layout{grid-template-columns:1fr}.play-detail-panel{position:static}.play-register-list{max-height:430px}}
+
+.rules-control-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}.rules-card{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:14px}.game-clock-readout{font-size:2.2rem;font-weight:900;letter-spacing:.06em}.clock-status{font-weight:800;margin:4px 0 10px;color:#f2c94c}.clock-status.running{color:#4fd17a}.rules-context{font-size:1rem;font-weight:700;line-height:1.5}.play-entry-sheet{width:min(760px,94vw);max-height:92vh;overflow:auto}.play-entry-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.play-option-grid{display:flex;flex-wrap:wrap;gap:12px;margin:14px 0}.play-option-grid label{display:flex;align-items:center;gap:6px}.button-row button.active{outline:2px solid #fff;box-shadow:0 0 0 3px rgba(201,32,59,.55)}@media(max-width:800px){.rules-control-grid,.play-entry-grid{grid-template-columns:1fr}}
+/* 1.13.0-alpha.3a field spotter */
+.field-spotter{margin:14px 0 18px;padding:16px;border:1px solid #46505d;border-radius:14px;background:linear-gradient(180deg,#172319,#111812)}
+.field-axis{display:flex;justify-content:space-between;font-size:.72rem;font-weight:800;letter-spacing:.06em;color:#d9e7d8;margin-bottom:8px}
+.spot-control{display:grid;grid-template-columns:1fr auto;gap:8px 14px;align-items:center;margin:12px 0}
+.spot-control>div{display:flex;justify-content:space-between;gap:12px}.spot-control span{font-weight:900;color:#fff}
+.spot-control input[type=range]{grid-column:1/-1;width:100%;accent-color:#d4203f}.spot-control button{grid-column:1/-1;justify-self:start}
+.spot-nudges{display:flex;gap:8px;justify-content:flex-end}.drive-direction-buttons button{font-size:1.8rem;min-height:58px}
+
+/* 1.13.0-alpha.3b direction and edit workflow */
+.drive-indicator{font-weight:900;font-size:1.05rem;letter-spacing:.08em;text-align:center;padding:.35rem .65rem;margin:0 auto .35rem;border:1px solid rgba(255,255,255,.18);border-radius:999px;width:max-content;min-width:7rem;background:rgba(181,18,27,.2)}
+.edit-field-spotter{margin-top:.75rem}.edit-field-spotter .spot-nudges{grid-template-columns:repeat(4,minmax(0,1fr))}
+
+/* 1.13.0-alpha.3c slider direction badge */
+.spot-control{position:relative;padding-top:34px}
+.spot-control>div:first-child{position:absolute;left:0;right:0;top:0}
+.slider-direction-badge{--spot-pct:50%;position:absolute;top:29px;left:clamp(48px,var(--spot-pct),calc(100% - 48px));transform:translate(-50%,-100%);z-index:3;min-width:82px;padding:5px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.22);background:rgba(67,25,20,.94);color:#fff;font-weight:900;text-align:center;line-height:1;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.32)}
+.spot-control input[type=range]{margin-top:8px}
+.jersey-resolution{display:block;min-height:1.2em;margin-top:6px;font-size:.82rem;color:#9aa4b2}.jersey-resolution.resolved{color:#54d68a;font-weight:700}.jersey-resolution.unresolved{color:#f3b34c;font-weight:700}

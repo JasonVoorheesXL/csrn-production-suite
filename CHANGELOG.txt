@@ -1,55 +1,15 @@
-Version 1.12.1c Hotfix — Statistician State Synchronization
+Version 1.13.0-alpha.3h
+- Fixed roster read loop that rewrote the database and created a snapshot on every API read.
+- Bounded one-time recovery scanning, added mtime cache, atomic writes, and no-op write detection.
+- Removed duplicate state request and render after UI mutations.
+- Reused roster data when opening play entry.
 
-- Fixed Statistician Current Down highlighting by restoring the missing control-group ID and button values.
-- Added a shared authoritative game-state refresh after Statistician mutations.
-- First Down, manual state changes, Undo, Quick Correct, event edits, and ejections now refresh the Statistician display and active highlights immediately.
-- Preserved all 1.12.1a networking and 1.12.1b operator workflow changes.
+CSRN Production Suite 1.13.0-alpha.3g — Database Integrity Recovery
 
-Version 1.12.1b Hotfix — Operator Workflow Cleanup
+- Prevents missing or malformed roster files from being silently replaced with an empty database.
+- Searches upgrade backups and prior installation folders for the most complete roster database.
+- Automatically restores the best available roster database and records a recovery report.
+- Creates timestamped roster snapshots before every roster database write.
+- Preserves the existing football rules and special-teams fixes from Alpha.3f.
 
-- Added Switch Console access from authenticated destination pages.
-- Added active highlighting to Statistician possession and down controls.
-- Renamed connection labels to Local Access and Network Access.
-- Shortened Refresh Broadcast List to Refresh Broadcast.
-- Improved Broadcast Readiness alignment and selector guidance.
-- Improved event-button wrapping for Turnover and Penalty controls.
-- Preserved all Version 1.12.1a networking and QR behavior.
-
-CSRN Production Suite — Version 1.12.1a Hotfix — Broadcast Network Manager
-
-ADDED
-- Automatic current IPv4 address detection for local Wi-Fi, iPhone hotspot, Ethernet, and USB tethering.
-- Command Center QR code for connecting phones and tablets to the current address.
-- Broadcaster, Statistician, and Read-Only Monitor role selection after scanning.
-- Refresh Network and Copy Address controls.
-
-CHANGED
-- Statistician and Statistics navigation moved beside Command Center.
-- Button text sizing and wrapping adjusted conservatively.
-
-BASELINE
-- Built directly from the validated Version 1.12 Alpha Game Control Engine v1 source update.
-- No play-entry, clock-control, ticker-expiration, or event-regeneration changes are included in this focused hotfix.
-
-CSRN Production Suite — Version 1.12 Alpha
-Game Control Engine v1
-
-ADDED
-- Rules-driven penalty enforcement foundation with accepted, declined, offsetting, and flag-picked-up rulings.
-- Statistician Undo control.
-- Quick correction controls for down, distance, ball spot, possession, and quarter.
-- Permanent play numbers and editable play/event register.
-- Event editing for yards, description, quarter, and resulting game state.
-- Correction audit log.
-- Cross-sport player/coach ejection events.
-- Mobile and USB-tether connection diagnostics with active local addresses.
-
-CHANGED
-- Statistics scoreboard now lists both team names on the left and scores on the right.
-- Undo now restores down, distance, ball spot, possession, and quarter when available.
-- Offensive and defensive penalties can automatically update down and distance.
-
-LIMITATIONS
-- This is an NFHS-oriented enforcement foundation, not yet a complete rulebook implementation.
-- Half-the-distance, spot fouls, multiple live-ball fouls, and complex enforcement require statistician quick correction.
-- Event editing recalculates event-derived statistics and can correct current state; full downstream drive reconstruction remains planned.
+Important: recovery can only restore roster data that still exists in a backup or prior installation folder.
