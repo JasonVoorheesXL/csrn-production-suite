@@ -29,6 +29,8 @@ from obs_client import (
     validate_obs_read_only,
 )
 from upgrade_manager import inspect_candidate, migrate
+from persistence_engine import JsonPersistenceEngine
+from core_repositories import ConfigurationRepository, StateRepository, SecurityRepository
 
 BASE_DIR = Path(__file__).resolve().parent
 STATE_FILE = BASE_DIR / "state.json"
@@ -202,31 +204,32 @@ def ensure_data_architecture() -> None:
     ASSET_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     SPONSOR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+CORE_BACKUP_DIR = DATA_DIR / "Backups" / "Core"
+CORE_QUARANTINE_DIR = DATA_DIR / "Backups" / "Quarantine"
+CORE_PERSISTENCE = JsonPersistenceEngine(CORE_BACKUP_DIR, CORE_QUARANTINE_DIR)
+CONFIG_REPOSITORY = ConfigurationRepository(
+    CORE_PERSISTENCE,
+    CONFIG_FILE,
+    DEFAULT_CONFIG,
+    runtime_identity={
+        "version": "Version 1.13.0-alpha.3h — Roster Performance Stabilization",
+        "build": "V1.13A3H-ROSTER-STABILITY",
+    },
+)
+STATE_REPOSITORY = StateRepository(CORE_PERSISTENCE, STATE_FILE, DEFAULT_STATE)
+SECURITY_REPOSITORY = SecurityRepository(CORE_PERSISTENCE, SECURITY_FILE, DEFAULT_SECURITY)
+
+
 def load_config() -> dict[str, Any]:
     ensure_data_architecture()
-    if not CONFIG_FILE.exists():
-        save_json(CONFIG_FILE, DEFAULT_CONFIG)
-        return copy.deepcopy(DEFAULT_CONFIG)
-    try:
-        loaded = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        loaded = copy.deepcopy(DEFAULT_CONFIG)
-        save_json(CONFIG_FILE, loaded)
-    merged = copy.deepcopy(DEFAULT_CONFIG)
-    for section, values in loaded.items():
-        if isinstance(values, dict) and isinstance(merged.get(section), dict):
-            merged[section].update(values)
-        else:
-            merged[section] = values
-    # Application identity always follows the running package, including after migration.
-    merged.setdefault("application", {})["version"] = "Version 1.13.0-alpha.3h — Roster Performance Stabilization"
-    merged["application"]["build"] = "V1.13A3H-ROSTER-STABILITY"
-    merged["application"]["rules_edition"] = "NFHS"
-    return merged
+    config = CONFIG_REPOSITORY.load()
+    config.setdefault("application", {})["rules_edition"] = "NFHS"
+    return config
+
 
 def save_config(config: dict[str, Any]) -> None:
     ensure_data_architecture()
-    save_json(CONFIG_FILE, config)
+    CONFIG_REPOSITORY.save(config)
 
 
 
@@ -1137,7 +1140,7 @@ def save_json(path: Path, data: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 def load_state() -> dict[str, Any]:
-    state = normalize_state(load_json(STATE_FILE, DEFAULT_STATE))
+    state = normalize_state(STATE_REPOSITORY.load())
     if state.get("clock_running"):
         started = int(state.get("clock_started_at", 0) or 0)
         now = int(time.time())
@@ -1149,15 +1152,15 @@ def load_state() -> dict[str, Any]:
                 if state["clock_seconds"] <= 0:
                     state["clock_running"] = False
                     state["clock_started_at"] = 0
-                save_json(STATE_FILE, normalize_state(state))
+                STATE_REPOSITORY.replace(normalize_state(state))
         else:
             state["clock_started_at"] = now
-            save_json(STATE_FILE, normalize_state(state))
+            STATE_REPOSITORY.replace(normalize_state(state))
     return state
 
 def save_state(state: dict[str, Any]) -> None:
     normalized = normalize_state(state)
-    save_json(STATE_FILE, normalized)
+    STATE_REPOSITORY.replace(normalized)
     broadcast_id = str(normalized.get("broadcast_id", "")).strip()
     if not broadcast_id:
         return
@@ -1241,18 +1244,15 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
     return result
 
 def load_security() -> dict[str, Any]:
-    sec = load_json(SECURITY_FILE, DEFAULT_SECURITY)
-    changed = False
-    for key, value in DEFAULT_SECURITY.items():
-        if key not in sec:
-            sec[key] = value
-            changed = True
+    sec = SECURITY_REPOSITORY.load()
     if not sec.get("secret_key"):
         sec["secret_key"] = secrets.token_hex(32)
-        changed = True
-    if changed:
-        save_json(SECURITY_FILE, sec)
+        SECURITY_REPOSITORY.save(sec)
     return sec
+
+
+def save_security(sec: dict[str, Any]) -> None:
+    SECURITY_REPOSITORY.save(sec)
 
 security = load_security()
 app.secret_key = security["secret_key"]
@@ -1611,7 +1611,7 @@ def setup_pin():
     sec["pin_hash"] = generate_password_hash(pin, method="scrypt")
     sec["failed_attempts"] = 0
     sec["locked_until"] = 0
-    save_json(SECURITY_FILE, sec)
+    save_security(sec)
 
     session.clear()
     session.permanent = True
@@ -1631,7 +1631,7 @@ def login():
     if check_password_hash(sec.get("pin_hash", ""), pin):
         sec["failed_attempts"] = 0
         sec["locked_until"] = 0
-        save_json(SECURITY_FILE, sec)
+        save_security(sec)
         session.clear()
         session.permanent = True
         session["authenticated"] = True
@@ -1641,11 +1641,11 @@ def login():
     if sec["failed_attempts"] >= MAX_ATTEMPTS:
         sec["failed_attempts"] = 0
         sec["locked_until"] = int(now + LOCKOUT_SECONDS)
-        save_json(SECURITY_FILE, sec)
+        save_security(sec)
         return jsonify({"error": "LOCKED", "locked_seconds": LOCKOUT_SECONDS}), 429
 
     remaining = MAX_ATTEMPTS - sec["failed_attempts"]
-    save_json(SECURITY_FILE, sec)
+    save_security(sec)
     return jsonify({"error": "INVALID_PIN", "attempts_remaining": remaining}), 401
 
 @app.post("/api/logout")
