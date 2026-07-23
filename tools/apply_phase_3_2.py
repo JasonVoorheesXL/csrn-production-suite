@@ -8,17 +8,6 @@ from pathlib import Path
 IMPORT_OLD = "from school_repository import SchoolRepository"
 IMPORT_NEW = IMPORT_OLD + "\nfrom roster_repository import RosterRepository"
 
-NORMALIZER_END = "    return changed\n\ndef _write_rosters_file(items: list[dict[str, Any]], snapshot: bool = True) -> None:"
-REPOSITORY_INSERT = '''    return changed
-
-ROSTER_REPOSITORY = RosterRepository(
-    CORE_PERSISTENCE,
-    ROSTERS_FILE,
-    normalizer=_normalize_rosters,
-)
-
-def _write_rosters_file(items: list[dict[str, Any]], snapshot: bool = True) -> None:'''
-
 WRITE_OLD = '''def _write_rosters_file(items: list[dict[str, Any]], snapshot: bool = True) -> None:
     global _roster_cache, _roster_cache_mtime_ns
     ensure_data_architecture()
@@ -82,33 +71,74 @@ def save_rosters(items: list[dict[str, Any]]) -> None:
     ROSTER_REPOSITORY.save(items)
 '''
 
+REPOSITORY_BLOCK = '''ROSTER_REPOSITORY = RosterRepository(
+    CORE_PERSISTENCE,
+    ROSTERS_FILE,
+    normalizer=_normalize_rosters,
+)
+
+'''
+
 MARKER = "# Phase 3.2: RosterRepository integrated"
+
+
+def _find_function_line(source: str, function_name: str) -> int:
+    tree = ast.parse(source)
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function_name:
+            return node.lineno
+    raise RuntimeError(f"Phase 3.2 cannot be applied; missing function: {function_name}")
+
+
+def _line_start_offset(source: str, line_number: int) -> int:
+    if line_number <= 1:
+        return 0
+    offset = 0
+    for _ in range(line_number - 1):
+        newline = source.find("\n", offset)
+        if newline < 0:
+            return len(source)
+        offset = newline + 1
+    return offset
 
 
 def transform(source: str) -> str:
     if MARKER in source:
         return source
-    missing = [
-        name
-        for name, anchor in (
-            ("school repository import", IMPORT_OLD),
-            ("roster normalizer boundary", NORMALIZER_END),
-            ("roster persistence functions", WRITE_OLD),
-        )
-        if anchor not in source
-    ]
+
+    missing = []
+    if IMPORT_OLD not in source:
+        missing.append("school repository import")
+    if WRITE_OLD not in source:
+        missing.append("roster persistence functions")
+    try:
+        normalizer_line = _find_function_line(source, "_normalize_rosters")
+        writer_line = _find_function_line(source, "_write_rosters_file")
+    except RuntimeError as exc:
+        missing.append(str(exc).split(": ")[-1])
+        normalizer_line = writer_line = 0
+
     if missing:
         raise RuntimeError("Phase 3.2 cannot be applied; missing anchors: " + ", ".join(missing))
+    if normalizer_line >= writer_line:
+        raise RuntimeError("Phase 3.2 cannot be applied; roster normalizer must precede roster writer.")
 
     updated = source.replace(IMPORT_OLD, IMPORT_NEW, 1)
-    updated = updated.replace(NORMALIZER_END, REPOSITORY_INSERT, 1)
     updated = updated.replace(WRITE_OLD, WRITE_NEW, 1)
-    updated = updated.replace("from roster_repository import RosterRepository", "from roster_repository import RosterRepository\n\n" + MARKER, 1)
+
+    writer_line_after = _find_function_line(updated, "_write_rosters_file")
+    insert_at = _line_start_offset(updated, writer_line_after)
+    updated = updated[:insert_at] + REPOSITORY_BLOCK + updated[insert_at:]
+    updated = updated.replace(
+        "from roster_repository import RosterRepository",
+        "from roster_repository import RosterRepository\n\n" + MARKER,
+        1,
+    )
 
     ast.parse(updated)
     forbidden = (
         'temp_path = ROSTERS_FILE.with_suffix(".json.tmp")',
-        'os.replace(temp_path, ROSTERS_FILE)',
+        "os.replace(temp_path, ROSTERS_FILE)",
     )
     if any(token in updated for token in forbidden):
         raise RuntimeError("Direct roster database write remains after migration.")
