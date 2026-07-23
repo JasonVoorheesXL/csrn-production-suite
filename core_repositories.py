@@ -1,0 +1,223 @@
+from __future__ import annotations
+
+import copy
+from pathlib import Path
+from typing import Any, Callable, Mapping
+
+from persistence_engine import JsonPersistenceEngine, PersistencePolicy
+
+
+Validator = Callable[[Any], bool]
+
+
+class RepositoryValidationError(ValueError):
+    """Raised when a repository receives invalid domain data."""
+
+
+def _deep_merge(defaults: Mapping[str, Any], incoming: Mapping[str, Any]) -> dict[str, Any]:
+    merged: dict[str, Any] = copy.deepcopy(dict(defaults))
+    for key, value in incoming.items():
+        if isinstance(value, Mapping) and isinstance(merged.get(key), Mapping):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
+def _is_json_dict(value: Any) -> bool:
+    return isinstance(value, dict)
+
+
+class JsonObjectRepository:
+    """Repository for a single JSON object backed by JsonPersistenceEngine."""
+
+    def __init__(
+        self,
+        engine: JsonPersistenceEngine,
+        path: Path,
+        defaults: Mapping[str, Any],
+        *,
+        validator: Validator | None = None,
+        policy: PersistencePolicy | None = None,
+    ) -> None:
+        self.engine = engine
+        self.path = Path(path)
+        self.defaults = copy.deepcopy(dict(defaults))
+        self.validator = validator or _is_json_dict
+        self.policy = policy or PersistencePolicy(backup_count=10)
+
+    def load(self) -> dict[str, Any]:
+        raw = self.engine.load(
+            self.path,
+            self.defaults,
+            validator=self.validator,
+            create_if_missing=True,
+            restore_recovered_file=True,
+        )
+        if not isinstance(raw, dict):
+            raise RepositoryValidationError(f"Expected an object in {self.path}.")
+        return copy.deepcopy(raw)
+
+    def save(self, value: Mapping[str, Any], *, force: bool = False) -> dict[str, Any]:
+        candidate = copy.deepcopy(dict(value))
+        if not self.validator(candidate):
+            raise RepositoryValidationError(f"Invalid data for {self.path}.")
+        self.engine.save(
+            self.path,
+            candidate,
+            validator=self.validator,
+            policy=self.policy,
+            force=force,
+        )
+        return copy.deepcopy(candidate)
+
+    def reset(self) -> dict[str, Any]:
+        return self.save(self.defaults, force=True)
+
+
+class ConfigurationRepository(JsonObjectRepository):
+    """Configuration storage with recursive default merging and migration hooks."""
+
+    def __init__(
+        self,
+        engine: JsonPersistenceEngine,
+        path: Path,
+        defaults: Mapping[str, Any],
+        *,
+        runtime_identity: Mapping[str, str] | None = None,
+        migrations: Mapping[str, Callable[[dict[str, Any]], dict[str, Any]]] | None = None,
+    ) -> None:
+        super().__init__(engine, path, defaults, validator=self.validate)
+        self.runtime_identity = dict(runtime_identity or {})
+        self.migrations = dict(migrations or {})
+
+    @staticmethod
+    def validate(value: Any) -> bool:
+        if not isinstance(value, dict):
+            return False
+        required_sections = ("organization", "broadcast_defaults", "folders", "obs", "application")
+        if any(section in value and not isinstance(value[section], dict) for section in required_sections):
+            return False
+        application = value.get("application", {})
+        if application and any(
+            key in application and not isinstance(application[key], str)
+            for key in ("version", "build")
+        ):
+            return False
+        return True
+
+    def load(self) -> dict[str, Any]:
+        raw = super().load()
+        merged = _deep_merge(self.defaults, raw)
+        merged = self._apply_migrations(merged)
+        application = merged.setdefault("application", {})
+        for key in ("version", "build"):
+            if self.runtime_identity.get(key):
+                application[key] = self.runtime_identity[key]
+        return merged
+
+    def save(self, value: Mapping[str, Any], *, force: bool = False) -> dict[str, Any]:
+        merged = _deep_merge(self.defaults, dict(value))
+        application = merged.setdefault("application", {})
+        for key in ("version", "build"):
+            if self.runtime_identity.get(key):
+                application[key] = self.runtime_identity[key]
+        return super().save(merged, force=force)
+
+    def update(self, patch: Mapping[str, Any]) -> dict[str, Any]:
+        current = self.load()
+        updated = _deep_merge(current, patch)
+        return self.save(updated)
+
+    def _apply_migrations(self, config: dict[str, Any]) -> dict[str, Any]:
+        current = copy.deepcopy(config)
+        application = current.setdefault("application", {})
+        migration_id = str(application.get("schema_version", ""))
+        visited: set[str] = set()
+        while migration_id in self.migrations and migration_id not in visited:
+            visited.add(migration_id)
+            current = self.migrations[migration_id](copy.deepcopy(current))
+            if not self.validate(current):
+                raise RepositoryValidationError(
+                    f"Configuration migration {migration_id!r} produced invalid data."
+                )
+            migration_id = str(current.setdefault("application", {}).get("schema_version", ""))
+        return current
+
+
+class StateRepository(JsonObjectRepository):
+    """Active application and broadcast state storage."""
+
+    def __init__(self, engine: JsonPersistenceEngine, path: Path, defaults: Mapping[str, Any]) -> None:
+        super().__init__(engine, path, defaults, validator=self.validate)
+
+    @staticmethod
+    def validate(value: Any) -> bool:
+        if not isinstance(value, dict):
+            return False
+        numeric_fields = ("home_score", "visitor_score", "next_play_number")
+        if any(field in value and (not isinstance(value[field], int) or isinstance(value[field], bool)) for field in numeric_fields):
+            return False
+        list_fields = ("history", "events", "correction_log")
+        if any(field in value and not isinstance(value[field], list) for field in list_fields):
+            return False
+        if "crew" in value and not isinstance(value["crew"], dict):
+            return False
+        if "broadcast_id" in value and not isinstance(value["broadcast_id"], str):
+            return False
+        return True
+
+    def load(self) -> dict[str, Any]:
+        return _deep_merge(self.defaults, super().load())
+
+    def replace(self, state: Mapping[str, Any]) -> dict[str, Any]:
+        return self.save(_deep_merge(self.defaults, state))
+
+    def update(self, patch: Mapping[str, Any]) -> dict[str, Any]:
+        current = self.load()
+        return self.save(_deep_merge(current, patch))
+
+
+class SecurityRepository(JsonObjectRepository):
+    """Security metadata storage. Secret values are preserved exactly as supplied."""
+
+    def __init__(self, engine: JsonPersistenceEngine, path: Path, defaults: Mapping[str, Any]) -> None:
+        super().__init__(engine, path, defaults, validator=self.validate)
+
+    @staticmethod
+    def validate(value: Any) -> bool:
+        if not isinstance(value, dict):
+            return False
+        for field in ("pin_hash", "secret_key"):
+            if field in value and not isinstance(value[field], str):
+                return False
+        for field in ("failed_attempts", "locked_until"):
+            if field in value and (not isinstance(value[field], (int, float)) or isinstance(value[field], bool)):
+                return False
+        if "failed_attempts" in value and value["failed_attempts"] < 0:
+            return False
+        return True
+
+    def load(self) -> dict[str, Any]:
+        return _deep_merge(self.defaults, super().load())
+
+    def record_failed_attempt(self, *, locked_until: float | None = None) -> dict[str, Any]:
+        security = self.load()
+        security["failed_attempts"] = int(security.get("failed_attempts", 0)) + 1
+        if locked_until is not None:
+            security["locked_until"] = locked_until
+        return self.save(security)
+
+    def clear_failed_attempts(self) -> dict[str, Any]:
+        security = self.load()
+        security["failed_attempts"] = 0
+        security["locked_until"] = 0
+        return self.save(security)
+
+    def update_credentials(self, *, pin_hash: str | None = None, secret_key: str | None = None) -> dict[str, Any]:
+        security = self.load()
+        if pin_hash is not None:
+            security["pin_hash"] = pin_hash
+        if secret_key is not None:
+            security["secret_key"] = secret_key
+        return self.save(security)
