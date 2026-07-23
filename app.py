@@ -31,6 +31,12 @@ from obs_client import (
 from upgrade_manager import inspect_candidate, migrate
 from persistence_engine import JsonPersistenceEngine
 from core_repositories import ConfigurationRepository, StateRepository, SecurityRepository
+from school_repository import SchoolRepository
+from roster_repository import RosterRepository
+
+# Phase 3.2: RosterRepository integrated
+
+# Phase 3.1: SchoolRepository integrated
 
 BASE_DIR = Path(__file__).resolve().parent
 STATE_FILE = BASE_DIR / "state.json"
@@ -418,29 +424,20 @@ def ensure_school_schema(school: dict[str, Any], schools: list[dict[str, Any]]) 
     metadata["scorebug_derivative"] = "256x256-round"
     return school
 
+SCHOOL_REPOSITORY = SchoolRepository(
+    CORE_PERSISTENCE,
+    SCHOOLS_FILE,
+    school_normalizer=ensure_school_schema,
+    collection_normalizer=reconcile_5a_csrn_ids,
+)
+
 def load_schools() -> list[dict[str, Any]]:
     ensure_data_architecture()
-    if not SCHOOLS_FILE.exists():
-        save_json(SCHOOLS_FILE, {"schools": []})
-    raw = load_json(SCHOOLS_FILE, {"schools": []})
-    if isinstance(raw, list):
-        schools = raw
-    else:
-        schools = raw.get("schools", [])
-    if not isinstance(schools, list):
-        return []
-    changed = reconcile_5a_csrn_ids(schools)
-    for school in schools:
-        before = json.dumps(school, sort_keys=True)
-        ensure_school_schema(school, schools)
-        changed = changed or before != json.dumps(school, sort_keys=True)
-    if changed:
-        save_schools(schools)
-    return schools
+    return SCHOOL_REPOSITORY.load()
 
 def save_schools(schools: list[dict[str, Any]]) -> None:
     ensure_data_architecture()
-    SCHOOLS_FILE.write_text(json.dumps(schools, indent=2), encoding="utf-8")
+    SCHOOL_REPOSITORY.save(schools)
 
 
 def load_venues() -> list[dict[str, Any]]:
@@ -740,53 +737,24 @@ def _normalize_rosters(items: list[dict[str, Any]]) -> bool:
                     changed = True
     return changed
 
+ROSTER_REPOSITORY = RosterRepository(
+    CORE_PERSISTENCE,
+    ROSTERS_FILE,
+    normalizer=_normalize_rosters,
+)
+
 def _write_rosters_file(items: list[dict[str, Any]], snapshot: bool = True) -> None:
-    global _roster_cache, _roster_cache_mtime_ns
     ensure_data_architecture()
-    with roster_io_lock:
-        existing = _parse_roster_payload(ROSTERS_FILE) if ROSTERS_FILE.exists() else []
-        if existing == items:
-            _roster_cache = copy.deepcopy(items)
-            _roster_cache_mtime_ns = ROSTERS_FILE.stat().st_mtime_ns if ROSTERS_FILE.exists() else None
-            return
-        if snapshot and ROSTERS_FILE.exists() and _roster_payload_score(existing)[0] > 0:
-            snapshot_path = DATA_DIR / "Backups" / "RosterSnapshots" / f"rosters-{int(time.time() * 1000)}.json"
-            snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                shutil.copy2(ROSTERS_FILE, snapshot_path)
-            except OSError:
-                pass
-        temp_path = ROSTERS_FILE.with_suffix(".json.tmp")
-        temp_path.write_text(json.dumps(items, indent=2), encoding="utf-8")
-        os.replace(temp_path, ROSTERS_FILE)
-        _roster_cache = copy.deepcopy(items)
-        _roster_cache_mtime_ns = ROSTERS_FILE.stat().st_mtime_ns
+    ROSTER_REPOSITORY.save(items)
 
 def load_rosters() -> list[dict[str, Any]]:
-    global _roster_cache, _roster_cache_mtime_ns
     ensure_data_architecture()
     recover_rosters_if_needed()
-    if not ROSTERS_FILE.exists():
-        return []
-    try:
-        mtime_ns = ROSTERS_FILE.stat().st_mtime_ns
-    except OSError:
-        mtime_ns = None
-    if _roster_cache is not None and _roster_cache_mtime_ns == mtime_ns:
-        return copy.deepcopy(_roster_cache)
-    items = _parse_roster_payload(ROSTERS_FILE)
-    if _normalize_rosters(items):
-        _write_rosters_file(items, snapshot=False)
-    else:
-        _roster_cache = copy.deepcopy(items)
-        _roster_cache_mtime_ns = mtime_ns
-    return copy.deepcopy(items)
+    return ROSTER_REPOSITORY.load()
 
 def save_rosters(items: list[dict[str, Any]]) -> None:
-    if not isinstance(items, list):
-        raise ValueError("Roster database must be a list")
-    _normalize_rosters(items)
-    _write_rosters_file(items, snapshot=True)
+    ensure_data_architecture()
+    ROSTER_REPOSITORY.save(items)
 
 def roster_summary(roster: dict[str, Any], schools: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     school_list = schools if schools is not None else load_schools()
