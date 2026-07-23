@@ -224,8 +224,8 @@ CONFIG_REPOSITORY = ConfigurationRepository(
     CONFIG_FILE,
     DEFAULT_CONFIG,
     runtime_identity={
-        "version": "Version 1.13.0-alpha.3j — Venue Repository Integration",
-        "build": "V1.13A3J-VENUE-REPOSITORY",
+        "version": "Version 1.13.0-alpha.3k — Broadcast Repository Integration",
+        "build": "V1.13A3K-BROADCAST-REPOSITORY",
     },
 )
 STATE_REPOSITORY = StateRepository(CORE_PERSISTENCE, STATE_FILE, DEFAULT_STATE)
@@ -248,8 +248,8 @@ def save_config(config: dict[str, Any]) -> None:
 def application_identity() -> dict[str, str]:
     """Return package identity from VERSION.txt with safe config fallbacks."""
     cfg = load_config()
-    version = cfg.get("application", {}).get("version", "Version 1.13.0-alpha.3j — Venue Repository Integration")
-    build = cfg.get("application", {}).get("build", "V1.13A3J-VENUE-REPOSITORY")
+    version = cfg.get("application", {}).get("version", "Version 1.13.0-alpha.3k — Broadcast Repository Integration")
+    build = cfg.get("application", {}).get("build", "V1.13A3K-BROADCAST-REPOSITORY")
     product = "CSRN Production Suite"
     if VERSION_FILE.exists():
         try:
