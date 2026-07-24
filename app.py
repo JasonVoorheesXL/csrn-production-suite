@@ -205,9 +205,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.3l — Configuration Repository Cleanup"
+    "Version 1.13.0-alpha.3m — Security Repository Cleanup"
 )
-RUNTIME_BUILD = "V1.13A3L-CONFIGURATION-CLEANUP"
+RUNTIME_BUILD = "V1.13A3M-SECURITY-CLEANUP"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -1330,8 +1330,9 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
 def load_security() -> dict[str, Any]:
     sec = SECURITY_REPOSITORY.load()
     if not sec.get("secret_key"):
-        sec["secret_key"] = secrets.token_hex(32)
-        SECURITY_REPOSITORY.save(sec)
+        sec = SECURITY_REPOSITORY.update_credentials(
+            secret_key=secrets.token_hex(32)
+        )
     return sec
 
 
@@ -1683,54 +1684,68 @@ def security_status():
 def setup_pin():
     if pin_is_configured():
         return jsonify({"error": "PIN_ALREADY_CONFIGURED"}), 409
+
     data = request.get_json(force=True)
     pin = str(data.get("pin", ""))
     confirm = str(data.get("confirm", ""))
+
     if not (pin.isdigit() and len(pin) == 6):
         return jsonify({"error": "PIN_MUST_BE_6_DIGITS"}), 400
     if pin != confirm:
         return jsonify({"error": "PIN_MISMATCH"}), 400
 
-    sec = load_security()
-    sec["pin_hash"] = generate_password_hash(pin, method="scrypt")
-    sec["failed_attempts"] = 0
-    sec["locked_until"] = 0
-    save_security(sec)
+    SECURITY_REPOSITORY.update_credentials(
+        pin_hash=generate_password_hash(pin, method="scrypt")
+    )
+    SECURITY_REPOSITORY.clear_failed_attempts()
 
     session.clear()
     session.permanent = True
     session["authenticated"] = True
     return jsonify({"ok": True})
 
+
 @app.post("/api/login")
 def login():
     sec = load_security()
     now = time.time()
     locked_until = float(sec.get("locked_until", 0))
+
     if now < locked_until:
-        return jsonify({"error": "LOCKED", "locked_seconds": int(locked_until - now)}), 429
+        return jsonify({
+            "error": "LOCKED",
+            "locked_seconds": int(locked_until - now),
+        }), 429
 
     data = request.get_json(force=True)
     pin = str(data.get("pin", ""))
+
     if check_password_hash(sec.get("pin_hash", ""), pin):
-        sec["failed_attempts"] = 0
-        sec["locked_until"] = 0
-        save_security(sec)
+        SECURITY_REPOSITORY.clear_failed_attempts()
         session.clear()
         session.permanent = True
         session["authenticated"] = True
         return jsonify({"ok": True})
 
-    sec["failed_attempts"] = int(sec.get("failed_attempts", 0)) + 1
-    if sec["failed_attempts"] >= MAX_ATTEMPTS:
-        sec["failed_attempts"] = 0
-        sec["locked_until"] = int(now + LOCKOUT_SECONDS)
-        save_security(sec)
-        return jsonify({"error": "LOCKED", "locked_seconds": LOCKOUT_SECONDS}), 429
+    failed = SECURITY_REPOSITORY.record_failed_attempt(
+        max_attempts=MAX_ATTEMPTS,
+        locked_until=int(now + LOCKOUT_SECONDS),
+    )
+    failed_attempts = int(failed.get("failed_attempts", 0))
+    new_locked_until = float(failed.get("locked_until", 0))
 
-    remaining = MAX_ATTEMPTS - sec["failed_attempts"]
-    save_security(sec)
-    return jsonify({"error": "INVALID_PIN", "attempts_remaining": remaining}), 401
+    if failed_attempts == 0 and new_locked_until > now:
+        return jsonify({
+            "error": "LOCKED",
+            "locked_seconds": LOCKOUT_SECONDS,
+        }), 429
+
+    remaining = MAX_ATTEMPTS - failed_attempts
+    return jsonify({
+        "error": "INVALID_PIN",
+        "attempts_remaining": remaining,
+    }), 401
+
 
 @app.post("/api/logout")
 def logout():
@@ -2548,8 +2563,8 @@ def update_config():
         if section in incoming and isinstance(incoming[section], dict):
             current[section].update(incoming[section])
     # Protect application identity fields.
-    current["application"]["version"] = "Version 1.10 Alpha — Statistics Engine v1"
-    current["application"]["build"] = "V1.10A-STATS1"
+    current["application"]["version"] = RUNTIME_VERSION
+    current["application"]["build"] = RUNTIME_BUILD
     save_config(current)
     return jsonify(current)
 

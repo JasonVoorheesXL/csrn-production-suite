@@ -201,11 +201,28 @@ class SecurityRepository(JsonObjectRepository):
     def load(self) -> dict[str, Any]:
         return _deep_merge(self.defaults, super().load())
 
-    def record_failed_attempt(self, *, locked_until: float | None = None) -> dict[str, Any]:
+    def record_failed_attempt(
+        self,
+        *,
+        max_attempts: int | None = None,
+        locked_until: float | None = None,
+    ) -> dict[str, Any]:
+        """Record a failed login and apply lockout at the attempt limit."""
+
+        if max_attempts is not None and max_attempts < 1:
+            raise ValueError("max_attempts must be at least 1.")
+
         security = self.load()
-        security["failed_attempts"] = int(security.get("failed_attempts", 0)) + 1
-        if locked_until is not None:
+        attempts = int(security.get("failed_attempts", 0)) + 1
+        security["failed_attempts"] = attempts
+
+        if max_attempts is not None and attempts >= max_attempts:
+            security["failed_attempts"] = 0
+            if locked_until is not None:
+                security["locked_until"] = locked_until
+        elif max_attempts is None and locked_until is not None:
             security["locked_until"] = locked_until
+
         return self.save(security)
 
     def clear_failed_attempts(self) -> dict[str, Any]:
