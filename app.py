@@ -35,6 +35,7 @@ from security_service import SecurityService
 from broadcast_package_service import BroadcastPackageService
 from school_service import SchoolService
 from association_import_service import AssociationImportService
+from association_supplement_service import AssociationSupplementService
 from school_repository import SchoolRepository
 from roster_repository import RosterRepository
 from sponsor_repository import SponsorRepository
@@ -582,6 +583,23 @@ def get_association_import_service() -> AssociationImportService:
         )
 
     return ASSOCIATION_IMPORT_SERVICE
+
+
+ASSOCIATION_SUPPLEMENT_SERVICE: AssociationSupplementService | None = None
+
+
+def get_association_supplement_service() -> AssociationSupplementService:
+    global ASSOCIATION_SUPPLEMENT_SERVICE
+
+    if ASSOCIATION_SUPPLEMENT_SERVICE is None:
+        ASSOCIATION_SUPPLEMENT_SERVICE = AssociationSupplementService(
+            load_schools=load_schools,
+            save_schools=save_schools,
+            load_venues=load_venues,
+            save_venues=save_venues,
+        )
+
+    return ASSOCIATION_SUPPLEMENT_SERVICE
 
 def load_assets() -> list[dict[str, Any]]:
     ensure_data_architecture()
@@ -2149,125 +2167,54 @@ def import_mhsaa_5a():
 @require_auth
 def analyze_mhsaa_5a_branding():
     manifest = load_json(MHSAA_5A_BRANDING_FILE, {"schools": []})
-    schools = load_schools()
-    results = []
-    for candidate in manifest.get("schools", []):
-        school = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        if not school:
-            status = "school_missing"
-        elif school.get("primary_logo") or str(school.get("branding_status", "")).lower() in {"approved", "manual"}:
-            status = "preserved"
-        else:
-            status = "ready"
-        results.append({**candidate, "status": status, "school_id": school.get("id", "") if school else ""})
-    return jsonify({
-        "found": len(results),
-        "ready": sum(1 for r in results if r["status"] == "ready"),
-        "preserved": sum(1 for r in results if r["status"] == "preserved"),
-        "school_missing": sum(1 for r in results if r["status"] == "school_missing"),
-        "schools": results,
-        "source": manifest.get("source", {}),
-    })
+    result = get_association_supplement_service().analyze_branding(
+        manifest.get("schools", []),
+        source=manifest.get("source", {}),
+    )
+    if not result.ok:
+        return jsonify({"error": result.code}), 400
+    return jsonify(result.data)
+
 
 @app.post("/api/imports/mhsaa/5A/branding")
 @require_auth
 def import_mhsaa_5a_branding():
     manifest = load_json(MHSAA_5A_BRANDING_FILE, {"schools": []})
-    schools = load_schools()
-    updated = 0
-    preserved = 0
-    missing = []
-    for candidate in manifest.get("schools", []):
-        school = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        if not school:
-            missing.append(candidate.get("official_name", ""))
-            continue
-        # Existing processed logos/colors are considered user-reviewed and are never overwritten.
-        if school.get("primary_logo") or str(school.get("branding_status", "")).lower() in {"approved", "manual"}:
-            preserved += 1
-            continue
-        school["primary_color"] = candidate.get("primary_color", school.get("primary_color", "#808080"))
-        school["secondary_color"] = candidate.get("secondary_color", school.get("secondary_color", "#FFFFFF"))
-        school["accent_color"] = candidate.get("accent_color", "")
-        school["branding_status"] = "candidate"
-        school["branding_source"] = {
-            "provider": candidate.get("source_provider", "CSRN research seed"),
-            "source_url": candidate.get("source_url", ""),
-            "checked_at": manifest.get("source", {}).get("checked_at", ""),
-            "verification_status": "candidate",
-            "notes": candidate.get("notes", "Candidate colors require visual approval."),
-        }
-        updated += 1
-    save_schools(schools)
-    return jsonify({"updated": updated, "preserved": preserved, "missing_schools": missing})
+    result = get_association_supplement_service().apply_branding(
+        manifest.get("schools", []),
+        source=manifest.get("source", {}),
+    )
+    if not result.ok:
+        return jsonify({"error": result.code}), 400
+    return jsonify(result.data)
+
 
 @app.get("/api/imports/mhsaa/5A/enrichment/analyze")
 @require_auth
 def analyze_mhsaa_5a_enrichment():
     manifest = load_json(MHSAA_5A_ENRICHMENT_FILE, {"schools": []})
-    schools = load_schools()
-    results = []
-    for candidate in manifest.get("schools", []):
-        school = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        missing = []
-        if not school:
-            status = "school_missing"
-        else:
-            status = "ready"
-            for key in ("mascot", "phone", "website"):
-                if not candidate.get(key): missing.append(key)
-            address = candidate.get("school_address", {})
-            if not address.get("address1"): missing.append("school_address")
-        results.append({"official_name": candidate.get("official_name"), "status": status, "missing_source_fields": missing})
-    return jsonify({
-        "classification": "5A", "found": len(results),
-        "ready": sum(1 for r in results if r["status"] == "ready"),
-        "school_missing": sum(1 for r in results if r["status"] == "school_missing"),
-        "source": manifest.get("source", {}), "schools": results
-    })
+    result = get_association_supplement_service().analyze_enrichment(
+        manifest.get("schools", []),
+        source=manifest.get("source", {}),
+        classification=str(manifest.get("classification", "5A")),
+    )
+    if not result.ok:
+        return jsonify({"error": result.code}), 400
+    return jsonify(result.data)
+
 
 @app.post("/api/imports/mhsaa/5A/enrichment")
 @require_auth
 def enrich_mhsaa_5a():
     manifest = load_json(MHSAA_5A_ENRICHMENT_FILE, {"schools": []})
-    schools = load_schools(); venues = load_venues(); logos = load_logos()
-    updated = 0; missing_schools = []; missing_mascot = 0; missing_address = 0; missing_website = 0; venue_verification_needed = 0; logo_pending = 0
-    for candidate in manifest.get("schools", []):
-        school = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        if not school:
-            missing_schools.append(candidate.get("official_name", "")); continue
-        overrides = school.get("user_overrides") or {}
-        mascot = candidate.get("mascot", "")
-        if mascot and not overrides.get("mascot"):
-            school["mascot"] = mascot; school["nickname"] = school.get("nickname") or mascot
-        elif not mascot: missing_mascot += 1
-        address = candidate.get("school_address", {})
-        if address.get("address1"):
-            school["school_address"] = address
-            school["city"] = school.get("city") or address.get("city", "")
-        else: missing_address += 1
-        if candidate.get("phone") and not overrides.get("phone"): school["phone"] = candidate.get("phone")
-        if candidate.get("website") and not overrides.get("website"):
-            school["website"] = candidate.get("website")
-            school.setdefault("general_social", {})["website"] = school.get("general_social", {}).get("website") or candidate.get("website")
-        elif not candidate.get("website"): missing_website += 1
-        school.setdefault("source_data", {}).update({"provider":"MHSAA School Directory","directory_source_url":candidate.get("source_url", ""),"directory_checked_at":manifest.get("source", {}).get("checked_at", "")})
-        school["verification_status"] = "candidate_enriched"
-        school.setdefault("logo_metadata", {}).update({"source_url":candidate.get("source_url", ""),"approval_status":"candidate","shape_standard":"round","master_canvas":"1024x1024-round","scorebug_derivative":"256x256-round"})
-        school["logo_status"] = school.get("logo_status") or "candidate"
-        logo_pending += 1
-        venue_id = school.get("venue_id") or f"{school.get('id')}-football"
-        school["venue_id"] = venue_id
-        venue = next((v for v in venues if v.get("id") == venue_id or v.get("school_id") == school.get("id")), None)
-        venue_payload = {"id": venue_id, "school_id": school.get("id"), "csrn_school_id": school.get("csrn_id", ""), "sport":"Football", "name":f"{school.get('broadcast_name') or candidate.get('official_name')} Football Stadium", **address, "latitude":None, "longitude":None, "on_campus_assumed":True, "venue_address_source":"school_address", "venue_verified":False, "approval_status":"candidate", "broadcast_notes":"Defaulted to school address; verify whether the stadium is off campus."}
-        if venue: venue.update({k:v for k,v in venue_payload.items() if k not in ("broadcast_notes",) or not venue.get(k)})
-        else: venues.append(venue_payload)
-        school["venues"] = [venue_payload if v.get("id") == venue_id else v for v in school.get("venues", [])] or [venue_payload]
-        school.setdefault("programs", {}).setdefault("Football", {})["venue_id"] = venue_id
-        venue_verification_needed += 1; updated += 1
-    save_schools(schools); save_venues(venues); save_logos(logos)
-    return jsonify({"updated":updated,"missing_schools":missing_schools,"missing_mascot":missing_mascot,"missing_address":missing_address,"missing_website":missing_website,"logo_pending_approval":logo_pending,"venue_verification_needed":venue_verification_needed})
-
+    result = get_association_supplement_service().apply_enrichment(
+        manifest.get("schools", []),
+        source=manifest.get("source", {}),
+        venue_sport="Football",
+    )
+    if not result.ok:
+        return jsonify({"error": result.code}), 400
+    return jsonify(result.data)
 
 
 def _hex(rgb: tuple[int, int, int]) -> str:
