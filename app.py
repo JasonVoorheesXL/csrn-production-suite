@@ -31,6 +31,7 @@ from obs_client import (
 from upgrade_manager import inspect_candidate, migrate
 from persistence_engine import JsonPersistenceEngine
 from core_repositories import ConfigurationRepository, StateRepository, SecurityRepository
+from security_service import SecurityService
 from school_repository import SchoolRepository
 from roster_repository import RosterRepository
 from sponsor_repository import SponsorRepository
@@ -298,6 +299,11 @@ CONFIG_REPOSITORY = ConfigurationRepository(
 )
 STATE_REPOSITORY = StateRepository(CORE_PERSISTENCE, STATE_FILE, DEFAULT_STATE)
 SECURITY_REPOSITORY = SecurityRepository(CORE_PERSISTENCE, SECURITY_FILE, DEFAULT_SECURITY)
+SECURITY_SERVICE = SecurityService(
+    SECURITY_REPOSITORY,
+    max_attempts=MAX_ATTEMPTS,
+    lockout_seconds=LOCKOUT_SECONDS,
+)
 
 
 def load_config() -> dict[str, Any]:
@@ -1328,12 +1334,9 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
     return result
 
 def load_security() -> dict[str, Any]:
-    sec = SECURITY_REPOSITORY.load()
-    if not sec.get("secret_key"):
-        sec = SECURITY_REPOSITORY.update_credentials(
-            secret_key=secrets.token_hex(32)
-        )
-    return sec
+    return SECURITY_SERVICE.ensure_secret_key(
+        lambda: secrets.token_hex(32)
+    )
 
 
 def save_security(sec: dict[str, Any]) -> None:
@@ -1349,7 +1352,7 @@ app.config.update(
 )
 
 def pin_is_configured() -> bool:
-    return bool(load_security().get("pin_hash"))
+    return SECURITY_SERVICE.pin_is_configured()
 
 def authenticated() -> bool:
     return bool(session.get("authenticated"))
@@ -1682,22 +1685,18 @@ def security_status():
 
 @app.post("/api/setup-pin")
 def setup_pin():
-    if pin_is_configured():
-        return jsonify({"error": "PIN_ALREADY_CONFIGURED"}), 409
-
     data = request.get_json(force=True)
     pin = str(data.get("pin", ""))
     confirm = str(data.get("confirm", ""))
 
-    if not (pin.isdigit() and len(pin) == 6):
-        return jsonify({"error": "PIN_MUST_BE_6_DIGITS"}), 400
-    if pin != confirm:
-        return jsonify({"error": "PIN_MISMATCH"}), 400
-
-    SECURITY_REPOSITORY.update_credentials(
-        pin_hash=generate_password_hash(pin, method="scrypt")
-    )
-    SECURITY_REPOSITORY.clear_failed_attempts()
+    result = SECURITY_SERVICE.setup_pin(pin, confirm)
+    if not result.ok:
+        status = {
+            "PIN_ALREADY_CONFIGURED": 409,
+            "PIN_MUST_BE_6_DIGITS": 400,
+            "PIN_MISMATCH": 400,
+        }[result.code]
+        return jsonify({"error": result.code}), status
 
     session.clear()
     session.permanent = True
@@ -1707,44 +1706,21 @@ def setup_pin():
 
 @app.post("/api/login")
 def login():
-    sec = load_security()
-    now = time.time()
-    locked_until = float(sec.get("locked_until", 0))
-
-    if now < locked_until:
-        return jsonify({
-            "error": "LOCKED",
-            "locked_seconds": int(locked_until - now),
-        }), 429
-
     data = request.get_json(force=True)
     pin = str(data.get("pin", ""))
+    result = SECURITY_SERVICE.authenticate(pin)
 
-    if check_password_hash(sec.get("pin_hash", ""), pin):
-        SECURITY_REPOSITORY.clear_failed_attempts()
+    if result.ok:
         session.clear()
         session.permanent = True
         session["authenticated"] = True
         return jsonify({"ok": True})
 
-    failed = SECURITY_REPOSITORY.record_failed_attempt(
-        max_attempts=MAX_ATTEMPTS,
-        locked_until=int(now + LOCKOUT_SECONDS),
-    )
-    failed_attempts = int(failed.get("failed_attempts", 0))
-    new_locked_until = float(failed.get("locked_until", 0))
+    payload = {"error": result.code, **result.data}
+    if result.code == "LOCKED":
+        return jsonify(payload), 429
 
-    if failed_attempts == 0 and new_locked_until > now:
-        return jsonify({
-            "error": "LOCKED",
-            "locked_seconds": LOCKOUT_SECONDS,
-        }), 429
-
-    remaining = MAX_ATTEMPTS - failed_attempts
-    return jsonify({
-        "error": "INVALID_PIN",
-        "attempts_remaining": remaining,
-    }), 401
+    return jsonify(payload), 401
 
 
 @app.post("/api/logout")
