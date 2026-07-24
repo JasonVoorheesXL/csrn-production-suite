@@ -50,6 +50,8 @@ def fake_module(tmp_path: Path):
         DEFAULT_CONFIG=defaults_config,
         DEFAULT_STATE=defaults_state,
         DEFAULT_SECURITY=defaults_security,
+        RUNTIME_VERSION="Version 1.13.0-alpha.3m — Security Repository Cleanup",
+        RUNTIME_BUILD="V1.13A3M-SECURITY-CLEANUP",
         load_json=original_load,
         save_json=original_save,
         ensure_data_architecture=lambda: data_dir.mkdir(parents=True, exist_ok=True),
@@ -92,5 +94,23 @@ def test_config_identity_is_supplied_by_repository(tmp_path: Path) -> None:
 
     config = module.load_config()
 
-    assert config["application"]["build"] == "V1.13A3H-ROSTER-STABILITY"
+    assert config["application"]["build"] == "V1.13A3M-SECURITY-CLEANUP"
     assert config["application"]["rules_edition"] == "NFHS"
+
+
+def test_runtime_generates_and_persists_missing_secret_key(
+    tmp_path: Path,
+) -> None:
+    module = fake_module(tmp_path)
+    module.DEFAULT_SECURITY = {
+        **module.DEFAULT_SECURITY,
+        "secret_key": "",
+    }
+
+    runtime = CoreRepositoryRuntime(module).install()
+
+    assert module.app.secret_key
+    assert (
+        runtime.security.load()["secret_key"]
+        == module.app.secret_key
+    )
