@@ -9,6 +9,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import app as app_module
 from core_repositories import SecurityRepository
 from persistence_engine import JsonPersistenceEngine
+from security_service import SecurityService
 
 
 @pytest.fixture
@@ -27,7 +28,13 @@ def security_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         tmp_path / "security.json",
         defaults,
     )
+    service = SecurityService(
+        repository,
+        max_attempts=app_module.MAX_ATTEMPTS,
+        lockout_seconds=app_module.LOCKOUT_SECONDS,
+    )
     monkeypatch.setattr(app_module, "SECURITY_REPOSITORY", repository)
+    monkeypatch.setattr(app_module, "SECURITY_SERVICE", service)
     monkeypatch.setitem(app_module.app.config, "TESTING", True)
     monkeypatch.setitem(
         app_module.app.config,
