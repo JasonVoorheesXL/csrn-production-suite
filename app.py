@@ -34,6 +34,7 @@ from core_repositories import ConfigurationRepository, StateRepository, Security
 from security_service import SecurityService
 from broadcast_package_service import BroadcastPackageService
 from school_service import SchoolService
+from association_import_service import AssociationImportService
 from school_repository import SchoolRepository
 from roster_repository import RosterRepository
 from sponsor_repository import SponsorRepository
@@ -70,6 +71,11 @@ IMPORTS_DIR = DATA_DIR / "Imports"
 MHSAA_5A_FILE = IMPORTS_DIR / "mhsaa_2025_27_football_5a.json"
 MHSAA_5A_ENRICHMENT_FILE = IMPORTS_DIR / "mhsaa_5a_enrichment.json"
 MHSAA_5A_BRANDING_FILE = IMPORTS_DIR / "mhsaa_5a_branding.json"
+MHSAA_5A_PROFILE_FILE = (
+    IMPORTS_DIR
+    / "Profiles"
+    / "mhsaa_football_5a_2025_27.json"
+)
 BROADCAST_INDEX_FILE = DATA_DIR / "Broadcasts" / "broadcasts.json"
 PACKAGES_FILE = DATA_DIR / "Packages" / "broadcast_packages.json"
 BUILD_JOURNAL_FILE = DATA_DIR / "Logs" / "build_journal.json"
@@ -559,6 +565,23 @@ def load_venues() -> list[dict[str, Any]]:
 def save_venues(items: list[dict[str, Any]]) -> None:
     ensure_data_architecture()
     VENUE_REPOSITORY.save(items)
+
+
+ASSOCIATION_IMPORT_SERVICE: AssociationImportService | None = None
+
+
+def get_association_import_service() -> AssociationImportService:
+    global ASSOCIATION_IMPORT_SERVICE
+
+    if ASSOCIATION_IMPORT_SERVICE is None:
+        ASSOCIATION_IMPORT_SERVICE = AssociationImportService(
+            school_service=get_school_service(),
+            load_schools=load_schools,
+            load_venues=load_venues,
+            save_venues=save_venues,
+        )
+
+    return ASSOCIATION_IMPORT_SERVICE
 
 def load_assets() -> list[dict[str, Any]]:
     ensure_data_architecture()
@@ -2060,78 +2083,66 @@ def duplicate_check():
 @app.get("/api/imports/mhsaa/5A/analyze")
 @require_auth
 def analyze_mhsaa_5a():
+    profile = load_json(MHSAA_5A_PROFILE_FILE, {})
     manifest = load_json(MHSAA_5A_FILE, {"schools": []})
-    existing = load_schools()
-    results = []
-    for candidate in manifest.get("schools", []):
-        matches = school_duplicate_candidates(candidate)
-        exact = next((s for s in existing if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        results.append({**candidate, "status": "existing" if exact else ("possible_duplicate" if matches else "new"), "matches": matches})
-    return jsonify({
-        "classification": "5A",
-        "source": manifest.get("source", {}),
-        "found": len(results),
-        "new": sum(1 for r in results if r["status"] == "new"),
-        "existing": sum(1 for r in results if r["status"] == "existing"),
-        "possible_duplicates": sum(1 for r in results if r["status"] == "possible_duplicate"),
-        "schools": results,
-    })
+    result = get_association_import_service().analyze(
+        profile,
+        manifest.get("schools", []),
+    )
+    if not result.ok:
+        return jsonify({"error": result.code}), 400
+
+    schools = []
+    for item in result.data.get("schools", []):
+        candidate = dict(item.get("candidate") or {})
+        candidate["status"] = item.get("status", "invalid")
+        candidate["matches"] = item.get("matches", [])
+        schools.append(candidate)
+
+    return jsonify(
+        {
+            "classification": manifest.get("classification", "5A"),
+            "source": manifest.get("source", {}),
+            "found": result.data.get("found", len(schools)),
+            "new": result.data.get("new", 0),
+            "existing": result.data.get("existing", 0),
+            "possible_duplicates": result.data.get(
+                "possible_duplicates",
+                0,
+            ),
+            "schools": schools,
+        }
+    )
+
 
 @app.post("/api/imports/mhsaa/5A")
 @require_auth
 def import_mhsaa_5a():
     options = request.get_json(silent=True) or {}
+    profile = load_json(MHSAA_5A_PROFILE_FILE, {})
     manifest = load_json(MHSAA_5A_FILE, {"schools": []})
-    schools = load_schools()
-    venues = load_venues()
-    imported = 0
-    skipped = 0
-    created_ids: list[str] = []
-    for candidate in manifest.get("schools", []):
-        exact = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        if exact:
-            # Enrich the authoritative classification/region without replacing user customization.
-            exact["classification"] = "5A"
-            exact["region"] = str(candidate.get("region", ""))
-            exact.setdefault("state", "MS")
-            exact.setdefault("csrn_id", next_csrn_school_id("MS", "5A", schools))
-            exact.setdefault("source_data", {}).update(candidate.get("source_data", {}))
-            ensure_school_schema(exact, schools)
-            skipped += 1
-            continue
-        school_id = normalize_school_id(candidate["broadcast_name"])
-        base_id, suffix = school_id, 2
-        while any(s.get("id") == school_id for s in schools):
-            school_id = f"{base_id}-{suffix}"; suffix += 1
-        venue_id = f"{school_id}-football"
-        school = {
-            "id": school_id,
-            "csrn_id": next_csrn_school_id("MS", "5A", schools),
-            "official_name": candidate["official_name"],
-            "broadcast_name": candidate["broadcast_name"],
-            "short_name": candidate["broadcast_name"],
-            "preferred_scorebug_name": candidate["broadcast_name"],
-            "nickname": "", "city": "", "county": "", "state": "MS", "active": True,
-            "classification": "5A", "region": str(candidate.get("region", "")), "district": "", "mhsaa_id": "",
-            "primary_color": "#808080", "secondary_color": "#FFFFFF",
-            "primary_logo": "", "alternate_logo": "", "default_broadcast_logo_id": "", "logo_status": "candidate",
-            "logo_metadata": {"source_url": "", "transparent_background_status": "unknown", "approval_status": "candidate", "shape_standard": "round", "master_canvas": "1024x1024-round", "safe_area": "circle-90-percent", "scorebug_derivative": "256x256-round"},
-            "general_social": {"facebook": "", "x": "", "instagram": "", "youtube": "", "website": ""},
-            "venue_id": venue_id if options.get("create_venues", True) else "",
-            "venues": [{"id": venue_id, "name": f"{candidate['broadcast_name']} Football Venue", "address1": "", "address2": "", "city": "", "state": "MS", "postal_code": "", "weather_radius_miles": 25}] if options.get("create_venues", True) else [],
-            "programs": {"Football": {"facebook": "", "x": "", "instagram": "", "youtube": "", "website": "", "venue_id": venue_id if options.get("create_venues", True) else "", "notes": ""}},
-            "source_data": candidate.get("source_data", {}), "user_overrides": {}, "verification_status": "candidate",
-            "pronunciation_guide": "", "notes": "Imported as a 5A candidate record; complete identity, venue, colors, logo and social fields during review."
-        }
-        schools.append(school)
-        if options.get("create_venues", True):
-            venues.append({"id": venue_id, "school_id": school_id, "csrn_school_id": school["csrn_id"], "sport": "Football", "name": f"{candidate['broadcast_name']} Football Venue", "address1": "", "address2": "", "city": "", "state": "MS", "postal_code": "", "latitude": None, "longitude": None, "approval_status": "candidate", "broadcast_notes": ""})
-        imported += 1
-        created_ids.append(school["csrn_id"])
-    save_schools(schools)
-    save_venues(venues)
-    return jsonify({"imported": imported, "skipped_existing": skipped, "created_ids": created_ids, "total_schools": len(schools)})
+    result = get_association_import_service().apply(
+        profile,
+        manifest.get("schools", []),
+        create_venues=bool(options.get("create_venues", True)),
+        # The legacy MHSAA importer only blocked exact-name matches.
+        # Preserve that behavior while generic imports default to review.
+        allow_possible_duplicates=True,
+    )
+    if not result.ok:
+        return jsonify({"error": result.code}), 400
 
+    return jsonify(
+        {
+            "imported": result.data.get("imported", 0),
+            "skipped_existing": (
+                result.data.get("enriched_existing", 0)
+                + result.data.get("skipped_existing", 0)
+            ),
+            "created_ids": result.data.get("created_ids", []),
+            "total_schools": result.data.get("total_schools", 0),
+        }
+    )
 
 
 @app.get("/api/imports/mhsaa/5A/branding/analyze")
