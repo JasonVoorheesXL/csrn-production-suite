@@ -33,6 +33,7 @@ from persistence_engine import JsonPersistenceEngine
 from core_repositories import ConfigurationRepository, StateRepository, SecurityRepository
 from security_service import SecurityService
 from broadcast_package_service import BroadcastPackageService
+from school_service import SchoolService
 from school_repository import SchoolRepository
 from roster_repository import RosterRepository
 from sponsor_repository import SponsorRepository
@@ -525,6 +526,23 @@ def load_schools() -> list[dict[str, Any]]:
 def save_schools(schools: list[dict[str, Any]]) -> None:
     ensure_data_architecture()
     SCHOOL_REPOSITORY.save(schools)
+
+
+SCHOOL_SERVICE: SchoolService | None = None
+
+
+def get_school_service() -> SchoolService:
+    global SCHOOL_SERVICE
+
+    if SCHOOL_SERVICE is None:
+        SCHOOL_SERVICE = SchoolService(
+            load_schools=load_schools,
+            save_schools=save_schools,
+            load_logos=load_logos,
+            save_logos=save_logos,
+        )
+
+    return SCHOOL_SERVICE
 
 
 VENUE_REPOSITORY = VenueRepository(
@@ -1963,146 +1981,81 @@ def import_roster_players(roster_id: str):
 @app.get("/api/schools")
 @require_auth
 def list_schools():
-    return jsonify([school_display_payload(s) for s in load_schools()])
+    return jsonify(get_school_service().list_schools())
+
 
 @app.get("/api/schools/<school_id>")
 @require_auth
 def read_school(school_id: str):
-    school = get_school(school_id)
-    if not school:
-        return jsonify({"error": "SCHOOL_NOT_FOUND"}), 404
-    return jsonify(school)
+    result = get_school_service().read(school_id)
+    if result.code == "SCHOOL_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    return jsonify(result.data["school"])
+
 
 @app.post("/api/schools")
 @require_auth
 def create_school():
-    incoming = request.get_json(force=True)
-    official_name = str(incoming.get("official_name", "")).strip()
-    broadcast_name = str(incoming.get("broadcast_name", "")).strip()
-    if not official_name or not broadcast_name:
-        return jsonify({"error": "SCHOOL_NAME_REQUIRED"}), 400
+    result = get_school_service().create(
+        request.get_json(force=True) or {}
+    )
+    if result.code == "SCHOOL_NAME_REQUIRED":
+        return jsonify({"error": result.code}), 400
+    if result.code == "LIKELY_DUPLICATE":
+        return jsonify(
+            {
+                "error": result.code,
+                "matches": result.data["matches"],
+            }
+        ), 409
+    if result.code == "INVALID_SOCIAL_URL":
+        return jsonify(
+            {
+                "error": result.code,
+                "fields": result.data["fields"],
+            }
+        ), 400
+    return jsonify(result.data["school"]), 201
 
-    duplicates = school_duplicate_candidates(incoming)
-    if duplicates and not bool(incoming.get("confirm_duplicate", False)):
-        return jsonify({"error": "LIKELY_DUPLICATE", "matches": duplicates}), 409
-
-    schools = load_schools()
-    school_id = normalize_school_id(incoming.get("id") or broadcast_name)
-    base_id = school_id
-    suffix = 2
-    while any(s.get("id") == school_id for s in schools):
-        school_id = f"{base_id}-{suffix}"
-        suffix += 1
-
-    general_social, social_errors = normalize_social_block(incoming.get("general_social") or {})
-    if social_errors:
-        return jsonify({"error": "INVALID_SOCIAL_URL", "fields": social_errors}), 400
-
-    programs = incoming.get("programs") or {}
-    if "Football" in programs:
-        football_social, football_errors = normalize_social_block(programs.get("Football") or {})
-        if football_errors:
-            return jsonify({"error": "INVALID_SOCIAL_URL", "fields": football_errors}), 400
-        programs["Football"].update(football_social)
-
-    school = {
-        "id": school_id,
-        "csrn_id": str(incoming.get("csrn_id", "")).strip() or next_csrn_school_id(str(incoming.get("state", "MS")), str(incoming.get("classification", "")), schools),
-        "official_name": official_name,
-        "broadcast_name": broadcast_name,
-        "nickname": str(incoming.get("nickname", "")).strip(),
-        "short_name": str(incoming.get("short_name", broadcast_name)).strip(),
-        "city": str(incoming.get("city", "")).strip(),
-        "county": str(incoming.get("county", "")).strip(),
-        "active": bool(incoming.get("active", True)),
-        "preferred_scorebug_name": str(incoming.get("preferred_scorebug_name", broadcast_name)).strip(),
-        "pronunciation_guide": str(incoming.get("pronunciation_guide", "")).strip(),
-        "venue_id": str(incoming.get("venue_id", "")).strip(),
-        "primary_color": incoming.get("primary_color", "#C9203B"),
-        "secondary_color": incoming.get("secondary_color", "#FFFFFF"),
-        "primary_logo": str(incoming.get("primary_logo", "")).strip(),
-        "alternate_logo": str(incoming.get("alternate_logo", "")).strip(),
-        "general_social": general_social,
-        "venues": incoming.get("venues") or [],
-        "programs": programs,
-        "state": str(incoming.get("state", "MS")).strip() or "MS",
-        "classification": str(incoming.get("classification", "")).strip(),
-        "region": str(incoming.get("region", "")).strip(),
-        "district": str(incoming.get("district", "")).strip(),
-        "mhsaa_id": str(incoming.get("mhsaa_id", "")).strip(),
-        "source_data": incoming.get("source_data") or {"provider": "Manual", "source_url": "", "retrieved_at": "", "district": ""},
-        "user_overrides": incoming.get("user_overrides") or {},
-        "verification_status": str(incoming.get("verification_status", "unverified")),
-        "default_broadcast_logo_id": str(incoming.get("default_broadcast_logo_id", "")).strip(),
-        "logo_status": str(incoming.get("logo_status", "candidate")),
-        "logo_metadata": incoming.get("logo_metadata") or {"source_url": "", "transparent_background_status": "unknown", "approval_status": "candidate", "shape_standard": "round", "master_canvas": "1024x1024-round", "safe_area": "circle-90-percent", "scorebug_derivative": "256x256-round"},
-        "notes": str(incoming.get("notes", "")).strip()
-    }
-
-    schools.append(school)
-    save_schools(schools)
-    return jsonify(school), 201
 
 @app.put("/api/schools/<school_id>")
 @require_auth
 def update_school(school_id: str):
-    incoming = request.get_json(force=True)
-    schools = load_schools()
-    index = next((i for i, s in enumerate(schools) if s.get("id") == school_id), None)
-    if index is None:
-        return jsonify({"error": "SCHOOL_NOT_FOUND"}), 404
+    result = get_school_service().update(
+        school_id,
+        request.get_json(force=True) or {},
+    )
+    if result.code == "SCHOOL_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    if result.code == "INVALID_SOCIAL_URL":
+        return jsonify(
+            {
+                "error": result.code,
+                "fields": result.data["fields"],
+            }
+        ), 400
+    return jsonify(result.data["school"])
 
-    school = schools[index]
-    if "general_social" in incoming:
-        normalized_social, social_errors = normalize_social_block(incoming.get("general_social") or {})
-        if social_errors:
-            return jsonify({"error": "INVALID_SOCIAL_URL", "fields": social_errors}), 400
-        incoming["general_social"] = normalized_social
-    if "programs" in incoming and "Football" in incoming["programs"]:
-        normalized_football, football_errors = normalize_social_block(incoming["programs"].get("Football") or {})
-        if football_errors:
-            return jsonify({"error": "INVALID_SOCIAL_URL", "fields": football_errors}), 400
-        incoming["programs"]["Football"].update(normalized_football)
-
-    school = schools[index]
-    for key in (
-        "official_name", "broadcast_name", "nickname", "mascot", "short_name", "city", "county", "active", "school_address", "phone", "website", "preferred_scorebug_name", "pronunciation_guide", "venue_id", "csrn_id", "primary_color",
-        "secondary_color", "primary_logo", "alternate_logo",
-        "general_social", "venues", "programs", "state", "classification", "region", "district", "mhsaa_id", "source_data", "user_overrides", "verification_status", "default_broadcast_logo_id", "logo_status", "logo_metadata", "notes"
-    ):
-        if key in incoming:
-            school[key] = incoming[key]
-
-    schools[index] = school
-    save_schools(schools)
-    linked_logo_id = str(school.get("default_broadcast_logo_id", "") or "").strip()
-    if linked_logo_id:
-        logos = load_logos()
-        linked = next((row for row in logos if str(row.get("id", "")) == linked_logo_id), None)
-        if linked is not None:
-            linked["approval_status"] = str(school.get("logo_status", linked.get("approval_status", "candidate")))
-            if school.get("primary_logo"):
-                linked["round_master_path"] = school.get("primary_logo")
-            save_logos(logos)
-    return jsonify(school)
 
 @app.delete("/api/schools/<school_id>")
 @require_auth
 def delete_school(school_id: str):
-    schools = load_schools()
-    school = next((s for s in schools if s.get("id") == school_id), None)
-    if not school:
-        return jsonify({"error": "SCHOOL_NOT_FOUND"}), 404
-    save_schools([s for s in schools if s.get("id") != school_id])
+    result = get_school_service().delete(school_id)
+    if result.code == "SCHOOL_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
     return jsonify({"ok": True})
-
 
 
 @app.post("/api/schools/duplicate-check")
 @require_auth
 def duplicate_check():
-    incoming = request.get_json(force=True)
-    return jsonify({"matches": school_duplicate_candidates(incoming, str(incoming.get("exclude_id", "")))})
+    incoming = request.get_json(force=True) or {}
+    matches = get_school_service().duplicate_candidates(
+        incoming,
+        str(incoming.get("exclude_id", "")),
+    )
+    return jsonify({"matches": matches})
+
 
 @app.get("/api/imports/mhsaa/5A/analyze")
 @require_auth
