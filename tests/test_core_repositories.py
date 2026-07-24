@@ -188,6 +188,38 @@ def test_security_failed_attempt_workflow(tmp_path: Path) -> None:
     assert cleared["locked_until"] == 0
     assert cleared["secret_key"] == "generated-secret"
 
+def test_security_attempt_limit_resets_counter_and_sets_lockout(
+    tmp_path: Path,
+) -> None:
+    repository = SecurityRepository(
+        engine(tmp_path),
+        tmp_path / "security.json",
+        SECURITY_DEFAULTS,
+    )
+
+    first = repository.record_failed_attempt(
+        max_attempts=3,
+        locked_until=500,
+    )
+    second = repository.record_failed_attempt(
+        max_attempts=3,
+        locked_until=500,
+    )
+    third = repository.record_failed_attempt(
+        max_attempts=3,
+        locked_until=500,
+    )
+
+    assert first["failed_attempts"] == 1
+    assert first["locked_until"] == 0
+
+    assert second["failed_attempts"] == 2
+    assert second["locked_until"] == 0
+
+    assert third["failed_attempts"] == 0
+    assert third["locked_until"] == 500
+    assert third["secret_key"] == "generated-secret"
+
 
 def test_security_credentials_are_updated_without_resetting_lockout_metadata(tmp_path: Path) -> None:
     repository = SecurityRepository(engine(tmp_path), tmp_path / "security.json", SECURITY_DEFAULTS)
