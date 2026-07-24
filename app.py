@@ -35,6 +35,9 @@ from school_repository import SchoolRepository
 from roster_repository import RosterRepository
 from sponsor_repository import SponsorRepository
 from venue_repository import VenueRepository
+from broadcast_repository import BroadcastRepository
+
+# Phase 3.5: BroadcastRespository integrated
 
 # Phase 3.4: VenueRepository integrated
 
@@ -201,7 +204,72 @@ DEFAULT_SECURITY: dict[str, Any] = {
 }
 
 
-DEFAULT_CONFIG: dict[str, Any] = {'organization': {'name': 'Caledonia Sports Radio Network', 'short_name': 'CSRN', 'logo_path': 'static/csrn-logo.png', 'primary_color': '#C9203B', 'secondary_color': '#000000', 'accent_color': '#FFFFFF'}, 'broadcast_defaults': {'venue': 'Caledonia High School', 'sport': 'Football', 'timezone': 'America/Chicago', 'theme': 'CSRN Dark', 'home_school_id': 'caledonia', 'visual_mode': 'graphic'}, 'folders': {'graphics': 'Graphics', 'assets': 'Assets', 'obs': 'OBS', 'broadcast_archive': 'Data/Broadcasts', 'exports': 'Exports', 'backups': 'Data/Backups'}, 'obs': {'websocket_enabled': False, 'controlled_commands': False, 'host': '127.0.0.1', 'port': 4455, 'password': '', 'scene_collection': 'CSRN Master', 'profile': 'CSRN Production', 'required_scene': '10.01 - FOOTBALL SCOREBUG', 'browser_source': 'BRWSR - Football Scorebug', 'program_visual_scene': '10.02 - PROGRAM VISUAL', 'graphic_source': 'IMG - Broadcast Background', 'camera_source': 'CAM - Primary Camera'}, 'weather': {'use_home_venue_address': True, 'default_alert_radius_miles': 25}, 'social': {'facebook': '', 'youtube': '', 'x': '', 'website': ''}, 'application': {'version': 'Version 1.13.0-alpha.3 — Football Rules Engine', 'build': 'V1.13A3G-DB-RECOVERY', 'automatic_backup': True, 'auto_save': True, 'operator_timeout_hours': 12, 'upgrade_manager_enabled': True, 'last_migration_status': ''}}
+RUNTIME_VERSION = (
+    "Version 1.13.0-alpha.3l — Configuration Repository Cleanup"
+)
+RUNTIME_BUILD = "V1.13A3L-CONFIGURATION-CLEANUP"
+
+
+DEFAULT_CONFIG: dict[str, Any] = {
+    "organization": {
+        "name": "Caledonia Sports Radio Network",
+        "short_name": "CSRN",
+        "logo_path": "static/csrn-logo.png",
+        "primary_color": "#C9203B",
+        "secondary_color": "#000000",
+        "accent_color": "#FFFFFF",
+    },
+    "broadcast_defaults": {
+        "venue": "Caledonia High School",
+        "sport": "Football",
+        "timezone": "America/Chicago",
+        "theme": "CSRN Dark",
+        "home_school_id": "caledonia",
+        "visual_mode": "graphic",
+    },
+    "folders": {
+        "graphics": "Graphics",
+        "assets": "Assets",
+        "obs": "OBS",
+        "broadcast_archive": "Data/Broadcasts",
+        "exports": "Exports",
+        "backups": "Data/Backups",
+    },
+    "obs": {
+        "websocket_enabled": False,
+        "controlled_commands": False,
+        "host": "127.0.0.1",
+        "port": 4455,
+        "password": "",
+        "scene_collection": "CSRN Master",
+        "profile": "CSRN Production",
+        "required_scene": "10.01 - FOOTBALL SCOREBUG",
+        "browser_source": "BRWSR - Football Scorebug",
+        "program_visual_scene": "10.02 - PROGRAM VISUAL",
+        "graphic_source": "IMG - Broadcast Background",
+        "camera_source": "CAM - Primary Camera",
+    },
+    "weather": {
+        "use_home_venue_address": True,
+        "default_alert_radius_miles": 25,
+    },
+    "social": {
+        "facebook": "",
+        "youtube": "",
+        "x": "",
+        "website": "",
+    },
+    "application": {
+        "version": RUNTIME_VERSION,
+        "build": RUNTIME_BUILD,
+        "rules_edition": "NFHS",
+        "automatic_backup": True,
+        "auto_save": True,
+        "operator_timeout_hours": 12,
+        "upgrade_manager_enabled": True,
+        "last_migration_status": "",
+    },
+}
 
 SESSION_SECONDS = 12 * 60 * 60
 MAX_ATTEMPTS = 3
@@ -224,9 +292,9 @@ CONFIG_REPOSITORY = ConfigurationRepository(
     CONFIG_FILE,
     DEFAULT_CONFIG,
     runtime_identity={
-        "version": "Version 1.13.0-alpha.3k — Broadcast Repository Integration",
-        "build": "V1.13A3K-BROADCAST-REPOSITORY",
-    },
+    "version": RUNTIME_VERSION,
+    "build": RUNTIME_BUILD,
+},
 )
 STATE_REPOSITORY = StateRepository(CORE_PERSISTENCE, STATE_FILE, DEFAULT_STATE)
 SECURITY_REPOSITORY = SecurityRepository(CORE_PERSISTENCE, SECURITY_FILE, DEFAULT_SECURITY)
@@ -234,9 +302,7 @@ SECURITY_REPOSITORY = SecurityRepository(CORE_PERSISTENCE, SECURITY_FILE, DEFAUL
 
 def load_config() -> dict[str, Any]:
     ensure_data_architecture()
-    config = CONFIG_REPOSITORY.load()
-    config.setdefault("application", {})["rules_edition"] = "NFHS"
-    return config
+    return CONFIG_REPOSITORY.load()
 
 
 def save_config(config: dict[str, Any]) -> None:
@@ -244,12 +310,23 @@ def save_config(config: dict[str, Any]) -> None:
     CONFIG_REPOSITORY.save(config)
 
 
+def update_config_values(
+    patch: dict[str, Any],
+) -> dict[str, Any]:
+    ensure_data_architecture()
+    return CONFIG_REPOSITORY.update(patch)
+
 
 def application_identity() -> dict[str, str]:
     """Return package identity from VERSION.txt with safe config fallbacks."""
     cfg = load_config()
-    version = cfg.get("application", {}).get("version", "Version 1.13.0-alpha.3k — Broadcast Repository Integration")
-    build = cfg.get("application", {}).get("build", "V1.13A3K-BROADCAST-REPOSITORY")
+    application = cfg.get("application", {})
+    version = str(
+        application.get("version") or RUNTIME_VERSION
+    )
+    build = str(
+        application.get("build") or RUNTIME_BUILD
+    )
     product = "CSRN Production Suite"
     if VERSION_FILE.exists():
         try:
@@ -616,31 +693,50 @@ def load_logos() -> list[dict[str, Any]]:
 def save_logos(items: list[dict[str, Any]]) -> None:
     save_json(LOGOS_FILE, items)
 
-def load_broadcasts() -> list[dict[str, Any]]:
-    ensure_data_architecture()
-    if not BROADCAST_INDEX_FILE.exists():
-        save_json(BROADCAST_INDEX_FILE, [])
-    data = load_json(BROADCAST_INDEX_FILE, [])
-    items = data if isinstance(data, list) else data.get("broadcasts", [])
-    if not isinstance(items, list):
-        return []
+def _normalize_broadcast_lifecycle(
+    items: list[dict[str, Any]],
+) -> bool:
+    """Migrate obsolete broadcast lifecycle values."""
+
     changed = False
+
     for item in items:
-        # Prepared was removed from the operator lifecycle in Version 1.0 Alpha Hotfix 2.
+        # Prepared was removed from the operator lifecycle
+        # in Version 1.0 Alpha Hotfix 2.
         if str(item.get("status", "")).lower() == "prepared":
             item["status"] = "planned"
             changed = True
+
         live_state = item.get("live_state")
-        if isinstance(live_state, dict) and str(live_state.get("status", "")).lower() == "prepared":
+
+        if (
+            isinstance(live_state, dict)
+            and str(live_state.get("status", "")).lower()
+            == "prepared"
+        ):
             live_state["status"] = "planned"
             changed = True
-    if changed:
-        save_json(BROADCAST_INDEX_FILE, items)
-    return items
 
-def save_broadcasts(items: list[dict[str, Any]]) -> None:
-    save_json(BROADCAST_INDEX_FILE, items)
+    return changed
 
+
+BROADCAST_REPOSITORY = BroadcastRepository(
+    CORE_PERSISTENCE,
+    BROADCAST_INDEX_FILE,
+    normalizer=_normalize_broadcast_lifecycle,
+)
+
+
+def load_broadcasts() -> list[dict[str, Any]]:
+    ensure_data_architecture()
+    return BROADCAST_REPOSITORY.load()
+
+
+def save_broadcasts(
+    items: list[dict[str, Any]],
+) -> None:
+    ensure_data_architecture()
+    BROADCAST_REPOSITORY.save(items)
 
 def normalize_roster_id(value: str) -> str:
     return normalize_school_id(value)
