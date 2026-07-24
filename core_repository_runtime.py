@@ -29,8 +29,8 @@ class CoreRepositoryRuntime:
             Path(module.CONFIG_FILE),
             module.DEFAULT_CONFIG,
             runtime_identity={
-                "version": "Version 1.13.0-alpha.3h — Roster Performance Stabilization",
-                "build": "V1.13A3H-ROSTER-STABILITY",
+                "version": getattr(module, "RUNTIME_VERSION", ""),
+                "build": getattr(module, "RUNTIME_BUILD", ""),
             },
         )
         self.state = StateRepository(

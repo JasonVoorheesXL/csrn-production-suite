@@ -205,9 +205,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.3l — Configuration Repository Cleanup"
+    "Version 1.13.0-alpha.3m — Security Repository Cleanup"
 )
-RUNTIME_BUILD = "V1.13A3L-CONFIGURATION-CLEANUP"
+RUNTIME_BUILD = "V1.13A3M-SECURITY-CLEANUP"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -2563,8 +2563,8 @@ def update_config():
         if section in incoming and isinstance(incoming[section], dict):
             current[section].update(incoming[section])
     # Protect application identity fields.
-    current["application"]["version"] = "Version 1.10 Alpha — Statistics Engine v1"
-    current["application"]["build"] = "V1.10A-STATS1"
+    current["application"]["version"] = RUNTIME_VERSION
+    current["application"]["build"] = RUNTIME_BUILD
     save_config(current)
     return jsonify(current)
 
