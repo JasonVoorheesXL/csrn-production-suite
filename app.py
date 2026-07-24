@@ -32,6 +32,7 @@ from upgrade_manager import inspect_candidate, migrate
 from persistence_engine import JsonPersistenceEngine
 from core_repositories import ConfigurationRepository, StateRepository, SecurityRepository
 from security_service import SecurityService
+from broadcast_package_service import BroadcastPackageService
 from school_repository import SchoolRepository
 from roster_repository import RosterRepository
 from sponsor_repository import SponsorRepository
@@ -206,9 +207,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4b — Developer Workflow Automation"
+    "Version 1.13.0-alpha.4c — Broadcast Package Service"
 )
-RUNTIME_BUILD = "V1.13A4B-DEVELOPER-WORKFLOW-AUTOMATION"
+RUNTIME_BUILD = "V1.13A4C-BROADCAST-PACKAGE-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -362,42 +363,39 @@ def save_packages(items: list[dict[str, Any]]) -> None:
     PACKAGES_FILE.parent.mkdir(parents=True, exist_ok=True)
     PACKAGES_FILE.write_text(json.dumps({"packages": items}, indent=2), encoding="utf-8")
 
-def package_health(package: dict[str, Any]) -> dict[str, Any]:
-    checks=[]
-    def add(key: str, label: str, ok: bool, note: str): checks.append({"key":key,"label":label,"ok":bool(ok),"note":note})
-    broadcasts=load_broadcasts(); broadcast=next((b for b in broadcasts if b.get("broadcast_id")==package.get("broadcast_id")),None)
-    add("broadcast","Broadcast",bool(broadcast),"Linked game record found." if broadcast else "Select a broadcast.")
-    add("schools","Schools",bool(broadcast and broadcast.get("home_school_id") and broadcast.get("visitor_school_id")),"Home and visitor schools linked." if broadcast and broadcast.get("home_school_id") and broadcast.get("visitor_school_id") else "Both schools are required.")
-    rosters=load_rosters(); roster_ids=set(package.get("roster_ids") or [])
-    add("rosters","Rosters",bool(roster_ids and any(r.get("id") in roster_ids for r in rosters)),"At least one roster linked." if roster_ids else "No roster linked.")
-    personnel=load_broadcasters(); crew_ids=set(package.get("personnel_ids") or [])
-    add("personnel","Personnel",bool(crew_ids and any(p.get("id") in crew_ids for p in personnel)),"Broadcast personnel linked." if crew_ids else "No personnel selected.")
-    sponsors=load_sponsors(); sponsor_ids=set(package.get("sponsor_ids") or [])
-    valid=[s for s in sponsors if s.get("id") in sponsor_ids and sponsor_contract_state(s)=="Active" and s.get("active",True)]
-    add("sponsors","Sponsors",bool(valid) or not sponsor_ids,"Active sponsors verified." if valid else ("No sponsors assigned." if not sponsor_ids else "Assigned sponsors are unavailable or expired."))
-    cfg=load_config(); add("graphics","Graphics",bool(package.get("graphics_profile","CSRN Default")),"Graphics profile configured.")
-    add("obs","OBS",bool(cfg.get("obs",{}).get("required_scene")),"OBS profile and required scene configured.")
-    score=round(sum(1 for x in checks if x["ok"])/len(checks)*100) if checks else 0
-    return {"score":score,"ready":all(x["ok"] for x in checks),"checks":checks}
+BROADCAST_PACKAGE_SERVICE: BroadcastPackageService | None = None
 
-def package_record(data: dict[str, Any], existing: dict[str, Any] | None = None) -> dict[str, Any]:
-    now=int(time.time()); record=copy.deepcopy(existing or {})
-    record.update({
-        "id": record.get("id") or f"pkg-{int(time.time()*1000)}",
-        "name": str(data.get("name") or record.get("name") or "Untitled Broadcast Package").strip(),
-        "broadcast_id": str(data.get("broadcast_id") or record.get("broadcast_id") or "").strip(),
-        "status": str(data.get("status") or record.get("status") or "Planning"),
-        "roster_ids": list(data.get("roster_ids") if "roster_ids" in data else record.get("roster_ids",[])),
-        "personnel_ids": list(data.get("personnel_ids") if "personnel_ids" in data else record.get("personnel_ids",[])),
-        "sponsor_ids": list(data.get("sponsor_ids") if "sponsor_ids" in data else record.get("sponsor_ids",[])),
-        "lineups": copy.deepcopy(data.get("lineups") if "lineups" in data else record.get("lineups", {})),
-        "graphics_profile": str(data.get("graphics_profile") or record.get("graphics_profile") or "CSRN Default"),
-        "notes": str(data.get("notes") if "notes" in data else record.get("notes", "")),
-        "locked": bool(data.get("locked") if "locked" in data else record.get("locked",False)),
-        "updated_at": now, "created_at": record.get("created_at",now),
-    })
-    record["health"]=package_health(record)
-    return record
+
+def get_broadcast_package_service() -> BroadcastPackageService:
+    global BROADCAST_PACKAGE_SERVICE
+
+    if BROADCAST_PACKAGE_SERVICE is None:
+        BROADCAST_PACKAGE_SERVICE = BroadcastPackageService(
+            load_packages=load_packages,
+            save_packages=save_packages,
+            load_broadcasts=load_broadcasts,
+            load_rosters=load_rosters,
+            load_personnel=load_broadcasters,
+            load_sponsors=load_sponsors,
+            load_config=load_config,
+            sponsor_contract_state=sponsor_contract_state,
+            load_state=load_state,
+            save_state=save_state,
+        )
+
+    return BROADCAST_PACKAGE_SERVICE
+
+
+def package_health(package: dict[str, Any]) -> dict[str, Any]:
+    return get_broadcast_package_service().health(package)
+
+
+def package_record(
+    data: dict[str, Any],
+    existing: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return get_broadcast_package_service().record(data, existing)
+
 
 def diagnostic_status() -> dict[str, Any]:
     cfg = load_config()
@@ -1396,67 +1394,71 @@ def control_panel():
 @app.get("/api/packages")
 @require_auth
 def list_packages_route():
-    items=[]
-    for item in load_packages():
-        item=copy.deepcopy(item); item["health"]=package_health(item); items.append(item)
-    return jsonify(sorted(items,key=lambda x:x.get("updated_at",0),reverse=True))
+    return jsonify(
+        get_broadcast_package_service().list_packages()
+    )
+
 
 @app.post("/api/packages")
 @require_auth
 def create_package_route():
-    record=package_record(request.get_json(force=True) or {})
-    items=load_packages(); items.append(record); save_packages(items)
-    return jsonify(record),201
+    result = get_broadcast_package_service().create(
+        request.get_json(force=True) or {}
+    )
+    return jsonify(result.data["package"]), 201
+
 
 @app.put("/api/packages/<package_id>")
 @require_auth
 def update_package_route(package_id: str):
-    items=load_packages(); idx=next((i for i,x in enumerate(items) if x.get("id")==package_id),None)
-    if idx is None: return jsonify({"error":"NOT_FOUND"}),404
-    if items[idx].get("locked") and not (request.get_json(silent=True) or {}).get("unlock"):
-        return jsonify({"error":"PACKAGE_LOCKED"}),409
-    items[idx]=package_record(request.get_json(force=True) or {},items[idx]); save_packages(items)
-    return jsonify(items[idx])
+    result = get_broadcast_package_service().update(
+        package_id,
+        request.get_json(force=True) or {},
+    )
+    if result.code == "NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    if result.code == "PACKAGE_LOCKED":
+        return jsonify({"error": result.code}), 409
+    return jsonify(result.data["package"])
+
 
 @app.delete("/api/packages/<package_id>")
 @require_auth
 def delete_package_route(package_id: str):
-    items=load_packages(); found=next((x for x in items if x.get("id")==package_id),None)
-    if not found: return jsonify({"error":"NOT_FOUND"}),404
-    if found.get("locked"): return jsonify({"error":"PACKAGE_LOCKED"}),409
-    save_packages([x for x in items if x.get("id")!=package_id]); return jsonify({"deleted":package_id})
+    result = get_broadcast_package_service().delete(package_id)
+    if result.code == "NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    if result.code == "PACKAGE_LOCKED":
+        return jsonify({"error": result.code}), 409
+    return jsonify({"deleted": result.data["deleted"]})
+
 
 @app.post("/api/packages/<package_id>/duplicate")
 @require_auth
 def duplicate_package_route(package_id: str):
-    source=next((x for x in load_packages() if x.get("id")==package_id),None)
-    if not source: return jsonify({"error":"NOT_FOUND"}),404
-    data=copy.deepcopy(source); data.pop("id",None); data["name"]=f"{source.get('name','Broadcast Package')} Copy"; data["locked"]=False; data["status"]="Planning"
-    record=package_record(data); items=load_packages(); items.append(record); save_packages(items); return jsonify(record),201
+    result = get_broadcast_package_service().duplicate(package_id)
+    if result.code == "NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    return jsonify(result.data["package"]), 201
+
 
 @app.post("/api/packages/<package_id>/load")
 @require_auth
 def load_package_route(package_id: str):
-    items=load_packages(); package=next((x for x in items if x.get("id")==package_id),None)
-    if not package: return jsonify({"error":"NOT_FOUND"}),404
-    broadcast=next((x for x in load_broadcasts() if x.get("broadcast_id")==package.get("broadcast_id")),None)
-    if not broadcast: return jsonify({"error":"BROADCAST_NOT_FOUND"}),409
-    state=load_state(); state.update({
-        "broadcast_created":True,"broadcast_id":broadcast.get("broadcast_id",""),"sport":broadcast.get("sport","Football"),
-        "season":broadcast.get("season",""),"week":broadcast.get("week","1"),"classification":broadcast.get("classification",""),
-        "level":broadcast.get("level","Varsity"),"division":broadcast.get("division","Boys"),
-        "home_school_id":broadcast.get("home_school_id",""),"visitor_school_id":broadcast.get("visitor_school_id",""),
-        "home_team":broadcast.get("home_team","Home"),"visitor_team":broadcast.get("visitor_team","Visitor"),
-        "home_identity":broadcast.get("home_identity",{}),"visitor_identity":broadcast.get("visitor_identity",{}),
-        "venue":broadcast.get("venue",""),"venue_id":broadcast.get("venue_id",""),"date":broadcast.get("date",""),
-        "scheduled_start":broadcast.get("scheduled_start",""),"visual_mode":broadcast.get("visual_mode","graphic"),
-        "crew":broadcast.get("crew",{}),"status":broadcast.get("status","planned"),"broadcast_package_id":package_id,
-        "package_roster_ids":package.get("roster_ids",[]),"package_personnel_ids":package.get("personnel_ids",[]),
-        "package_sponsor_ids":package.get("sponsor_ids",[]),"package_lineups":copy.deepcopy(package.get("lineups",{})),
-        "graphics_profile":package.get("graphics_profile","CSRN Default")
-    }); save_state(state)
-    package["status"]="Loaded"; package["last_loaded_at"]=int(time.time()); package["health"]=package_health(package); save_packages(items)
-    return jsonify({"package":package,"state":public_state(state),"health":package["health"]})
+    result = get_broadcast_package_service().load(package_id)
+    if result.code == "NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    if result.code == "BROADCAST_NOT_FOUND":
+        return jsonify({"error": result.code}), 409
+
+    return jsonify(
+        {
+            "package": result.data["package"],
+            "state": public_state(result.data["state"]),
+            "health": result.data["health"],
+        }
+    )
+
 
 @app.get("/api/sponsors")
 @require_auth
