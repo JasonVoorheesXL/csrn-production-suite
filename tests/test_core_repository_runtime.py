@@ -94,3 +94,21 @@ def test_config_identity_is_supplied_by_repository(tmp_path: Path) -> None:
 
     assert config["application"]["build"] == "V1.13A3H-ROSTER-STABILITY"
     assert config["application"]["rules_edition"] == "NFHS"
+
+
+def test_runtime_generates_and_persists_missing_secret_key(
+    tmp_path: Path,
+) -> None:
+    module = fake_module(tmp_path)
+    module.DEFAULT_SECURITY = {
+        **module.DEFAULT_SECURITY,
+        "secret_key": "",
+    }
+
+    runtime = CoreRepositoryRuntime(module).install()
+
+    assert module.app.secret_key
+    assert (
+        runtime.security.load()["secret_key"]
+        == module.app.secret_key
+    )

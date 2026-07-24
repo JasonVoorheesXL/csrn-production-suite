@@ -88,9 +88,9 @@ class CoreRepositoryRuntime:
         security = self.security.load()
         if not security.get("secret_key"):
             import secrets
-
-            security["secret_key"] = secrets.token_hex(32)
-            self.security.save(security)
+            security = self.security.update_credentials(
+                secret_key=secrets.token_hex(32)
+            )
         return security
 
     def install(self) -> "CoreRepositoryRuntime":
