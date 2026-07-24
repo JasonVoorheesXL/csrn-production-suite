@@ -4,6 +4,7 @@ from pathlib import Path
 
 
 APP_PATH = Path("app.py")
+IMPORT_SERVICE_PATH = Path("association_import_service.py")
 
 
 def insert_after(source: str, anchor: str, addition: str, label: str) -> str:
@@ -304,7 +305,22 @@ def apply_association_import():
         "generic association routes",
     )
 
+    import_source = IMPORT_SERVICE_PATH.read_text(encoding="utf-8")
+    broadcast_requirement = (
+        '        if (\n'
+        '            "broadcast_name" not in mapped_targets\n'
+        '            and not str(defaults.get("broadcast_name", "")).strip()\n'
+        '        ):\n'
+        '            raise ValueError("BROADCAST_NAME_MAPPING_REQUIRED")\n'
+        '\n'
+    )
+    if broadcast_requirement in import_source:
+        import_source = import_source.replace(broadcast_requirement, "", 1)
+    elif "BROADCAST_NAME_MAPPING_REQUIRED" in import_source:
+        raise RuntimeError("broadcast-name fallback anchor not found")
+
     APP_PATH.write_text(source, encoding="utf-8")
+    IMPORT_SERVICE_PATH.write_text(import_source, encoding="utf-8")
     print("Phase 4.4B6 generic association workflow routes wired.")
 
 
