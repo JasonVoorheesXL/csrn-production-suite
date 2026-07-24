@@ -33,6 +33,12 @@ from persistence_engine import JsonPersistenceEngine
 from core_repositories import ConfigurationRepository, StateRepository, SecurityRepository
 from security_service import SecurityService
 from broadcast_package_service import BroadcastPackageService
+from school_service import SchoolService
+from association_import_service import AssociationImportService
+from association_supplement_service import AssociationSupplementService
+from association_profile_service import AssociationProfileService
+from association_source_service import AssociationSourceService
+from association_workflow_service import AssociationWorkflowService
 from school_repository import SchoolRepository
 from roster_repository import RosterRepository
 from sponsor_repository import SponsorRepository
@@ -66,9 +72,15 @@ SPONSOR_UPLOAD_DIR = DATA_DIR / "Sponsors" / "Logos"
 VENUES_FILE = DATA_DIR / "Venues" / "venues.json"
 LOGOS_FILE = DATA_DIR / "Logos" / "logos.json"
 IMPORTS_DIR = DATA_DIR / "Imports"
+ASSOCIATION_PROFILES_DIR = IMPORTS_DIR / "Profiles"
 MHSAA_5A_FILE = IMPORTS_DIR / "mhsaa_2025_27_football_5a.json"
 MHSAA_5A_ENRICHMENT_FILE = IMPORTS_DIR / "mhsaa_5a_enrichment.json"
 MHSAA_5A_BRANDING_FILE = IMPORTS_DIR / "mhsaa_5a_branding.json"
+MHSAA_5A_PROFILE_FILE = (
+    IMPORTS_DIR
+    / "Profiles"
+    / "mhsaa_football_5a_2025_27.json"
+)
 BROADCAST_INDEX_FILE = DATA_DIR / "Broadcasts" / "broadcasts.json"
 PACKAGES_FILE = DATA_DIR / "Packages" / "broadcast_packages.json"
 BUILD_JOURNAL_FILE = DATA_DIR / "Logs" / "build_journal.json"
@@ -207,9 +219,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4c — Broadcast Package Service"
+    "Version 1.13.0-alpha.4d — School Service"
 )
-RUNTIME_BUILD = "V1.13A4C-BROADCAST-PACKAGE-SERVICE"
+RUNTIME_BUILD = "V1.13A4D-SCHOOL-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -281,6 +293,7 @@ LOCKOUT_SECONDS = 60
 def ensure_data_architecture() -> None:
     for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings"):
         (DATA_DIR / name).mkdir(parents=True, exist_ok=True)
+    ASSOCIATION_PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     PERSONNEL_HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     ASSET_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -527,6 +540,23 @@ def save_schools(schools: list[dict[str, Any]]) -> None:
     SCHOOL_REPOSITORY.save(schools)
 
 
+SCHOOL_SERVICE: SchoolService | None = None
+
+
+def get_school_service() -> SchoolService:
+    global SCHOOL_SERVICE
+
+    if SCHOOL_SERVICE is None:
+        SCHOOL_SERVICE = SchoolService(
+            load_schools=load_schools,
+            save_schools=save_schools,
+            load_logos=load_logos,
+            save_logos=save_logos,
+        )
+
+    return SCHOOL_SERVICE
+
+
 VENUE_REPOSITORY = VenueRepository(
     CORE_PERSISTENCE,
     VENUES_FILE,
@@ -541,6 +571,82 @@ def load_venues() -> list[dict[str, Any]]:
 def save_venues(items: list[dict[str, Any]]) -> None:
     ensure_data_architecture()
     VENUE_REPOSITORY.save(items)
+
+
+ASSOCIATION_IMPORT_SERVICE: AssociationImportService | None = None
+
+
+def get_association_import_service() -> AssociationImportService:
+    global ASSOCIATION_IMPORT_SERVICE
+
+    if ASSOCIATION_IMPORT_SERVICE is None:
+        ASSOCIATION_IMPORT_SERVICE = AssociationImportService(
+            school_service=get_school_service(),
+            load_schools=load_schools,
+            load_venues=load_venues,
+            save_venues=save_venues,
+        )
+
+    return ASSOCIATION_IMPORT_SERVICE
+
+
+ASSOCIATION_SUPPLEMENT_SERVICE: AssociationSupplementService | None = None
+
+
+def get_association_supplement_service() -> AssociationSupplementService:
+    global ASSOCIATION_SUPPLEMENT_SERVICE
+
+    if ASSOCIATION_SUPPLEMENT_SERVICE is None:
+        ASSOCIATION_SUPPLEMENT_SERVICE = AssociationSupplementService(
+            load_schools=load_schools,
+            save_schools=save_schools,
+            load_venues=load_venues,
+            save_venues=save_venues,
+        )
+
+    return ASSOCIATION_SUPPLEMENT_SERVICE
+
+
+ASSOCIATION_PROFILE_SERVICE: AssociationProfileService | None = None
+
+
+def get_association_profile_service() -> AssociationProfileService:
+    global ASSOCIATION_PROFILE_SERVICE
+
+    if ASSOCIATION_PROFILE_SERVICE is None:
+        ASSOCIATION_PROFILE_SERVICE = AssociationProfileService(
+            ASSOCIATION_PROFILES_DIR,
+            protected_ids={"mhsaa-football-5a-2025-27"},
+        )
+
+    return ASSOCIATION_PROFILE_SERVICE
+
+
+ASSOCIATION_SOURCE_SERVICE: AssociationSourceService | None = None
+
+
+def get_association_source_service() -> AssociationSourceService:
+    global ASSOCIATION_SOURCE_SERVICE
+
+    if ASSOCIATION_SOURCE_SERVICE is None:
+        ASSOCIATION_SOURCE_SERVICE = AssociationSourceService()
+
+    return ASSOCIATION_SOURCE_SERVICE
+
+
+ASSOCIATION_WORKFLOW_SERVICE: AssociationWorkflowService | None = None
+
+
+def get_association_workflow_service() -> AssociationWorkflowService:
+    global ASSOCIATION_WORKFLOW_SERVICE
+
+    if ASSOCIATION_WORKFLOW_SERVICE is None:
+        ASSOCIATION_WORKFLOW_SERVICE = AssociationWorkflowService(
+            source_service=get_association_source_service(),
+            import_service=get_association_import_service(),
+        )
+
+    return ASSOCIATION_WORKFLOW_SERVICE
 
 def load_assets() -> list[dict[str, Any]]:
     ensure_data_architecture()
@@ -1963,347 +2069,391 @@ def import_roster_players(roster_id: str):
 @app.get("/api/schools")
 @require_auth
 def list_schools():
-    return jsonify([school_display_payload(s) for s in load_schools()])
+    return jsonify(get_school_service().list_schools())
+
 
 @app.get("/api/schools/<school_id>")
 @require_auth
 def read_school(school_id: str):
-    school = get_school(school_id)
-    if not school:
-        return jsonify({"error": "SCHOOL_NOT_FOUND"}), 404
-    return jsonify(school)
+    result = get_school_service().read(school_id)
+    if result.code == "SCHOOL_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    return jsonify(result.data["school"])
+
 
 @app.post("/api/schools")
 @require_auth
 def create_school():
-    incoming = request.get_json(force=True)
-    official_name = str(incoming.get("official_name", "")).strip()
-    broadcast_name = str(incoming.get("broadcast_name", "")).strip()
-    if not official_name or not broadcast_name:
-        return jsonify({"error": "SCHOOL_NAME_REQUIRED"}), 400
+    result = get_school_service().create(
+        request.get_json(force=True) or {}
+    )
+    if result.code == "SCHOOL_NAME_REQUIRED":
+        return jsonify({"error": result.code}), 400
+    if result.code == "LIKELY_DUPLICATE":
+        return jsonify(
+            {
+                "error": result.code,
+                "matches": result.data["matches"],
+            }
+        ), 409
+    if result.code == "INVALID_SOCIAL_URL":
+        return jsonify(
+            {
+                "error": result.code,
+                "fields": result.data["fields"],
+            }
+        ), 400
+    return jsonify(result.data["school"]), 201
 
-    duplicates = school_duplicate_candidates(incoming)
-    if duplicates and not bool(incoming.get("confirm_duplicate", False)):
-        return jsonify({"error": "LIKELY_DUPLICATE", "matches": duplicates}), 409
-
-    schools = load_schools()
-    school_id = normalize_school_id(incoming.get("id") or broadcast_name)
-    base_id = school_id
-    suffix = 2
-    while any(s.get("id") == school_id for s in schools):
-        school_id = f"{base_id}-{suffix}"
-        suffix += 1
-
-    general_social, social_errors = normalize_social_block(incoming.get("general_social") or {})
-    if social_errors:
-        return jsonify({"error": "INVALID_SOCIAL_URL", "fields": social_errors}), 400
-
-    programs = incoming.get("programs") or {}
-    if "Football" in programs:
-        football_social, football_errors = normalize_social_block(programs.get("Football") or {})
-        if football_errors:
-            return jsonify({"error": "INVALID_SOCIAL_URL", "fields": football_errors}), 400
-        programs["Football"].update(football_social)
-
-    school = {
-        "id": school_id,
-        "csrn_id": str(incoming.get("csrn_id", "")).strip() or next_csrn_school_id(str(incoming.get("state", "MS")), str(incoming.get("classification", "")), schools),
-        "official_name": official_name,
-        "broadcast_name": broadcast_name,
-        "nickname": str(incoming.get("nickname", "")).strip(),
-        "short_name": str(incoming.get("short_name", broadcast_name)).strip(),
-        "city": str(incoming.get("city", "")).strip(),
-        "county": str(incoming.get("county", "")).strip(),
-        "active": bool(incoming.get("active", True)),
-        "preferred_scorebug_name": str(incoming.get("preferred_scorebug_name", broadcast_name)).strip(),
-        "pronunciation_guide": str(incoming.get("pronunciation_guide", "")).strip(),
-        "venue_id": str(incoming.get("venue_id", "")).strip(),
-        "primary_color": incoming.get("primary_color", "#C9203B"),
-        "secondary_color": incoming.get("secondary_color", "#FFFFFF"),
-        "primary_logo": str(incoming.get("primary_logo", "")).strip(),
-        "alternate_logo": str(incoming.get("alternate_logo", "")).strip(),
-        "general_social": general_social,
-        "venues": incoming.get("venues") or [],
-        "programs": programs,
-        "state": str(incoming.get("state", "MS")).strip() or "MS",
-        "classification": str(incoming.get("classification", "")).strip(),
-        "region": str(incoming.get("region", "")).strip(),
-        "district": str(incoming.get("district", "")).strip(),
-        "mhsaa_id": str(incoming.get("mhsaa_id", "")).strip(),
-        "source_data": incoming.get("source_data") or {"provider": "Manual", "source_url": "", "retrieved_at": "", "district": ""},
-        "user_overrides": incoming.get("user_overrides") or {},
-        "verification_status": str(incoming.get("verification_status", "unverified")),
-        "default_broadcast_logo_id": str(incoming.get("default_broadcast_logo_id", "")).strip(),
-        "logo_status": str(incoming.get("logo_status", "candidate")),
-        "logo_metadata": incoming.get("logo_metadata") or {"source_url": "", "transparent_background_status": "unknown", "approval_status": "candidate", "shape_standard": "round", "master_canvas": "1024x1024-round", "safe_area": "circle-90-percent", "scorebug_derivative": "256x256-round"},
-        "notes": str(incoming.get("notes", "")).strip()
-    }
-
-    schools.append(school)
-    save_schools(schools)
-    return jsonify(school), 201
 
 @app.put("/api/schools/<school_id>")
 @require_auth
 def update_school(school_id: str):
-    incoming = request.get_json(force=True)
-    schools = load_schools()
-    index = next((i for i, s in enumerate(schools) if s.get("id") == school_id), None)
-    if index is None:
-        return jsonify({"error": "SCHOOL_NOT_FOUND"}), 404
+    result = get_school_service().update(
+        school_id,
+        request.get_json(force=True) or {},
+    )
+    if result.code == "SCHOOL_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    if result.code == "INVALID_SOCIAL_URL":
+        return jsonify(
+            {
+                "error": result.code,
+                "fields": result.data["fields"],
+            }
+        ), 400
+    return jsonify(result.data["school"])
 
-    school = schools[index]
-    if "general_social" in incoming:
-        normalized_social, social_errors = normalize_social_block(incoming.get("general_social") or {})
-        if social_errors:
-            return jsonify({"error": "INVALID_SOCIAL_URL", "fields": social_errors}), 400
-        incoming["general_social"] = normalized_social
-    if "programs" in incoming and "Football" in incoming["programs"]:
-        normalized_football, football_errors = normalize_social_block(incoming["programs"].get("Football") or {})
-        if football_errors:
-            return jsonify({"error": "INVALID_SOCIAL_URL", "fields": football_errors}), 400
-        incoming["programs"]["Football"].update(normalized_football)
-
-    school = schools[index]
-    for key in (
-        "official_name", "broadcast_name", "nickname", "mascot", "short_name", "city", "county", "active", "school_address", "phone", "website", "preferred_scorebug_name", "pronunciation_guide", "venue_id", "csrn_id", "primary_color",
-        "secondary_color", "primary_logo", "alternate_logo",
-        "general_social", "venues", "programs", "state", "classification", "region", "district", "mhsaa_id", "source_data", "user_overrides", "verification_status", "default_broadcast_logo_id", "logo_status", "logo_metadata", "notes"
-    ):
-        if key in incoming:
-            school[key] = incoming[key]
-
-    schools[index] = school
-    save_schools(schools)
-    linked_logo_id = str(school.get("default_broadcast_logo_id", "") or "").strip()
-    if linked_logo_id:
-        logos = load_logos()
-        linked = next((row for row in logos if str(row.get("id", "")) == linked_logo_id), None)
-        if linked is not None:
-            linked["approval_status"] = str(school.get("logo_status", linked.get("approval_status", "candidate")))
-            if school.get("primary_logo"):
-                linked["round_master_path"] = school.get("primary_logo")
-            save_logos(logos)
-    return jsonify(school)
 
 @app.delete("/api/schools/<school_id>")
 @require_auth
 def delete_school(school_id: str):
-    schools = load_schools()
-    school = next((s for s in schools if s.get("id") == school_id), None)
-    if not school:
-        return jsonify({"error": "SCHOOL_NOT_FOUND"}), 404
-    save_schools([s for s in schools if s.get("id") != school_id])
+    result = get_school_service().delete(school_id)
+    if result.code == "SCHOOL_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
     return jsonify({"ok": True})
-
 
 
 @app.post("/api/schools/duplicate-check")
 @require_auth
 def duplicate_check():
-    incoming = request.get_json(force=True)
-    return jsonify({"matches": school_duplicate_candidates(incoming, str(incoming.get("exclude_id", "")))})
+    incoming = request.get_json(force=True) or {}
+    matches = get_school_service().duplicate_candidates(
+        incoming,
+        str(incoming.get("exclude_id", "")),
+    )
+    return jsonify({"matches": matches})
+
+
+def _association_error_status(code: str) -> int:
+    if code == "PROFILE_NOT_FOUND":
+        return 404
+    if code in {
+        "PROFILE_ALREADY_EXISTS",
+        "PROFILE_ID_CONFLICT",
+        "PROFILE_PROTECTED",
+        "IMPORT_APPROVAL_REQUIRED",
+        "SOURCE_PREVIEW_REQUIRED",
+        "SOURCE_CHANGED_SINCE_PREVIEW",
+    }:
+        return 409
+    if code in {"SOURCE_FETCH_FAILED", "SOURCE_HOST_UNRESOLVED"}:
+        return 502
+    if code in {
+        "PROFILE_READ_FAILED",
+        "PROFILE_SAVE_FAILED",
+        "PROFILE_DELETE_FAILED",
+    }:
+        return 500
+    return 400
+
+
+def _association_error_response(code: str):
+    return jsonify({"error": code}), _association_error_status(code)
+
+
+def _association_bool(value: Any, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _association_request_payload():
+    supplied_content: bytes | str | None = None
+    supplied_content_type = ""
+
+    if request.files or request.form:
+        payload: dict[str, Any] = request.form.to_dict(flat=True)
+        profile_text = str(payload.get("profile", "")).strip()
+        if profile_text:
+            try:
+                parsed_profile = json.loads(profile_text)
+            except json.JSONDecodeError:
+                return {}, None, "", "INVALID_PROFILE_JSON"
+            if not isinstance(parsed_profile, dict):
+                return {}, None, "", "INVALID_PROFILE_PAYLOAD"
+            payload["profile"] = parsed_profile
+
+        upload = request.files.get("source")
+        if upload is not None and upload.filename:
+            supplied_content = upload.read()
+            supplied_content_type = str(upload.mimetype or "")
+        else:
+            supplied_content = payload.get("source_content")
+            supplied_content_type = str(
+                payload.get("source_content_type", "")
+            )
+    else:
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return {}, None, "", "INVALID_REQUEST_PAYLOAD"
+        supplied_content = payload.get("source_content")
+        supplied_content_type = str(payload.get("source_content_type", ""))
+
+    if supplied_content is not None and not isinstance(
+        supplied_content,
+        (bytes, str),
+    ):
+        return {}, None, "", "INVALID_SOURCE_CONTENT"
+    return payload, supplied_content, supplied_content_type, ""
+
+
+def _resolve_association_profile(payload: dict[str, Any]):
+    inline_profile = payload.get("profile")
+    if inline_profile is not None:
+        if not isinstance(inline_profile, dict):
+            return None, "INVALID_PROFILE_PAYLOAD"
+        return inline_profile, ""
+
+    profile_id = str(payload.get("profile_id", "")).strip()
+    if not profile_id:
+        return None, "PROFILE_ID_REQUIRED"
+    result = get_association_profile_service().read(profile_id)
+    if not result.ok:
+        return None, result.code
+    return result.data["profile"], ""
+
+
+@app.get("/api/imports/associations/profiles")
+@require_auth
+def list_association_profiles():
+    result = get_association_profile_service().list_profiles()
+    if not result.ok:
+        return _association_error_response(result.code)
+    return jsonify(result.data)
+
+
+@app.get("/api/imports/associations/profiles/<profile_id>")
+@require_auth
+def read_association_profile(profile_id: str):
+    result = get_association_profile_service().read(profile_id)
+    if not result.ok:
+        return _association_error_response(result.code)
+    return jsonify(result.data["profile"])
+
+
+@app.post("/api/imports/associations/profiles")
+@require_auth
+def create_association_profile():
+    incoming = request.get_json(silent=True) or {}
+    result = get_association_profile_service().create(incoming)
+    if not result.ok:
+        return _association_error_response(result.code)
+    return jsonify(result.data["profile"]), 201
+
+
+@app.put("/api/imports/associations/profiles/<profile_id>")
+@require_auth
+def update_association_profile(profile_id: str):
+    incoming = request.get_json(silent=True) or {}
+    result = get_association_profile_service().update(profile_id, incoming)
+    if not result.ok:
+        return _association_error_response(result.code)
+    return jsonify(result.data["profile"])
+
+
+@app.delete("/api/imports/associations/profiles/<profile_id>")
+@require_auth
+def delete_association_profile(profile_id: str):
+    result = get_association_profile_service().delete(profile_id)
+    if not result.ok:
+        return _association_error_response(result.code)
+    return jsonify(result.data)
+
+
+@app.post("/api/imports/associations/preview")
+@require_auth
+def preview_association_import():
+    payload, supplied_content, supplied_content_type, error = (
+        _association_request_payload()
+    )
+    if error:
+        return _association_error_response(error)
+    profile, error = _resolve_association_profile(payload)
+    if error:
+        return _association_error_response(error)
+
+    result = get_association_workflow_service().preview(
+        profile,
+        supplied_content=supplied_content,
+        supplied_content_type=supplied_content_type,
+    )
+    if not result.ok:
+        return _association_error_response(result.code)
+    return jsonify(result.data)
+
+
+@app.post("/api/imports/associations/import")
+@require_auth
+def apply_association_import():
+    payload, supplied_content, supplied_content_type, error = (
+        _association_request_payload()
+    )
+    if error:
+        return _association_error_response(error)
+    profile, error = _resolve_association_profile(payload)
+    if error:
+        return _association_error_response(error)
+
+    create_venues = None
+    if "create_venues" in payload:
+        create_venues = _association_bool(payload.get("create_venues"))
+
+    result = get_association_workflow_service().apply(
+        profile,
+        approved=_association_bool(payload.get("approved")),
+        expected_sha256=str(payload.get("expected_sha256", "")),
+        supplied_content=supplied_content,
+        supplied_content_type=supplied_content_type,
+        create_venues=create_venues,
+        allow_possible_duplicates=_association_bool(
+            payload.get("allow_possible_duplicates")
+        ),
+    )
+    if not result.ok:
+        return _association_error_response(result.code)
+    return jsonify(result.data)
+
 
 @app.get("/api/imports/mhsaa/5A/analyze")
 @require_auth
 def analyze_mhsaa_5a():
+    profile = load_json(MHSAA_5A_PROFILE_FILE, {})
     manifest = load_json(MHSAA_5A_FILE, {"schools": []})
-    existing = load_schools()
-    results = []
-    for candidate in manifest.get("schools", []):
-        matches = school_duplicate_candidates(candidate)
-        exact = next((s for s in existing if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        results.append({**candidate, "status": "existing" if exact else ("possible_duplicate" if matches else "new"), "matches": matches})
-    return jsonify({
-        "classification": "5A",
-        "source": manifest.get("source", {}),
-        "found": len(results),
-        "new": sum(1 for r in results if r["status"] == "new"),
-        "existing": sum(1 for r in results if r["status"] == "existing"),
-        "possible_duplicates": sum(1 for r in results if r["status"] == "possible_duplicate"),
-        "schools": results,
-    })
+    result = get_association_import_service().analyze(
+        profile,
+        manifest.get("schools", []),
+    )
+    if not result.ok:
+        return jsonify({"error": result.code}), 400
+
+    schools = []
+    for item in result.data.get("schools", []):
+        candidate = dict(item.get("candidate") or {})
+        candidate["status"] = item.get("status", "invalid")
+        candidate["matches"] = item.get("matches", [])
+        schools.append(candidate)
+
+    return jsonify(
+        {
+            "classification": manifest.get("classification", "5A"),
+            "source": manifest.get("source", {}),
+            "found": result.data.get("found", len(schools)),
+            "new": result.data.get("new", 0),
+            "existing": result.data.get("existing", 0),
+            "possible_duplicates": result.data.get(
+                "possible_duplicates",
+                0,
+            ),
+            "schools": schools,
+        }
+    )
+
 
 @app.post("/api/imports/mhsaa/5A")
 @require_auth
 def import_mhsaa_5a():
     options = request.get_json(silent=True) or {}
+    profile = load_json(MHSAA_5A_PROFILE_FILE, {})
     manifest = load_json(MHSAA_5A_FILE, {"schools": []})
-    schools = load_schools()
-    venues = load_venues()
-    imported = 0
-    skipped = 0
-    created_ids: list[str] = []
-    for candidate in manifest.get("schools", []):
-        exact = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        if exact:
-            # Enrich the authoritative classification/region without replacing user customization.
-            exact["classification"] = "5A"
-            exact["region"] = str(candidate.get("region", ""))
-            exact.setdefault("state", "MS")
-            exact.setdefault("csrn_id", next_csrn_school_id("MS", "5A", schools))
-            exact.setdefault("source_data", {}).update(candidate.get("source_data", {}))
-            ensure_school_schema(exact, schools)
-            skipped += 1
-            continue
-        school_id = normalize_school_id(candidate["broadcast_name"])
-        base_id, suffix = school_id, 2
-        while any(s.get("id") == school_id for s in schools):
-            school_id = f"{base_id}-{suffix}"; suffix += 1
-        venue_id = f"{school_id}-football"
-        school = {
-            "id": school_id,
-            "csrn_id": next_csrn_school_id("MS", "5A", schools),
-            "official_name": candidate["official_name"],
-            "broadcast_name": candidate["broadcast_name"],
-            "short_name": candidate["broadcast_name"],
-            "preferred_scorebug_name": candidate["broadcast_name"],
-            "nickname": "", "city": "", "county": "", "state": "MS", "active": True,
-            "classification": "5A", "region": str(candidate.get("region", "")), "district": "", "mhsaa_id": "",
-            "primary_color": "#808080", "secondary_color": "#FFFFFF",
-            "primary_logo": "", "alternate_logo": "", "default_broadcast_logo_id": "", "logo_status": "candidate",
-            "logo_metadata": {"source_url": "", "transparent_background_status": "unknown", "approval_status": "candidate", "shape_standard": "round", "master_canvas": "1024x1024-round", "safe_area": "circle-90-percent", "scorebug_derivative": "256x256-round"},
-            "general_social": {"facebook": "", "x": "", "instagram": "", "youtube": "", "website": ""},
-            "venue_id": venue_id if options.get("create_venues", True) else "",
-            "venues": [{"id": venue_id, "name": f"{candidate['broadcast_name']} Football Venue", "address1": "", "address2": "", "city": "", "state": "MS", "postal_code": "", "weather_radius_miles": 25}] if options.get("create_venues", True) else [],
-            "programs": {"Football": {"facebook": "", "x": "", "instagram": "", "youtube": "", "website": "", "venue_id": venue_id if options.get("create_venues", True) else "", "notes": ""}},
-            "source_data": candidate.get("source_data", {}), "user_overrides": {}, "verification_status": "candidate",
-            "pronunciation_guide": "", "notes": "Imported as a 5A candidate record; complete identity, venue, colors, logo and social fields during review."
-        }
-        schools.append(school)
-        if options.get("create_venues", True):
-            venues.append({"id": venue_id, "school_id": school_id, "csrn_school_id": school["csrn_id"], "sport": "Football", "name": f"{candidate['broadcast_name']} Football Venue", "address1": "", "address2": "", "city": "", "state": "MS", "postal_code": "", "latitude": None, "longitude": None, "approval_status": "candidate", "broadcast_notes": ""})
-        imported += 1
-        created_ids.append(school["csrn_id"])
-    save_schools(schools)
-    save_venues(venues)
-    return jsonify({"imported": imported, "skipped_existing": skipped, "created_ids": created_ids, "total_schools": len(schools)})
+    result = get_association_import_service().apply(
+        profile,
+        manifest.get("schools", []),
+        create_venues=bool(options.get("create_venues", True)),
+        # The legacy MHSAA importer only blocked exact-name matches.
+        # Preserve that behavior while generic imports default to review.
+        allow_possible_duplicates=True,
+    )
+    if not result.ok:
+        return jsonify({"error": result.code}), 400
 
+    return jsonify(
+        {
+            "imported": result.data.get("imported", 0),
+            "skipped_existing": (
+                result.data.get("enriched_existing", 0)
+                + result.data.get("skipped_existing", 0)
+            ),
+            "created_ids": result.data.get("created_ids", []),
+            "total_schools": result.data.get("total_schools", 0),
+        }
+    )
 
 
 @app.get("/api/imports/mhsaa/5A/branding/analyze")
 @require_auth
 def analyze_mhsaa_5a_branding():
     manifest = load_json(MHSAA_5A_BRANDING_FILE, {"schools": []})
-    schools = load_schools()
-    results = []
-    for candidate in manifest.get("schools", []):
-        school = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        if not school:
-            status = "school_missing"
-        elif school.get("primary_logo") or str(school.get("branding_status", "")).lower() in {"approved", "manual"}:
-            status = "preserved"
-        else:
-            status = "ready"
-        results.append({**candidate, "status": status, "school_id": school.get("id", "") if school else ""})
-    return jsonify({
-        "found": len(results),
-        "ready": sum(1 for r in results if r["status"] == "ready"),
-        "preserved": sum(1 for r in results if r["status"] == "preserved"),
-        "school_missing": sum(1 for r in results if r["status"] == "school_missing"),
-        "schools": results,
-        "source": manifest.get("source", {}),
-    })
+    result = get_association_supplement_service().analyze_branding(
+        manifest.get("schools", []),
+        source=manifest.get("source", {}),
+    )
+    if not result.ok:
+        return jsonify({"error": result.code}), 400
+    return jsonify(result.data)
+
 
 @app.post("/api/imports/mhsaa/5A/branding")
 @require_auth
 def import_mhsaa_5a_branding():
     manifest = load_json(MHSAA_5A_BRANDING_FILE, {"schools": []})
-    schools = load_schools()
-    updated = 0
-    preserved = 0
-    missing = []
-    for candidate in manifest.get("schools", []):
-        school = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        if not school:
-            missing.append(candidate.get("official_name", ""))
-            continue
-        # Existing processed logos/colors are considered user-reviewed and are never overwritten.
-        if school.get("primary_logo") or str(school.get("branding_status", "")).lower() in {"approved", "manual"}:
-            preserved += 1
-            continue
-        school["primary_color"] = candidate.get("primary_color", school.get("primary_color", "#808080"))
-        school["secondary_color"] = candidate.get("secondary_color", school.get("secondary_color", "#FFFFFF"))
-        school["accent_color"] = candidate.get("accent_color", "")
-        school["branding_status"] = "candidate"
-        school["branding_source"] = {
-            "provider": candidate.get("source_provider", "CSRN research seed"),
-            "source_url": candidate.get("source_url", ""),
-            "checked_at": manifest.get("source", {}).get("checked_at", ""),
-            "verification_status": "candidate",
-            "notes": candidate.get("notes", "Candidate colors require visual approval."),
-        }
-        updated += 1
-    save_schools(schools)
-    return jsonify({"updated": updated, "preserved": preserved, "missing_schools": missing})
+    result = get_association_supplement_service().apply_branding(
+        manifest.get("schools", []),
+        source=manifest.get("source", {}),
+    )
+    if not result.ok:
+        return jsonify({"error": result.code}), 400
+    return jsonify(result.data)
+
 
 @app.get("/api/imports/mhsaa/5A/enrichment/analyze")
 @require_auth
 def analyze_mhsaa_5a_enrichment():
     manifest = load_json(MHSAA_5A_ENRICHMENT_FILE, {"schools": []})
-    schools = load_schools()
-    results = []
-    for candidate in manifest.get("schools", []):
-        school = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        missing = []
-        if not school:
-            status = "school_missing"
-        else:
-            status = "ready"
-            for key in ("mascot", "phone", "website"):
-                if not candidate.get(key): missing.append(key)
-            address = candidate.get("school_address", {})
-            if not address.get("address1"): missing.append("school_address")
-        results.append({"official_name": candidate.get("official_name"), "status": status, "missing_source_fields": missing})
-    return jsonify({
-        "classification": "5A", "found": len(results),
-        "ready": sum(1 for r in results if r["status"] == "ready"),
-        "school_missing": sum(1 for r in results if r["status"] == "school_missing"),
-        "source": manifest.get("source", {}), "schools": results
-    })
+    result = get_association_supplement_service().analyze_enrichment(
+        manifest.get("schools", []),
+        source=manifest.get("source", {}),
+        classification=str(manifest.get("classification", "5A")),
+    )
+    if not result.ok:
+        return jsonify({"error": result.code}), 400
+    return jsonify(result.data)
+
 
 @app.post("/api/imports/mhsaa/5A/enrichment")
 @require_auth
 def enrich_mhsaa_5a():
     manifest = load_json(MHSAA_5A_ENRICHMENT_FILE, {"schools": []})
-    schools = load_schools(); venues = load_venues(); logos = load_logos()
-    updated = 0; missing_schools = []; missing_mascot = 0; missing_address = 0; missing_website = 0; venue_verification_needed = 0; logo_pending = 0
-    for candidate in manifest.get("schools", []):
-        school = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        if not school:
-            missing_schools.append(candidate.get("official_name", "")); continue
-        overrides = school.get("user_overrides") or {}
-        mascot = candidate.get("mascot", "")
-        if mascot and not overrides.get("mascot"):
-            school["mascot"] = mascot; school["nickname"] = school.get("nickname") or mascot
-        elif not mascot: missing_mascot += 1
-        address = candidate.get("school_address", {})
-        if address.get("address1"):
-            school["school_address"] = address
-            school["city"] = school.get("city") or address.get("city", "")
-        else: missing_address += 1
-        if candidate.get("phone") and not overrides.get("phone"): school["phone"] = candidate.get("phone")
-        if candidate.get("website") and not overrides.get("website"):
-            school["website"] = candidate.get("website")
-            school.setdefault("general_social", {})["website"] = school.get("general_social", {}).get("website") or candidate.get("website")
-        elif not candidate.get("website"): missing_website += 1
-        school.setdefault("source_data", {}).update({"provider":"MHSAA School Directory","directory_source_url":candidate.get("source_url", ""),"directory_checked_at":manifest.get("source", {}).get("checked_at", "")})
-        school["verification_status"] = "candidate_enriched"
-        school.setdefault("logo_metadata", {}).update({"source_url":candidate.get("source_url", ""),"approval_status":"candidate","shape_standard":"round","master_canvas":"1024x1024-round","scorebug_derivative":"256x256-round"})
-        school["logo_status"] = school.get("logo_status") or "candidate"
-        logo_pending += 1
-        venue_id = school.get("venue_id") or f"{school.get('id')}-football"
-        school["venue_id"] = venue_id
-        venue = next((v for v in venues if v.get("id") == venue_id or v.get("school_id") == school.get("id")), None)
-        venue_payload = {"id": venue_id, "school_id": school.get("id"), "csrn_school_id": school.get("csrn_id", ""), "sport":"Football", "name":f"{school.get('broadcast_name') or candidate.get('official_name')} Football Stadium", **address, "latitude":None, "longitude":None, "on_campus_assumed":True, "venue_address_source":"school_address", "venue_verified":False, "approval_status":"candidate", "broadcast_notes":"Defaulted to school address; verify whether the stadium is off campus."}
-        if venue: venue.update({k:v for k,v in venue_payload.items() if k not in ("broadcast_notes",) or not venue.get(k)})
-        else: venues.append(venue_payload)
-        school["venues"] = [venue_payload if v.get("id") == venue_id else v for v in school.get("venues", [])] or [venue_payload]
-        school.setdefault("programs", {}).setdefault("Football", {})["venue_id"] = venue_id
-        venue_verification_needed += 1; updated += 1
-    save_schools(schools); save_venues(venues); save_logos(logos)
-    return jsonify({"updated":updated,"missing_schools":missing_schools,"missing_mascot":missing_mascot,"missing_address":missing_address,"missing_website":missing_website,"logo_pending_approval":logo_pending,"venue_verification_needed":venue_verification_needed})
-
+    result = get_association_supplement_service().apply_enrichment(
+        manifest.get("schools", []),
+        source=manifest.get("source", {}),
+        venue_sport="Football",
+    )
+    if not result.ok:
+        return jsonify({"error": result.code}), 400
+    return jsonify(result.data)
 
 
 def _hex(rgb: tuple[int, int, int]) -> str:
