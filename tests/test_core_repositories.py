@@ -106,6 +106,44 @@ def test_configuration_migration_hook_advances_schema(tmp_path: Path) -> None:
     assert loaded["application"]["schema_version"] == "2"
     assert loaded["broadcast_defaults"]["visual_mode"] == "graphic"
 
+def test_configuration_runtime_identity_overrides_stale_saved_values(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "application": {
+                    "version": "stale-version",
+                    "build": "stale-build",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    repository = ConfigurationRepository(
+        engine(tmp_path),
+        path,
+        CONFIG_DEFAULTS,
+        runtime_identity={
+            "version": "current-version",
+            "build": "current-build",
+        },
+    )
+
+    loaded = repository.load()
+
+    assert loaded["application"]["version"] == "current-version"
+    assert loaded["application"]["build"] == "current-build"
+
+    repository.save(loaded)
+
+    persisted = json.loads(path.read_text(encoding="utf-8"))
+
+    assert persisted["application"]["version"] == "current-version"
+    assert persisted["application"]["build"] == "current-build"
+
 
 def test_corrupt_configuration_is_not_silently_replaced_without_backup(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
