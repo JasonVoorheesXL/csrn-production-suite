@@ -206,9 +206,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4a — Service Layer Foundation"
+    "Version 1.13.0-alpha.4b — Developer Workflow Automation"
 )
-RUNTIME_BUILD = "V1.13A4A-SERVICE-FOUNDATION"
+RUNTIME_BUILD = "V1.13A4B-DEVELOPER-WORKFLOW-AUTOMATION"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
