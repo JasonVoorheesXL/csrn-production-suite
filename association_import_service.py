@@ -93,12 +93,6 @@ class AssociationProfile:
         mapped_targets = {str(value).strip() for value in field_mapping.values()}
         if "official_name" not in mapped_targets:
             raise ValueError("OFFICIAL_NAME_MAPPING_REQUIRED")
-        if (
-            "broadcast_name" not in mapped_targets
-            and not str(defaults.get("broadcast_name", "")).strip()
-        ):
-            raise ValueError("BROADCAST_NAME_MAPPING_REQUIRED")
-
         invalid_targets = mapped_targets - IMPORTABLE_FIELDS
         if invalid_targets:
             raise ValueError("UNSUPPORTED_TARGET_FIELD")
