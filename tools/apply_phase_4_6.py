@@ -288,7 +288,7 @@ def main() -> None:
             source,
             "def sponsor_logo_assets() -> list[dict[str, Any]]:\n",
             "def clean_asset_record(",
-            SPONSOR_HELPERS + "def clean_asset_record(",
+            SPONSOR_HELPERS,
         )
 
     if "return jsonify(get_sponsor_service().list_payload())" not in source:
@@ -296,7 +296,7 @@ def main() -> None:
             source,
             '@app.get("/api/sponsors")\n',
             '@app.get("/sponsor-logos/<filename>")\n',
-            SPONSOR_ROUTES + '@app.get("/sponsor-logos/<filename>")\n',
+            SPONSOR_ROUTES,
         )
 
     APP_PATH.write_text(source, encoding="utf-8")
