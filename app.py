@@ -46,6 +46,7 @@ from obs_service import OBSService
 from configuration_service import ConfigurationService
 from state_service import StateService
 from diagnostics_service import DiagnosticsService
+from upgrade_service import UpgradeService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -2688,36 +2689,55 @@ def list_logos():
     return jsonify(result.data["logos"])
 
 
+UPGRADE_SERVICE: UpgradeService | None = None
+
+
+def activate_upgrade_secret_key(secret_key: str) -> None:
+    app.secret_key = secret_key
+
+
+def get_upgrade_service() -> UpgradeService:
+    global UPGRADE_SERVICE
+    if UPGRADE_SERVICE is None:
+        UPGRADE_SERVICE = UpgradeService(
+            current_dir=BASE_DIR,
+            defaults=DEFAULT_CONFIG,
+            inspect_candidate=inspect_candidate,
+            migrate=migrate,
+            load_security=load_security,
+            activate_secret_key=activate_upgrade_secret_key,
+            report_store=last_upgrade_report,
+            migration_lock=upgrade_lock,
+        )
+    return UPGRADE_SERVICE
+
+
 @app.get("/api/upgrade/candidate")
 def upgrade_candidate():
-    return jsonify(inspect_candidate(BASE_DIR))
+    result = get_upgrade_service().candidate()
+    if result.code == "INSPECTION_FAILED":
+        return jsonify(
+            {
+                "error": result.code,
+                "message": result.data.get("message", ""),
+            }
+        ), 500
+    return jsonify(result.data["candidate"])
+
 
 @app.get("/api/upgrade/status")
 def upgrade_status():
-    return jsonify(copy.deepcopy(last_upgrade_report))
+    result = get_upgrade_service().status()
+    return jsonify(result.data["report"])
+
 
 @app.post("/api/upgrade/migrate")
 def run_upgrade_migration():
     incoming = request.get_json(silent=True) or {}
-    include_security = bool(incoming.get("include_security", True))
-    with upgrade_lock:
-        report = migrate(BASE_DIR, DEFAULT_CONFIG, include_security=include_security)
-        last_upgrade_report.clear()
-        last_upgrade_report.update(report)
-    if report.get("security_migrated"):
-        # Migration occurs before authentication, so the migrated session-signing
-        # key can be activated safely without restarting the server.
-        app.secret_key = load_security()["secret_key"]
-    report["active_pin"] = (
-        "PREVIOUS_PIN" if report.get("security_migrated")
-        else "CREATE_NEW_PIN"
+    result = get_upgrade_service().run(
+        incoming.get("include_security", True)
     )
-    report["pin_message"] = (
-        "Migration is complete. Unlock the Production Suite with the operator PIN from the previous build."
-        if report.get("security_migrated") else
-        "Migration is complete. Create a new 6-digit operator PIN on this screen."
-    )
-    return jsonify(report)
+    return jsonify(result.data["report"])
 
 
 @app.get("/api/obs/status")
