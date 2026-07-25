@@ -44,6 +44,7 @@ from graphics_service import GraphicsService
 from logo_service import LogoService
 from obs_service import OBSService
 from configuration_service import ConfigurationService
+from state_service import StateService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -1349,55 +1350,7 @@ def get_graphics_service() -> GraphicsService:
 
 
 def normalize_state(state: dict[str, Any]) -> dict[str, Any]:
-    merged = copy.deepcopy(DEFAULT_STATE)
-    merged.update(state or {})
-    if merged.get("broadcast_phase") not in {"pregame", "live", "halftime", "postgame", "final"}:
-        merged["broadcast_phase"] = "pregame"
-    if merged.get("possession") not in {"home", "visitor"}:
-        merged["possession"] = "home"
-    merged.setdefault("history", [])
-    merged.setdefault("events", [])
-    merged.setdefault("plays", [])
-    # Backward-compatible migration: Alpha.1 events become canonical play records.
-    if not merged["plays"] and merged["events"]:
-        migrated = []
-        for event in merged["events"]:
-            play_number = int(event.get("play_number", len(migrated) + 1) or len(migrated) + 1)
-            before = event.get("before") or {}
-            after = event.get("after") or {}
-            auto = event.get("automation") or {}
-            migrated.append({
-                "play_id": f"{merged.get('broadcast_id') or 'GAME'}-{play_number:04d}",
-                "play_number": play_number,
-                "event_id": event.get("id", ""),
-                "broadcast_id": event.get("broadcast_id", merged.get("broadcast_id", "")),
-                "quarter": str(event.get("quarter", after.get("quarter", merged.get("quarter", "1")))),
-                "clock": str(event.get("clock", "")),
-                "offense": event.get("team", before.get("possession", "")),
-                "defense": "visitor" if event.get("team") == "home" else "home" if event.get("team") == "visitor" else "",
-                "down": str(before.get("down", "")),
-                "distance": str(before.get("distance", "")),
-                "ball_spot": str(before.get("ball_spot", "")),
-                "play_type": auto.get("play_type") or event.get("event", "").lower(),
-                "result": event.get("description", ""),
-                "yards": auto.get("yards", ""),
-                "first_down": event.get("event") == "FIRST_DOWN",
-                "touchdown": event.get("event") == "TD" or bool(auto.get("return_td")),
-                "turnover": event.get("event") == "TURNOVER",
-                "safety": event.get("event") == "SAFETY",
-                "notes": "",
-                "created_by": event.get("source", "broadcaster"),
-                "created_at": event.get("created_at", 0),
-                "label": event.get("label", event.get("event", "Play")),
-                "undone": bool(event.get("undone", False)),
-            })
-        merged["plays"] = migrated
-    merged.setdefault("correction_log", [])
-    merged["next_play_number"] = max(1, int(merged.get("next_play_number", 1) or 1))
-    if merged.get("game_data_authority") not in {"broadcaster", "statistician"}:
-        merged["game_data_authority"] = "broadcaster"
-    merged["statistician_enabled"] = merged.get("game_data_authority") == "statistician"
-    return merged
+    return get_state_service().normalize(state)
 
 def load_json(path: Path, default: dict[str, Any]) -> dict[str, Any]:
     if not path.exists():
@@ -1412,109 +1365,58 @@ def load_json(path: Path, default: dict[str, Any]) -> dict[str, Any]:
 def save_json(path: Path, data: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-def load_state() -> dict[str, Any]:
-    state = normalize_state(STATE_REPOSITORY.load())
-    if state.get("clock_running"):
-        started = int(state.get("clock_started_at", 0) or 0)
-        now = int(time.time())
-        if started:
-            elapsed = max(0, now - started)
-            if elapsed:
-                state["clock_seconds"] = max(0, int(state.get("clock_seconds", 0) or 0) - elapsed)
-                state["clock_started_at"] = now
-                if state["clock_seconds"] <= 0:
-                    state["clock_running"] = False
-                    state["clock_started_at"] = 0
-                STATE_REPOSITORY.replace(normalize_state(state))
-        else:
-            state["clock_started_at"] = now
-            STATE_REPOSITORY.replace(normalize_state(state))
-    return state
+STATE_SERVICE: StateService | None = None
 
-def save_state(state: dict[str, Any]) -> None:
-    normalized = normalize_state(state)
-    STATE_REPOSITORY.replace(normalized)
+
+def persist_linked_state_snapshot(normalized: dict[str, Any]) -> None:
     broadcast_id = str(normalized.get("broadcast_id", "")).strip()
     if not broadcast_id:
         return
     items = load_broadcasts()
-    item = next((row for row in items if row.get("broadcast_id") == broadcast_id), None)
+    item = next(
+        (row for row in items if row.get("broadcast_id") == broadcast_id),
+        None,
+    )
     if not item:
         return
     snapshot = copy.deepcopy(normalized)
     snapshot["history"] = []
     item["live_state"] = snapshot
-    item["status"] = normalized.get("status", item.get("status", "planned"))
+    item["status"] = normalized.get(
+        "status",
+        item.get("status", "planned"),
+    )
     item["updated_at"] = int(time.time())
     save_broadcasts(items)
     detail = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
     detail.write_text(json.dumps(item, indent=2), encoding="utf-8")
 
-def public_state(state: dict[str, Any]) -> dict[str, Any]:
-    """Return overlay-safe state. Logo values are application-relative HTTP paths."""
-    result = copy.deepcopy(state)
-    for key in ("home_identity", "visitor_identity"):
-        identity = result.get(key)
-        if isinstance(identity, dict):
-            logo = str(identity.get("logo", "") or "")
-            # Never expose local filesystem paths; retain only application URLs.
-            if logo and not (logo.startswith("/") or logo.startswith("data:image/svg+xml") or logo.startswith("http://") or logo.startswith("https://")):
-                identity["logo"] = ""
-    personnel = result.get("personnel_graphic")
-    if isinstance(personnel, dict):
-        for field in ("headshot", "logo", "sponsor_logo"):
-            value = str(personnel.get(field, "") or "")
-            if value and not (value.startswith("/") or value.startswith("data:image/svg+xml") or value.startswith("http://") or value.startswith("https://")):
-                personnel[field] = ""
-    graphic = result.get("player_graphic")
-    if isinstance(graphic, dict):
-        for field in ("headshot", "team_logo", "sponsor_logo"):
-            value = str(graphic.get(field, "") or "")
-            if value and not (value.startswith("/") or value.startswith("data:image/svg+xml") or value.startswith("http://") or value.startswith("https://")):
-                graphic[field] = ""
-    # Alpha.3e: resolve roster names at display time so older jersey-only plays
-    # immediately benefit from the active game roster without rewriting history.
-    enriched_plays = []
-    for source_play in list(result.get("plays") or []):
-        play = copy.deepcopy(source_play)
-        offense = canonical_team_key(result, play.get("offense", ""))
-        defense = canonical_team_key(result, play.get("defense", ""))
-        play["offense_name"] = canonical_team_name(result, offense)
-        play["defense_name"] = canonical_team_name(result, defense)
-        role_specs = (
-            ("player", offense), ("passer", offense), ("receiver", offense),
-            ("kicker", offense), ("returner", defense), ("sacker", defense),
+
+def get_state_service() -> StateService:
+    global STATE_SERVICE
+    if STATE_SERVICE is None:
+        STATE_SERVICE = StateService(
+            load_raw=STATE_REPOSITORY.load,
+            replace_raw=STATE_REPOSITORY.replace,
+            default_state=lambda: copy.deepcopy(DEFAULT_STATE),
+            persist_linked_snapshot=persist_linked_state_snapshot,
+            resolve_player=resolve_game_roster_player,
+            canonical_team_key=canonical_team_key,
+            canonical_team_name=canonical_team_name,
         )
-        for role, team_key in role_specs:
-            number_key, name_key = f"{role}_number", f"{role}_name"
-            number = str(play.get(number_key, "") or "").strip()
-            if number and not str(play.get(name_key, "") or "").strip():
-                resolved = resolve_game_roster_player(result, team_key, number)
-                if resolved.get("name"):
-                    play[name_key] = resolved["name"]
-        # Rebuild legacy jersey-only results for the common offensive play types.
-        kind = str(play.get("play_type", "") or "").lower()
-        yards = play.get("yards", "")
-        if kind == "run" and play.get("player_number") and play.get("player_name"):
-            suffix = "kneel" if play.get("kneel") else "run"
-            play["result"] = f"#{play['player_number']} {play['player_name']} {suffix} for {yards} yards"
-            if play.get("touchdown"):
-                play["result"] += ", touchdown"
-            elif play.get("first_down"):
-                play["result"] += ", first down"
-        elif kind == "pass":
-            outcome = str(play.get("pass_outcome", "complete") or "complete").lower()
-            passer = f"#{play.get('passer_number','')} {play.get('passer_name','')}".strip()
-            receiver = f"#{play.get('receiver_number','')} {play.get('receiver_name','')}".strip()
-            if outcome == "complete" and receiver:
-                play["result"] = f"{passer} complete to {receiver} for {yards} yards".strip()
-                if play.get("touchdown"):
-                    play["result"] += ", touchdown"
-            elif outcome == "incomplete":
-                play["result"] = f"{passer} pass incomplete".strip()
-        enriched_plays.append(play)
-    result["plays"] = enriched_plays
-    return result
+    return STATE_SERVICE
+
+
+def load_state() -> dict[str, Any]:
+    return get_state_service().load().data["state"]
+
+
+def save_state(state: dict[str, Any]) -> None:
+    get_state_service().save(state)
+
+
+def public_state(state: dict[str, Any]) -> dict[str, Any]:
+    return get_state_service().public(state).data["state"]
 
 def load_security() -> dict[str, Any]:
     return SECURITY_SERVICE.ensure_secret_key(
@@ -1551,18 +1453,18 @@ def require_auth(func: Callable):
     return wrapper
 
 def push_history(state: dict[str, Any]) -> None:
-    snapshot = {k: copy.deepcopy(v) for k, v in state.items() if k != "history"}
-    state.setdefault("history", []).append(snapshot)
-    state["history"] = state["history"][-50:]
+    StateService.push_history(state)
 
-def apply_change(changes: dict[str, Any], save_undo: bool = True) -> dict[str, Any]:
+
+def apply_change(
+    changes: dict[str, Any],
+    save_undo: bool = True,
+) -> dict[str, Any]:
     with lock:
-        state = load_state()
-        if save_undo:
-            push_history(state)
-        state.update(changes)
-        save_state(state)
-        return state
+        return get_state_service().apply_change(
+            changes,
+            save_undo=save_undo,
+        ).data["state"]
 
 def load_obs_status() -> dict[str, Any]:
     with obs_status_lock:
