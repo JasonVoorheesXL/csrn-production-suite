@@ -40,6 +40,7 @@ from venue_service import VenueService
 from broadcast_service import BroadcastService
 from personnel_service import PersonnelService
 from asset_service import AssetService
+from graphics_service import GraphicsService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -225,9 +226,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4j — Asset Service"
+    "Version 1.13.0-alpha.4k — Graphics Service"
 )
-RUNTIME_BUILD = "V1.13A4J-ASSET-SERVICE"
+RUNTIME_BUILD = "V1.13A4K-GRAPHICS-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -1326,6 +1327,25 @@ def get_personnel_service() -> PersonnelService:
         )
 
     return PERSONNEL_SERVICE
+
+
+GRAPHICS_SERVICE: GraphicsService | None = None
+
+
+def get_graphics_service() -> GraphicsService:
+    global GRAPHICS_SERVICE
+
+    if GRAPHICS_SERVICE is None:
+        GRAPHICS_SERVICE = GraphicsService(
+            default_state=lambda: copy.deepcopy(DEFAULT_STATE),
+            load_rosters=load_rosters,
+            load_schools=load_schools,
+            load_personnel=load_broadcasters,
+            build_identity=broadcast_identity,
+            apply_sponsor=apply_sponsor_to_graphic,
+        )
+
+    return GRAPHICS_SERVICE
 
 
 def normalize_state(state: dict[str, Any]) -> dict[str, Any]:
@@ -3186,147 +3206,54 @@ def upload_player_headshot(roster_id: str, player_id: str):
 
 
 def activate_primary_graphic(state: dict[str, Any], active: str) -> None:
-    """Only one primary identification graphic may be visible at a time."""
-    mapping = {"lower_third": "lower_third", "player": "player_graphic", "personnel": "personnel_graphic"}
-    for channel, key in mapping.items():
-        if channel != active:
-            item = dict(state.get(key) or {})
-            item["visible"] = False; item["expires_at"] = 0
-            state[key] = item
-    state["primary_graphic_channel"] = active
+    """Keep the legacy mutating helper while delegating graphic rules."""
+    updated = get_graphics_service().activate_primary(state, active)
+    state.clear()
+    state.update(updated)
+
 
 @app.post("/api/graphics/lower-third")
 @require_auth
 def update_lower_third():
     data = request.get_json(force=True) or {}
-    action = str(data.get("action", "update")).lower()
     with lock:
-        state = load_state()
-        current = dict(state.get("lower_third") or {})
-        defaults = copy.deepcopy(DEFAULT_STATE["lower_third"])
-        defaults.update(current)
-        if action == "clear":
-            lower = copy.deepcopy(DEFAULT_STATE["lower_third"])
-        else:
-            lower = defaults
-            for key in ("eyebrow", "headline", "secondary", "footer", "logo_source", "accent_source", "custom_accent"):
-                if key in data:
-                    lower[key] = str(data.get(key, ""))[:180]
-            try:
-                lower["duration"] = max(0, min(120, int(data.get("duration", lower.get("duration", 0)) or 0)))
-            except (TypeError, ValueError):
-                lower["duration"] = 0
-            if action == "hide":
-                lower["visible"] = False
-                lower["expires_at"] = 0
-            elif action in {"show", "update"}:
-                activate_primary_graphic(state, "lower_third")
-                lower["visible"] = bool(data.get("visible", action == "show"))
-                if lower["visible"] and lower["duration"] > 0:
-                    lower["expires_at"] = int(time.time()) + lower["duration"]
-                elif lower["visible"]:
-                    lower["expires_at"] = 0
-            lower["updated_at"] = int(time.time())
-        state["lower_third"] = lower
+        result = get_graphics_service().update_lower_third(load_state(), data)
+        state = result.data["state"]
         save_state(state)
     return jsonify(public_state(state))
+
 
 @app.post("/api/graphics/player")
 @require_auth
 def update_player_graphic():
     data = request.get_json(force=True) or {}
-    action = str(data.get("action", "update")).lower()
     with lock:
-        state = load_state()
-        current = dict(state.get("player_graphic") or {})
-        defaults = copy.deepcopy(DEFAULT_STATE["player_graphic"])
-        defaults.update(current)
-        if action == "clear":
-            graphic = copy.deepcopy(DEFAULT_STATE["player_graphic"])
-        else:
-            graphic = defaults
-            for key in ("graphic_type", "roster_id", "player_id", "eyebrow"):
-                if key in data:
-                    graphic[key] = str(data.get(key, ""))[:240]
-            sponsor_warning = apply_sponsor_to_graphic(graphic, data)
-            roster_id = str(data.get("roster_id", graphic.get("roster_id", ""))).strip()
-            player_id = str(data.get("player_id", graphic.get("player_id", ""))).strip()
-            roster = next((r for r in load_rosters() if str(r.get("id")) == roster_id), None)
-            player = next((p for p in (roster or {}).get("players", []) if str(p.get("id")) == player_id), None)
-            if roster and player:
-                school = next((sc for sc in load_schools() if str(sc.get("id")) == str(roster.get("school_id"))), {})
-                full_name = " ".join([str(player.get("first_name", "")).strip(), str(player.get("last_name", "")).strip()]).strip()
-                display_name = str(player.get("preferred_name", "")).strip() or full_name
-                identity = broadcast_identity(school, str(roster.get("sport", "Football"))) if school else {}
-                graphic.update({
-                    "school_id": roster.get("school_id", ""),
-                    "full_name": full_name,
-                    "display_name": display_name,
-                    "number": str(player.get("number", "")),
-                    "position": str(player.get("position", "")),
-                    "secondary_position": str(player.get("secondary_position", "")),
-                    "grade": str(player.get("grade", "")),
-                    "height": str(player.get("height", "")),
-                    "weight": str(player.get("weight", "")),
-                    "headshot": str(player.get("headshot", "")),
-                    "team_logo": str(identity.get("logo", "")),
-                    "team_name": str(school.get("broadcast_name") or school.get("official_name") or roster.get("school_id", "")),
-                    "team_color": str(identity.get("primary_color") or school.get("primary_color") or "#C9203B"),
-                })
-            try:
-                graphic["duration"] = max(0, min(120, int(data.get("duration", graphic.get("duration", 0)) or 0)))
-            except (TypeError, ValueError):
-                graphic["duration"] = 0
-            if action == "hide":
-                graphic["visible"] = False
-                graphic["expires_at"] = 0
-            elif action in {"show", "update"}:
-                if not graphic.get("player_id"):
-                    return jsonify({"error": "PLAYER_REQUIRED"}), 400
-                activate_primary_graphic(state, "player")
-                graphic["visible"] = bool(data.get("visible", action == "show"))
-                if graphic["visible"] and graphic["duration"] > 0:
-                    graphic["expires_at"] = int(time.time()) + graphic["duration"]
-                elif graphic["visible"]:
-                    graphic["expires_at"] = 0
-            graphic["updated_at"] = int(time.time())
-        state["player_graphic"] = graphic
+        result = get_graphics_service().update_player(load_state(), data)
+        if result.code == "PLAYER_REQUIRED":
+            return jsonify({"error": result.code}), 400
+        state = result.data["state"]
         save_state(state)
     response = public_state(state)
-    if locals().get("sponsor_warning"):
-        response["sponsor_warning"] = sponsor_warning
+    warning = str(result.data.get("sponsor_warning", ""))
+    if warning:
+        response["sponsor_warning"] = warning
     return jsonify(response)
+
 
 @app.post("/api/graphics/personnel")
 @require_auth
 def update_personnel_graphic():
-    data=request.get_json(force=True) or {}
-    action=str(data.get("action","update")).lower()
+    data = request.get_json(force=True) or {}
     with lock:
-        state=load_state(); graphic=copy.deepcopy(DEFAULT_STATE["personnel_graphic"]); graphic.update(state.get("personnel_graphic") or {})
-        if action=="clear": graphic=copy.deepcopy(DEFAULT_STATE["personnel_graphic"])
-        else:
-            pid=str(data.get("personnel_id",graphic.get("personnel_id",""))).strip(); person=next((x for x in load_broadcasters() if str(x.get("id"))==pid),None)
-            if person:
-                school=next((x for x in load_schools() if str(x.get("id"))==str(person.get("school_id",""))),{})
-                identity=broadcast_identity(school,"Football") if school else {}
-                full=str(person.get("full_name") or person.get("name") or "").strip(); preferred=str(person.get("preferred_name","")).strip() or full
-                graphic.update({"personnel_id":pid,"full_name":full,"display_name":preferred,"title":str(person.get("title") or person.get("role") or ""),"role":str(person.get("role", "")),"organization":str(person.get("organization") or school.get("broadcast_name") or school.get("official_name") or ""),"headshot":str(person.get("headshot","")),"logo":str(identity.get("logo") or "/static/csrn-logo.png"),"accent":str(identity.get("primary_color") or "#C9203B")})
-            for key in ("graphic_type","eyebrow"):
-                if key in data: graphic[key]=str(data.get(key,""))[:240]
-            sponsor_warning=apply_sponsor_to_graphic(graphic,data)
-            try: graphic["duration"]=max(0,min(120,int(data.get("duration",graphic.get("duration",0)) or 0)))
-            except: graphic["duration"]=0
-            if action=="hide": graphic["visible"]=False; graphic["expires_at"]=0
-            elif action in {"show","update"}:
-                if not graphic.get("personnel_id"): return jsonify({"error":"PERSONNEL_REQUIRED"}),400
-                activate_primary_graphic(state, "personnel")
-                graphic["visible"]=True
-                graphic["expires_at"]=int(time.time())+graphic["duration"] if graphic["duration"] else 0
-            graphic["updated_at"]=int(time.time())
-        state["personnel_graphic"]=graphic; save_state(state)
-    response=public_state(state)
-    if locals().get("sponsor_warning"): response["sponsor_warning"]=sponsor_warning
+        result = get_graphics_service().update_personnel(load_state(), data)
+        if result.code == "PERSONNEL_REQUIRED":
+            return jsonify({"error": result.code}), 400
+        state = result.data["state"]
+        save_state(state)
+    response = public_state(state)
+    warning = str(result.data.get("sponsor_warning", ""))
+    if warning:
+        response["sponsor_warning"] = warning
     return jsonify(response)
 
 
@@ -3336,28 +3263,15 @@ def automation_player(roster_id: str, player_id: str):
     return roster, player
 
 def player_display(player):
-    if not player:
-        return ""
-    full = " ".join([str(player.get("first_name", "")).strip(), str(player.get("last_name", "")).strip()]).strip()
-    return str(player.get("preferred_name", "")).strip() or full
+    return GraphicsService.player_display(player)
 
 
 def normalize_position(value):
-    value = str(value or "").strip()
-    if value.lower() == "athlete":
-        return "ATH"
-    return value or "ATH"
+    return GraphicsService.normalize_position(value)
 
 
 def event_position(player, defensive=False):
-    if not player:
-        return "ATH"
-    primary = normalize_position(player.get("position"))
-    secondary = normalize_position(player.get("secondary_position")) if player.get("secondary_position") else ""
-    value = (secondary or primary) if defensive else (primary or secondary)
-    if "/" in value:
-        value = value.split("/", 1)[0].strip()
-    return value or "ATH"
+    return GraphicsService.event_position(player, defensive=defensive)
 
 
 def manual_automation_player(data, team_name):
@@ -3381,28 +3295,28 @@ def manual_automation_player(data, team_name):
         "manual": True,
     }
 
-def show_automation_player_graphic(state, roster, player, graphic_type, duration, defensive=False, eyebrow="", play_detail=""):
-    if not roster or not player or duration <= 0:
-        return
-    school = next((sc for sc in load_schools() if str(sc.get("id")) == str(roster.get("school_id"))), {})
-    identity = broadcast_identity(school, str(roster.get("sport", "Football"))) if school else {}
-    full_name = " ".join([str(player.get("first_name", "")).strip(), str(player.get("last_name", "")).strip()]).strip()
-    graphic = copy.deepcopy(DEFAULT_STATE["player_graphic"])
-    graphic.update({
-        "visible": True, "graphic_type": graphic_type, "eyebrow": eyebrow or ("TOUCHDOWN" if graphic_type == "touchdown" else "PLAYER PROFILE"),
-        "roster_id": str(roster.get("id", "")), "player_id": str(player.get("id", "")), "school_id": str(roster.get("school_id", "")),
-        "full_name": full_name, "display_name": player_display(player), "number": str(player.get("number", "")),
-        "position": event_position(player, defensive=defensive), "secondary_position": "",
-        "grade": str(player.get("grade", "")), "height": str(player.get("height", "")), "weight": str(player.get("weight", "")),
-        "headshot": str(player.get("headshot", "")), "team_logo": str(identity.get("logo", "")),
-        "team_name": str(school.get("broadcast_name") or school.get("official_name") or ""),
-        "team_color": str(identity.get("primary_color") or school.get("primary_color") or "#C9203B"),
-        "play_detail": str(play_detail or ""),
-        "duration": duration, "expires_at": int(time.time()) + duration, "updated_at": int(time.time()),
-    })
-    activate_primary_graphic(state, "player")
-    state["player_graphic"] = graphic
-
+def show_automation_player_graphic(
+    state,
+    roster,
+    player,
+    graphic_type,
+    duration,
+    defensive=False,
+    eyebrow="",
+    play_detail="",
+):
+    result = get_graphics_service().show_automation_player(
+        state,
+        roster,
+        player,
+        graphic_type,
+        duration,
+        defensive=defensive,
+        eyebrow=eyebrow,
+        play_detail=play_detail,
+    )
+    state.clear()
+    state.update(result.data["state"])
 
 
 def canonical_team_key(state: dict[str, Any], value: Any) -> str:
