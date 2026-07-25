@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import runpy
+import sys
 from pathlib import Path
 
 
@@ -12,6 +13,9 @@ def main() -> None:
     if not PHASE_PREPARATION.exists():
         print("No optional CI phase preparation is present.")
         return
+    root_text = str(ROOT)
+    if root_text not in sys.path:
+        sys.path.insert(0, root_text)
     print(f"Applying optional CI preparation: {PHASE_PREPARATION.name}")
     runpy.run_path(str(PHASE_PREPARATION), run_name="__main__")
 
