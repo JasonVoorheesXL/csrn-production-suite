@@ -36,6 +36,7 @@ from broadcast_package_service import BroadcastPackageService
 from school_service import SchoolService
 from roster_service import RosterService
 from sponsor_service import SponsorService
+from venue_service import VenueService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -575,6 +576,23 @@ def save_venues(items: list[dict[str, Any]]) -> None:
     VENUE_REPOSITORY.save(items)
 
 
+VENUE_SERVICE: VenueService | None = None
+
+
+def get_venue_service() -> VenueService:
+    global VENUE_SERVICE
+
+    if VENUE_SERVICE is None:
+        VENUE_SERVICE = VenueService(
+            load_venues=load_venues,
+            save_venues=save_venues,
+            load_schools=load_schools,
+            load_broadcasts=load_broadcasts,
+        )
+
+    return VENUE_SERVICE
+
+
 ASSOCIATION_IMPORT_SERVICE: AssociationImportService | None = None
 
 
@@ -1018,16 +1036,12 @@ def next_broadcast_id(sport: str, season: str, classification: str, week: Any) -
     number=max(used, default=0)+1
     return f"{prefix}{number:03d}"
 
-def venue_for_school(school: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not school:
-        return None
-    venue_id = str(school.get("venue_id", ""))
-    venues=load_venues()
-    if venue_id:
-        found=next((v for v in venues if str(v.get("id")) == venue_id), None)
-        if found: return found
-    school_id=str(school.get("id", ""))
-    return next((v for v in venues if str(v.get("school_id", "")) == school_id), None)
+def venue_for_school(
+    school: dict[str, Any] | None,
+    sport: str = "",
+) -> dict[str, Any] | None:
+    return get_venue_service().for_school(school, sport)
+
 
 def school_duplicate_candidates(incoming: dict[str, Any], exclude_id: str = "") -> list[dict[str, Any]]:
     official = str(incoming.get("official_name", "")).strip().casefold()
@@ -2585,7 +2599,75 @@ def process_school_logo(school_id: str):
 @app.get("/api/venues")
 @require_auth
 def list_venues():
-    return jsonify(load_venues())
+    include_inactive = str(
+        request.args.get("include_inactive", "true")
+    ).strip().lower() not in {"0", "false", "no", "off"}
+    result = get_venue_service().list_venues(
+        school_id=str(request.args.get("school_id", "")),
+        sport=str(request.args.get("sport", "")),
+        include_inactive=include_inactive,
+    )
+    return jsonify(result.data["venues"])
+
+
+@app.get("/api/venues/<venue_id>")
+@require_auth
+def read_venue(venue_id: str):
+    result = get_venue_service().read(venue_id)
+    if result.code == "VENUE_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    return jsonify(result.data["venue"])
+
+
+@app.post("/api/venues")
+@require_auth
+def create_venue():
+    result = get_venue_service().create(
+        request.get_json(silent=True) or {}
+    )
+    if result.code == "VENUE_NAME_REQUIRED":
+        return jsonify({"error": result.code}), 400
+    if result.code == "DUPLICATE_VENUE":
+        return jsonify(
+            {
+                "error": result.code,
+                "duplicate_venue": result.data["duplicate_venue"],
+            }
+        ), 409
+    return jsonify(result.data["venue"]), 201
+
+
+@app.put("/api/venues/<venue_id>")
+@require_auth
+def update_venue(venue_id: str):
+    result = get_venue_service().update(
+        venue_id,
+        request.get_json(silent=True) or {},
+    )
+    if result.code == "VENUE_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    if result.code == "VENUE_NAME_REQUIRED":
+        return jsonify({"error": result.code}), 400
+    if result.code == "DUPLICATE_VENUE":
+        return jsonify(
+            {
+                "error": result.code,
+                "duplicate_venue": result.data["duplicate_venue"],
+            }
+        ), 409
+    return jsonify(result.data["venue"])
+
+
+@app.delete("/api/venues/<venue_id>")
+@require_auth
+def delete_venue(venue_id: str):
+    result = get_venue_service().delete(venue_id)
+    if result.code == "VENUE_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    if result.code == "VENUE_IN_USE":
+        return jsonify({"error": result.code, **result.data}), 409
+    return jsonify(result.data)
+
 
 @app.get("/api/logos")
 @require_auth
@@ -2741,16 +2823,8 @@ def update_linked_broadcast_status(broadcast_id: str, status: str, extra: dict[s
     path.write_text(json.dumps(item, indent=2), encoding="utf-8")
 
 def migrate_venue_names() -> None:
-    venues=load_venues(); changed=False
-    for venue in venues:
-        name=str(venue.get("name", ""))
-        if name.endswith(" Football Venue"):
-            school=name[:-len(" Football Venue")].strip()
-            venue["name"]=f"{school} HS Football Field"; changed=True
-        elif name.endswith(" Football Stadium"):
-            school=name[:-len(" Football Stadium")].strip()
-            venue["name"]=f"{school} HS Football Field"; changed=True
-    if changed: save_venues(venues)
+    get_venue_service().migrate_legacy_names()
+
 
 def readiness_payload() -> dict[str, Any]:
     state=load_state(); cfg=load_config(); obs=copy.deepcopy(last_obs_status); checks=[]
@@ -2893,7 +2967,7 @@ def create_broadcast():
     classification = str(data.get("classification") or (home_school or {}).get("classification") or (visitor_school or {}).get("classification") or "Open").strip()
     season = str(data.get("season") or time.strftime("%Y")).strip()
     week = str(data.get("week") or "1").strip()
-    venue = venue_for_school(home_school)
+    venue = venue_for_school(home_school, sport)
     venue_name = str(data.get("venue") or (venue or {}).get("name") or defaults.get("venue", "Caledonia High School")).strip()
     venue_id = str((venue or {}).get("id", ""))
     broadcast_id = next_broadcast_id(sport, season, classification, week)
