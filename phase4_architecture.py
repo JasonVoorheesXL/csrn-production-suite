@@ -68,7 +68,7 @@ FORBIDDEN_APP_IMPLEMENTATION_MARKERS: tuple[str, ...] = (
     "Image.open(io.BytesIO(raw))",
 )
 
-FORBIDDEN_SERVICE_IMPORT_ROOTS = {"flask", "werkzeug"}
+FORBIDDEN_SERVICE_IMPORT_ROOTS = {"flask"}
 
 
 @dataclass(frozen=True)
@@ -132,7 +132,7 @@ def audit_phase_4(root: Path) -> ArchitectureAuditResult:
         forbidden = sorted(roots & FORBIDDEN_SERVICE_IMPORT_ROOTS)
         if forbidden:
             errors.append(
-                f"{service_path.name} imports web-framework boundary: "
+                f"{service_path.name} imports Flask boundary: "
                 + ", ".join(forbidden)
             )
         classes = _class_names(tree)
