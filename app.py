@@ -35,6 +35,7 @@ from security_service import SecurityService
 from broadcast_package_service import BroadcastPackageService
 from school_service import SchoolService
 from roster_service import RosterService
+from sponsor_service import SponsorService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -220,9 +221,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4e — Roster Service"
+    "Version 1.13.0-alpha.4f — Sponsor Service"
 )
-RUNTIME_BUILD = "V1.13A4E-ROSTER-SERVICE"
+RUNTIME_BUILD = "V1.13A4F-SPONSOR-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -673,20 +674,6 @@ def asset_file_hash(path: Path) -> str:
             digest.update(chunk)
     return digest.hexdigest()
 
-def sponsor_logo_assets() -> list[dict[str, Any]]:
-    return [item for item in load_assets() if item.get("active", True) and item.get("category") == "Sponsor" and item.get("asset_type") == "Logo"]
-
-def sponsor_contract_state(record: dict[str, Any]) -> str:
-    """Return the effective sponsor status without destroying the operator's stored intent."""
-    end = str(record.get("contract_end", "")).strip()
-    if end:
-        try:
-            if date.fromisoformat(end[:10]) < date.today():
-                return "Expired"
-        except ValueError:
-            pass
-    return str(record.get("status", "Prospect"))
-
 SPONSOR_REPOSITORY = SponsorRepository(
     CORE_PERSISTENCE,
     SPONSORS_FILE,
@@ -695,84 +682,57 @@ SPONSOR_REPOSITORY = SponsorRepository(
 
 def load_sponsors() -> list[dict[str, Any]]:
     ensure_data_architecture()
-    items = SPONSOR_REPOSITORY.load()
-
-    for item in items:
-        item["effective_status"] = sponsor_contract_state(item)
-        item["contract_expired"] = item["effective_status"] == "Expired"
-
-    return items
+    return SPONSOR_REPOSITORY.load()
 
 
 def save_sponsors(items: list[dict[str, Any]]) -> None:
     ensure_data_architecture()
     SPONSOR_REPOSITORY.save(items)
-def clean_sponsor_record(data: dict[str, Any], sponsor_id: str | None = None) -> dict[str, Any]:
-    data = {k: v for k, v in data.items() if k not in {"effective_status", "contract_expired"}}
-    now = int(time.time())
-    lead_ins = data.get("lead_ins", [])
-    if isinstance(lead_ins, str):
-        lead_ins = [x.strip() for x in lead_ins.split(",") if x.strip()]
-    return {
-        "id": sponsor_id or str(data.get("id") or f"sponsor-{now}-{secrets.token_hex(3)}"),
-        "name": str(data.get("name", "")).strip()[:160],
-        "category": str(data.get("category", "Local Business"))[:80],
-        "status": str(data.get("status", "Prospect"))[:40],
-        "contact_name": str(data.get("contact_name", "")).strip()[:160],
-        "email": str(data.get("email", "")).strip()[:200],
-        "phone": str(data.get("phone", "")).strip()[:80],
-        "website": str(data.get("website", "")).strip()[:300],
-        "contract_start": str(data.get("contract_start", ""))[:20],
-        "contract_end": str(data.get("contract_end", ""))[:20],
-        "package": str(data.get("package", "General Sponsor"))[:120],
-        "lead_ins": lead_ins[:12],
-        "asset_id": str(data.get("asset_id", ""))[:120],
-        "logo_url": str(data.get("logo_url", ""))[:500],
-        "notes": str(data.get("notes", ""))[:3000],
-        "active": bool(data.get("active", True)),
-        "created_at": int(data.get("created_at", now) or now),
-        "updated_at": now,
-    }
+
+
+SPONSOR_SERVICE: SponsorService | None = None
+
+
+def get_sponsor_service() -> SponsorService:
+    global SPONSOR_SERVICE
+
+    if SPONSOR_SERVICE is None:
+        SPONSOR_SERVICE = SponsorService(
+            load_sponsors=load_sponsors,
+            save_sponsors=save_sponsors,
+            load_assets=load_assets,
+        )
+
+    return SPONSOR_SERVICE
+
+
+def sponsor_logo_assets() -> list[dict[str, Any]]:
+    return get_sponsor_service().logo_assets()
+
+
+def sponsor_contract_state(record: dict[str, Any]) -> str:
+    return get_sponsor_service().contract_state(record)
+
+
+def clean_sponsor_record(
+    data: dict[str, Any],
+    sponsor_id: str | None = None,
+) -> dict[str, Any]:
+    return get_sponsor_service().clean_record(data, sponsor_id)
 
 
 def active_sponsor_by_id(sponsor_id: str) -> dict[str, Any] | None:
-    """Return a sponsor only when it is active and its contract is currently valid."""
-    sponsor_id = str(sponsor_id or "").strip()
-    if not sponsor_id:
-        return None
-    sponsor = next((item for item in load_sponsors() if str(item.get("id")) == sponsor_id), None)
-    if not sponsor:
-        return None
-    if sponsor.get("active", True) is False or sponsor_contract_state(sponsor) != "Active":
-        return None
-    asset = asset_by_id(str(sponsor.get("asset_id", "")))
-    if asset and asset.get("active", True) and asset.get("file_url"):
-        sponsor = dict(sponsor)
-        sponsor["logo_url"] = asset.get("file_url", "")
-    return sponsor
+    return get_sponsor_service().active_sponsor_by_id(sponsor_id)
 
-def apply_sponsor_to_graphic(graphic: dict[str, Any], incoming: dict[str, Any]) -> str:
-    """Resolve a linked sponsor at render time and clear stale expired sponsor data."""
-    sponsor_id = str(incoming.get("sponsor_id", graphic.get("sponsor_id", "")) or "").strip()
-    graphic["sponsor_id"] = sponsor_id
-    if sponsor_id:
-        sponsor = active_sponsor_by_id(sponsor_id)
-        if not sponsor:
-            graphic["sponsor_id"] = ""
-            graphic["sponsor_name"] = ""
-            graphic["sponsor_logo"] = ""
-            graphic["sponsor_lead_in"] = ""
-            return "SPONSOR_EXPIRED_OR_INACTIVE"
-        graphic["sponsor_name"] = str(sponsor.get("name", ""))[:240]
-        graphic["sponsor_logo"] = str(sponsor.get("logo_url", ""))[:500]
-        lead_ins = sponsor.get("lead_ins", [])
-        graphic["sponsor_lead_in"] = str((lead_ins[0] if lead_ins else incoming.get("sponsor_lead_in") or "Presented by:"))[:120]
-        return ""
-    # Manual sponsorship remains available, but cannot silently retain a previously linked sponsor.
-    graphic["sponsor_name"] = str(incoming.get("sponsor_name", graphic.get("sponsor_name", "")) or "")[:240]
-    graphic["sponsor_logo"] = str(incoming.get("sponsor_logo", graphic.get("sponsor_logo", "")) or "")[:500]
-    graphic["sponsor_lead_in"] = str(incoming.get("sponsor_lead_in", graphic.get("sponsor_lead_in", "")) or "")[:120]
-    return ""
+
+def apply_sponsor_to_graphic(
+    graphic: dict[str, Any],
+    incoming: dict[str, Any],
+) -> str:
+    result = get_sponsor_service().apply_to_graphic(graphic, incoming)
+    graphic.clear()
+    graphic.update(result.data["graphic"])
+    return str(result.data.get("warning", ""))
 
 
 def clean_asset_record(incoming: dict[str, Any], existing_id: str = "") -> dict[str, Any]:
@@ -1586,52 +1546,54 @@ def load_package_route(package_id: str):
 @app.get("/api/sponsors")
 @require_auth
 def api_sponsors_list():
-    assets = {str(item.get("id")): item for item in load_assets()}
-    sponsors = load_sponsors()
-    for sponsor in sponsors:
-        linked = assets.get(str(sponsor.get("asset_id", "")))
-        if linked and linked.get("file_url"):
-            sponsor["logo_url"] = linked.get("file_url", "")
-            sponsor["asset_name"] = linked.get("name", "")
-    return jsonify({"sponsors": sponsors, "logo_assets": sponsor_logo_assets()})
+    return jsonify(get_sponsor_service().list_payload())
+
 
 @app.post("/api/sponsors")
 @require_auth
 def api_sponsors_create():
-    incoming = request.get_json(silent=True) or {}
-    record = clean_sponsor_record(incoming)
-    if not record["name"]:
+    result = get_sponsor_service().create(
+        request.get_json(silent=True) or {}
+    )
+    if result.code == "SPONSOR_NAME_REQUIRED":
         return jsonify({"error": "Sponsor name is required."}), 400
-    items = load_sponsors()
-    duplicate = next((x for x in items if str(x.get("name", "")).strip().casefold() == record["name"].casefold()), None)
-    if duplicate and not bool(incoming.get("confirm_duplicate", False)):
-        return jsonify({"error": "DUPLICATE_SPONSOR", "duplicate_sponsor": duplicate}), 409
-    items.append(record); save_sponsors(items)
-    return jsonify({"sponsor": record})
+    if result.code == "DUPLICATE_SPONSOR":
+        return jsonify(
+            {
+                "error": result.code,
+                "duplicate_sponsor": result.data["duplicate_sponsor"],
+            }
+        ), 409
+    return jsonify({"sponsor": result.data["sponsor"]})
+
 
 @app.put("/api/sponsors/<sponsor_id>")
 @require_auth
 def api_sponsors_update(sponsor_id: str):
-    incoming = request.get_json(silent=True) or {}
-    items = load_sponsors()
-    candidate_name = str(incoming.get("name", "")).strip()
-    duplicate = next((x for x in items if str(x.get("id")) != sponsor_id and candidate_name and str(x.get("name", "")).strip().casefold() == candidate_name.casefold()), None)
-    if duplicate and not bool(incoming.get("confirm_duplicate", False)):
-        return jsonify({"error": "DUPLICATE_SPONSOR", "duplicate_sponsor": duplicate}), 409
-    for index, item in enumerate(items):
-        if str(item.get("id")) == sponsor_id:
-            items[index] = clean_sponsor_record({**item, **incoming}, sponsor_id)
-            save_sponsors(items)
-            return jsonify({"sponsor": items[index]})
-    return jsonify({"error": "Sponsor not found."}), 404
+    result = get_sponsor_service().update(
+        sponsor_id,
+        request.get_json(silent=True) or {},
+    )
+    if result.code == "SPONSOR_NOT_FOUND":
+        return jsonify({"error": "Sponsor not found."}), 404
+    if result.code == "DUPLICATE_SPONSOR":
+        return jsonify(
+            {
+                "error": result.code,
+                "duplicate_sponsor": result.data["duplicate_sponsor"],
+            }
+        ), 409
+    return jsonify({"sponsor": result.data["sponsor"]})
+
 
 @app.delete("/api/sponsors/<sponsor_id>")
 @require_auth
 def api_sponsors_delete(sponsor_id: str):
-    items = load_sponsors(); remaining = [x for x in items if str(x.get("id")) != sponsor_id]
-    if len(remaining) == len(items):
+    result = get_sponsor_service().delete(sponsor_id)
+    if result.code == "SPONSOR_NOT_FOUND":
         return jsonify({"error": "Sponsor not found."}), 404
-    save_sponsors(remaining); return jsonify({"ok": True})
+    return jsonify({"ok": True})
+
 
 @app.post("/api/sponsors/<sponsor_id>/logo")
 @require_auth
@@ -1642,35 +1604,65 @@ def api_sponsor_logo(sponsor_id: str):
     suffix = Path(upload.filename).suffix.lower()
     if suffix not in {".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif"}:
         return jsonify({"error": "Unsupported logo type."}), 400
-    duplicate_action = str(request.form.get("duplicate_action", "prompt")).lower()
-    sponsors = load_sponsors()
-    sponsor = next((item for item in sponsors if str(item.get("id")) == sponsor_id), None)
+
+    duplicate_action = str(
+        request.form.get("duplicate_action", "prompt")
+    ).lower()
+    sponsor = next(
+        (
+            item
+            for item in load_sponsors()
+            if str(item.get("id")) == sponsor_id
+        ),
+        None,
+    )
     if not sponsor:
         return jsonify({"error": "Save the sponsor first."}), 404
+
     ASSET_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     temp = ASSET_UPLOAD_DIR / f".upload-{secrets.token_hex(8)}{suffix}"
     upload.save(temp)
     sha256 = asset_file_hash(temp)
     assets = load_assets()
-    existing = next((item for item in assets if item.get("sha256") == sha256 and item.get("active", True)), None)
+    existing = next(
+        (
+            item
+            for item in assets
+            if item.get("sha256") == sha256 and item.get("active", True)
+        ),
+        None,
+    )
+
     if existing and duplicate_action == "prompt":
         temp.unlink(missing_ok=True)
-        return jsonify({"error": "DUPLICATE_ASSET", "duplicate_asset": existing}), 409
+        return jsonify(
+            {"error": "DUPLICATE_ASSET", "duplicate_asset": existing}
+        ), 409
+
     if existing and duplicate_action == "reuse":
         temp.unlink(missing_ok=True)
         asset = existing
     elif existing and duplicate_action == "replace":
         current_url = str(existing.get("file_url", ""))
-        current_name = current_url.rsplit('/', 1)[-1] if current_url.startswith('/asset-files/') else ''
-        if current_name:
-            target = ASSET_UPLOAD_DIR / current_name
-        else:
-            target = ASSET_UPLOAD_DIR / f"{existing['id']}{suffix}"
+        current_name = (
+            current_url.rsplit("/", 1)[-1]
+            if current_url.startswith("/asset-files/")
+            else ""
+        )
+        target = (
+            ASSET_UPLOAD_DIR / current_name
+            if current_name
+            else ASSET_UPLOAD_DIR / f"{existing['id']}{suffix}"
+        )
         temp.replace(target)
-        existing.update({
-            "file_url": f"/asset-files/{target.name}", "sha256": sha256,
-            "original_filename": upload.filename, "updated_at": int(time.time())
-        })
+        existing.update(
+            {
+                "file_url": f"/asset-files/{target.name}",
+                "sha256": sha256,
+                "original_filename": upload.filename,
+                "updated_at": int(time.time()),
+            }
+        )
         save_assets(assets)
         asset = existing
     else:
@@ -1678,37 +1670,59 @@ def api_sponsor_logo(sponsor_id: str):
         filename = f"{asset_id}{suffix}"
         target = ASSET_UPLOAD_DIR / filename
         temp.replace(target)
-        asset = clean_asset_record({
-            "id": asset_id, "name": f"{sponsor.get('name','Sponsor')} Logo",
-            "category": "Sponsor", "asset_type": "Logo",
-            "file_url": f"/asset-files/{filename}", "rights_status": "Unverified",
-            "rights_owner": sponsor.get("name", ""),
-            "notes": "Created automatically from Sponsor Engine upload.",
-            "sha256": sha256, "original_filename": upload.filename, "active": True,
-        }, asset_id)
-        assets.append(asset); save_assets(assets)
-    sponsor["asset_id"] = asset.get("id", "")
-    sponsor["logo_url"] = asset.get("file_url", "")
-    sponsor["updated_at"] = int(time.time())
-    save_sponsors(sponsors)
-    return jsonify({"logo_url": sponsor["logo_url"], "asset": asset, "duplicate_reused": bool(existing and duplicate_action == "reuse"), "sponsor": sponsor})
+        asset = clean_asset_record(
+            {
+                "id": asset_id,
+                "name": f"{sponsor.get('name', 'Sponsor')} Logo",
+                "category": "Sponsor",
+                "asset_type": "Logo",
+                "file_url": f"/asset-files/{filename}",
+                "rights_status": "Unverified",
+                "rights_owner": sponsor.get("name", ""),
+                "notes": "Created automatically from Sponsor Engine upload.",
+                "sha256": sha256,
+                "original_filename": upload.filename,
+                "active": True,
+            },
+            asset_id,
+        )
+        assets.append(asset)
+        save_assets(assets)
+
+    result = get_sponsor_service().link_asset(
+        sponsor_id,
+        str(asset.get("id", "")),
+    )
+    if result.code == "SPONSOR_NOT_FOUND":
+        return jsonify({"error": "Save the sponsor first."}), 404
+
+    return jsonify(
+        {
+            "logo_url": result.data["sponsor"].get("logo_url", ""),
+            "asset": asset,
+            "duplicate_reused": bool(
+                existing and duplicate_action == "reuse"
+            ),
+            "sponsor": result.data["sponsor"],
+        }
+    )
+
 
 @app.put("/api/sponsors/<sponsor_id>/asset")
 @require_auth
 def api_sponsor_asset_link(sponsor_id: str):
-    asset_id = str((request.get_json(silent=True) or {}).get("asset_id", "")).strip()
-    asset = asset_by_id(asset_id) if asset_id else None
-    if asset_id and (not asset or asset.get("category") != "Sponsor" or asset.get("asset_type") != "Logo"):
-        return jsonify({"error": "Choose a valid Sponsor Logo asset."}), 400
-    sponsors = load_sponsors()
-    for sponsor in sponsors:
-        if str(sponsor.get("id")) == sponsor_id:
-            sponsor["asset_id"] = asset_id
-            sponsor["logo_url"] = asset.get("file_url", "") if asset else ""
-            sponsor["updated_at"] = int(time.time())
-            save_sponsors(sponsors)
-            return jsonify({"sponsor": sponsor, "asset": asset})
-    return jsonify({"error": "Sponsor not found."}), 404
+    asset_id = str(
+        (request.get_json(silent=True) or {}).get("asset_id", "")
+    ).strip()
+    result = get_sponsor_service().link_asset(sponsor_id, asset_id)
+    if result.code == "INVALID_SPONSOR_LOGO_ASSET":
+        return jsonify(
+            {"error": "Choose a valid Sponsor Logo asset."}
+        ), 400
+    if result.code == "SPONSOR_NOT_FOUND":
+        return jsonify({"error": "Sponsor not found."}), 404
+    return jsonify(result.data)
+
 
 @app.get("/sponsor-logos/<filename>")
 def sponsor_logo_file(filename: str):
