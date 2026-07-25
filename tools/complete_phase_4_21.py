@@ -188,7 +188,7 @@ def main() -> None:
             "tests/test_core_repository_runtime.py",
         )
     )
-    run(("git", "diff", "--cached", "check"))
+    run(("git", "diff", "--cached", "--check"))
     run(("git", "commit", "-m", "Phase 4.21: complete Game Operations Service"))
     run(("git", "push", "origin", BRANCH))
 
