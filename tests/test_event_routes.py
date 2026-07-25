@@ -54,7 +54,9 @@ class StubEventService:
 def event_client(monkeypatch: pytest.MonkeyPatch):
     service = StubEventService()
     monkeypatch.setattr(app_module, "EVENT_SERVICE", service, raising=False)
+    monkeypatch.setattr(app_module, "pin_is_configured", lambda: True)
     monkeypatch.setitem(app_module.app.config, "TESTING", True)
+    monkeypatch.setitem(app_module.app.config, "SECRET_KEY", "event-route-test")
     with app_module.app.test_client() as client:
         with client.session_transaction() as session:
             session["authenticated"] = True
