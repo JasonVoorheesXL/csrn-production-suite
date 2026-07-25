@@ -1,0 +1,462 @@
+from __future__ import annotations
+
+import copy
+import time
+from dataclasses import dataclass, field
+from typing import Any, Callable
+
+
+Broadcast = dict[str, Any]
+School = dict[str, Any]
+State = dict[str, Any]
+BroadcastLoader = Callable[[], list[Broadcast]]
+BroadcastSaver = Callable[[list[Broadcast]], None]
+SchoolLookup = Callable[[str], School | None]
+VenueResolver = Callable[[School | None, str], dict[str, Any] | None]
+IdentityBuilder = Callable[[School | None, str], dict[str, Any]]
+LogoCertification = Callable[[School], Any]
+MonogramBuilder = Callable[[str], str]
+ConfigLoader = Callable[[], dict[str, Any]]
+StateLoader = Callable[[], State]
+StateSaver = Callable[[State], None]
+DefaultStateFactory = Callable[[], State]
+DetailWriter = Callable[[Broadcast, bool], None]
+DetailDeleter = Callable[[str], None]
+Clock = Callable[[], float]
+YearProvider = Callable[[], str]
+
+
+@dataclass(frozen=True)
+class BroadcastResult:
+    code: str
+    data: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def ok(self) -> bool:
+        return self.code == "OK"
+
+
+class BroadcastService:
+    """Broadcast planning and lifecycle behavior independent of Flask."""
+
+    _CREW_KEYS = (
+        "play_by_play",
+        "color_analyst",
+        "sideline_reporter",
+        "statistician",
+        "producer",
+    )
+    _EDITABLE_KEYS = (
+        "sport",
+        "season",
+        "classification",
+        "week",
+        "level",
+        "division",
+        "date",
+        "scheduled_start",
+        "venue",
+        "venue_id",
+        "visual_mode",
+        "crew",
+    )
+    _STATE_SYNC_KEYS = _EDITABLE_KEYS + (
+        "home_school_id",
+        "visitor_school_id",
+        "home_team",
+        "visitor_team",
+        "home_identity",
+        "visitor_identity",
+    )
+    _VALID_STATUSES = {"planned", "live", "completed"}
+
+    def __init__(
+        self,
+        *,
+        load_broadcasts: BroadcastLoader,
+        save_broadcasts: BroadcastSaver,
+        get_school: SchoolLookup,
+        resolve_venue: VenueResolver,
+        build_identity: IdentityBuilder,
+        logo_certification: LogoCertification,
+        school_monogram: MonogramBuilder,
+        load_config: ConfigLoader,
+        load_state: StateLoader,
+        save_state: StateSaver,
+        default_state: DefaultStateFactory,
+        write_detail: DetailWriter | None = None,
+        delete_detail: DetailDeleter | None = None,
+        clock: Clock | None = None,
+        year_provider: YearProvider | None = None,
+    ) -> None:
+        self._load_broadcasts = load_broadcasts
+        self._save_broadcasts = save_broadcasts
+        self._get_school = get_school
+        self._resolve_venue = resolve_venue
+        self._build_identity = build_identity
+        self._logo_certification = logo_certification
+        self._school_monogram = school_monogram
+        self._load_config = load_config
+        self._load_state = load_state
+        self._save_state = save_state
+        self._default_state = default_state
+        self._write_detail = write_detail or (lambda _record, _existing_only: None)
+        self._delete_detail = delete_detail or (lambda _broadcast_id: None)
+        self._clock = clock or time.time
+        self._year_provider = year_provider or (lambda: time.strftime("%Y"))
+
+    @staticmethod
+    def football_week_code(value: Any) -> str:
+        text = str(value or "1").strip().upper().replace("WEEK", "").strip()
+        try:
+            return f"W{int(text):02d}"
+        except ValueError:
+            cleaned = "".join(character for character in text if character.isalnum())
+            return f"W{(cleaned[:3] or '01')}"
+
+    def next_id(
+        self,
+        sport: str,
+        season: str,
+        classification: str,
+        week: Any,
+    ) -> str:
+        sport_text = str(sport or "")
+        sport_code = {
+            "football": "FB",
+            "basketball": "BB",
+            "baseball": "BSB",
+            "softball": "SB",
+        }.get(sport_text.lower(), sport_text[:3].upper() or "EVT")
+        season_code = "".join(
+            character for character in str(season or "") if character.isdigit()
+        )[:4] or self._year_provider()
+        class_code = (
+            str(classification or "OPEN")
+            .upper()
+            .replace("CLASS", "")
+            .replace(" ", "")
+        )
+        prefix = (
+            f"{sport_code}-{season_code}-{class_code}-"
+            f"{self.football_week_code(week)}-"
+        )
+        used: list[int] = []
+        for item in self._load_broadcasts():
+            value = str(item.get("broadcast_id", ""))
+            if not value.startswith(prefix):
+                continue
+            try:
+                used.append(int(value.rsplit("-", 1)[1]))
+            except (ValueError, IndexError):
+                continue
+        return f"{prefix}{max(used, default=0) + 1:03d}"
+
+    def list_records(self, *, include_archived: bool = False) -> BroadcastResult:
+        rows = [
+            copy.deepcopy(item)
+            for item in self._load_broadcasts()
+            if include_archived or not item.get("archived")
+        ]
+        rows.sort(
+            key=lambda item: (
+                str(item.get("date", "")),
+                str(item.get("scheduled_start", "")),
+            ),
+            reverse=True,
+        )
+        return BroadcastResult("OK", {"broadcasts": rows})
+
+    def read(self, broadcast_id: str) -> BroadcastResult:
+        item = self._find(self._load_broadcasts(), broadcast_id)
+        if item is None:
+            return BroadcastResult("NOT_FOUND")
+        return BroadcastResult("OK", {"broadcast": copy.deepcopy(item)})
+
+    def create(self, incoming: Broadcast) -> BroadcastResult:
+        data = copy.deepcopy(incoming or {})
+        config = self._load_config()
+        defaults = config.get("broadcast_defaults", {})
+        if not isinstance(defaults, dict):
+            defaults = {}
+
+        sport = str(data.get("sport", defaults.get("sport", "Football")) or "Football")
+        home_school_id = str(data.get("home_school_id", "")).strip()
+        visitor_school_id = str(data.get("visitor_school_id", "")).strip()
+        home_school = self._get_school(home_school_id) if home_school_id else None
+        visitor_school = self._get_school(visitor_school_id) if visitor_school_id else None
+
+        home_name = (
+            str((home_school or {}).get("broadcast_name", "")).strip()
+            if home_school
+            else str(data.get("home_team", "")).strip()
+        ) or "Home"
+        visitor_name = (
+            str((visitor_school or {}).get("broadcast_name", "")).strip()
+            if visitor_school
+            else str(data.get("visitor_team", "")).strip()
+        ) or "Visitor"
+        classification = str(
+            data.get("classification")
+            or (home_school or {}).get("classification")
+            or (visitor_school or {}).get("classification")
+            or "Open"
+        ).strip()
+        season = str(data.get("season") or self._year_provider()).strip()
+        week = str(data.get("week") or "1").strip()
+        venue = self._resolve_venue(home_school, sport)
+        venue_name = str(
+            data.get("venue")
+            or (venue or {}).get("name")
+            or defaults.get("venue", "Caledonia High School")
+        ).strip()
+        venue_id = str((venue or {}).get("id", ""))
+        broadcast_id = self.next_id(sport, season, classification, week)
+        now = int(self._clock())
+        crew_incoming = data.get("crew", {})
+        if not isinstance(crew_incoming, dict):
+            crew_incoming = {}
+        crew = {
+            key: str(crew_incoming.get(key, ""))
+            for key in self._CREW_KEYS
+        }
+        visual_mode = data.get(
+            "visual_mode",
+            defaults.get("visual_mode", "graphic"),
+        )
+        home_identity = self._build_identity(home_school, sport)
+        visitor_identity = self._build_identity(visitor_school, sport)
+
+        record: Broadcast = {
+            "broadcast_id": broadcast_id,
+            "created_at": now,
+            "updated_at": now,
+            "status": "planned",
+            "sport": sport,
+            "season": season,
+            "classification": classification,
+            "week": week,
+            "level": data.get("level", "Varsity"),
+            "division": data.get("division", "Boys"),
+            "date": data.get("date", ""),
+            "scheduled_start": data.get("scheduled_start", "07:00 PM"),
+            "home_school_id": home_school_id,
+            "visitor_school_id": visitor_school_id,
+            "home_team": home_name,
+            "visitor_team": visitor_name,
+            "home_identity": home_identity,
+            "visitor_identity": visitor_identity,
+            "venue_id": venue_id,
+            "venue": venue_name,
+            "graphics_profile": "CSRN Default",
+            "obs_profile": config.get("obs", {}).get(
+                "profile",
+                "CSRN Production",
+            )
+            if isinstance(config.get("obs", {}), dict)
+            else "CSRN Production",
+            "visual_mode": visual_mode,
+            "crew": crew,
+            "production_type": str(data.get("production_type", "game") or "game"),
+        }
+
+        items = self._load_broadcasts()
+        items.append(record)
+        self._save_broadcasts(items)
+        self._write_detail(copy.deepcopy(record), False)
+        return BroadcastResult(
+            "OK",
+            {
+                "broadcast": copy.deepcopy(record),
+                "warnings": self._branding_warnings(home_school, visitor_school),
+            },
+        )
+
+    def update(self, broadcast_id: str, incoming: Broadcast) -> BroadcastResult:
+        data = copy.deepcopy(incoming or {})
+        items = self._load_broadcasts()
+        item = self._find(items, broadcast_id)
+        if item is None:
+            return BroadcastResult("NOT_FOUND")
+
+        home_id = str(
+            data.get("home_school_id", item.get("home_school_id", "")) or ""
+        )
+        visitor_id = str(
+            data.get("visitor_school_id", item.get("visitor_school_id", "")) or ""
+        )
+        home = self._get_school(home_id) if home_id else None
+        visitor = self._get_school(visitor_id) if visitor_id else None
+
+        for key in self._EDITABLE_KEYS:
+            if key in data:
+                item[key] = copy.deepcopy(data[key])
+
+        sport = str(item.get("sport", "Football") or "Football")
+        item.update(
+            {
+                "home_school_id": home_id,
+                "visitor_school_id": visitor_id,
+                "home_team": (
+                    (home or {}).get("broadcast_name")
+                    or data.get("home_team")
+                    or item.get("home_team")
+                ),
+                "visitor_team": (
+                    (visitor or {}).get("broadcast_name")
+                    or data.get("visitor_team")
+                    or item.get("visitor_team")
+                ),
+                "home_identity": (
+                    self._build_identity(home, sport)
+                    if home
+                    else copy.deepcopy(item.get("home_identity", {}))
+                ),
+                "visitor_identity": (
+                    self._build_identity(visitor, sport)
+                    if visitor
+                    else copy.deepcopy(item.get("visitor_identity", {}))
+                ),
+                "updated_at": int(self._clock()),
+            }
+        )
+        self._save_broadcasts(items)
+        self._write_detail(copy.deepcopy(item), False)
+        self._sync_active_state(item)
+        return BroadcastResult(
+            "OK",
+            {
+                "broadcast": copy.deepcopy(item),
+                "warnings": self._branding_warnings(home, visitor),
+            },
+        )
+
+    def set_status(self, broadcast_id: str, status: Any) -> BroadcastResult:
+        normalized = str(status or "").lower()
+        if normalized == "prepared":
+            normalized = "planned"
+        if normalized not in self._VALID_STATUSES:
+            return BroadcastResult("INVALID_STATUS")
+
+        items = self._load_broadcasts()
+        item = self._find(items, broadcast_id)
+        if item is None:
+            return BroadcastResult("NOT_FOUND")
+        item["status"] = normalized
+        item["updated_at"] = int(self._clock())
+        self._save_broadcasts(items)
+        self._write_detail(copy.deepcopy(item), True)
+        return BroadcastResult("OK", {"broadcast": copy.deepcopy(item)})
+
+    def update_linked_status(
+        self,
+        broadcast_id: str,
+        status: str,
+        extra: dict[str, Any] | None = None,
+    ) -> BroadcastResult:
+        target = str(broadcast_id or "").strip()
+        if not target:
+            return BroadcastResult("NO_BROADCAST_ID")
+        items = self._load_broadcasts()
+        item = self._find(items, target)
+        if item is None:
+            return BroadcastResult("NOT_FOUND")
+
+        now = int(self._clock())
+        item["status"] = str(status or "")
+        item["updated_at"] = now
+        if status == "live":
+            item.setdefault("started_at", now)
+        if status == "completed":
+            item["completed_at"] = now
+        if extra:
+            item.update(copy.deepcopy(extra))
+        self._save_broadcasts(items)
+        self._write_detail(copy.deepcopy(item), False)
+        return BroadcastResult("OK", {"broadcast": copy.deepcopy(item)})
+
+    def resume_record(self, broadcast_id: str) -> BroadcastResult:
+        target = str(broadcast_id or "").strip()
+        if not target:
+            return BroadcastResult("NO_BROADCAST_ID")
+        items = self._load_broadcasts()
+        item = self._find(items, target)
+        if item is None:
+            return BroadcastResult("NOT_FOUND")
+        item["status"] = "live"
+        item["updated_at"] = int(self._clock())
+        item.pop("completed_at", None)
+        item.pop("final_home_score", None)
+        item.pop("final_visitor_score", None)
+        self._save_broadcasts(items)
+        self._write_detail(copy.deepcopy(item), False)
+        return BroadcastResult("OK", {"broadcast": copy.deepcopy(item)})
+
+    def delete(self, broadcast_id: str) -> BroadcastResult:
+        items = self._load_broadcasts()
+        item = self._find(items, broadcast_id)
+        if item is None:
+            return BroadcastResult("NOT_FOUND")
+        remaining = [
+            row
+            for row in items
+            if str(row.get("broadcast_id", "")) != str(broadcast_id)
+        ]
+        self._save_broadcasts(remaining)
+        self._delete_detail(str(broadcast_id))
+
+        state = self._load_state()
+        if str(state.get("broadcast_id", "")) == str(broadcast_id):
+            self._save_state(copy.deepcopy(self._default_state()))
+        return BroadcastResult("OK", {"deleted": str(broadcast_id)})
+
+    def _sync_active_state(self, broadcast: Broadcast) -> None:
+        state = self._load_state()
+        if str(state.get("broadcast_id", "")) != str(
+            broadcast.get("broadcast_id", "")
+        ):
+            return
+        for key in self._STATE_SYNC_KEYS:
+            if key in broadcast:
+                state[key] = copy.deepcopy(broadcast[key])
+        self._save_state(state)
+
+    def _branding_warnings(
+        self,
+        home: School | None,
+        visitor: School | None,
+    ) -> list[str]:
+        warnings: list[str] = []
+        for side, school in (("Home", home), ("Visitor", visitor)):
+            if school is None or self._certified(school):
+                continue
+            name = str(
+                school.get("broadcast_name")
+                or school.get("official_name", "")
+            )
+            monogram = self._school_monogram(name)
+            warnings.append(
+                f"{side} has no certified logo; {monogram} monogram will be used."
+            )
+        return warnings
+
+    def _certified(self, school: School) -> bool:
+        result = self._logo_certification(school)
+        if isinstance(result, (tuple, list)):
+            return bool(result[0]) if result else False
+        return bool(result)
+
+    @staticmethod
+    def _find(
+        items: list[Broadcast],
+        broadcast_id: str,
+    ) -> Broadcast | None:
+        target = str(broadcast_id or "")
+        return next(
+            (
+                item
+                for item in items
+                if str(item.get("broadcast_id", "")) == target
+            ),
+            None,
+        )
