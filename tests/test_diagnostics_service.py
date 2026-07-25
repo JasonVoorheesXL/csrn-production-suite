@@ -174,7 +174,7 @@ def test_readiness_actions_use_configured_obs_names(tmp_path: Path) -> None:
 
 
 def test_readiness_returns_overlay_safe_state_copy(tmp_path: Path) -> None:
-    service, _, _, _, _, state = build_service(tmp_path)
+    service, _, _, _, state, _ = build_service(tmp_path)
     payload = service.readiness().data["readiness"]
     assert payload["state"] == {"broadcast_id": "B1", "public": True}
     payload["state"]["broadcast_id"] = "changed"
