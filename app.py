@@ -50,6 +50,7 @@ from upgrade_service import UpgradeService
 from event_service import EventService
 from rules_service import RulesService
 from statistics_service import StatisticsService
+from game_operations_service import GameOperationsService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -235,9 +236,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4t — Statistics Service"
+    "Version 1.13.0-alpha.4u — Game Operations Service"
 )
-RUNTIME_BUILD = "V1.13A4T-STATISTICS-SERVICE"
+RUNTIME_BUILD = "V1.13A4U-GAME-OPERATIONS-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -3027,41 +3028,49 @@ def delete_broadcast_record(broadcast_id: str):
 def build_journal():
     return jsonify(load_build_journal())
 
+GAME_OPERATIONS_SERVICE: GameOperationsService | None = None
+
+
+def get_game_operations_service() -> GameOperationsService:
+    global GAME_OPERATIONS_SERVICE
+    if GAME_OPERATIONS_SERVICE is None:
+        GAME_OPERATIONS_SERVICE = GameOperationsService(
+            load_state=load_state,
+            save_state=save_state,
+            default_state=lambda: copy.deepcopy(DEFAULT_STATE),
+            push_history=push_history,
+            source_allowed=EventService.source_allowed,
+            locked_payload=EventService.locked_payload,
+            update_linked_status=update_linked_broadcast_status,
+            load_config=load_config,
+            command_scorebug_visibility=command_scorebug_visibility,
+            transaction_lock=lock,
+        )
+    return GAME_OPERATIONS_SERVICE
+
+
 @app.post("/api/score")
 @require_auth
 def update_score():
-    data = request.get_json(force=True)
-    team = data.get("team")
-    delta = int(data.get("delta", 0))
-    if team not in {"home", "visitor"} or delta not in {-1, 1, 2, 3, 6}:
-        return jsonify({"error": "INVALID_SCORE_REQUEST"}), 400
-    with lock:
-        state = load_state()
-        source = str(data.get("source", "broadcaster") or "broadcaster").lower()
-        if not game_data_source_allowed(state, source):
-            return authority_rejection(state)
-        push_history(state)
-        key = "home_score" if team == "home" else "visitor_score"
-        state[key] = max(0, int(state.get(key, 0)) + delta)
-        if state["broadcast_phase"] == "pregame":
-            state["broadcast_phase"] = "live"
-        save_state(state)
-        if state.get("broadcast_id") and state.get("status") != "live":
-            state["status"]="live"; save_state(state); update_linked_broadcast_status(state["broadcast_id"],"live")
-    return jsonify(state)
+    result = get_game_operations_service().score(
+        request.get_json(force=True) or {}
+    )
+    if result.code == "INVALID_SCORE_REQUEST":
+        return jsonify({"error": result.code}), 400
+    if result.code == "CONTROL_SOURCE_LOCKED":
+        return jsonify(result.data), 409
+    return jsonify(result.data["state"])
+
 
 @app.post("/api/set")
 @require_auth
 def set_value():
-    data = request.get_json(force=True) or {}
-    allowed = {"quarter", "down", "distance", "clock_visible", "possession", "scorebug_visible", "broadcast_phase", "ticker_visible", "ticker_speed", "ticker_pause"}
-    game_data_fields = {"quarter", "down", "distance", "possession"}
-    changes = {k: v for k, v in data.items() if k in allowed}
-    state = load_state()
-    source = str(data.get("source", "broadcaster") or "broadcaster").lower()
-    if game_data_fields.intersection(changes) and not game_data_source_allowed(state, source):
-        return authority_rejection(state)
-    return jsonify(apply_change(changes))
+    result = get_game_operations_service().set_values(
+        request.get_json(force=True) or {}
+    )
+    if result.code == "CONTROL_SOURCE_LOCKED":
+        return jsonify(result.data), 409
+    return jsonify(result.data["state"])
 
 
 @app.get("/roster-headshots/<filename>")
@@ -3512,96 +3521,43 @@ def connection_qr():
 @app.post("/api/toggle-scorebug")
 @require_auth
 def toggle_scorebug():
-    with lock:
-        state = load_state()
-        active_broadcast_id = state.get("broadcast_id", "")
-        next_visible = not bool(state.get("scorebug_visible"))
-        if load_config().get("obs", {}).get("controlled_commands", False):
-            try:
-                command_scorebug_visibility(next_visible)
-            except OBSConnectionError as exc:
-                return jsonify({"error": "OBS_COMMAND_BLOCKED", "message": str(exc)}), 409
-        push_history(state)
-        # Visibility is deliberately isolated from broadcast lifecycle and active selection.
-        state["scorebug_visible"] = next_visible
-        state["broadcast_id"] = active_broadcast_id
-        save_state(state)
-        return jsonify(state)
+    result = get_game_operations_service().toggle_scorebug()
+    if result.code == "OBS_COMMAND_BLOCKED":
+        return jsonify(
+            {
+                "error": result.code,
+                "message": result.data.get("message", ""),
+            }
+        ), 409
+    return jsonify(result.data["state"])
+
 
 @app.post("/api/toggle-halftime")
 @require_auth
 def toggle_halftime():
-    with lock:
-        state = load_state()
-        push_history(state)
-        if state["broadcast_phase"] == "halftime":
-            state["broadcast_phase"] = "live"
-            state["quarter"] = "3"
-            state["scorebug_visible"] = True
-        else:
-            state["broadcast_phase"] = "halftime"
-            state["scorebug_visible"] = False
-        save_state(state)
-        return jsonify(state)
+    result = get_game_operations_service().toggle_halftime()
+    return jsonify(result.data["state"])
+
 
 @app.post("/api/end-game")
 @require_auth
 def end_game():
-    with lock:
-        state = load_state()
-        push_history(state)
-        state["broadcast_phase"] = "final"
-        state["scorebug_visible"] = False
-        state["status"] = "completed"
-        save_state(state)
-        update_linked_broadcast_status(state.get("broadcast_id", ""), "completed", {"final_home_score":state.get("home_score",0),"final_visitor_score":state.get("visitor_score",0)})
-        return jsonify(state)
+    result = get_game_operations_service().end_game()
+    return jsonify(result.data["state"])
+
 
 @app.post("/api/reset-data")
 @require_auth
 def reset_data():
-    with lock:
-        current = load_state()
-        reset = copy.deepcopy(DEFAULT_STATE)
-        # Reset only game-operation data. Preserve the selected broadcast and
-        # its schedule/identity so an accidentally completed game can resume.
-        reset.update({
-            "broadcast_created": bool(current.get("broadcast_id")),
-            "broadcast_id": current.get("broadcast_id", ""),
-            "sport": current.get("sport", "Football"),
-            "season": current.get("season", ""),
-            "week": current.get("week", "1"),
-            "classification": current.get("classification", ""),
-            "level": current.get("level", "Varsity"),
-            "division": current.get("division", "Boys"),
-            "home_team": current.get("home_team", "Caledonia"),
-            "visitor_team": current.get("visitor_team", "Visitor"),
-            "home_school_id": current.get("home_school_id", ""),
-            "visitor_school_id": current.get("visitor_school_id", ""),
-            "home_identity": current.get("home_identity", {}),
-            "visitor_identity": current.get("visitor_identity", {}),
-            "venue_id": current.get("venue_id", ""),
-            "venue": current.get("venue", "Caledonia High School"),
-            "date": current.get("date", ""),
-            "scheduled_start": current.get("scheduled_start", ""),
-            "visual_mode": current.get("visual_mode", "graphic"),
-            "crew": current.get("crew", {}),
-            "status": current.get("status", "planned"),
-            "broadcast_phase": "final" if current.get("status") == "completed" else "pregame",
-            "review_mode": current.get("status") == "completed",
-            "scorebug_visible": False,
-        })
-        save_state(reset)
-        return jsonify(reset)
+    result = get_game_operations_service().reset_data()
+    return jsonify(result.data["state"])
+
 
 @app.post("/api/new-broadcast")
 @require_auth
 def new_broadcast():
-    with lock:
-        state = copy.deepcopy(DEFAULT_STATE)
-        save_state(state)
-        return jsonify(state)
-
+    result = get_game_operations_service().new_broadcast()
+    return jsonify(result.data["state"])
 
 
 def spot_to_coord(value: Any) -> int:
