@@ -152,7 +152,7 @@ def audit_phase_4(root: Path) -> ArchitectureAuditResult:
             errors.append(f"business implementation leaked into app.py: {marker}")
 
     app_import_roots = _import_roots(app_tree)
-    for stale_root in ("qrcode", "socket"):
+    for stale_root in ("io", "qrcode", "socket"):
         if stale_root in app_import_roots:
             errors.append(f"obsolete app.py import remains: {stale_root}")
 
