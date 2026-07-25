@@ -55,7 +55,7 @@ def test_normalize_id_extension_and_hash(tmp_path: Path) -> None:
     payload = tmp_path / "asset.bin"
     payload.write_bytes(b"csrn")
     assert AssetService.file_hash(payload) == (
-        "e0985b9974f69f123986e42e45125fff64baa8d298c2ef219e0b369016b25e09"
+        "229ca798e5732febcb152085b467580494dc7d75c3e3adcf14686c8bb90d0552"
     )
 
 
