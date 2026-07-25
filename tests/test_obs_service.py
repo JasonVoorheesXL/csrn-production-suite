@@ -14,8 +14,7 @@ def build_service(*, controlled: bool = True):
         "scorebug": [],
         "visual": [],
         "saved_status": [],
-        "saved_state": [],
-        "history": [],
+        "visual_state": [],
     }
 
     def load_config():
@@ -43,17 +42,12 @@ def build_service(*, controlled: bool = True):
             raise RuntimeError("Program visual mode must be graphic or camera.")
         return {"command_sent": True, "visual_mode": mode}
 
-    def load_state():
+    def update_visual_state(mode):
+        calls["visual_state"].append(mode)
+        previous = state.get("visual_mode")
+        state.setdefault("history", []).append({"visual_mode": previous})
+        state["visual_mode"] = mode
         return copy.deepcopy(state)
-
-    def save_state(value):
-        state.clear()
-        state.update(copy.deepcopy(value))
-        calls["saved_state"].append(copy.deepcopy(value))
-
-    def push_history(value):
-        calls["history"].append(copy.deepcopy(value))
-        value.setdefault("history", []).append({"visual_mode": value.get("visual_mode")})
 
     service = OBSService(
         load_config=load_config,
@@ -62,9 +56,7 @@ def build_service(*, controlled: bool = True):
         validate_obs=validate,
         set_scorebug_visibility=set_scorebug,
         set_program_visual_mode=set_visual,
-        load_state=load_state,
-        save_state=save_state,
-        push_history=push_history,
+        update_visual_state=update_visual_state,
     )
     return service, config, status, state, calls
 
@@ -128,6 +120,7 @@ def test_program_visual_mode_normalizes_and_persists_state():
     result = service.program_visual_mode(" CAMERA ")
     assert result.ok
     assert calls["visual"][0][1] == "camera"
+    assert calls["visual_state"] == ["camera"]
     assert state["visual_mode"] == "camera"
     assert state["history"] == [{"visual_mode": "graphic"}]
     assert status["visual_mode"] == "camera"
@@ -139,16 +132,16 @@ def test_program_visual_mode_rejects_invalid_mode_without_state_change():
     assert result.code == "OBS_COMMAND_BLOCKED"
     assert result.data["message"] == "Program visual mode must be graphic or camera."
     assert state["visual_mode"] == "graphic"
-    assert calls["saved_state"] == []
+    assert calls["visual_state"] == []
 
 
-def test_program_visual_mode_is_blocked_before_loading_state():
+def test_program_visual_mode_is_blocked_before_state_update():
     service, _, _, state, calls = build_service(controlled=False)
     result = service.program_visual_mode("camera")
     assert result.code == "OBS_COMMAND_BLOCKED"
     assert state["visual_mode"] == "graphic"
     assert calls["visual"] == []
-    assert calls["history"] == []
+    assert calls["visual_state"] == []
 
 
 def test_command_scorebug_visibility_returns_payload():
