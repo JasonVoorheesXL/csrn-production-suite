@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 import copy
-import io
 import json
 import hashlib
 import os
 import re
 import secrets
-import socket
 import time
 import shutil
 from functools import wraps
@@ -20,8 +18,6 @@ from urllib.parse import urlparse, quote
 from flask import Flask, jsonify, render_template, request, session, send_from_directory, Response
 from werkzeug.security import check_password_hash, generate_password_hash
 from PIL import Image, ImageChops
-import qrcode
-import qrcode.image.svg
 from obs_client import (
     OBSConnectionError,
     set_program_visual_mode,
@@ -64,15 +60,7 @@ from sponsor_repository import SponsorRepository
 from venue_repository import VenueRepository
 from broadcast_repository import BroadcastRepository
 
-# Phase 3.5: BroadcastRespository integrated
-
-# Phase 3.4: VenueRepository integrated
-
-# Phase 3.3: SponsorRepository integrated
-
-# Phase 3.2: RosterRepository integrated
-
-# Phase 3.1: SchoolRepository integrated
+# Phase 3 repository boundaries remain integrated below.
 
 BASE_DIR = Path(__file__).resolve().parent
 STATE_FILE = BASE_DIR / "state.json"
@@ -238,9 +226,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4w — Broadcast Lifecycle Service"
+    "Version 1.13.0-alpha.4x — Phase 4 Consolidation"
 )
-RUNTIME_BUILD = "V1.13A4W-BROADCAST-LIFECYCLE-SERVICE"
+RUNTIME_BUILD = "V1.13A4X-PHASE-4-CONSOLIDATION"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
