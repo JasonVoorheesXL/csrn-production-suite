@@ -7,7 +7,8 @@ Phase 4 converts `app.py` into a transport and composition layer. Business rules
 Each Phase 4 service:
 
 - lives in a dedicated `*_service.py` module;
-- does not import Flask or Werkzeug;
+- does not import Flask;
+- may use framework-neutral utilities such as Werkzeug password hashing;
 - receives external dependencies through its constructor or method arguments;
 - returns a result object carrying a stable `code`, structured `data`, and an `ok` indicator where applicable;
 - is covered by focused service tests and route-contract tests;
