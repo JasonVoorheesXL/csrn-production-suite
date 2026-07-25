@@ -10,6 +10,7 @@ on:
     branches:
       - develop-1.13
       - release/1.13-foundation
+      - "phase/**"
   workflow_dispatch:
 
 permissions:
