@@ -49,6 +49,10 @@ from statistics_service import StatisticsService
 from game_operations_service import GameOperationsService
 from support_media_service import SupportMediaService
 from broadcast_lifecycle_service import BroadcastLifecycleService
+from routes.system_routes import (
+    SystemRoutesDependencies,
+    create_system_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -226,9 +230,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4x — Phase 4 Consolidation"
+    "Version 1.13.0-alpha.5a — Route Blueprint Foundation"
 )
-RUNTIME_BUILD = "V1.13A4X-PHASE-4-CONSOLIDATION"
+RUNTIME_BUILD = "V1.13A5A-ROUTE-BLUEPRINT-FOUNDATION"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -2789,39 +2793,6 @@ def obs_program_visual_mode():
     return jsonify(result.data)
 
 
-@app.get("/api/config")
-@require_auth
-def get_config():
-    result = get_configuration_service().read()
-    return jsonify(result.data["config"])
-
-
-@app.post("/api/config")
-@require_auth
-def update_config():
-    incoming = request.get_json(force=True)
-    result = get_configuration_service().update(incoming)
-    if result.code == "CONFIG_PAYLOAD_REQUIRED":
-        return jsonify({"error": result.code}), 400
-    if result.code == "INVALID_SOCIAL_URL":
-        return jsonify(
-            {
-                "error": result.code,
-                "fields": result.data.get("fields", {}),
-            }
-        ), 400
-    return jsonify(result.data["config"])
-
-@app.get("/api/diagnostics")
-@require_auth
-def diagnostics():
-    return jsonify(diagnostic_status())
-
-@app.get("/api/state")
-def get_state():
-    # Read-only endpoint for both authenticated control devices and OBS overlay.
-    return jsonify(public_state(load_state()))
-
 def update_linked_broadcast_status(
     broadcast_id: str,
     status: str,
@@ -2842,10 +2813,19 @@ def readiness_payload() -> dict[str, Any]:
     return get_diagnostics_service().readiness().data["readiness"]
 
 
-@app.get("/api/readiness")
-@require_auth
-def readiness():
-    return jsonify(readiness_payload())
+SYSTEM_ROUTES_BLUEPRINT = create_system_blueprint(
+    SystemRoutesDependencies(
+        require_auth=require_auth,
+        get_configuration_service=get_configuration_service,
+        diagnostic_status=diagnostic_status,
+        load_state=load_state,
+        public_state=public_state,
+        readiness_payload=readiness_payload,
+        load_build_journal=load_build_journal,
+    )
+)
+app.register_blueprint(SYSTEM_ROUTES_BLUEPRINT)
+
 
 BROADCAST_LIFECYCLE_SERVICE: BroadcastLifecycleService | None = None
 
@@ -2974,11 +2954,6 @@ def delete_broadcast_record(broadcast_id: str):
         return jsonify({"error": "NOT_FOUND"}), 404
     return jsonify(result.data)
 
-
-@app.get("/api/build-journal")
-@require_auth
-def build_journal():
-    return jsonify(load_build_journal())
 
 GAME_OPERATIONS_SERVICE: GameOperationsService | None = None
 
