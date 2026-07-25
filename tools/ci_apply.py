@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tools.apply_phase_4_24 import apply
+from apply_phase_4_24 import apply
 
 
 if __name__ == "__main__":
