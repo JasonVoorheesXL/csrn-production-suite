@@ -48,6 +48,7 @@ from state_service import StateService
 from diagnostics_service import DiagnosticsService
 from upgrade_service import UpgradeService
 from event_service import EventService
+from rules_service import RulesService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -233,9 +234,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4r — Event Service"
+    "Version 1.13.0-alpha.4s — Rules Service"
 )
-RUNTIME_BUILD = "V1.13A4R-EVENT-SERVICE"
+RUNTIME_BUILD = "V1.13A4S-RULES-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -3667,185 +3668,76 @@ def new_broadcast():
 
 
 def spot_to_coord(value: Any) -> int:
-    """Canonical field coordinate: 0=left goal line, 100=right goal line."""
-    text = str(value or "").strip().lower()
-    if text in {"left goal", "left_goal", "home goal", "home_goal", "0"}: return 0
-    if text in {"right goal", "right_goal", "visitor goal", "visitor_goal", "100"}: return 100
-    if text == "50": return 50
-    match = re.match(r"^(left|right|home|visitor)\s*(\d{1,2})$", text)
-    if match:
-        side, yard = match.group(1), max(0, min(49, int(match.group(2))))
-        return yard if side in {"left", "home"} else 100-yard
-    try: return max(0, min(100, int(float(text))))
-    except (TypeError, ValueError): return 50
+    return RulesService.spot_to_coord(value)
 
 
 def coord_to_spot(coord: int) -> str:
-    coord=max(0,min(100,int(coord)))
-    if coord==0: return "LEFT GOAL"
-    if coord==100: return "RIGHT GOAL"
-    if coord==50: return "50"
-    return f"LEFT {coord}" if coord<50 else f"RIGHT {100-coord}"
+    return RulesService.coord_to_spot(coord)
 
 
 def team_direction(state: dict[str, Any], team: str) -> int:
-    direction=str(state.get(f"{team}_direction", "right" if team=="home" else "left")).lower()
-    return 1 if direction=="right" else -1
+    return RulesService.team_direction(state, team)
 
 
 def opposite(team: str) -> str:
-    return "visitor" if team=="home" else "home"
+    return RulesService.opposite(team)
 
 
 def advance_down(down: str) -> str:
-    order=["1st","2nd","3rd","4th"]
-    try: return order[min(3,order.index(str(down))+1)]
-    except ValueError: return "1st"
+    return RulesService.advance_down(down)
+
+
+RULES_SERVICE: RulesService | None = None
+
+
+def get_rules_service() -> RulesService:
+    global RULES_SERVICE
+    if RULES_SERVICE is None:
+        RULES_SERVICE = RulesService(
+            load_state=load_state,
+            save_state=save_state,
+            push_history=push_history,
+            source_allowed=game_data_source_allowed,
+            locked_payload=EventService.locked_payload,
+            resolve_player=resolve_game_roster_player,
+            show_player_graphic=show_automation_player_graphic,
+            transaction_lock=lock,
+        )
+    return RULES_SERVICE
 
 
 @app.post("/api/clock-control")
 @require_auth
 def clock_control():
-    data=request.get_json(force=True) or {}
-    with lock:
-        state=load_state(); action=str(data.get("action","")).lower()
-        seconds=max(0,min(3599,int(state.get("clock_seconds",720) or 0)))
-        if action=="start": state["clock_running"]=True; state["clock_started_at"]=int(time.time())
-        elif action=="stop": state["clock_running"]=False; state["clock_started_at"]=0
-        elif action=="set": seconds=max(0,min(3599,int(data.get("seconds",seconds) or 0)))
-        elif action=="adjust": seconds=max(0,min(3599,seconds+int(data.get("delta",0) or 0)))
-        elif action=="reset": seconds=max(0,min(3599,int(data.get("seconds",720) or 720))); state["clock_running"]=False; state["clock_started_at"]=0
-        state["clock_seconds"]=seconds
-        if "visible" in data: state["clock_visible"]=bool(data.get("visible"))
-        save_state(state); return jsonify(state)
+    result = get_rules_service().clock_control(
+        request.get_json(force=True) or {}
+    )
+    return jsonify(result.data["state"])
 
 
 @app.post("/api/field-direction")
 @require_auth
 def field_direction():
-    data=request.get_json(force=True) or {}
-    with lock:
-        state=load_state()
-        team=str(data.get("team") or "home").lower()
-        direction=str(data.get("direction") or data.get("home_direction") or "right").lower()
-        if team not in {"home","visitor"} or direction not in {"left","right"}: return jsonify({"error":"INVALID_DIRECTION"}),400
-        state[f"{team}_direction"]=direction
-        state[f"{opposite(team)}_direction"]="left" if direction=="right" else "right"
-        save_state(state); return jsonify(state)
+    result = get_rules_service().field_direction(
+        request.get_json(force=True) or {}
+    )
+    if result.code == "INVALID_DIRECTION":
+        return jsonify({"error": result.code}), 400
+    return jsonify(result.data["state"])
 
 
 @app.post("/api/rules-play")
 @require_auth
 def rules_play():
-    data=request.get_json(force=True) or {}
-    team=str(data.get("team","")).lower(); kind=str(data.get("play_type","")).lower()
-    if team not in {"home","visitor"} or kind not in {"run","pass","kickoff","punt"}:
-        return jsonify({"error":"INVALID_PLAY"}),400
-    with lock:
-        state=load_state()
-        if not state.get("broadcast_id"): return jsonify({"error":"NO_ACTIVE_BROADCAST"}),409
-        if not game_data_source_allowed(state,"statistician"): return authority_rejection(state)
-        push_history(state)
-        before={k:copy.deepcopy(state.get(k)) for k in ("home_score","visitor_score","possession","down","distance","ball_spot","quarter","clock_seconds","clock_running","player_graphic")}
-        start=spot_to_coord(data.get("start_spot") or state.get("ball_spot") or 50)
-        end=spot_to_coord(data.get("end_spot") if data.get("end_spot") not in (None,"") else start)
-        direction=team_direction(state,team); yards=(end-start)*direction
-        old_down=str(state.get("down","1st")); old_distance=str(state.get("distance","10"))
-        try: distance=10 if old_distance in {"Off","Goal",""} else max(1,int(old_distance))
-        except ValueError: distance=10
-        outcome=str(data.get("pass_outcome","")).lower()
-        turnover=bool(data.get("fumble_lost")) or outcome=="interception"
-        touchdown=(direction==1 and end==100) or (direction==-1 and end==0)
-        safety=(direction==1 and end==0) or (direction==-1 and end==100)
-        first_down=False
-        label=kind.title(); result=""
-        player_number=str(data.get("player_number","")).strip(); passer_number=str(data.get("passer_number","")).strip(); receiver_number=str(data.get("receiver_number","")).strip(); sacker_number=str(data.get("sacker_number","")).strip(); kicker_number=str(data.get("kicker_number","")).strip(); returner_number=str(data.get("returner_number","")).strip()
-        player_ref=resolve_game_roster_player(state,team,player_number); passer_ref=resolve_game_roster_player(state,team,passer_number); receiver_ref=resolve_game_roster_player(state,team,receiver_number); sacker_ref=resolve_game_roster_player(state,opposite(team),sacker_number); kicker_ref=resolve_game_roster_player(state,team,kicker_number); returner_ref=resolve_game_roster_player(state,opposite(team),returner_number)
-        player_name=player_ref.get('name') or str(data.get('player_name','')).strip(); passer_name=passer_ref.get('name') or str(data.get('passer_name','')).strip(); receiver_name=receiver_ref.get('name') or str(data.get('receiver_name','')).strip(); sacker_name=sacker_ref.get('name') or str(data.get('sacker_name','')).strip(); kicker_name=kicker_ref.get('name') or str(data.get('kicker_name','')).strip(); returner_name=returner_ref.get('name') or str(data.get('returner_name','')).strip()
-        if kind=="run":
-            kneel=bool(data.get("kneel")); label="Kneel" if kneel else "Run"
-            runner_label=(f"#{player_number} {player_name}".strip() if player_number else player_name or '?'); result=f"{runner_label} {'kneel' if kneel else 'run'} for {yards} yards"
-        elif kind=="pass":
-            if outcome in {"incomplete","spike"}:
-                end=start; yards=0; label="Spike" if outcome=="spike" else "Incomplete Pass"; passer_label=(f"#{passer_number} {passer_name}".strip() if passer_number else passer_name or '?'); result=f"{passer_label} pass incomplete" if outcome!="spike" else f"{passer_label} spike"
-            elif outcome=="interception": label="Interception"; passer_label=(f"#{passer_number} {passer_name}".strip() if passer_number else passer_name or '?'); result=f"{passer_label} pass intercepted"
-            elif outcome=="sack": label="Sack"; passer_label=(f"#{passer_number} {passer_name}".strip() if passer_number else passer_name or '?'); sacker_label=(f"#{sacker_number} {sacker_name}".strip() if sacker_number else sacker_name or '?'); result=f"{passer_label} sacked by {sacker_label} for {yards} yards"
-            else: label="Pass"; passer_label=(f"#{passer_number} {passer_name}".strip() if passer_number else passer_name or '?'); receiver_label=(f"#{receiver_number} {receiver_name}".strip() if receiver_number else receiver_name or '?'); result=f"{passer_label} complete to {receiver_label} for {yards} yards"
-        elif kind in {"kickoff","punt"}:
-            receiving=opposite(team); state["possession"]=receiving
-            landing=spot_to_coord(data.get("landing_spot") if data.get("landing_spot") not in (None,"") else end)
-            touchback=bool(data.get("touchback")); fair=bool(data.get("fair_catch")); blocked=bool(data.get("blocked"))
-            if touchback:
-                # NFHS edition default: receiving team begins at its own 20.
-                receiving_direction=team_direction(state, receiving)
-                end=20 if receiving_direction==1 else 80
-            kick_distance=abs(landing-start)
-            return_direction=team_direction(state, receiving)
-            return_yards=max(0,(end-landing)*return_direction)
-            touchdown = (not touchback and not fair and returner_number and ((return_direction==1 and end==100) or (return_direction==-1 and end==0)))
-            if touchdown:
-                state[f"{receiving}_score"] = int(state.get(f"{receiving}_score", 0) or 0) + 6
-            state["ball_spot"]=coord_to_spot(end); state["down"]="1st"; state["distance"]="10"; state["clock_running"]=False; state["clock_started_at"]=0
-            label="Kickoff" if kind=="kickoff" else "Punt"
-            result=f"{label} by #{kicker_number or '?'} landed at {coord_to_spot(landing)}"
-            if returner_number and not fair and not touchback:
-                returner_label=(f"#{returner_number} {returner_name}".strip() if returner_number else returner_name or '?')
-                result += f", returned by {returner_label} for {return_yards} yards to {coord_to_spot(end)}"
-            else: result += f", ball at {coord_to_spot(end)}"
-            result += (" — touchback" if touchback else " — fair catch" if fair else " — blocked" if blocked else "")
-            if touchdown:
-                result += ", touchdown"
-                label = "Kickoff Return Touchdown" if kind == "kickoff" else "Punt Return Touchdown"
-                if returner_number or returner_name:
-                    td_roster = {"id": returner_ref.get("roster_id", ""), "school_id": state.get(f"{receiving}_school_id", ""), "sport": str(state.get("sport") or "Football"), "players": []}
-                    td_player = {"id": returner_ref.get("player_id", ""), "number": returner_number, "preferred_name": returner_name, "first_name": returner_name, "last_name": "", "position": "Returner"}
-                    show_automation_player_graphic(state, td_roster, td_player, "touchdown", 8, eyebrow="TOUCHDOWN", play_detail=f"{return_yards}-yard {kind} return")
-        if kind in {"run","pass"}:
-            if touchdown:
-                state[f"{team}_score"]=int(state.get(f"{team}_score",0))+6; state["down"]="1st"; state["distance"]="10"; state["clock_running"]=False; state["clock_started_at"]=0
-                # Alpha.3e: a touchdown derived by the rules engine must trigger
-                # the same player graphic path as a manual touchdown event.
-                td_number = receiver_number if kind == "pass" and outcome == "complete" else player_number
-                td_name = receiver_name if kind == "pass" and outcome == "complete" else player_name
-                if td_number or td_name:
-                    td_roster = {
-                        "id": "", "school_id": state.get(f"{team}_school_id", ""),
-                        "sport": str(state.get("sport") or "Football"), "players": [],
-                    }
-                    td_player = {"id": "", "number": td_number, "preferred_name": td_name,
-                                 "first_name": td_name, "last_name": "", "position": ""}
-                    td_detail = f"{yards}-yard touchdown " + ("reception" if kind == "pass" else "run")
-                    show_automation_player_graphic(state, td_roster, td_player, "touchdown", 8,
-                                                   eyebrow="TOUCHDOWN", play_detail=td_detail)
-            elif safety:
-                other=opposite(team); state[f"{other}_score"]=int(state.get(f"{other}_score",0))+2; state["possession"]=other; state["clock_running"]=False; state["clock_started_at"]=0
-            elif turnover:
-                state["possession"]=opposite(team); state["down"]="1st"; state["distance"]="10"; state["clock_running"]=False; state["clock_started_at"]=0
-            else:
-                first_down=yards>=distance
-                if first_down: state["down"]="1st"; state["distance"]="10"
-                else:
-                    state["down"]=advance_down(old_down); state["distance"]=str(max(1,distance-yards))
-                    if old_down=="4th": state["possession"]=opposite(team); state["down"]="1st"; state["distance"]="10"; state["clock_running"]=False; state["clock_started_at"]=0; turnover=True
-                if outcome in {"incomplete","spike"} or bool(data.get("out_of_bounds")): state["clock_running"]=False; state["clock_started_at"]=0
-            state["ball_spot"]=coord_to_spot(end)
-        play_number=int(state.get("next_play_number",1) or 1); state["next_play_number"]=play_number+1
-        token=re.sub(r"[^A-Za-z0-9]+","-",str(state.get("broadcast_id") or "GAME")).strip("-") or "GAME"
-        play_id=f"{token}-{play_number:04d}"; event_id=f"evt-{int(time.time()*1000)}-{play_number}"
-        if bool(data.get("fumble")): result += ", fumble" + (" lost" if bool(data.get("fumble_lost")) else " recovered")
-        if touchdown and kind in {"run", "pass"}:
-            result += ", touchdown"
-            label = "Touchdown Pass" if kind == "pass" else "Touchdown Run"
-        elif first_down:
-            result += ", first down"
-        scoring_team = opposite(team) if touchdown and kind in {"kickoff", "punt"} else team
-        td_number = returner_number if touchdown and kind in {"kickoff", "punt"} else (receiver_number if kind == "pass" and outcome == "complete" else player_number)
-        td_name = returner_name if touchdown and kind in {"kickoff", "punt"} else (receiver_name if kind == "pass" and outcome == "complete" else player_name)
-        event={"id":event_id,"play_id":play_id,"play_number":play_number,"broadcast_id":state.get("broadcast_id",""),"team":scoring_team,"team_name":state.get(f"{scoring_team}_team",scoring_team.title()),"event":"PLAY","label":label,"description":result,"quarter":state.get("quarter","1"),"source":"statistician","created_at":int(time.time()),"score_delta":6 if touchdown else (2 if safety else 0),"before":before,"after":{k:copy.deepcopy(state.get(k)) for k in before},"automation":{"play_type":kind,"yards":str(yards),"pass_outcome":outcome,"fumble":bool(data.get("fumble")),"fumble_lost":bool(data.get("fumble_lost")),"turnover":turnover,"touchdown":touchdown,"safety":safety,"player_name":td_name if touchdown else (player_name or receiver_name),"player_number":td_number if touchdown else (player_number or receiver_number),"sacker_number":sacker_number,"landing_spot":coord_to_spot(landing) if kind in {"kickoff","punt"} else "","kick_distance":kick_distance if kind in {"kickoff","punt"} else 0,"return_yards":return_yards if kind in {"kickoff","punt"} else 0},"media_trigger":{"key":f"touchdown_{scoring_team}" if touchdown else "","assigned":bool(touchdown and (td_number or td_name)),"graphics":"player_touchdown" if touchdown and (td_number or td_name) else None,"audio":None,"video":None}}
-        play={"play_id":play_id,"play_number":play_number,"event_id":event_id,"broadcast_id":state.get("broadcast_id",""),"quarter":str(state.get("quarter","1")),"clock":str(data.get("clock", "")),"offense":opposite(team) if kind in {"kickoff","punt"} else team,"defense":team if kind in {"kickoff","punt"} else opposite(team),"kicking_team":team if kind in {"kickoff","punt"} else "","down":old_down,"distance":old_distance,"ball_spot":coord_to_spot(start),"end_spot":coord_to_spot(end),"play_type":kind,"result":result,"yards":yards,"first_down":first_down,"touchdown":touchdown,"turnover":turnover,"safety":safety,"notes":str(data.get("notes","")),"created_by":"statistician","created_at":int(time.time()),"label":label,"player_number":returner_number if kind in {"kickoff","punt"} else (player_number or receiver_number),"player_name":returner_name if kind in {"kickoff","punt"} else (player_name or receiver_name),"passer_number":passer_number,"passer_name":passer_name,"receiver_number":receiver_number,"receiver_name":receiver_name,"sacker_number":sacker_number,"sacker_name":sacker_name,"kicker_number":kicker_number,"kicker_name":kicker_name,"returner_number":returner_number,"returner_name":returner_name,"unresolved_players":[role for role,ref in (("player",player_ref),("passer",passer_ref),("receiver",receiver_ref),("sacker",sacker_ref),("kicker",kicker_ref),("returner",returner_ref)) if ref.get("number") and not ref.get("resolved")],"landing_spot":coord_to_spot(landing) if kind in {"kickoff","punt"} else "","fumble":bool(data.get("fumble")),"fumble_lost":bool(data.get("fumble_lost")),"kneel":bool(data.get("kneel")),"undone":False}
-        state["events"]=(list(state.get("events") or [])+[event])[-500:]; state["plays"]=(list(state.get("plays") or [])+[play])[-500:]; state["last_event"]=event
-        state["status"]="live"; state["broadcast_phase"]="live"
-        save_state(state); return jsonify({"state":state,"play":play})
+    result = get_rules_service().play(request.get_json(force=True) or {})
+    if result.code == "INVALID_PLAY":
+        return jsonify({"error": result.code}), 400
+    if result.code == "NO_ACTIVE_BROADCAST":
+        return jsonify({"error": result.code}), 409
+    if result.code == "CONTROL_SOURCE_LOCKED":
+        return jsonify(result.data), 409
+    return jsonify(result.data)
+
 
 @app.post("/api/undo")
 @require_auth
