@@ -22,12 +22,12 @@ jobs:
           python-version: "3.13"
       - run: python -m pip install -q -r requirements.txt pytest
       - run: python tools/ci_prepare.py
-      - run: python tools/ci_apply.py
-      - name: Run architecture audit and focused tests
+      - name: Apply cleanup and run focused validation
         id: focused
         continue-on-error: true
         run: |
-          python phase4_architecture.py > phase4.log 2>&1
+          python tools/ci_apply.py > phase4.log 2>&1
+          python phase4_architecture.py >> phase4.log 2>&1
           python -m pytest -q tests/test_phase_4_architecture.py tests/test_phase_4_24_migration.py --tb=short >> phase4.log 2>&1
       - name: Upload diagnostic log
         if: always()
