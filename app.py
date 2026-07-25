@@ -57,6 +57,14 @@ from routes.security_upgrade_routes import (
     SecurityUpgradeRoutesDependencies,
     create_security_upgrade_blueprint,
 )
+from routes.school_routes import (
+    SchoolRoutesDependencies,
+    create_school_blueprint,
+)
+from routes.association_routes import (
+    AssociationRoutesDependencies,
+    create_association_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -234,9 +242,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.5b — Security and Upgrade Routes"
+    "Version 1.13.0-alpha.5c — School and Association Routes"
 )
-RUNTIME_BUILD = "V1.13A5B-SECURITY-AND-UPGRADE-ROUTES"
+RUNTIME_BUILD = "V1.13A5C-SCHOOL-AND-ASSOCIATION-ROUTES"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -2092,394 +2100,37 @@ def import_roster_players(roster_id: str):
     return jsonify(result.data)
 
 
-@app.get("/api/schools")
-@require_auth
-def list_schools():
-    return jsonify(get_school_service().list_schools())
-
-
-@app.get("/api/schools/<school_id>")
-@require_auth
-def read_school(school_id: str):
-    result = get_school_service().read(school_id)
-    if result.code == "SCHOOL_NOT_FOUND":
-        return jsonify({"error": result.code}), 404
-    return jsonify(result.data["school"])
-
-
-@app.post("/api/schools")
-@require_auth
-def create_school():
-    result = get_school_service().create(
-        request.get_json(force=True) or {}
+SCHOOL_ROUTES_BLUEPRINT = create_school_blueprint(
+    SchoolRoutesDependencies(
+        require_auth=require_auth,
+        get_school_service=get_school_service,
     )
-    if result.code == "SCHOOL_NAME_REQUIRED":
-        return jsonify({"error": result.code}), 400
-    if result.code == "LIKELY_DUPLICATE":
-        return jsonify(
-            {
-                "error": result.code,
-                "matches": result.data["matches"],
-            }
-        ), 409
-    if result.code == "INVALID_SOCIAL_URL":
-        return jsonify(
-            {
-                "error": result.code,
-                "fields": result.data["fields"],
-            }
-        ), 400
-    return jsonify(result.data["school"]), 201
+)
+app.register_blueprint(SCHOOL_ROUTES_BLUEPRINT)
 
-
-@app.put("/api/schools/<school_id>")
-@require_auth
-def update_school(school_id: str):
-    result = get_school_service().update(
-        school_id,
-        request.get_json(force=True) or {},
-    )
-    if result.code == "SCHOOL_NOT_FOUND":
-        return jsonify({"error": result.code}), 404
-    if result.code == "INVALID_SOCIAL_URL":
-        return jsonify(
-            {
-                "error": result.code,
-                "fields": result.data["fields"],
-            }
-        ), 400
-    return jsonify(result.data["school"])
-
-
-@app.delete("/api/schools/<school_id>")
-@require_auth
-def delete_school(school_id: str):
-    result = get_school_service().delete(school_id)
-    if result.code == "SCHOOL_NOT_FOUND":
-        return jsonify({"error": result.code}), 404
-    return jsonify({"ok": True})
-
-
-@app.post("/api/schools/duplicate-check")
-@require_auth
-def duplicate_check():
-    incoming = request.get_json(force=True) or {}
-    matches = get_school_service().duplicate_candidates(
-        incoming,
-        str(incoming.get("exclude_id", "")),
-    )
-    return jsonify({"matches": matches})
-
-
-def _association_error_status(code: str) -> int:
-    if code == "PROFILE_NOT_FOUND":
-        return 404
-    if code in {
-        "PROFILE_ALREADY_EXISTS",
-        "PROFILE_ID_CONFLICT",
-        "PROFILE_PROTECTED",
-        "IMPORT_APPROVAL_REQUIRED",
-        "SOURCE_PREVIEW_REQUIRED",
-        "SOURCE_CHANGED_SINCE_PREVIEW",
-    }:
-        return 409
-    if code in {"SOURCE_FETCH_FAILED", "SOURCE_HOST_UNRESOLVED"}:
-        return 502
-    if code in {
-        "PROFILE_READ_FAILED",
-        "PROFILE_SAVE_FAILED",
-        "PROFILE_DELETE_FAILED",
-    }:
-        return 500
-    return 400
-
-
-def _association_error_response(code: str):
-    return jsonify({"error": code}), _association_error_status(code)
-
-
-def _association_bool(value: Any, default: bool = False) -> bool:
-    if value is None:
-        return default
-    if isinstance(value, bool):
-        return value
-    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
-
-
-def _association_request_payload():
-    supplied_content: bytes | str | None = None
-    supplied_content_type = ""
-
-    if request.files or request.form:
-        payload: dict[str, Any] = request.form.to_dict(flat=True)
-        profile_text = str(payload.get("profile", "")).strip()
-        if profile_text:
-            try:
-                parsed_profile = json.loads(profile_text)
-            except json.JSONDecodeError:
-                return {}, None, "", "INVALID_PROFILE_JSON"
-            if not isinstance(parsed_profile, dict):
-                return {}, None, "", "INVALID_PROFILE_PAYLOAD"
-            payload["profile"] = parsed_profile
-
-        upload = request.files.get("source")
-        if upload is not None and upload.filename:
-            supplied_content = upload.read()
-            supplied_content_type = str(upload.mimetype or "")
-        else:
-            supplied_content = payload.get("source_content")
-            supplied_content_type = str(
-                payload.get("source_content_type", "")
-            )
-    else:
-        payload = request.get_json(silent=True) or {}
-        if not isinstance(payload, dict):
-            return {}, None, "", "INVALID_REQUEST_PAYLOAD"
-        supplied_content = payload.get("source_content")
-        supplied_content_type = str(payload.get("source_content_type", ""))
-
-    if supplied_content is not None and not isinstance(
-        supplied_content,
-        (bytes, str),
-    ):
-        return {}, None, "", "INVALID_SOURCE_CONTENT"
-    return payload, supplied_content, supplied_content_type, ""
-
-
-def _resolve_association_profile(payload: dict[str, Any]):
-    inline_profile = payload.get("profile")
-    if inline_profile is not None:
-        if not isinstance(inline_profile, dict):
-            return None, "INVALID_PROFILE_PAYLOAD"
-        return inline_profile, ""
-
-    profile_id = str(payload.get("profile_id", "")).strip()
-    if not profile_id:
-        return None, "PROFILE_ID_REQUIRED"
-    result = get_association_profile_service().read(profile_id)
-    if not result.ok:
-        return None, result.code
-    return result.data["profile"], ""
-
-
-@app.get("/api/imports/associations/profiles")
-@require_auth
-def list_association_profiles():
-    result = get_association_profile_service().list_profiles()
-    if not result.ok:
-        return _association_error_response(result.code)
-    return jsonify(result.data)
-
-
-@app.get("/api/imports/associations/profiles/<profile_id>")
-@require_auth
-def read_association_profile(profile_id: str):
-    result = get_association_profile_service().read(profile_id)
-    if not result.ok:
-        return _association_error_response(result.code)
-    return jsonify(result.data["profile"])
-
-
-@app.post("/api/imports/associations/profiles")
-@require_auth
-def create_association_profile():
-    incoming = request.get_json(silent=True) or {}
-    result = get_association_profile_service().create(incoming)
-    if not result.ok:
-        return _association_error_response(result.code)
-    return jsonify(result.data["profile"]), 201
-
-
-@app.put("/api/imports/associations/profiles/<profile_id>")
-@require_auth
-def update_association_profile(profile_id: str):
-    incoming = request.get_json(silent=True) or {}
-    result = get_association_profile_service().update(profile_id, incoming)
-    if not result.ok:
-        return _association_error_response(result.code)
-    return jsonify(result.data["profile"])
-
-
-@app.delete("/api/imports/associations/profiles/<profile_id>")
-@require_auth
-def delete_association_profile(profile_id: str):
-    result = get_association_profile_service().delete(profile_id)
-    if not result.ok:
-        return _association_error_response(result.code)
-    return jsonify(result.data)
-
-
-@app.post("/api/imports/associations/preview")
-@require_auth
-def preview_association_import():
-    payload, supplied_content, supplied_content_type, error = (
-        _association_request_payload()
-    )
-    if error:
-        return _association_error_response(error)
-    profile, error = _resolve_association_profile(payload)
-    if error:
-        return _association_error_response(error)
-
-    result = get_association_workflow_service().preview(
-        profile,
-        supplied_content=supplied_content,
-        supplied_content_type=supplied_content_type,
-    )
-    if not result.ok:
-        return _association_error_response(result.code)
-    return jsonify(result.data)
-
-
-@app.post("/api/imports/associations/import")
-@require_auth
-def apply_association_import():
-    payload, supplied_content, supplied_content_type, error = (
-        _association_request_payload()
-    )
-    if error:
-        return _association_error_response(error)
-    profile, error = _resolve_association_profile(payload)
-    if error:
-        return _association_error_response(error)
-
-    create_venues = None
-    if "create_venues" in payload:
-        create_venues = _association_bool(payload.get("create_venues"))
-
-    result = get_association_workflow_service().apply(
-        profile,
-        approved=_association_bool(payload.get("approved")),
-        expected_sha256=str(payload.get("expected_sha256", "")),
-        supplied_content=supplied_content,
-        supplied_content_type=supplied_content_type,
-        create_venues=create_venues,
-        allow_possible_duplicates=_association_bool(
-            payload.get("allow_possible_duplicates")
+ASSOCIATION_ROUTES_BLUEPRINT = create_association_blueprint(
+    AssociationRoutesDependencies(
+        require_auth=require_auth,
+        get_profile_service=get_association_profile_service,
+        get_workflow_service=get_association_workflow_service,
+        get_import_service=get_association_import_service,
+        get_supplement_service=get_association_supplement_service,
+        load_mhsaa_profile=lambda: load_json(MHSAA_5A_PROFILE_FILE, {}),
+        load_mhsaa_manifest=lambda: load_json(
+            MHSAA_5A_FILE,
+            {"schools": []},
+        ),
+        load_mhsaa_branding_manifest=lambda: load_json(
+            MHSAA_5A_BRANDING_FILE,
+            {"schools": []},
+        ),
+        load_mhsaa_enrichment_manifest=lambda: load_json(
+            MHSAA_5A_ENRICHMENT_FILE,
+            {"schools": []},
         ),
     )
-    if not result.ok:
-        return _association_error_response(result.code)
-    return jsonify(result.data)
-
-
-@app.get("/api/imports/mhsaa/5A/analyze")
-@require_auth
-def analyze_mhsaa_5a():
-    profile = load_json(MHSAA_5A_PROFILE_FILE, {})
-    manifest = load_json(MHSAA_5A_FILE, {"schools": []})
-    result = get_association_import_service().analyze(
-        profile,
-        manifest.get("schools", []),
-    )
-    if not result.ok:
-        return jsonify({"error": result.code}), 400
-
-    schools = []
-    for item in result.data.get("schools", []):
-        candidate = dict(item.get("candidate") or {})
-        candidate["status"] = item.get("status", "invalid")
-        candidate["matches"] = item.get("matches", [])
-        schools.append(candidate)
-
-    return jsonify(
-        {
-            "classification": manifest.get("classification", "5A"),
-            "source": manifest.get("source", {}),
-            "found": result.data.get("found", len(schools)),
-            "new": result.data.get("new", 0),
-            "existing": result.data.get("existing", 0),
-            "possible_duplicates": result.data.get(
-                "possible_duplicates",
-                0,
-            ),
-            "schools": schools,
-        }
-    )
-
-
-@app.post("/api/imports/mhsaa/5A")
-@require_auth
-def import_mhsaa_5a():
-    options = request.get_json(silent=True) or {}
-    profile = load_json(MHSAA_5A_PROFILE_FILE, {})
-    manifest = load_json(MHSAA_5A_FILE, {"schools": []})
-    result = get_association_import_service().apply(
-        profile,
-        manifest.get("schools", []),
-        create_venues=bool(options.get("create_venues", True)),
-        # The legacy MHSAA importer only blocked exact-name matches.
-        # Preserve that behavior while generic imports default to review.
-        allow_possible_duplicates=True,
-    )
-    if not result.ok:
-        return jsonify({"error": result.code}), 400
-
-    return jsonify(
-        {
-            "imported": result.data.get("imported", 0),
-            "skipped_existing": (
-                result.data.get("enriched_existing", 0)
-                + result.data.get("skipped_existing", 0)
-            ),
-            "created_ids": result.data.get("created_ids", []),
-            "total_schools": result.data.get("total_schools", 0),
-        }
-    )
-
-
-@app.get("/api/imports/mhsaa/5A/branding/analyze")
-@require_auth
-def analyze_mhsaa_5a_branding():
-    manifest = load_json(MHSAA_5A_BRANDING_FILE, {"schools": []})
-    result = get_association_supplement_service().analyze_branding(
-        manifest.get("schools", []),
-        source=manifest.get("source", {}),
-    )
-    if not result.ok:
-        return jsonify({"error": result.code}), 400
-    return jsonify(result.data)
-
-
-@app.post("/api/imports/mhsaa/5A/branding")
-@require_auth
-def import_mhsaa_5a_branding():
-    manifest = load_json(MHSAA_5A_BRANDING_FILE, {"schools": []})
-    result = get_association_supplement_service().apply_branding(
-        manifest.get("schools", []),
-        source=manifest.get("source", {}),
-    )
-    if not result.ok:
-        return jsonify({"error": result.code}), 400
-    return jsonify(result.data)
-
-
-@app.get("/api/imports/mhsaa/5A/enrichment/analyze")
-@require_auth
-def analyze_mhsaa_5a_enrichment():
-    manifest = load_json(MHSAA_5A_ENRICHMENT_FILE, {"schools": []})
-    result = get_association_supplement_service().analyze_enrichment(
-        manifest.get("schools", []),
-        source=manifest.get("source", {}),
-        classification=str(manifest.get("classification", "5A")),
-    )
-    if not result.ok:
-        return jsonify({"error": result.code}), 400
-    return jsonify(result.data)
-
-
-@app.post("/api/imports/mhsaa/5A/enrichment")
-@require_auth
-def enrich_mhsaa_5a():
-    manifest = load_json(MHSAA_5A_ENRICHMENT_FILE, {"schools": []})
-    result = get_association_supplement_service().apply_enrichment(
-        manifest.get("schools", []),
-        source=manifest.get("source", {}),
-        venue_sport="Football",
-    )
-    if not result.ok:
-        return jsonify({"error": result.code}), 400
-    return jsonify(result.data)
+)
+app.register_blueprint(ASSOCIATION_ROUTES_BLUEPRINT)
 
 
 def _hex(rgb: tuple[int, int, int]) -> str:
