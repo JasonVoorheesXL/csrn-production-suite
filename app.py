@@ -39,6 +39,7 @@ from sponsor_service import SponsorService
 from venue_service import VenueService
 from broadcast_service import BroadcastService
 from personnel_service import PersonnelService
+from asset_service import AssetService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -224,9 +225,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4i — Personnel Service"
+    "Version 1.13.0-alpha.4j — Asset Service"
 )
-RUNTIME_BUILD = "V1.13A4I-PERSONNEL-SERVICE"
+RUNTIME_BUILD = "V1.13A4J-ASSET-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -681,18 +682,32 @@ def load_assets() -> list[dict[str, Any]]:
         return []
     return data if isinstance(data, list) else data.get("assets", [])
 
+
 def save_assets(items: list[dict[str, Any]]) -> None:
     save_json(ASSETS_FILE, items)
 
+
+ASSET_SERVICE: AssetService | None = None
+
+
+def get_asset_service() -> AssetService:
+    global ASSET_SERVICE
+    if ASSET_SERVICE is None:
+        ASSET_SERVICE = AssetService(
+            load_assets=load_assets,
+            save_assets=save_assets,
+        )
+    return ASSET_SERVICE
+
+
 def asset_by_id(asset_id: str) -> dict[str, Any] | None:
-    return next((item for item in load_assets() if str(item.get("id")) == str(asset_id)), None)
+    result = get_asset_service().read(asset_id)
+    return result.data.get("asset") if result.ok else None
+
 
 def asset_file_hash(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return AssetService.file_hash(path)
+
 
 SPONSOR_REPOSITORY = SponsorRepository(
     CORE_PERSISTENCE,
@@ -755,24 +770,17 @@ def apply_sponsor_to_graphic(
     return str(result.data.get("warning", ""))
 
 
-def clean_asset_record(incoming: dict[str, Any], existing_id: str = "") -> dict[str, Any]:
-    category = str(incoming.get("category", "Other")).strip() or "Other"
-    return {
-        "id": existing_id or str(incoming.get("id", "")).strip() or f"asset-{int(time.time()*1000)}",
-        "name": str(incoming.get("name", "")).strip(),
-        "category": category,
-        "asset_type": str(incoming.get("asset_type", "Other")).strip() or "Other",
-        "file_url": str(incoming.get("file_url", "")).strip(),
-        "source_url": str(incoming.get("source_url", "")).strip(),
-        "rights_status": str(incoming.get("rights_status", "Unverified")).strip() or "Unverified",
-        "rights_owner": str(incoming.get("rights_owner", "")).strip(),
-        "notes": str(incoming.get("notes", "")).strip(),
-        "active": bool(incoming.get("active", True)),
-        "sha256": str(incoming.get("sha256", "")).strip(),
-        "original_filename": str(incoming.get("original_filename", "")).strip(),
-        "created_at": int(incoming.get("created_at", int(time.time())) or int(time.time())),
-        "updated_at": int(time.time()),
-    }
+def clean_asset_record(
+    incoming: dict[str, Any],
+    existing_id: str = "",
+) -> dict[str, Any]:
+    existing = asset_by_id(existing_id) if existing_id else None
+    return get_asset_service().clean_record(
+        incoming,
+        existing_id,
+        existing=existing,
+    )
+
 
 def load_logos() -> list[dict[str, Any]]:
     ensure_data_architecture()
@@ -1805,78 +1813,132 @@ def sponsor_logo_file(filename: str):
 @app.get("/api/assets")
 @require_auth
 def api_assets_list():
-    return jsonify({"assets": load_assets()})
+    include_inactive = str(
+        request.args.get("include_inactive", "true")
+    ).strip().lower() not in {"0", "false", "no", "off"}
+    result = get_asset_service().list_records(
+        include_inactive=include_inactive,
+        category=str(request.args.get("category", "")),
+        asset_type=str(request.args.get("asset_type", "")),
+        rights_status=str(request.args.get("rights_status", "")),
+    )
+    return jsonify(result.data)
+
 
 @app.post("/api/assets")
 @require_auth
 def api_assets_create():
-    incoming = request.get_json(silent=True) or {}
-    record = clean_asset_record(incoming)
-    if not record["name"]:
+    result = get_asset_service().create(
+        request.get_json(silent=True) or {}
+    )
+    if result.code == "ASSET_NAME_REQUIRED":
         return jsonify({"error": "Asset name is required."}), 400
-    items = load_assets(); items.append(record); save_assets(items)
-    return jsonify({"asset": record})
+    return jsonify({"asset": result.data["asset"]})
+
 
 @app.put("/api/assets/<asset_id>")
 @require_auth
 def api_assets_update(asset_id: str):
-    incoming = request.get_json(silent=True) or {}
-    items = load_assets(); found = False
-    for index, item in enumerate(items):
-        if str(item.get("id")) == asset_id:
-            items[index] = clean_asset_record({**item, **incoming}, asset_id); found = True; break
-    if not found: return jsonify({"error": "Asset not found."}), 404
-    save_assets(items); return jsonify({"asset": items[index]})
+    result = get_asset_service().update(
+        asset_id,
+        request.get_json(silent=True) or {},
+    )
+    if result.code == "ASSET_NOT_FOUND":
+        return jsonify({"error": "Asset not found."}), 404
+    if result.code == "ASSET_NAME_REQUIRED":
+        return jsonify({"error": "Asset name is required."}), 400
+    return jsonify({"asset": result.data["asset"]})
+
 
 @app.delete("/api/assets/<asset_id>")
 @require_auth
 def api_assets_delete(asset_id: str):
-    items = load_assets(); remaining = [x for x in items if str(x.get("id")) != asset_id]
-    if len(remaining) == len(items): return jsonify({"error": "Asset not found."}), 404
-    save_assets(remaining); return jsonify({"ok": True})
+    result = get_asset_service().delete(asset_id)
+    if result.code == "ASSET_NOT_FOUND":
+        return jsonify({"error": "Asset not found."}), 404
+    return jsonify({"ok": True})
+
 
 @app.post("/api/assets/<asset_id>/upload")
 @require_auth
 def api_asset_upload(asset_id: str):
     upload = request.files.get("asset")
-    if not upload or not upload.filename: return jsonify({"error": "Choose a file to upload."}), 400
+    if not upload or not upload.filename:
+        return jsonify({"error": "Choose a file to upload."}), 400
     suffix = Path(upload.filename).suffix.lower()
-    allowed = {".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif", ".mp4", ".webm", ".mp3", ".wav", ".pdf"}
-    if suffix not in allowed: return jsonify({"error": "Unsupported asset file type."}), 400
-    duplicate_action = str(request.form.get("duplicate_action", "prompt")).lower()
-    safe_id = re.sub(r"[^A-Za-z0-9_-]+", "-", asset_id).strip("-") or "asset"
+    if not AssetService.extension_allowed(upload.filename):
+        return jsonify({"error": "Unsupported asset file type."}), 400
+
+    duplicate_action = str(
+        request.form.get("duplicate_action", "prompt")
+    ).lower()
+    service = get_asset_service()
+    current_result = service.read(asset_id)
+    if current_result.code == "ASSET_NOT_FOUND":
+        return jsonify({"error": "Save the asset record before uploading."}), 404
+
+    safe_id = AssetService.normalize_id(asset_id)
     temp = ASSET_UPLOAD_DIR / f".upload-{secrets.token_hex(8)}{suffix}"
     upload.save(temp)
-    sha256 = asset_file_hash(temp)
-    items = load_assets(); found = False
-    current = next((x for x in items if str(x.get("id")) == asset_id), None)
-    if not current:
-        temp.unlink(missing_ok=True)
-        return jsonify({"error": "Save the asset record before uploading."}), 404
-    duplicate = next((x for x in items if str(x.get("id")) != asset_id and x.get("sha256") == sha256 and x.get("active", True)), None)
+    sha256 = service.file_hash(temp)
+    duplicate = service.duplicate_by_hash(sha256, exclude_id=asset_id)
+
     if duplicate and duplicate_action == "prompt":
         temp.unlink(missing_ok=True)
-        return jsonify({"error": "DUPLICATE_ASSET", "duplicate_asset": duplicate}), 409
+        return jsonify(
+            {"error": "DUPLICATE_ASSET", "duplicate_asset": duplicate}
+        ), 409
+
     if duplicate and duplicate_action == "reuse":
         temp.unlink(missing_ok=True)
-        items = [x for x in items if str(x.get("id")) != asset_id]
-        save_assets(items)
-        return jsonify({"file_url": duplicate.get("file_url", ""), "asset": duplicate, "duplicate_asset": duplicate, "duplicate_reused": True, "pending_asset_removed": True})
+        result = service.reuse_duplicate(asset_id, str(duplicate.get("id", "")))
+        return jsonify(
+            {
+                "file_url": result.data["asset"].get("file_url", ""),
+                **result.data,
+            }
+        )
+
     if duplicate and duplicate_action == "replace":
         existing_url = str(duplicate.get("file_url", ""))
-        existing_name = existing_url.rsplit("/", 1)[-1] if existing_url.startswith("/asset-files/") else f"{duplicate['id']}{suffix}"
+        existing_name = (
+            existing_url.rsplit("/", 1)[-1]
+            if existing_url.startswith("/asset-files/")
+            else f"{duplicate['id']}{suffix}"
+        )
         target = ASSET_UPLOAD_DIR / existing_name
         temp.replace(target)
-        duplicate.update({"file_url": f"/asset-files/{target.name}", "sha256": sha256, "original_filename": upload.filename, "updated_at": int(time.time())})
-        items = [x for x in items if str(x.get("id")) != asset_id]
-        save_assets(items)
-        return jsonify({"file_url": duplicate["file_url"], "asset": duplicate, "duplicate_asset": duplicate, "duplicate_replaced": True, "pending_asset_removed": True})
+        result = service.replace_duplicate(
+            asset_id,
+            str(duplicate.get("id", "")),
+            file_url=f"/asset-files/{target.name}",
+            sha256=sha256,
+            original_filename=upload.filename,
+        )
+        return jsonify(
+            {
+                "file_url": result.data["asset"]["file_url"],
+                **result.data,
+            }
+        )
+
     filename = f"{safe_id}-{int(time.time())}{suffix}"
     target = ASSET_UPLOAD_DIR / filename
     temp.replace(target)
-    current.update({"file_url": f"/asset-files/{filename}", "sha256": sha256, "original_filename": upload.filename, "updated_at": int(time.time())})
-    save_assets(items)
-    return jsonify({"file_url": current["file_url"], "duplicate_asset": duplicate, "duplicate_kept": bool(duplicate)})
+    result = service.attach_file(
+        asset_id,
+        file_url=f"/asset-files/{filename}",
+        sha256=sha256,
+        original_filename=upload.filename,
+    )
+    return jsonify(
+        {
+            "file_url": result.data["asset"]["file_url"],
+            "duplicate_asset": duplicate,
+            "duplicate_kept": bool(duplicate),
+        }
+    )
+
 
 @app.get("/asset-files/<filename>")
 def asset_file(filename: str):
