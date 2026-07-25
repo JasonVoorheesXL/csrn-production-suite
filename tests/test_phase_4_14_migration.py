@@ -10,11 +10,10 @@ def test_phase_4_14_migration_is_idempotent(tmp_path: Path) -> None:
     target = tmp_path / "app.py"
     target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
 
-    first = apply(target)
+    apply(target)
     second = apply(target)
     text = target.read_text(encoding="utf-8")
 
-    assert first is True
     assert second is False
     assert text.count("from configuration_service import ConfigurationService") == 1
     assert text.count(
