@@ -14,7 +14,7 @@ RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
 class PersonnelRoutesDependencies:
     require_auth: RouteDecorator
     get_personnel_service: Callable[[], Any]
-    headshots_dir: Path
+    get_headshots_dir: Callable[[], Path]
     normalize_personnel_id: Callable[[str], str]
 
 
@@ -74,7 +74,7 @@ def create_personnel_blueprint(
 
     @routes.get("/personnel-headshots/<filename>")
     def personnel_headshot_file(filename: str):
-        return send_from_directory(dependencies.headshots_dir, filename)
+        return send_from_directory(dependencies.get_headshots_dir(), filename)
 
     @routes.post("/api/personnel/<personnel_id>/headshot")
     @dependencies.require_auth
@@ -86,8 +86,9 @@ def create_personnel_blueprint(
         if extension not in {".png", ".jpg", ".jpeg", ".webp"}:
             return jsonify({"error": "UNSUPPORTED_IMAGE"}), 400
 
-        dependencies.headshots_dir.mkdir(parents=True, exist_ok=True)
-        target = dependencies.headshots_dir / (
+        headshots_dir = dependencies.get_headshots_dir()
+        headshots_dir.mkdir(parents=True, exist_ok=True)
+        target = headshots_dir / (
             f"{dependencies.normalize_personnel_id(personnel_id)}{extension}"
         )
         upload.save(target)
