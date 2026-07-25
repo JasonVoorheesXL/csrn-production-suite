@@ -53,6 +53,10 @@ from routes.system_routes import (
     SystemRoutesDependencies,
     create_system_blueprint,
 )
+from routes.security_upgrade_routes import (
+    SecurityUpgradeRoutesDependencies,
+    create_security_upgrade_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -1898,64 +1902,6 @@ def asset_file(filename: str):
 def overlay():
     return render_template("overlay.html")
 
-@app.get("/api/security-status")
-def security_status():
-    sec = load_security()
-    remaining = max(0, int(sec.get("locked_until", 0) - time.time()))
-    return jsonify({
-        "pin_configured": bool(sec.get("pin_hash")),
-        "authenticated": authenticated(),
-        "locked_seconds": remaining,
-    })
-
-@app.post("/api/setup-pin")
-def setup_pin():
-    data = request.get_json(force=True)
-    pin = str(data.get("pin", ""))
-    confirm = str(data.get("confirm", ""))
-
-    result = SECURITY_SERVICE.setup_pin(pin, confirm)
-    if not result.ok:
-        status = {
-            "PIN_ALREADY_CONFIGURED": 409,
-            "PIN_MUST_BE_6_DIGITS": 400,
-            "PIN_MISMATCH": 400,
-        }[result.code]
-        return jsonify({"error": result.code}), status
-
-    session.clear()
-    session.permanent = True
-    session["authenticated"] = True
-    return jsonify({"ok": True})
-
-
-@app.post("/api/login")
-def login():
-    data = request.get_json(force=True)
-    pin = str(data.get("pin", ""))
-    result = SECURITY_SERVICE.authenticate(pin)
-
-    if result.ok:
-        session.clear()
-        session.permanent = True
-        session["authenticated"] = True
-        return jsonify({"ok": True})
-
-    payload = {"error": result.code, **result.data}
-    if result.code == "LOCKED":
-        return jsonify(payload), 429
-
-    return jsonify(payload), 401
-
-
-@app.post("/api/logout")
-def logout():
-    session.clear()
-    return jsonify({"ok": True})
-
-
-
-
 @app.get("/api/broadcasters")
 @require_auth
 def list_broadcasters():
@@ -2710,32 +2656,16 @@ def get_upgrade_service() -> UpgradeService:
     return UPGRADE_SERVICE
 
 
-@app.get("/api/upgrade/candidate")
-def upgrade_candidate():
-    result = get_upgrade_service().candidate()
-    if result.code == "INSPECTION_FAILED":
-        return jsonify(
-            {
-                "error": result.code,
-                "message": result.data.get("message", ""),
-            }
-        ), 500
-    return jsonify(result.data["candidate"])
-
-
-@app.get("/api/upgrade/status")
-def upgrade_status():
-    result = get_upgrade_service().status()
-    return jsonify(result.data["report"])
-
-
-@app.post("/api/upgrade/migrate")
-def run_upgrade_migration():
-    incoming = request.get_json(silent=True) or {}
-    result = get_upgrade_service().run(
-        incoming.get("include_security", True)
+SECURITY_UPGRADE_ROUTES_BLUEPRINT = create_security_upgrade_blueprint(
+    SecurityUpgradeRoutesDependencies(
+        get_security_service=lambda: SECURITY_SERVICE,
+        load_security=load_security,
+        authenticated=authenticated,
+        clock=time.time,
+        get_upgrade_service=get_upgrade_service,
     )
-    return jsonify(result.data["report"])
+)
+app.register_blueprint(SECURITY_UPGRADE_ROUTES_BLUEPRINT)
 
 
 @app.get("/api/obs/status")
