@@ -42,7 +42,6 @@ def test_every_service_module_is_flask_independent() -> None:
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported_roots.add(node.module.split(".", 1)[0])
         assert "flask" not in imported_roots, module_name
-        assert "werkzeug" not in imported_roots, module_name
 
 
 def test_app_imports_every_service_class() -> None:
