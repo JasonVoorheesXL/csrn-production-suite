@@ -34,6 +34,7 @@ from core_repositories import ConfigurationRepository, StateRepository, Security
 from security_service import SecurityService
 from broadcast_package_service import BroadcastPackageService
 from school_service import SchoolService
+from roster_service import RosterService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -981,6 +982,22 @@ def load_rosters() -> list[dict[str, Any]]:
 def save_rosters(items: list[dict[str, Any]]) -> None:
     ensure_data_architecture()
     ROSTER_REPOSITORY.save(items)
+
+
+ROSTER_SERVICE: RosterService | None = None
+
+
+def get_roster_service() -> RosterService:
+    global ROSTER_SERVICE
+
+    if ROSTER_SERVICE is None:
+        ROSTER_SERVICE = RosterService(
+            load_rosters=load_rosters,
+            save_rosters=save_rosters,
+            load_schools=load_schools,
+        )
+
+    return ROSTER_SERVICE
 
 def roster_summary(roster: dict[str, Any], schools: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     school_list = schools if schools is not None else load_schools()
@@ -1960,51 +1977,47 @@ def validate_social():
 @app.get("/api/rosters")
 @require_auth
 def list_rosters():
-    rosters = load_rosters()
-    schools = load_schools()
-    return jsonify([roster_summary(r, schools) for r in rosters])
+    return jsonify(get_roster_service().list_rosters())
+
 
 @app.post("/api/rosters")
 @require_auth
 def create_roster():
-    incoming = request.get_json(force=True) or {}
-    school_id = str(incoming.get("school_id", "")).strip()
-    sport = str(incoming.get("sport", "Football")).strip() or "Football"
-    season = str(incoming.get("season", "")).strip()
-    level = str(incoming.get("level", "Varsity")).strip() or "Varsity"
-    division = str(incoming.get("division", "Boys")).strip() or "Boys"
-    if not school_id or not season:
-        return jsonify({"error":"SCHOOL_AND_SEASON_REQUIRED"}), 400
-    items = load_rosters()
-    duplicate = next((r for r in items if str(r.get("school_id"))==school_id and str(r.get("sport")).lower()==sport.lower() and str(r.get("season"))==season and str(r.get("level")).lower()==level.lower() and str(r.get("division")).lower()==division.lower()), None)
-    if duplicate:
-        return jsonify({"error":"ROSTER_ALREADY_EXISTS", "roster":roster_summary(duplicate)}), 409
-    roster_id = normalize_roster_id(f"{school_id}-{sport}-{season}-{level}-{division}")
-    base=roster_id; n=2
-    while any(r.get("id")==roster_id for r in items):
-        roster_id=f"{base}-{n}"; n+=1
-    record={"id":roster_id,"school_id":school_id,"sport":sport,"season":season,"level":level,"division":division,"players":[],"created_at":int(time.time()),"updated_at":int(time.time())}
-    items.append(record); save_rosters(items)
-    return jsonify(roster_summary(record)), 201
+    result = get_roster_service().create(
+        request.get_json(force=True) or {}
+    )
+    if result.code == "SCHOOL_AND_SEASON_REQUIRED":
+        return jsonify({"error": result.code}), 400
+    if result.code == "ROSTER_ALREADY_EXISTS":
+        return jsonify(
+            {
+                "error": result.code,
+                "roster": result.data["roster"],
+            }
+        ), 409
+    return jsonify(result.data["roster"]), 201
+
 
 @app.put("/api/rosters/<roster_id>")
 @require_auth
 def update_roster(roster_id: str):
-    incoming=request.get_json(force=True) or {}; items=load_rosters()
-    roster=next((r for r in items if r.get("id")==roster_id),None)
-    if not roster: return jsonify({"error":"ROSTER_NOT_FOUND"}),404
-    for field in ("school_id","sport","season","level","division"):
-        if field in incoming: roster[field]=str(incoming[field]).strip()
-    roster["updated_at"]=int(time.time()); save_rosters(items)
-    return jsonify(roster_summary(roster))
+    result = get_roster_service().update(
+        roster_id,
+        request.get_json(force=True) or {},
+    )
+    if result.code == "ROSTER_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    return jsonify(result.data["roster"])
+
 
 @app.delete("/api/rosters/<roster_id>")
 @require_auth
 def delete_roster(roster_id: str):
-    items=load_rosters()
-    if not any(r.get("id")==roster_id for r in items): return jsonify({"error":"ROSTER_NOT_FOUND"}),404
-    save_rosters([r for r in items if r.get("id")!=roster_id])
-    return jsonify({"ok":True})
+    result = get_roster_service().delete(roster_id)
+    if result.code == "ROSTER_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    return jsonify({"ok": True})
+
 
 @app.post("/api/rosters/<roster_id>/players")
 @require_auth
