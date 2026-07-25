@@ -104,7 +104,10 @@ def auth_headers() -> dict[str, str]:
 
 def test_blueprint_registers_preserved_system_urls(system_client) -> None:
     _, app, _, _ = system_client
-    rules = {(rule.rule, tuple(sorted(rule.methods - {"HEAD", "OPTIONS"}))) for rule in app.url_map.iter_rules()}
+    rules = {
+        (rule.rule, tuple(sorted(rule.methods - {"HEAD", "OPTIONS"})))
+        for rule in app.url_map.iter_rules()
+    }
     assert ("/api/config", ("GET",)) in rules
     assert ("/api/config", ("POST",)) in rules
     assert ("/api/diagnostics", ("GET",)) in rules
@@ -155,11 +158,13 @@ def test_update_config_maps_missing_payload_error(system_client) -> None:
     configuration.update_result = StubResult("CONFIG_PAYLOAD_REQUIRED", {})
     response = client.post(
         "/api/config",
-        json=None,
-        headers={**auth_headers(), "Content-Type": "application/json"},
+        data="null",
+        content_type="application/json",
+        headers=auth_headers(),
     )
     assert response.status_code == 400
     assert response.get_json() == {"error": "CONFIG_PAYLOAD_REQUIRED"}
+    assert configuration.updates == [None]
 
 
 def test_update_config_maps_invalid_social_url_fields(system_client) -> None:
