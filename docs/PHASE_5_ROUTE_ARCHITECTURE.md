@@ -40,6 +40,20 @@ Each route group should:
 
 These routes remain public because they establish or report authentication state and support first-run or pre-login upgrades. Session mutation remains an HTTP-layer responsibility, while PIN validation, lockout behavior, candidate inspection, and migration coordination stay in their Phase 4 services.
 
+## Phase 5.3 school and association routes
+
+`routes/school_routes.py` owns school listing, reading, creation, update, deletion, and duplicate checking under `/api/schools`.
+
+`routes/association_routes.py` owns:
+
+- association profile CRUD;
+- generic association preview and approved import workflows;
+- multipart and inline source parsing;
+- association error-to-status mapping;
+- compatibility routes for the MHSAA 5A school, branding, and enrichment manifests.
+
+Manifest loading remains in the application composition root and is injected as callable boundaries. The route module does not know repository paths or create import services. Existing authentication, legacy response shapes, duplicate review behavior, and MHSAA compatibility semantics remain unchanged.
+
 ## Migration sequence
 
 Later Phase 5 stages should move one coherent route domain at a time, add focused Blueprint tests, retain route-contract coverage, and remove the corresponding `@app` decorators only after the Blueprint passes integrated validation.
