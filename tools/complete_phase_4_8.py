@@ -153,6 +153,7 @@ def main() -> None:
     run((sys.executable, "tools/dev_workflow.py", "validate"))
 
     run(("git", "rm", "tools/apply_phase_4_8.py"))
+    run(("git", "rm", "tools/ci_apply.py"))
     run(("git", "rm", "tests/test_phase_4_8_migration.py"))
     run(
         (
