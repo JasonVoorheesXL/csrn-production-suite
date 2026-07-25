@@ -43,5 +43,8 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pytest
 
+      - name: Apply optional phase integration
+        run: python tools/ci_prepare.py
+
       - name: Validate repository
         run: python tools/dev_workflow.py validate
