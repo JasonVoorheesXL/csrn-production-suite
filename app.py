@@ -51,6 +51,7 @@ from event_service import EventService
 from rules_service import RulesService
 from statistics_service import StatisticsService
 from game_operations_service import GameOperationsService
+from support_media_service import SupportMediaService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -3073,9 +3074,24 @@ def set_value():
     return jsonify(result.data["state"])
 
 
+SUPPORT_MEDIA_SERVICE: SupportMediaService | None = None
+
+
+def get_support_media_service() -> SupportMediaService:
+    global SUPPORT_MEDIA_SERVICE
+    if SUPPORT_MEDIA_SERVICE is None:
+        SUPPORT_MEDIA_SERVICE = SupportMediaService(
+            headshots_dir=HEADSHOTS_DIR,
+            load_rosters=load_rosters,
+            save_rosters=save_rosters,
+        )
+    return SUPPORT_MEDIA_SERVICE
+
+
 @app.get("/roster-headshots/<filename>")
 def roster_headshot_file(filename: str):
     return send_from_directory(HEADSHOTS_DIR, filename)
+
 
 @app.post("/api/rosters/<roster_id>/players/<player_id>/headshot")
 @require_auth
@@ -3083,35 +3099,34 @@ def upload_player_headshot(roster_id: str, player_id: str):
     upload = request.files.get("headshot")
     if not upload or not upload.filename:
         return jsonify({"error": "HEADSHOT_FILE_REQUIRED"}), 400
-    ext = Path(upload.filename).suffix.lower()
-    if ext not in (".png", ".jpg", ".jpeg", ".webp"):
-        return jsonify({"error": "UNSUPPORTED_IMAGE_TYPE"}), 400
-    try:
-        raw = upload.read()
-        image = Image.open(io.BytesIO(raw))
-        image.load()
-        if image.width < 64 or image.height < 64:
-            return jsonify({"error": "IMAGE_TOO_SMALL"}), 400
-    except Exception:
-        return jsonify({"error": "INVALID_IMAGE"}), 400
-    rosters = load_rosters()
-    roster = next((r for r in rosters if str(r.get("id")) == roster_id), None)
-    if not roster:
-        return jsonify({"error": "ROSTER_NOT_FOUND"}), 404
-    player = next((p for p in roster.get("players", []) if str(p.get("id")) == player_id), None)
-    if not player:
-        return jsonify({"error": "PLAYER_NOT_FOUND"}), 404
-    safe_roster = re.sub(r"[^A-Za-z0-9_-]+", "-", roster_id).strip("-") or "roster"
-    safe_player = re.sub(r"[^A-Za-z0-9_-]+", "-", player_id).strip("-") or "player"
-    filename = f"{safe_roster}__{safe_player}{ext}"
-    path = HEADSHOTS_DIR / filename
-    path.write_bytes(raw)
-    url = f"/roster-headshots/{filename}"
-    player["headshot"] = url
-    player["headshot_source"] = "uploaded"
-    player["headshot_original_filename"] = upload.filename
-    save_rosters(rosters)
-    return jsonify({"headshot": url, "player": player})
+    result = get_support_media_service().upload_headshot(
+        roster_id,
+        player_id,
+        original_filename=upload.filename,
+        raw=upload.read(),
+    )
+    if result.code in {
+        "HEADSHOT_FILE_REQUIRED",
+        "UNSUPPORTED_IMAGE_TYPE",
+        "INVALID_IMAGE",
+        "IMAGE_TOO_SMALL",
+    }:
+        return jsonify({"error": result.code}), 400
+    if result.code in {"ROSTER_NOT_FOUND", "PLAYER_NOT_FOUND"}:
+        return jsonify({"error": result.code}), 404
+    if result.code == "HEADSHOT_STORAGE_FAILED":
+        return jsonify(
+            {
+                "error": result.code,
+                "message": result.data.get("message", ""),
+            }
+        ), 500
+    return jsonify(
+        {
+            "headshot": result.data["headshot"],
+            "player": result.data["player"],
+        }
+    )
 
 
 def activate_primary_graphic(state: dict[str, Any], active: str) -> None:
@@ -3385,18 +3400,8 @@ def apply_penalty_enforcement(state: dict[str, Any], category: str, name: str, y
     return result
 
 def local_addresses() -> list[str]:
-    addresses: set[str] = set()
-    try:
-        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
-            ip = info[4][0]
-            if ip and not ip.startswith("127."):
-                addresses.add(ip)
-    except OSError:
-        pass
-    primary = local_ip()
-    if primary and not primary.startswith("127."):
-        addresses.add(primary)
-    return sorted(addresses)
+    return get_support_media_service().local_addresses()
+
 
 @app.get("/api/statistics")
 @require_auth
@@ -3499,24 +3504,31 @@ def corrections_report():
 @app.get("/api/connection-info")
 @require_auth
 def connection_info():
-    addresses = local_addresses()
-    return jsonify({
-        "port": 5050,
-        "addresses": [{"ip": ip, "url": f"http://{ip}:5050"} for ip in addresses],
-        "localhost": "http://127.0.0.1:5050",
-        "guidance": "For USB tethering, connect the phone by USB, enable USB tethering, then refresh this panel and use the newly listed address from the second device. Some phones cannot browse back to the laptop while serving as the tethering device; use a separate statistician phone/tablet when that occurs.",
-    })
+    result = get_support_media_service().connection_info(5050)
+    return jsonify(result.data["connection"])
+
 
 @app.get("/api/connection-qr")
 @require_auth
 def connection_qr():
-    url = str(request.args.get("url", "") or "")
-    if not re.match(r"^https?://", url):
-        return jsonify({"error": "INVALID_URL"}), 400
-    image = qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage, box_size=8, border=2)
-    stream = io.BytesIO()
-    image.save(stream)
-    return Response(stream.getvalue(), mimetype="image/svg+xml", headers={"Cache-Control": "no-store"})
+    result = get_support_media_service().qr_svg(
+        request.args.get("url", "")
+    )
+    if result.code == "INVALID_URL":
+        return jsonify({"error": result.code}), 400
+    if result.code == "QR_GENERATION_FAILED":
+        return jsonify(
+            {
+                "error": result.code,
+                "message": result.data.get("message", ""),
+            }
+        ), 500
+    return Response(
+        result.data["svg"],
+        mimetype=result.data["mimetype"],
+        headers=result.data["headers"],
+    )
+
 
 @app.post("/api/toggle-scorebug")
 @require_auth
@@ -3640,14 +3652,8 @@ def undo():
 
 
 def local_ip() -> str:
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except OSError:
-        return "127.0.0.1"
+    return SupportMediaService.local_ip()
+
 
 if __name__ == "__main__":
     ensure_data_architecture()
