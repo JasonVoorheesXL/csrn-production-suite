@@ -43,6 +43,7 @@ from asset_service import AssetService
 from graphics_service import GraphicsService
 from logo_service import LogoService
 from obs_service import OBSService
+from configuration_service import ConfigurationService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -228,9 +229,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4m — OBS Service"
+    "Version 1.13.0-alpha.4n — Configuration Service"
 )
-RUNTIME_BUILD = "V1.13A4M-OBS-SERVICE"
+RUNTIME_BUILD = "V1.13A4N-CONFIGURATION-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -344,6 +345,21 @@ def update_config_values(
 ) -> dict[str, Any]:
     ensure_data_architecture()
     return CONFIG_REPOSITORY.update(patch)
+
+
+CONFIGURATION_SERVICE: ConfigurationService | None = None
+
+
+def get_configuration_service() -> ConfigurationService:
+    global CONFIGURATION_SERVICE
+    if CONFIGURATION_SERVICE is None:
+        CONFIGURATION_SERVICE = ConfigurationService(
+            load_config=load_config,
+            save_config=save_config,
+            runtime_version=RUNTIME_VERSION,
+            runtime_build=RUNTIME_BUILD,
+        )
+    return CONFIGURATION_SERVICE
 
 
 def application_identity() -> dict[str, str]:
@@ -1285,51 +1301,17 @@ def save_broadcasters(items: list[dict[str, Any]]) -> None:
     ensure_data_architecture()
     BROADCASTERS_FILE.write_text(json.dumps(items, indent=2), encoding="utf-8")
 
-def normalize_social_url(platform: str, value: str) -> tuple[str, bool, str]:
-    value = (value or "").strip()
-    if not value:
-        return "", True, ""
-    if value.startswith("@"):
-        value = value[1:]
-    if "://" not in value and "/" not in value:
-        domains = {
-            "facebook": "https://facebook.com/",
-            "x": "https://x.com/",
-            "instagram": "https://instagram.com/",
-            "youtube": "https://youtube.com/@",
-        }
-        if platform in domains:
-            value = domains[platform] + value
-        elif platform == "website":
-            value = "https://" + value
-    elif "://" not in value:
-        value = "https://" + value
+def normalize_social_url(
+    platform: str,
+    value: str,
+) -> tuple[str, bool, str]:
+    return ConfigurationService.normalize_social_url(platform, value)
 
-    try:
-        hostname = (urlparse(value).hostname or "").lower()
-    except ValueError:
-        hostname = ""
-    valid_domains = {
-        "facebook": ("facebook.com", "www.facebook.com"),
-        "x": ("x.com", "twitter.com", "www.x.com", "www.twitter.com"),
-        "instagram": ("instagram.com", "www.instagram.com"),
-        "youtube": ("youtube.com", "www.youtube.com", "youtu.be"),
-    }
-    if platform == "website":
-        valid = bool(hostname) and value.lower().startswith(("http://", "https://"))
-    else:
-        valid = any(hostname == domain or hostname.endswith(f".{domain}") for domain in valid_domains.get(platform, ()))
-    return value, valid, "" if valid else f"Expected a valid {platform} URL"
 
-def normalize_social_block(block: dict[str, Any]) -> tuple[dict[str, str], dict[str, str]]:
-    normalized: dict[str, str] = {}
-    errors: dict[str, str] = {}
-    for platform in ("facebook", "x", "instagram", "youtube", "website"):
-        value, valid, message = normalize_social_url(platform, str(block.get(platform, "")))
-        normalized[platform] = value
-        if not valid:
-            errors[platform] = message
-    return normalized, errors
+def normalize_social_block(
+    block: dict[str, Any],
+) -> tuple[dict[str, str], dict[str, str]]:
+    return ConfigurationService.normalize_social_block(block)
 
 
 PERSONNEL_SERVICE: PersonnelService | None = None
@@ -2903,26 +2885,25 @@ def obs_program_visual_mode():
 @app.get("/api/config")
 @require_auth
 def get_config():
-    return jsonify(load_config())
+    result = get_configuration_service().read()
+    return jsonify(result.data["config"])
+
 
 @app.post("/api/config")
 @require_auth
 def update_config():
     incoming = request.get_json(force=True)
-    current = load_config()
-    if "social" in incoming:
-        normalized_social, social_errors = normalize_social_block(incoming.get("social") or {})
-        if social_errors:
-            return jsonify({"error": "INVALID_SOCIAL_URL", "fields": social_errors}), 400
-        incoming["social"] = normalized_social
-    for section in current:
-        if section in incoming and isinstance(incoming[section], dict):
-            current[section].update(incoming[section])
-    # Protect application identity fields.
-    current["application"]["version"] = RUNTIME_VERSION
-    current["application"]["build"] = RUNTIME_BUILD
-    save_config(current)
-    return jsonify(current)
+    result = get_configuration_service().update(incoming)
+    if result.code == "CONFIG_PAYLOAD_REQUIRED":
+        return jsonify({"error": result.code}), 400
+    if result.code == "INVALID_SOCIAL_URL":
+        return jsonify(
+            {
+                "error": result.code,
+                "fields": result.data.get("fields", {}),
+            }
+        ), 400
+    return jsonify(result.data["config"])
 
 @app.get("/api/diagnostics")
 @require_auth
