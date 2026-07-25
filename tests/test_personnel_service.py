@@ -61,7 +61,7 @@ def test_normalize_id_and_headshot_url() -> None:
     assert PersonnelService.normalize_id("") == "staff-member"
     assert (
         PersonnelService.normalize_headshot_url(
-            r"Data\Personnel\Headshots\jason.png"
+            r"data\Personnel\Headshots\jason.png"
         )
         == "/personnel-headshots/jason.png"
     )
