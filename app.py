@@ -49,6 +49,7 @@ from diagnostics_service import DiagnosticsService
 from upgrade_service import UpgradeService
 from event_service import EventService
 from rules_service import RulesService
+from statistics_service import StatisticsService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -3219,21 +3220,12 @@ def show_automation_player_graphic(
 
 
 def canonical_team_key(state: dict[str, Any], value: Any) -> str:
-    text = str(value or "").strip()
-    low = text.lower()
-    if low in {"home", str(state.get("home_team", "")).strip().lower()}:
-        return "home"
-    if low in {"visitor", "away", str(state.get("visitor_team", "")).strip().lower()}:
-        return "visitor"
-    return text
+    return StatisticsService.canonical_team_key(state, value)
+
 
 def canonical_team_name(state: dict[str, Any], value: Any) -> str:
-    key = canonical_team_key(state, value)
-    if key == "home":
-        return str(state.get("home_team") or "Home")
-    if key == "visitor":
-        return str(state.get("visitor_team") or "Visitor")
-    return str(value or "")
+    return StatisticsService.canonical_team_name(state, value)
+
 
 def resolve_game_roster_player(state: dict[str, Any], team: str, number: Any) -> dict[str, str]:
     """Resolve a jersey against the active broadcast rosters.
@@ -3280,73 +3272,18 @@ def resolve_game_roster_player(state: dict[str, Any], team: str, number: Any) ->
     name = str(player.get("preferred_name") or f"{player.get('first_name','')} {player.get('last_name','')}".strip()).strip()
     return {"number": jersey, "name": name, "resolved": True, "roster_id": str(roster.get("id", "")), "player_id": str(player.get("id", ""))}
 
+STATISTICS_SERVICE: StatisticsService | None = None
+
+
+def get_statistics_service() -> StatisticsService:
+    global STATISTICS_SERVICE
+    if STATISTICS_SERVICE is None:
+        STATISTICS_SERVICE = StatisticsService()
+    return STATISTICS_SERVICE
+
+
 def build_statistics(state: dict[str, Any]) -> dict[str, Any]:
-    """Derive scoring and basic offensive yardage from canonical Play Register records."""
-    broadcast_id = str(state.get("broadcast_id", ""))
-    events = [e for e in list(state.get("events") or []) if not e.get("undone") and (not broadcast_id or not e.get("broadcast_id") or str(e.get("broadcast_id")) == broadcast_id)]
-    plays = [p for p in list(state.get("plays") or []) if not p.get("undone") and (not broadcast_id or not p.get("broadcast_id") or str(p.get("broadcast_id")) == broadcast_id)]
-    teams = {}
-    for key, name, score in (("home", state.get("home_team") or "Home", state.get("home_score",0)), ("visitor", state.get("visitor_team") or "Visitor", state.get("visitor_score",0))):
-        teams[key] = {"name":str(name),"score":int(score or 0),"touchdowns":0,"field_goals":0,"extra_points":0,"two_point_conversions":0,"turnovers_gained":0,"rushing_attempts":0,"rushing_yards":0,"pass_attempts":0,"completions":0,"passing_yards":0,"interceptions":0,"total_plays":0,"total_yards":0}
-    players = {}
-    def prow(team, name, number):
-        name=str(name or '').strip(); number=str(number or '').strip()
-        if not name and not number:return None
-        key=f"{team}|{number}|{name.lower()}"
-        if key not in players: players[key]={"team":team,"team_name":teams.get(team,{}).get("name",''),"name":name or f"Player {number}","number":number,"touchdowns":0,"passing_touchdowns":0,"field_goals":0,"extra_points":0,"two_point_conversions":0,"points":0,"rushing_attempts":0,"rushing_yards":0,"pass_attempts":0,"completions":0,"passing_yards":0,"receptions":0,"receiving_yards":0,"interceptions_thrown":0,"fumbles":0,"fumbles_lost":0}
-        return players[key]
-    scoring=[]
-    for e in events:
-        team=canonical_team_key(state,e.get('team','')); code=str(e.get('event','')).upper(); a=e.get('automation') or {}; delta=int(e.get('score_delta',0) or 0)
-        if team not in teams: continue
-        if code=='TD' or (code=='TURNOVER' and a.get('return_td')): teams[team]['touchdowns']+=1
-        elif code=='FG': teams[team]['field_goals']+=1
-        elif code=='XP': teams[team]['extra_points']+=1
-        elif code=='2PT': teams[team]['two_point_conversions']+=1
-        if code=='TURNOVER': teams[team]['turnovers_gained']+=1
-        sc=prow(team,a.get('player_name',''),a.get('player_number',''))
-        if sc:
-            sc['points']+=delta
-            if code=='TD' or (code=='TURNOVER' and a.get('return_td')):sc['touchdowns']+=1
-            elif code=='FG':sc['field_goals']+=1
-            elif code=='XP':sc['extra_points']+=1
-            elif code=='2PT':sc['two_point_conversions']+=1
-        if delta:
-            aft=e.get('after') or {}; scoring.append({"quarter":str(e.get('quarter','')),"team":team,"team_name":teams[team]['name'],"label":str(e.get('label') or code),"description":str(e.get('description') or code),"points":delta,"home_score":int(aft.get('home_score',0) or 0),"visitor_score":int(aft.get('visitor_score',0) or 0),"created_at":int(e.get('created_at',0) or 0)})
-    for p in plays:
-        team=canonical_team_key(state,p.get('offense','')); kind=str(p.get('play_type','')).lower();
-        if team not in teams or kind not in {'run','pass'}: continue
-        try:y=int(str(p.get('yards','0') or '0'))
-        except:y=0
-        teams[team]['total_plays']+=1; teams[team]['total_yards']+=y
-        ball=prow(team,p.get('player_name',''),p.get('player_number','')); passer=prow(team,p.get('passer_name',''),p.get('passer_number',''))
-        if kind=='run':
-            teams[team]['rushing_attempts']+=1; teams[team]['rushing_yards']+=y
-            if ball: ball['rushing_attempts']+=1; ball['rushing_yards']+=y
-        else:
-            outcome=str(p.get('pass_outcome','complete')).lower(); teams[team]['pass_attempts']+=1
-            if passer: passer['pass_attempts']+=1
-            if outcome=='complete':
-                teams[team]['completions']+=1; teams[team]['passing_yards']+=y
-                if passer: passer['completions']+=1; passer['passing_yards']+=y
-                if ball: ball['receptions']+=1; ball['receiving_yards']+=y
-            elif outcome=='interception':
-                teams[team]['interceptions']+=1
-                if passer: passer['interceptions_thrown']+=1
-        if p.get('fumble') and ball: ball['fumbles']+=1
-        if p.get('fumble_lost') and ball: ball['fumbles_lost']+=1
-    for t in teams.values(): t['yards_per_play']=round(t['total_yards']/t['total_plays'],1) if t['total_plays'] else 0
-    normalized_plays = []
-    for source_play in plays:
-        row = copy.deepcopy(source_play)
-        offense_key = canonical_team_key(state, row.get("offense"))
-        defense_key = canonical_team_key(state, row.get("defense"))
-        row["offense"] = offense_key
-        row["defense"] = defense_key
-        row["offense_name"] = canonical_team_name(state, offense_key)
-        row["defense_name"] = canonical_team_name(state, defense_key)
-        normalized_plays.append(row)
-    return {"broadcast_id":broadcast_id,"sport":str(state.get('sport') or 'Football'),"season":state.get('season',''),"date":state.get('date',''),"venue":state.get('venue',''),"quarter":str(state.get('quarter','')),"status":str(state.get('status','')),"teams":teams,"players":sorted(players.values(),key=lambda x:(x['team_name'],int(x['number']) if str(x['number']).isdigit() else 999,x['name'])),"scoring_summary":scoring,"play_register":normalized_plays,"event_count":len(events),"play_count":len(plays),"scoring_event_count":len(scoring),"generated_at":int(time.time()),"note":"Statistics are derived from canonical Play Register records and scoring events."}
+    return get_statistics_service().report(state).data["statistics"]
 
 
 PENALTY_RULES: dict[tuple[str, str], dict[str, Any]] = {
