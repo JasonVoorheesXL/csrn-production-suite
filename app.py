@@ -38,6 +38,7 @@ from roster_service import RosterService
 from sponsor_service import SponsorService
 from venue_service import VenueService
 from broadcast_service import BroadcastService
+from personnel_service import PersonnelService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -223,9 +224,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4h — Broadcast Service"
+    "Version 1.13.0-alpha.4i — Personnel Service"
 )
-RUNTIME_BUILD = "V1.13A4H-BROADCAST-SERVICE"
+RUNTIME_BUILD = "V1.13A4I-PERSONNEL-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -1304,6 +1305,21 @@ def normalize_social_block(block: dict[str, Any]) -> tuple[dict[str, str], dict[
     return normalized, errors
 
 
+PERSONNEL_SERVICE: PersonnelService | None = None
+
+
+def get_personnel_service() -> PersonnelService:
+    global PERSONNEL_SERVICE
+
+    if PERSONNEL_SERVICE is None:
+        PERSONNEL_SERVICE = PersonnelService(
+            load_personnel=load_broadcasters,
+            save_personnel=save_broadcasters,
+        )
+
+    return PERSONNEL_SERVICE
+
+
 def normalize_state(state: dict[str, Any]) -> dict[str, Any]:
     merged = copy.deepcopy(DEFAULT_STATE)
     merged.update(state or {})
@@ -1931,119 +1947,95 @@ def logout():
 @app.get("/api/broadcasters")
 @require_auth
 def list_broadcasters():
-    return jsonify(load_broadcasters())
+    include_inactive = str(
+        request.args.get("include_inactive", "true")
+    ).strip().lower() not in {"0", "false", "no", "off"}
+    result = get_personnel_service().list_records(
+        include_inactive=include_inactive,
+        category=str(request.args.get("category", "")),
+        role=str(request.args.get("role", "")),
+        school_id=str(request.args.get("school_id", "")),
+    )
+    return jsonify(result.data["personnel"])
+
 
 @app.post("/api/broadcasters")
 @require_auth
 def create_broadcaster():
-    incoming = request.get_json(force=True)
-    name = str(incoming.get("full_name") or incoming.get("name", "")).strip()
-    role = str(incoming.get("role") or incoming.get("primary_role", "Other"))
-    if not name:
-        return jsonify({"error": "STAFF_NAME_REQUIRED"}), 400
-    if role not in STAFF_ROLES:
-        return jsonify({"error": "INVALID_STAFF_ROLE"}), 400
+    result = get_personnel_service().create(
+        request.get_json(force=True) or {}
+    )
+    if result.code in {"STAFF_NAME_REQUIRED", "INVALID_STAFF_ROLE"}:
+        return jsonify({"error": result.code}), 400
+    if result.code == "INVALID_SOCIAL_URL":
+        return jsonify({"error": result.code, **result.data}), 400
+    return jsonify(result.data["personnel"]), 201
 
-    social, errors = normalize_social_block(incoming.get("social") or {})
-    if errors:
-        return jsonify({"error": "INVALID_SOCIAL_URL", "fields": errors}), 400
-
-    items = load_broadcasters()
-    staff_id = normalize_staff_id(incoming.get("id") or name)
-    base_id = staff_id
-    suffix = 2
-    while any(item.get("id") == staff_id for item in items):
-        staff_id = f"{base_id}-{suffix}"
-        suffix += 1
-
-    record = {
-        "id": staff_id,
-        "full_name": name, "name": name, "preferred_name": str(incoming.get("preferred_name", "")).strip(),
-        "pronunciation": str(incoming.get("pronunciation", "")).strip(), "pronunciation_verified": bool(incoming.get("pronunciation_verified", False)),
-        "category": str(incoming.get("category", "Other")), "role": role, "primary_role": role,
-        "title": role, "organization": str(incoming.get("organization", "")).strip(),
-        "school_id": str(incoming.get("school_id", "")).strip(), "bio": str(incoming.get("bio", "")).strip(),
-        "headshot": normalize_personnel_headshot_url(incoming.get("headshot", "")), "status": "inactive" if str(incoming.get("status", "active")).lower()=="inactive" else "active",
-        "producer": bool(incoming.get("producer", False)), "social": social,
-    }
-    items.append(record)
-    save_broadcasters(items)
-    return jsonify(record), 201
 
 @app.put("/api/broadcasters/<broadcaster_id>")
 @require_auth
 def update_broadcaster(broadcaster_id: str):
-    incoming = request.get_json(force=True)
-    items = load_broadcasters()
-    index = next((i for i, item in enumerate(items) if item.get("id") == broadcaster_id), None)
-    if index is None:
-        return jsonify({"error": "BROADCASTER_NOT_FOUND"}), 404
+    result = get_personnel_service().update(
+        broadcaster_id,
+        request.get_json(force=True) or {},
+    )
+    if result.code == "BROADCASTER_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    if result.code in {"STAFF_NAME_REQUIRED", "INVALID_STAFF_ROLE"}:
+        return jsonify({"error": result.code}), 400
+    if result.code == "INVALID_SOCIAL_URL":
+        return jsonify({"error": result.code, **result.data}), 400
+    return jsonify(result.data["personnel"])
 
-    name = str(incoming.get("full_name") or incoming.get("name", items[index].get("full_name") or items[index].get("name", ""))).strip()
-    role = str(incoming.get("role") or incoming.get("primary_role", items[index].get("role") or items[index].get("primary_role", "Other")))
-    if not name:
-        return jsonify({"error": "STAFF_NAME_REQUIRED"}), 400
-    if role not in STAFF_ROLES:
-        return jsonify({"error": "INVALID_STAFF_ROLE"}), 400
-
-    social, errors = normalize_social_block(incoming.get("social") or {})
-    if errors:
-        return jsonify({"error": "INVALID_SOCIAL_URL", "fields": errors}), 400
-
-    items[index].update({
-        "full_name": name, "name": name, "preferred_name": str(incoming.get("preferred_name", "")).strip(),
-        "pronunciation": str(incoming.get("pronunciation", "")).strip(), "pronunciation_verified": bool(incoming.get("pronunciation_verified", False)),
-        "category": str(incoming.get("category", "Other")), "role": role, "primary_role": role,
-        "title": role, "organization": str(incoming.get("organization", "")).strip(),
-        "school_id": str(incoming.get("school_id", "")).strip(), "bio": str(incoming.get("bio", "")).strip(),
-        "headshot": normalize_personnel_headshot_url(incoming.get("headshot", "")), "status": "inactive" if str(incoming.get("status", "active")).lower()=="inactive" else "active",
-        "producer": bool(incoming.get("producer", False)), "social": social,
-    })
-    save_broadcasters(items)
-    return jsonify(items[index])
 
 @app.delete("/api/broadcasters/<broadcaster_id>")
 @require_auth
 def delete_broadcaster(broadcaster_id: str):
-    items = load_broadcasters()
-    if not any(item.get("id") == broadcaster_id for item in items):
-        return jsonify({"error": "BROADCASTER_NOT_FOUND"}), 404
-    save_broadcasters([item for item in items if item.get("id") != broadcaster_id])
+    result = get_personnel_service().delete(broadcaster_id)
+    if result.code == "BROADCASTER_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
     return jsonify({"ok": True})
+
 
 @app.get("/personnel-headshots/<filename>")
 def personnel_headshot_file(filename: str):
     return send_from_directory(PERSONNEL_HEADSHOTS_DIR, filename)
+
 
 @app.post("/api/personnel/<personnel_id>/headshot")
 @require_auth
 def upload_personnel_headshot(personnel_id: str):
     file = request.files.get("file")
     if not file or not file.filename:
-        return jsonify({"error":"FILE_REQUIRED"}), 400
+        return jsonify({"error": "FILE_REQUIRED"}), 400
     ext = Path(file.filename).suffix.lower()
-    if ext not in {".png",".jpg",".jpeg",".webp"}:
-        return jsonify({"error":"UNSUPPORTED_IMAGE"}), 400
+    if ext not in {".png", ".jpg", ".jpeg", ".webp"}:
+        return jsonify({"error": "UNSUPPORTED_IMAGE"}), 400
     PERSONNEL_HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
-    target = PERSONNEL_HEADSHOTS_DIR / f"{normalize_staff_id(personnel_id)}{ext}"
+    target = PERSONNEL_HEADSHOTS_DIR / (
+        f"{PersonnelService.normalize_id(personnel_id)}{ext}"
+    )
     file.save(target)
-    rel = "/personnel-headshots/" + target.name
-    items = load_broadcasters()
-    for item in items:
-        if str(item.get("id")) == personnel_id:
-            item["headshot"] = rel
-            save_broadcasters(items)
-            return jsonify({"path":rel})
-    return jsonify({"error":"PERSONNEL_NOT_FOUND"}), 404
+    relative = "/personnel-headshots/" + target.name
+    result = get_personnel_service().attach_headshot(
+        personnel_id,
+        relative,
+    )
+    if result.code == "PERSONNEL_NOT_FOUND":
+        target.unlink(missing_ok=True)
+        return jsonify({"error": result.code}), 404
+    return jsonify({"path": result.data["path"]})
+
 
 @app.post("/api/validate-social")
 @require_auth
 def validate_social():
-    incoming = request.get_json(force=True)
-    platform = str(incoming.get("platform", ""))
-    value, valid, message = normalize_social_url(platform, str(incoming.get("value", "")))
-    return jsonify({"normalized": value, "valid": valid, "message": message})
-
+    incoming = request.get_json(force=True) or {}
+    result = get_personnel_service().validate_social(
+        str(incoming.get("platform", "")),
+        str(incoming.get("value", "")),
+    )
+    return jsonify(result.data)
 
 
 @app.get("/api/rosters")
