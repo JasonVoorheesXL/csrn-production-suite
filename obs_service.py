@@ -10,7 +10,7 @@ SaveMapping = Callable[[dict[str, Any]], None]
 ValidateOBS = Callable[[dict[str, Any]], dict[str, Any]]
 SetScorebugVisibility = Callable[[dict[str, Any], bool], dict[str, Any]]
 SetProgramVisualMode = Callable[[dict[str, Any], str], dict[str, Any]]
-PushHistory = Callable[[dict[str, Any]], None]
+UpdateVisualState = Callable[[str], dict[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -35,9 +35,7 @@ class OBSService:
         validate_obs: ValidateOBS,
         set_scorebug_visibility: SetScorebugVisibility,
         set_program_visual_mode: SetProgramVisualMode,
-        load_state: LoadMapping,
-        save_state: SaveMapping,
-        push_history: PushHistory,
+        update_visual_state: UpdateVisualState,
     ) -> None:
         self._load_config = load_config
         self._load_status = load_status
@@ -45,9 +43,7 @@ class OBSService:
         self._validate_obs = validate_obs
         self._set_scorebug_visibility = set_scorebug_visibility
         self._set_program_visual_mode = set_program_visual_mode
-        self._load_state = load_state
-        self._save_state = save_state
-        self._push_history = push_history
+        self._update_visual_state = update_visual_state
 
     def status(self) -> OBSServiceResult:
         return OBSServiceResult(
@@ -101,10 +97,7 @@ class OBSService:
             )
 
         self._save_status(result)
-        state = copy.deepcopy(self._load_state())
-        self._push_history(state)
-        state["visual_mode"] = normalized_mode
-        self._save_state(state)
+        state = copy.deepcopy(self._update_visual_state(normalized_mode))
         return OBSServiceResult(
             "OK",
             {"state": state, "obs": result},
