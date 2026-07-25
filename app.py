@@ -42,6 +42,7 @@ from personnel_service import PersonnelService
 from asset_service import AssetService
 from graphics_service import GraphicsService
 from logo_service import LogoService
+from obs_service import OBSService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -227,9 +228,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4l — Logo Service"
+    "Version 1.13.0-alpha.4m — OBS Service"
 )
-RUNTIME_BUILD = "V1.13A4L-LOGO-SERVICE"
+RUNTIME_BUILD = "V1.13A4M-OBS-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -1581,6 +1582,44 @@ def apply_change(changes: dict[str, Any], save_undo: bool = True) -> dict[str, A
         save_state(state)
         return state
 
+def load_obs_status() -> dict[str, Any]:
+    with obs_status_lock:
+        return copy.deepcopy(last_obs_status)
+
+
+def save_obs_status(status: dict[str, Any]) -> None:
+    with obs_status_lock:
+        last_obs_status.clear()
+        last_obs_status.update(copy.deepcopy(status))
+
+
+def update_obs_visual_state(mode: str) -> dict[str, Any]:
+    with lock:
+        state = load_state()
+        push_history(state)
+        state["visual_mode"] = mode
+        save_state(state)
+        return state
+
+
+OBS_SERVICE: OBSService | None = None
+
+
+def get_obs_service() -> OBSService:
+    global OBS_SERVICE
+    if OBS_SERVICE is None:
+        OBS_SERVICE = OBSService(
+            load_config=load_config,
+            load_status=load_obs_status,
+            save_status=save_obs_status,
+            validate_obs=validate_obs_read_only,
+            set_scorebug_visibility=set_scorebug_visibility,
+            set_program_visual_mode=set_program_visual_mode,
+            update_visual_state=update_obs_visual_state,
+        )
+    return OBS_SERVICE
+
+
 @app.get("/")
 def control_panel():
     identity = application_identity()
@@ -2809,66 +2848,56 @@ def run_upgrade_migration():
 @app.get("/api/obs/status")
 @require_auth
 def obs_status():
-    return jsonify(copy.deepcopy(last_obs_status))
+    result = get_obs_service().status()
+    return jsonify(result.data["status"])
+
 
 @app.post("/api/obs/test")
 @require_auth
 def test_obs_connection():
-    cfg = load_config()
-    with obs_status_lock:
-        result = validate_obs_read_only(cfg.get("obs", {}))
-        last_obs_status.clear()
-        last_obs_status.update(result)
-    return jsonify(result)
+    result = get_obs_service().test_connection()
+    return jsonify(result.data["obs"])
 
 
 def command_scorebug_visibility(visible: bool) -> dict[str, Any]:
-    cfg = load_config()
-    obs_settings = cfg.get("obs", {})
-    if not obs_settings.get("controlled_commands", False):
-        raise OBSConnectionError("Controlled OBS commands are disabled in Settings.")
-    result = set_scorebug_visibility(obs_settings, visible)
-    with obs_status_lock:
-        last_obs_status.clear()
-        last_obs_status.update(result)
-    return result
+    result = get_obs_service().scorebug_visibility(visible)
+    if not result.ok:
+        raise OBSConnectionError(
+            str(result.data.get("message", result.code))
+        )
+    return result.data["obs"]
 
 
 @app.post("/api/obs/scorebug-visibility")
 @require_auth
 def obs_scorebug_visibility():
-    incoming = request.get_json(force=True)
-    visible = incoming.get("visible")
-    if not isinstance(visible, bool):
-        return jsonify({"error": "VISIBLE_MUST_BE_BOOLEAN"}), 400
-    try:
-        result = command_scorebug_visibility(visible)
-    except OBSConnectionError as exc:
-        return jsonify({"error": "OBS_COMMAND_BLOCKED", "message": str(exc)}), 409
-    return jsonify(result)
+    incoming = request.get_json(force=True) or {}
+    result = get_obs_service().scorebug_visibility(incoming.get("visible"))
+    if result.code == "VISIBLE_MUST_BE_BOOLEAN":
+        return jsonify({"error": result.code}), 400
+    if result.code == "OBS_COMMAND_BLOCKED":
+        return jsonify(
+            {
+                "error": result.code,
+                "message": result.data.get("message", ""),
+            }
+        ), 409
+    return jsonify(result.data["obs"])
 
 
 @app.post("/api/obs/program-visual-mode")
 @require_auth
 def obs_program_visual_mode():
-    incoming = request.get_json(force=True)
-    mode = str(incoming.get("mode", "")).lower()
-    cfg = load_config()
-    if not cfg.get("obs", {}).get("controlled_commands", False):
-        return jsonify({"error": "OBS_COMMAND_BLOCKED", "message": "Controlled OBS commands are disabled in Settings."}), 409
-    try:
-        result = set_program_visual_mode(cfg.get("obs", {}), mode)
-    except OBSConnectionError as exc:
-        return jsonify({"error": "OBS_COMMAND_BLOCKED", "message": str(exc)}), 409
-    with obs_status_lock:
-        last_obs_status.clear()
-        last_obs_status.update(result)
-    with lock:
-        state = load_state()
-        push_history(state)
-        state["visual_mode"] = mode
-        save_state(state)
-    return jsonify({"state": state, "obs": result})
+    incoming = request.get_json(force=True) or {}
+    result = get_obs_service().program_visual_mode(incoming.get("mode", ""))
+    if result.code == "OBS_COMMAND_BLOCKED":
+        return jsonify(
+            {
+                "error": result.code,
+                "message": result.data.get("message", ""),
+            }
+        ), 409
+    return jsonify(result.data)
 
 
 @app.get("/api/config")
