@@ -1,0 +1,41 @@
+name: Phase 5.4 Compact Diagnostic
+
+on:
+  push:
+    branches:
+      - phase/5.4-roster-personnel-venue-routes
+  pull_request:
+    branches:
+      - develop-1.13
+
+permissions:
+  contents: read
+
+jobs:
+  compact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install -q -r requirements.txt pytest
+      - run: python tools/ci_prepare.py
+      - name: Apply integration and run focused tests
+        id: focused
+        continue-on-error: true
+        run: |
+          python tools/ci_apply.py > phase5.log 2>&1
+          python -m pytest -q tests/test_personnel_routes_blueprint.py tests/test_roster_routes_blueprint.py tests/test_venue_routes_blueprint.py tests/test_roster_personnel_venue_route_architecture.py tests/test_phase_5_4_migration.py --tb=short >> phase5.log 2>&1
+      - name: Upload focused log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-5-4-log
+          path: phase5.log
+      - name: Report focused result
+        if: always()
+        run: |
+          cat phase5.log
+          test "${{ steps.focused.outcome }}" = "success"
