@@ -235,9 +235,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4s — Rules Service"
+    "Version 1.13.0-alpha.4t — Statistics Service"
 )
-RUNTIME_BUILD = "V1.13A4S-RULES-SERVICE"
+RUNTIME_BUILD = "V1.13A4T-STATISTICS-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
