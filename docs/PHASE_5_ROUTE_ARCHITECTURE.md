@@ -26,6 +26,20 @@ Each route group should:
 
 `app.py` remains the composition root and registers the Blueprint using injected application boundaries. The public state route remains unauthenticated for the OBS overlay; the remaining routes preserve operator authentication.
 
+## Phase 5.2 security and upgrade routes
+
+`routes/security_upgrade_routes.py` owns:
+
+- `GET /api/security-status`
+- `POST /api/setup-pin`
+- `POST /api/login`
+- `POST /api/logout`
+- `GET /api/upgrade/candidate`
+- `GET /api/upgrade/status`
+- `POST /api/upgrade/migrate`
+
+These routes remain public because they establish or report authentication state and support first-run or pre-login upgrades. Session mutation remains an HTTP-layer responsibility, while PIN validation, lockout behavior, candidate inspection, and migration coordination stay in their Phase 4 services.
+
 ## Migration sequence
 
 Later Phase 5 stages should move one coherent route domain at a time, add focused Blueprint tests, retain route-contract coverage, and remove the corresponding `@app` decorators only after the Blueprint passes integrated validation.
