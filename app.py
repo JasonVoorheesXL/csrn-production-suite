@@ -234,9 +234,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.5a — Route Blueprint Foundation"
+    "Version 1.13.0-alpha.5b — Security and Upgrade Routes"
 )
-RUNTIME_BUILD = "V1.13A5A-ROUTE-BLUEPRINT-FOUNDATION"
+RUNTIME_BUILD = "V1.13A5B-SECURITY-AND-UPGRADE-ROUTES"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
