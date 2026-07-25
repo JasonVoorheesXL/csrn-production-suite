@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - phase/4.18-event-service
+  pull_request:
+    branches:
+      - develop-1.13
 
 permissions:
   contents: read
