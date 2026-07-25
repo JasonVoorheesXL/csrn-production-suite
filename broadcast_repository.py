@@ -5,6 +5,7 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, Callable, Mapping
 
+from file_cache_signature import FileCacheSignature, file_cache_signature
 from persistence_engine import (
     DataCorruptionError,
     JsonPersistenceEngine,
@@ -45,7 +46,7 @@ class BroadcastRepository:
 
         self._lock = RLock()
         self._cache: list[dict[str, Any]] | None = None
-        self._cache_mtime_ns: int | None = None
+        self._cache_signature: FileCacheSignature | None = None
 
     @staticmethod
     def _extract(payload: Any) -> list[dict[str, Any]]:
@@ -108,11 +109,8 @@ class BroadcastRepository:
 
         return True
 
-    def _mtime(self) -> int | None:
-        try:
-            return self.path.stat().st_mtime_ns
-        except OSError:
-            return None
+    def _signature(self) -> FileCacheSignature | None:
+        return file_cache_signature(self.path)
 
     def _normalize(
         self,
@@ -135,9 +133,12 @@ class BroadcastRepository:
 
     def load(self) -> list[dict[str, Any]]:
         with self._lock:
-            mtime = self._mtime()
+            signature = self._signature()
 
-            if self._cache is not None and self._cache_mtime_ns == mtime:
+            if (
+                self._cache is not None
+                and self._cache_signature == signature
+            ):
                 return copy.deepcopy(self._cache)
 
             try:
@@ -168,7 +169,7 @@ class BroadcastRepository:
                 )
             else:
                 self._cache = copy.deepcopy(normalized)
-                self._cache_mtime_ns = self._mtime()
+                self._cache_signature = self._signature()
 
             return copy.deepcopy(normalized)
 
@@ -195,7 +196,7 @@ class BroadcastRepository:
             )
 
             self._cache = copy.deepcopy(normalized)
-            self._cache_mtime_ns = self._mtime()
+            self._cache_signature = self._signature()
 
             return copy.deepcopy(normalized)
 
@@ -220,4 +221,4 @@ class BroadcastRepository:
     def invalidate_cache(self) -> None:
         with self._lock:
             self._cache = None
-            self._cache_mtime_ns = None
+            self._cache_signature = None
