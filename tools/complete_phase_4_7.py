@@ -39,11 +39,41 @@ def output(*args: str) -> str:
 
 
 def status_paths() -> set[str]:
+    result = run(
+        ("git", "status", "--porcelain=v1", "-z"),
+        capture=True,
+    )
     paths: set[str] = set()
-    for line in output("git", "status", "--short").splitlines():
-        if line.strip():
-            paths.add(line[3:].strip())
+    entries = result.stdout.split("\0")
+    index = 0
+    while index < len(entries):
+        entry = entries[index]
+        index += 1
+        if not entry:
+            continue
+        if len(entry) < 4:
+            raise CompletionError(f"Unexpected Git status entry: {entry!r}")
+        status = entry[:2]
+        path = entry[3:]
+        if status[0] in {"R", "C"}:
+            if index >= len(entries):
+                raise CompletionError("Incomplete Git rename/copy status entry.")
+            path = entries[index]
+            index += 1
+        paths.add(path)
     return paths
+
+
+def venue_integration_present() -> bool:
+    app_text = (ROOT / "app.py").read_text(encoding="utf-8")
+    return all(
+        marker in app_text
+        for marker in (
+            "from venue_service import VenueService",
+            "VENUE_SERVICE: VenueService | None = None",
+            "return jsonify(get_venue_service().list_payload())",
+        )
+    )
 
 
 def main() -> None:
@@ -53,15 +83,19 @@ def main() -> None:
             f"Run this only on {BRANCH}; current branch is {branch or 'detached HEAD'}."
         )
 
-    initial_status = output("git", "status", "--short")
-    if initial_status:
+    initial_paths = status_paths()
+    if not initial_paths:
+        print("Applying VenueService integration...")
+        run((sys.executable, "tools/apply_phase_4_7.py"))
+    elif initial_paths == {"app.py"} and venue_integration_present():
+        print("Resuming from the already-applied VenueService integration...")
+    else:
+        rendered = ", ".join(sorted(initial_paths)) or "unknown files"
         raise CompletionError(
-            "Working tree must be clean before Phase 4.7 completion:\n"
-            + initial_status
+            "Working tree contains unexpected changes before Phase 4.7 completion: "
+            + rendered
         )
 
-    print("Applying VenueService integration...")
-    run((sys.executable, "tools/apply_phase_4_7.py"))
     changed = status_paths()
     if changed != {"app.py"}:
         raise CompletionError(
