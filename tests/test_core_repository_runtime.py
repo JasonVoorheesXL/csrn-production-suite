@@ -50,8 +50,8 @@ def fake_module(tmp_path: Path):
         DEFAULT_CONFIG=defaults_config,
         DEFAULT_STATE=defaults_state,
         DEFAULT_SECURITY=defaults_security,
-        RUNTIME_VERSION="Version 1.13.0-alpha.4u — Game Operations Service",
-        RUNTIME_BUILD="V1.13A4U-GAME-OPERATIONS-SERVICE",
+        RUNTIME_VERSION="Version 1.13.0-alpha.4v — Support Media Service",
+        RUNTIME_BUILD="V1.13A4V-SUPPORT-MEDIA-SERVICE",
         load_json=original_load,
         save_json=original_save,
         ensure_data_architecture=lambda: data_dir.mkdir(parents=True, exist_ok=True),
@@ -94,7 +94,7 @@ def test_config_identity_is_supplied_by_repository(tmp_path: Path) -> None:
 
     config = module.load_config()
 
-    assert config["application"]["build"] == "V1.13A4U-GAME-OPERATIONS-SERVICE"
+    assert config["application"]["build"] == "V1.13A4V-SUPPORT-MEDIA-SERVICE"
     assert config["application"]["rules_edition"] == "NFHS"
 
 
