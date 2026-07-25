@@ -5,10 +5,54 @@ from pathlib import Path
 from tools.apply_phase_4_13 import apply
 
 
+LEGACY_APP = '''\
+from logo_service import LogoService
+
+
+def apply_change(changes):
+    return changes
+
+
+@app.get("/")
+def control_panel():
+    return "ok"
+
+
+@app.get("/api/obs/status")
+def obs_status():
+    return jsonify(copy.deepcopy(last_obs_status))
+
+
+@app.post("/api/obs/test")
+def test_obs_connection():
+    cfg = load_config()
+    result = validate_obs_read_only(cfg.get("obs", {}))
+    return jsonify(result)
+
+
+def command_scorebug_visibility(visible):
+    return set_scorebug_visibility(load_config().get("obs", {}), visible)
+
+
+@app.post("/api/obs/scorebug-visibility")
+def obs_scorebug_visibility():
+    return jsonify(command_scorebug_visibility(True))
+
+
+@app.post("/api/obs/program-visual-mode")
+def obs_program_visual_mode():
+    return jsonify(set_program_visual_mode({}, "graphic"))
+
+
+@app.get("/api/config")
+def get_config():
+    return jsonify(load_config())
+'''
+
+
 def test_phase_4_13_migration_is_idempotent(tmp_path: Path) -> None:
-    source = Path(__file__).resolve().parents[1] / "app.py"
     target = tmp_path / "app.py"
-    target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    target.write_text(LEGACY_APP, encoding="utf-8")
 
     first = apply(target)
     second = apply(target)
