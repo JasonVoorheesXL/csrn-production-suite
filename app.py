@@ -45,6 +45,7 @@ from logo_service import LogoService
 from obs_service import OBSService
 from configuration_service import ConfigurationService
 from state_service import StateService
+from diagnostics_service import DiagnosticsService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -230,9 +231,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4o — State Service"
+    "Version 1.13.0-alpha.4p — Diagnostics Service"
 )
-RUNTIME_BUILD = "V1.13A4O-STATE-SERVICE"
+RUNTIME_BUILD = "V1.13A4P-DIAGNOSTICS-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -436,46 +437,36 @@ def package_record(
     return get_broadcast_package_service().record(data, existing)
 
 
-def diagnostic_status() -> dict[str, Any]:
-    cfg = load_config()
-    required = {
-        "Configuration": CONFIG_FILE,
-        "Data folder": DATA_DIR,
-        "Schools folder": DATA_DIR / "Schools",
-        "Broadcasts folder": DATA_DIR / "Broadcasts",
-        "Backups folder": DATA_DIR / "Backups",
-        "Logo file": BASE_DIR / cfg["organization"].get("logo_path", "static/csrn-logo.png"),
-        "School database": SCHOOLS_FILE,
-        "Broadcaster profiles": BROADCASTERS_FILE,
-        "Roster database": ROSTERS_FILE,
-        "Venue database": VENUES_FILE,
-        "Logo database": LOGOS_FILE,
-        "Broadcast packages": PACKAGES_FILE,
-    }
-    return {
-        "checks": [
-            {"name": name, "ok": path.exists(), "path": str(path)}
-            for name, path in required.items()
-        ],
-        "version": cfg["application"].get("version", "1.0 Alpha"),
-        "build": cfg["application"].get("build", "0007"),
-        "authenticated": authenticated(),
-        "config_file": str(CONFIG_FILE),
-        "data_folder": str(DATA_DIR),
-        "obs": copy.deepcopy(last_obs_status),
-        "engines": [
-            {"name":"Roster Engine","version":"v1.1","status":"Healthy" if ROSTERS_FILE.exists() else "Needs Attention"},
-            {"name":"Personnel Engine","version":"v1.0","status":"Healthy" if BROADCASTERS_FILE.exists() else "Needs Attention"},
-            {"name":"Graphics Engine","version":"v2.1","status":"Healthy"},
-            {"name":"Graphics Library","version":"v1.0","status":"Healthy"},
-            {"name":"Asset Manager","version":"v1.0","status":"Healthy" if ASSETS_FILE.parent.exists() else "Needs Attention"},
-            {"name":"Sponsor Engine","version":"v1.0","status":"Healthy" if SPONSORS_FILE.parent.exists() else "Needs Attention"},
-            {"name":"Broadcast Package Engine","version":"v1.0","status":"Healthy" if PACKAGES_FILE.parent.exists() else "Needs Attention"},
-            {"name":"Lineup Manager","version":"v1.0","status":"Healthy" if ROSTERS_FILE.exists() else "Needs Attention"},
-        ],
-        "channels": {"primary_graphics":"Healthy","scorebug":"Healthy"},
-    }
+DIAGNOSTICS_SERVICE: DiagnosticsService | None = None
 
+
+def get_diagnostics_service() -> DiagnosticsService:
+    global DIAGNOSTICS_SERVICE
+    if DIAGNOSTICS_SERVICE is None:
+        DIAGNOSTICS_SERVICE = DiagnosticsService(
+            base_dir=BASE_DIR,
+            data_dir=DATA_DIR,
+            config_file=CONFIG_FILE,
+            schools_file=SCHOOLS_FILE,
+            broadcasters_file=BROADCASTERS_FILE,
+            rosters_file=ROSTERS_FILE,
+            venues_file=VENUES_FILE,
+            logos_file=LOGOS_FILE,
+            packages_file=PACKAGES_FILE,
+            assets_file=ASSETS_FILE,
+            sponsors_file=SPONSORS_FILE,
+            load_config=load_config,
+            load_state=load_state,
+            public_state=public_state,
+            load_obs_status=load_obs_status,
+            authenticated=authenticated,
+            migrate_venues=migrate_venue_names,
+        )
+    return DIAGNOSTICS_SERVICE
+
+
+def diagnostic_status() -> dict[str, Any]:
+    return get_diagnostics_service().diagnostics().data["diagnostics"]
 
 
 def normalize_school_id(value: str) -> str:
@@ -2834,19 +2825,12 @@ def migrate_venue_names() -> None:
 
 
 def readiness_payload() -> dict[str, Any]:
-    state=load_state(); cfg=load_config(); obs=copy.deepcopy(last_obs_status); checks=[]
-    def add(key,label,ok,note,action=""): checks.append({"key":key,"label":label,"ok":bool(ok),"note":note,"action":action})
-    add("obs","OBS WebSocket",bool(obs.get("reachable") and obs.get("authenticated")),"Connected and authenticated.","Open OBS, enable the WebSocket server, then retry.")
-    add("scene","Scorebug scene",bool(obs.get("required_scene_exists")),"Required scorebug scene found.",f"In OBS create or load scene: {cfg.get('obs',{}).get('required_scene','10.01 - FOOTBALL SCOREBUG')}")
-    add("browser","Browser source",bool(obs.get("browser_source_exists")),"Browser source found; a hidden scorebug is still ready.",f"In OBS add Browser Source {cfg.get('obs',{}).get('browser_source','BRWSR - Football Scorebug')} using http://127.0.0.1:5050/overlay")
-    add("overlay","Overlay endpoint",True,"Overlay endpoint is reachable.")
-    add("visual","Program visual",bool(cfg.get("obs",{}).get("program_visual_scene")),"Program Visual is configured.","Configure the Program Visual scene in Settings.")
-    return {"ready":all(c["ok"] for c in checks),"checks":checks,"overlay_url":"http://127.0.0.1:5050/overlay","state":public_state(state)}
+    return get_diagnostics_service().readiness().data["readiness"]
+
 
 @app.get("/api/readiness")
 @require_auth
 def readiness():
-    migrate_venue_names()
     return jsonify(readiness_payload())
 
 @app.post("/api/broadcasts/<broadcast_id>/load")
