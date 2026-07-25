@@ -34,6 +34,7 @@ from core_repositories import ConfigurationRepository, StateRepository, Security
 from security_service import SecurityService
 from broadcast_package_service import BroadcastPackageService
 from school_service import SchoolService
+from roster_service import RosterService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -219,9 +220,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4d — School Service"
+    "Version 1.13.0-alpha.4e — Roster Service"
 )
-RUNTIME_BUILD = "V1.13A4D-SCHOOL-SERVICE"
+RUNTIME_BUILD = "V1.13A4E-ROSTER-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -981,6 +982,22 @@ def load_rosters() -> list[dict[str, Any]]:
 def save_rosters(items: list[dict[str, Any]]) -> None:
     ensure_data_architecture()
     ROSTER_REPOSITORY.save(items)
+
+
+ROSTER_SERVICE: RosterService | None = None
+
+
+def get_roster_service() -> RosterService:
+    global ROSTER_SERVICE
+
+    if ROSTER_SERVICE is None:
+        ROSTER_SERVICE = RosterService(
+            load_rosters=load_rosters,
+            save_rosters=save_rosters,
+            load_schools=load_schools,
+        )
+
+    return ROSTER_SERVICE
 
 def roster_summary(roster: dict[str, Any], schools: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     school_list = schools if schools is not None else load_schools()
@@ -1960,110 +1977,97 @@ def validate_social():
 @app.get("/api/rosters")
 @require_auth
 def list_rosters():
-    rosters = load_rosters()
-    schools = load_schools()
-    return jsonify([roster_summary(r, schools) for r in rosters])
+    return jsonify(get_roster_service().list_rosters())
+
 
 @app.post("/api/rosters")
 @require_auth
 def create_roster():
-    incoming = request.get_json(force=True) or {}
-    school_id = str(incoming.get("school_id", "")).strip()
-    sport = str(incoming.get("sport", "Football")).strip() or "Football"
-    season = str(incoming.get("season", "")).strip()
-    level = str(incoming.get("level", "Varsity")).strip() or "Varsity"
-    division = str(incoming.get("division", "Boys")).strip() or "Boys"
-    if not school_id or not season:
-        return jsonify({"error":"SCHOOL_AND_SEASON_REQUIRED"}), 400
-    items = load_rosters()
-    duplicate = next((r for r in items if str(r.get("school_id"))==school_id and str(r.get("sport")).lower()==sport.lower() and str(r.get("season"))==season and str(r.get("level")).lower()==level.lower() and str(r.get("division")).lower()==division.lower()), None)
-    if duplicate:
-        return jsonify({"error":"ROSTER_ALREADY_EXISTS", "roster":roster_summary(duplicate)}), 409
-    roster_id = normalize_roster_id(f"{school_id}-{sport}-{season}-{level}-{division}")
-    base=roster_id; n=2
-    while any(r.get("id")==roster_id for r in items):
-        roster_id=f"{base}-{n}"; n+=1
-    record={"id":roster_id,"school_id":school_id,"sport":sport,"season":season,"level":level,"division":division,"players":[],"created_at":int(time.time()),"updated_at":int(time.time())}
-    items.append(record); save_rosters(items)
-    return jsonify(roster_summary(record)), 201
+    result = get_roster_service().create(
+        request.get_json(force=True) or {}
+    )
+    if result.code == "SCHOOL_AND_SEASON_REQUIRED":
+        return jsonify({"error": result.code}), 400
+    if result.code == "ROSTER_ALREADY_EXISTS":
+        return jsonify(
+            {
+                "error": result.code,
+                "roster": result.data["roster"],
+            }
+        ), 409
+    return jsonify(result.data["roster"]), 201
+
 
 @app.put("/api/rosters/<roster_id>")
 @require_auth
 def update_roster(roster_id: str):
-    incoming=request.get_json(force=True) or {}; items=load_rosters()
-    roster=next((r for r in items if r.get("id")==roster_id),None)
-    if not roster: return jsonify({"error":"ROSTER_NOT_FOUND"}),404
-    for field in ("school_id","sport","season","level","division"):
-        if field in incoming: roster[field]=str(incoming[field]).strip()
-    roster["updated_at"]=int(time.time()); save_rosters(items)
-    return jsonify(roster_summary(roster))
+    result = get_roster_service().update(
+        roster_id,
+        request.get_json(force=True) or {},
+    )
+    if result.code == "ROSTER_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    return jsonify(result.data["roster"])
+
 
 @app.delete("/api/rosters/<roster_id>")
 @require_auth
 def delete_roster(roster_id: str):
-    items=load_rosters()
-    if not any(r.get("id")==roster_id for r in items): return jsonify({"error":"ROSTER_NOT_FOUND"}),404
-    save_rosters([r for r in items if r.get("id")!=roster_id])
-    return jsonify({"ok":True})
+    result = get_roster_service().delete(roster_id)
+    if result.code == "ROSTER_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    return jsonify({"ok": True})
+
 
 @app.post("/api/rosters/<roster_id>/players")
 @require_auth
 def create_roster_player(roster_id: str):
-    incoming=request.get_json(force=True) or {}; items=load_rosters(); roster=next((r for r in items if r.get("id")==roster_id),None)
-    if not roster: return jsonify({"error":"ROSTER_NOT_FOUND"}),404
-    first=str(incoming.get("first_name","")).strip(); last=str(incoming.get("last_name","")).strip(); number=str(incoming.get("number","")).strip()
-    if not first and not last: return jsonify({"error":"PLAYER_NAME_REQUIRED"}),400
-    player_id=normalize_player_id(incoming.get("id") or f"{number}-{first}-{last}"); base=player_id; n=2
-    while any(p.get("id")==player_id for p in roster.get("players",[])): player_id=f"{base}-{n}"; n+=1
-    duplicate_number=bool(number and any(str(p.get("number","")).strip()==number for p in roster.get("players",[])))
-    player={"id":player_id,"number":number,"first_name":first,"last_name":last,"preferred_name":str(incoming.get("preferred_name","")).strip(),"position":str(incoming.get("position","")).strip(),"secondary_position":str(incoming.get("secondary_position","")).strip(),"grade":str(incoming.get("grade","")).strip(),"height":str(incoming.get("height","")).strip(),"weight":str(incoming.get("weight","")).strip(),"captain":bool(incoming.get("captain",False)),"starter":bool(incoming.get("starter",False)),"status":"inactive" if str(incoming.get("status", "active")).lower()=="inactive" else "active","pronunciation":str(incoming.get("pronunciation","")).strip(),"pronunciation_verified":bool(incoming.get("pronunciation_verified",False)),"headshot":str(incoming.get("headshot","")).strip()}
-    roster.setdefault("players",[]).append(player); roster["updated_at"]=int(time.time()); save_rosters(items)
-    return jsonify({"player":player,"warning":"DUPLICATE_JERSEY_NUMBER" if duplicate_number else ""}),201
+    result = get_roster_service().create_player(
+        roster_id,
+        request.get_json(force=True) or {},
+    )
+    if result.code == "ROSTER_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    if result.code == "PLAYER_NAME_REQUIRED":
+        return jsonify({"error": result.code}), 400
+    return jsonify(result.data), 201
+
 
 @app.put("/api/rosters/<roster_id>/players/<player_id>")
 @require_auth
 def update_roster_player(roster_id: str, player_id: str):
-    incoming=request.get_json(force=True) or {}; items=load_rosters(); roster=next((r for r in items if r.get("id")==roster_id),None)
-    if not roster: return jsonify({"error":"ROSTER_NOT_FOUND"}),404
-    player=next((p for p in roster.get("players",[]) if p.get("id")==player_id),None)
-    if not player: return jsonify({"error":"PLAYER_NOT_FOUND"}),404
-    number=str(incoming.get("number",player.get("number",''))).strip(); duplicate_number=bool(number and any(p.get("id")!=player_id and str(p.get("number","")).strip()==number for p in roster.get("players",[])))
-    for field in ("number","first_name","last_name","preferred_name","position","secondary_position","grade","height","weight","pronunciation","headshot"):
-        if field in incoming: player[field]=str(incoming[field]).strip()
-    for field in ("captain","starter","pronunciation_verified"):
-        if field in incoming: player[field]=bool(incoming[field])
-    if "status" in incoming: player["status"]="inactive" if str(incoming["status"]).lower()=="inactive" else "active"
-    roster["updated_at"]=int(time.time()); save_rosters(items)
-    return jsonify({"player":player,"warning":"DUPLICATE_JERSEY_NUMBER" if duplicate_number else ""})
+    result = get_roster_service().update_player(
+        roster_id,
+        player_id,
+        request.get_json(force=True) or {},
+    )
+    if result.code in {"ROSTER_NOT_FOUND", "PLAYER_NOT_FOUND"}:
+        return jsonify({"error": result.code}), 404
+    return jsonify(result.data)
+
 
 @app.delete("/api/rosters/<roster_id>/players/<player_id>")
 @require_auth
 def delete_roster_player(roster_id: str, player_id: str):
-    items=load_rosters(); roster=next((r for r in items if r.get("id")==roster_id),None)
-    if not roster: return jsonify({"error":"ROSTER_NOT_FOUND"}),404
-    before=len(roster.get("players",[])); roster["players"]=[p for p in roster.get("players",[]) if p.get("id")!=player_id]
-    if len(roster["players"])==before: return jsonify({"error":"PLAYER_NOT_FOUND"}),404
-    roster["updated_at"]=int(time.time()); save_rosters(items); return jsonify({"ok":True})
+    result = get_roster_service().delete_player(roster_id, player_id)
+    if result.code in {"ROSTER_NOT_FOUND", "PLAYER_NOT_FOUND"}:
+        return jsonify({"error": result.code}), 404
+    return jsonify({"ok": True})
+
 
 @app.post("/api/rosters/<roster_id>/players/import")
 @require_auth
 def import_roster_players(roster_id: str):
-    incoming=request.get_json(force=True) or {}; rows=incoming.get("players",[])
-    if not isinstance(rows,list): return jsonify({"error":"INVALID_PLAYER_LIST"}),400
-    items=load_rosters(); roster=next((r for r in items if r.get("id")==roster_id),None)
-    if not roster: return jsonify({"error":"ROSTER_NOT_FOUND"}),404
-    added=0; warnings=[]
-    for row in rows:
-        if not isinstance(row,dict): continue
-        first=str(row.get("first_name","")).strip(); last=str(row.get("last_name","")).strip()
-        if not first and not last: continue
-        number=str(row.get("number","")).strip()
-        if number and any(str(p.get("number","")).strip()==number for p in roster.get("players",[])): warnings.append(f"Duplicate jersey number {number}")
-        pid=normalize_player_id(f"{number}-{first}-{last}"); base=pid; n=2
-        while any(p.get("id")==pid for p in roster.get("players",[])): pid=f"{base}-{n}"; n+=1
-        roster.setdefault("players",[]).append({"id":pid,"number":number,"first_name":first,"last_name":last,"preferred_name":str(row.get("preferred_name","")).strip(),"position":str(row.get("position","")).strip(),"secondary_position":str(row.get("secondary_position","")).strip(),"grade":str(row.get("grade","")).strip(),"height":str(row.get("height","")).strip(),"weight":str(row.get("weight","")).strip(),"captain":str(row.get("captain","")).lower() in ("1","true","yes","y"),"starter":str(row.get("starter","")).lower() in ("1","true","yes","y"),"status":"inactive" if str(row.get("status","")).lower()=="inactive" else "active","pronunciation":str(row.get("pronunciation","")).strip(),"pronunciation_verified":str(row.get("pronunciation_verified","")).lower() in ("1","true","yes","y"),"headshot":str(row.get("headshot","")).strip()}); added+=1
-    roster["updated_at"]=int(time.time()); save_rosters(items)
-    return jsonify({"added":added,"warnings":warnings,"roster":roster_summary(roster)})
+    incoming = request.get_json(force=True) or {}
+    result = get_roster_service().import_players(
+        roster_id,
+        incoming.get("players", []),
+    )
+    if result.code == "INVALID_PLAYER_LIST":
+        return jsonify({"error": result.code}), 400
+    if result.code == "ROSTER_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    return jsonify(result.data)
 
 
 @app.get("/api/schools")
