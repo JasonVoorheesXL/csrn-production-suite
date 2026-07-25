@@ -52,6 +52,7 @@ from rules_service import RulesService
 from statistics_service import StatisticsService
 from game_operations_service import GameOperationsService
 from support_media_service import SupportMediaService
+from broadcast_lifecycle_service import BroadcastLifecycleService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -237,9 +238,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4v — Support Media Service"
+    "Version 1.13.0-alpha.4w — Broadcast Lifecycle Service"
 )
-RUNTIME_BUILD = "V1.13A4V-SUPPORT-MEDIA-SERVICE"
+RUNTIME_BUILD = "V1.13A4W-BROADCAST-LIFECYCLE-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -2858,104 +2859,66 @@ def readiness_payload() -> dict[str, Any]:
 def readiness():
     return jsonify(readiness_payload())
 
+BROADCAST_LIFECYCLE_SERVICE: BroadcastLifecycleService | None = None
+
+
+def get_broadcast_lifecycle_service() -> BroadcastLifecycleService:
+    global BROADCAST_LIFECYCLE_SERVICE
+    if BROADCAST_LIFECYCLE_SERVICE is None:
+        BROADCAST_LIFECYCLE_SERVICE = BroadcastLifecycleService(
+            load_broadcasts=load_broadcasts,
+            load_packages=load_packages,
+            load_state=load_state,
+            save_state=save_state,
+            normalize_state=normalize_state,
+            default_state=lambda: copy.deepcopy(DEFAULT_STATE),
+            get_school=get_school,
+            build_identity=broadcast_identity,
+            readiness=readiness_payload,
+            update_linked_status=update_linked_broadcast_status,
+            load_config=load_config,
+            command_scorebug_visibility=command_scorebug_visibility,
+            public_state=public_state,
+            resume_record=get_broadcast_service().resume_record,
+            transaction_lock=lock,
+        )
+    return BROADCAST_LIFECYCLE_SERVICE
+
+
 @app.post("/api/broadcasts/<broadcast_id>/load")
 @require_auth
 def load_planned_broadcast(broadcast_id: str):
-    item = next((x for x in load_broadcasts() if x.get("broadcast_id") == broadcast_id and not x.get("archived")), None)
-    if not item:
-        return jsonify({"error": "NOT_FOUND"}), 404
-    current = load_state()
-    if current.get("broadcast_id") == broadcast_id and current.get("broadcast_created"):
-        return jsonify(current)
-    snapshot = item.get("live_state") if isinstance(item.get("live_state"), dict) else None
-    if snapshot:
-        state = normalize_state(snapshot)
-    else:
-        state = copy.deepcopy(DEFAULT_STATE)
-        state.update({
-            "broadcast_created": True, "broadcast_id": broadcast_id,
-            "sport": item.get("sport", "Football"), "season": item.get("season", ""),
-            "week": item.get("week", "1"), "classification": item.get("classification", ""),
-            "level": item.get("level", "Varsity"), "division": item.get("division", "Boys"),
-            "home_school_id": item.get("home_school_id", ""), "visitor_school_id": item.get("visitor_school_id", ""),
-            "home_team": item.get("home_team", "Home"), "visitor_team": item.get("visitor_team", "Visitor"),
-            "home_identity": item.get("home_identity") or broadcast_identity(get_school(item.get("home_school_id", "")), item.get("sport", "Football")),
-            "visitor_identity": item.get("visitor_identity") or broadcast_identity(get_school(item.get("visitor_school_id", "")), item.get("sport", "Football")),
-            "venue_id": item.get("venue_id", ""), "venue": item.get("venue", ""),
-            "date": item.get("date", ""), "scheduled_start": item.get("scheduled_start", "07:00 PM"),
-            "visual_mode": item.get("visual_mode", "graphic"), "crew": item.get("crew", {}),
-            "status": item.get("status", "planned"),
-            "broadcast_phase": "final" if item.get("status") == "completed" else ("live" if item.get("status") == "live" else "pregame"),
-            "scorebug_visible": False,
-            "home_score": item.get("final_home_score", 0) if item.get("status") == "completed" else 0,
-            "visitor_score": item.get("final_visitor_score", 0) if item.get("status") == "completed" else 0,
-        })
-    # Alpha.3f: restore roster links whenever a broadcast is loaded directly,
-    # including resumed live-state snapshots created before roster persistence.
-    package = next((p for p in load_packages() if p.get("broadcast_id") == broadcast_id), None)
-    if package:
-        state["broadcast_package_id"] = package.get("id", state.get("broadcast_package_id", ""))
-        state["package_roster_ids"] = list(package.get("roster_ids") or state.get("package_roster_ids") or [])
-    state["status"] = item.get("status", state.get("status", "planned"))
-    state["review_mode"] = state["status"] == "completed"
-    # Reconcile a saved snapshot with the status selected in Game Manager.
-    # This allows a completed game to be changed back to Live and reopened.
-    if state["status"] == "live":
-        state["broadcast_phase"] = "live"
-    elif state["status"] == "planned":
-        state["broadcast_phase"] = "pregame"
-    elif state["status"] == "completed":
-        state["broadcast_phase"] = "final"
-    save_state(state)
-    return jsonify(state)
+    result = get_broadcast_lifecycle_service().load(broadcast_id)
+    if result.code == "NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    return jsonify(result.data["state"])
+
 
 @app.post("/api/initialize-broadcast")
 @require_auth
 def initialize_broadcast():
-    # Compatibility endpoint retained for older clients. The Prepared stage was removed.
-    state = load_state()
-    if not state.get("broadcast_id"):
-        return jsonify({"error": "NO_ACTIVE_BROADCAST"}), 409
-    payload = readiness_payload()
-    return jsonify({"state": state, "readiness": payload, "deprecated": True})
+    result = get_broadcast_lifecycle_service().initialize()
+    if result.code == "NO_ACTIVE_BROADCAST":
+        return jsonify({"error": result.code}), 409
+    return jsonify(result.data)
+
 
 @app.post("/api/start-broadcast")
 @require_auth
 def start_broadcast():
-    state=load_state()
-    if not state.get("broadcast_id"):
-        return jsonify({"error":"NO_ACTIVE_BROADCAST"}),409
-    state["status"]="live"
-    state["broadcast_phase"]="live"
-    state["scorebug_visible"]=True
-    save_state(state)
-    update_linked_broadcast_status(state["broadcast_id"],"live")
-    obs_result=None
-    if load_config().get("obs", {}).get("controlled_commands", False):
-        try:
-            obs_result=command_scorebug_visibility(True)
-        except OBSConnectionError as exc:
-            obs_result={"error":str(exc)}
-    record=next((x for x in load_broadcasts() if x.get("broadcast_id")==state["broadcast_id"]),None)
-    return jsonify({"state":public_state(state),"broadcast":record,"obs":obs_result})
+    result = get_broadcast_lifecycle_service().start()
+    if result.code == "NO_ACTIVE_BROADCAST":
+        return jsonify({"error": result.code}), 409
+    return jsonify(result.data)
+
 
 @app.post("/api/resume-broadcast")
 @require_auth
 def resume_broadcast():
-    """Reopen a completed broadcast without discarding its saved game data."""
-    with lock:
-        state = load_state()
-        broadcast_id = str(state.get("broadcast_id", "")).strip()
-        if not broadcast_id:
-            return jsonify({"error": "NO_ACTIVE_BROADCAST"}), 409
-        state["status"] = "live"
-        state["broadcast_phase"] = "live"
-        state["review_mode"] = False
-        # Keep the scorebug hidden until the operator deliberately shows it.
-        state["scorebug_visible"] = False
-        save_state(state)
-        get_broadcast_service().resume_record(broadcast_id)
-        return jsonify(public_state(state))
+    result = get_broadcast_lifecycle_service().resume()
+    if result.code == "NO_ACTIVE_BROADCAST":
+        return jsonify({"error": result.code}), 409
+    return jsonify(result.data["state"])
 
 
 @app.post("/api/create-broadcast")
