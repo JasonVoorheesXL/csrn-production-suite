@@ -81,7 +81,7 @@ def personnel_client(tmp_path: Path):
             PersonnelRoutesDependencies(
                 require_auth=require_auth,
                 get_personnel_service=lambda: service,
-                headshots_dir=headshots,
+                get_headshots_dir=lambda: headshots,
                 normalize_personnel_id=lambda value: value.strip().lower().replace(" ", "-"),
             )
         )
