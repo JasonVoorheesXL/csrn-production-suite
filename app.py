@@ -37,6 +37,7 @@ from school_service import SchoolService
 from roster_service import RosterService
 from sponsor_service import SponsorService
 from venue_service import VenueService
+from broadcast_service import BroadcastService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -827,6 +828,53 @@ def save_broadcasts(
     ensure_data_architecture()
     BROADCAST_REPOSITORY.save(items)
 
+
+def write_broadcast_detail(
+    record: dict[str, Any],
+    existing_only: bool = False,
+) -> None:
+    broadcast_id = str(record.get("broadcast_id", "")).strip()
+    if not broadcast_id:
+        return
+    path = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
+    if existing_only and not path.exists():
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+
+
+def delete_broadcast_detail(broadcast_id: str) -> None:
+    path = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
+    if path.exists():
+        path.unlink()
+
+
+BROADCAST_SERVICE: BroadcastService | None = None
+
+
+def get_broadcast_service() -> BroadcastService:
+    global BROADCAST_SERVICE
+
+    if BROADCAST_SERVICE is None:
+        BROADCAST_SERVICE = BroadcastService(
+            load_broadcasts=load_broadcasts,
+            save_broadcasts=save_broadcasts,
+            get_school=get_school,
+            resolve_venue=venue_for_school,
+            build_identity=broadcast_identity,
+            logo_certification=logo_certification,
+            school_monogram=school_monogram,
+            load_config=load_config,
+            load_state=load_state,
+            save_state=save_state,
+            default_state=lambda: copy.deepcopy(DEFAULT_STATE),
+            write_detail=write_broadcast_detail,
+            delete_detail=delete_broadcast_detail,
+        )
+
+    return BROADCAST_SERVICE
+
+
 def normalize_roster_id(value: str) -> str:
     return normalize_school_id(value)
 
@@ -1015,26 +1063,22 @@ def ensure_build_0018_journal() -> None:
     save_build_journal(items)
 
 def football_week_code(value: Any) -> str:
-    text = str(value or "1").strip().upper().replace("WEEK", "").strip()
-    try:
-        return f"W{int(text):02d}"
-    except ValueError:
-        cleaned = ''.join(ch for ch in text if ch.isalnum())[:3] or '01'
-        return f"W{cleaned}"
+    return BroadcastService.football_week_code(value)
 
-def next_broadcast_id(sport: str, season: str, classification: str, week: Any) -> str:
-    sport_code = {"football": "FB", "basketball": "BB", "baseball": "BSB", "softball": "SB"}.get(str(sport).lower(), str(sport)[:3].upper() or "EVT")
-    season_code = ''.join(ch for ch in str(season) if ch.isdigit())[:4] or time.strftime("%Y")
-    class_code = str(classification or "OPEN").upper().replace("CLASS", "").replace(" ", "")
-    prefix = f"{sport_code}-{season_code}-{class_code}-{football_week_code(week)}-"
-    used=[]
-    for item in load_broadcasts():
-        value=str(item.get("broadcast_id", ""))
-        if value.startswith(prefix):
-            try: used.append(int(value.rsplit("-",1)[1]))
-            except (ValueError, IndexError): pass
-    number=max(used, default=0)+1
-    return f"{prefix}{number:03d}"
+
+def next_broadcast_id(
+    sport: str,
+    season: str,
+    classification: str,
+    week: Any,
+) -> str:
+    return get_broadcast_service().next_id(
+        sport,
+        season,
+        classification,
+        week,
+    )
+
 
 def venue_for_school(
     school: dict[str, Any] | None,
@@ -2806,21 +2850,17 @@ def get_state():
     # Read-only endpoint for both authenticated control devices and OBS overlay.
     return jsonify(public_state(load_state()))
 
-def update_linked_broadcast_status(broadcast_id: str, status: str, extra: dict[str, Any] | None = None) -> None:
-    if not broadcast_id:
-        return
-    items = load_broadcasts()
-    item = next((x for x in items if x.get("broadcast_id") == broadcast_id), None)
-    if not item:
-        return
-    item["status"] = status
-    item["updated_at"] = int(time.time())
-    if status == "live": item.setdefault("started_at", int(time.time()))
-    if status == "completed": item["completed_at"] = int(time.time())
-    if extra: item.update(extra)
-    save_broadcasts(items)
-    path = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
-    path.write_text(json.dumps(item, indent=2), encoding="utf-8")
+def update_linked_broadcast_status(
+    broadcast_id: str,
+    status: str,
+    extra: dict[str, Any] | None = None,
+) -> None:
+    get_broadcast_service().update_linked_status(
+        broadcast_id,
+        status,
+        extra,
+    )
+
 
 def migrate_venue_names() -> None:
     get_venue_service().migrate_legacy_names()
@@ -2938,143 +2978,75 @@ def resume_broadcast():
         # Keep the scorebug hidden until the operator deliberately shows it.
         state["scorebug_visible"] = False
         save_state(state)
-        items = load_broadcasts()
-        item = next((row for row in items if row.get("broadcast_id") == broadcast_id), None)
-        if item:
-            item["status"] = "live"
-            item["updated_at"] = int(time.time())
-            item.pop("completed_at", None)
-            item.pop("final_home_score", None)
-            item.pop("final_visitor_score", None)
-            save_broadcasts(items)
-            detail = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
-            detail.write_text(json.dumps(item, indent=2), encoding="utf-8")
+        get_broadcast_service().resume_record(broadcast_id)
         return jsonify(public_state(state))
+
 
 @app.post("/api/create-broadcast")
 @require_auth
 def create_broadcast():
-    data = request.get_json(force=True)
-    cfg = load_config()
-    defaults = cfg["broadcast_defaults"]
-    sport = data.get("sport", defaults.get("sport", "Football"))
-    home_school_id = str(data.get("home_school_id", "")).strip()
-    visitor_school_id = str(data.get("visitor_school_id", "")).strip()
-    home_school = get_school(home_school_id) if home_school_id else None
-    visitor_school = get_school(visitor_school_id) if visitor_school_id else None
-    home_name = (str(home_school.get("broadcast_name", "")).strip() if home_school else str(data.get("home_team", "")).strip()) or "Home"
-    visitor_name = (str(visitor_school.get("broadcast_name", "")).strip() if visitor_school else str(data.get("visitor_team", "")).strip()) or "Visitor"
-    classification = str(data.get("classification") or (home_school or {}).get("classification") or (visitor_school or {}).get("classification") or "Open").strip()
-    season = str(data.get("season") or time.strftime("%Y")).strip()
-    week = str(data.get("week") or "1").strip()
-    venue = venue_for_school(home_school, sport)
-    venue_name = str(data.get("venue") or (venue or {}).get("name") or defaults.get("venue", "Caledonia High School")).strip()
-    venue_id = str((venue or {}).get("id", ""))
-    broadcast_id = next_broadcast_id(sport, season, classification, week)
-    state = copy.deepcopy(DEFAULT_STATE)
-    state.update({
-        "broadcast_created": True, "broadcast_id": broadcast_id, "sport": sport,
-        "season": season, "week": week, "classification": classification,
-        "level": data.get("level", "Varsity"), "division": data.get("division", "Boys"),
-        "home_team": home_name, "visitor_team": visitor_name,
-        "home_school_id": home_school_id, "visitor_school_id": visitor_school_id,
-        "home_identity": broadcast_identity(home_school, sport),
-        "visitor_identity": broadcast_identity(visitor_school, sport),
-        "venue": venue_name, "venue_id": venue_id,
-        "date": data.get("date", ""), "scheduled_start": data.get("scheduled_start", "07:00 PM"),
-        "visual_mode": data.get("visual_mode", defaults.get("visual_mode", "graphic")),
-        "production_type": str(data.get("production_type", "game") or "game"),
-        "broadcast_phase": "pregame", "status": "planned",
-        "crew": {key: str(data.get("crew", {}).get(key, "")) for key in ("play_by_play", "color_analyst", "sideline_reporter", "statistician", "producer")},
-    })
-    # Planning in Game Manager does not change live OBS program state.
-    record = {
-        "broadcast_id": broadcast_id, "created_at": int(time.time()), "updated_at": int(time.time()),
-        "status": "planned", "sport": sport, "season": season, "classification": classification, "week": week,
-        "date": state["date"], "scheduled_start": state["scheduled_start"],
-        "home_school_id": home_school_id, "visitor_school_id": visitor_school_id,
-        "home_team": home_name, "visitor_team": visitor_name,
-        "home_identity": state["home_identity"], "visitor_identity": state["visitor_identity"],
-        "venue_id": venue_id, "venue": venue_name, "graphics_profile": "CSRN Default",
-        "obs_profile": cfg.get("obs", {}).get("profile", "CSRN Production"),
-        "visual_mode": state["visual_mode"], "crew": state["crew"],
-        "production_type": state.get("production_type", "game")
-    }
-    with lock:
-        items = load_broadcasts()
-        items.append(record)
-        save_broadcasts(items)
-        (DATA_DIR / "Broadcasts" / f"{broadcast_id}.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
-    warnings=[]
-    for side,school in (("Home",home_school),("Visitor",visitor_school)):
-        if school and not logo_certification(school)[0]:
-            warnings.append(f"{side} has no certified logo; {school_monogram(school.get('broadcast_name') or school.get('official_name',''))} monogram will be used.")
-    return jsonify({"broadcast": record, "warnings": warnings})
+    result = get_broadcast_service().create(
+        request.get_json(force=True) or {}
+    )
+    return jsonify(result.data)
+
 
 @app.get("/api/broadcasts")
 @require_auth
 def list_broadcasts():
-    items = [item for item in load_broadcasts() if not item.get("archived")]
-    items = sorted(items, key=lambda x: (str(x.get("date", "")), str(x.get("scheduled_start", ""))), reverse=True)
-    return jsonify(items)
+    include_archived = str(
+        request.args.get("include_archived", "false")
+    ).strip().lower() in {"1", "true", "yes", "y", "on"}
+    result = get_broadcast_service().list_records(
+        include_archived=include_archived
+    )
+    return jsonify(result.data["broadcasts"])
+
 
 @app.get("/api/broadcasts/<broadcast_id>")
 @require_auth
 def get_broadcast_record(broadcast_id: str):
-    item=next((x for x in load_broadcasts() if x.get("broadcast_id") == broadcast_id), None)
-    return (jsonify(item), 200) if item else (jsonify({"error":"NOT_FOUND"}),404)
+    result = get_broadcast_service().read(broadcast_id)
+    if result.code == "NOT_FOUND":
+        return jsonify({"error": "NOT_FOUND"}), 404
+    return jsonify(result.data["broadcast"])
+
 
 @app.put("/api/broadcasts/<broadcast_id>")
 @require_auth
 def update_broadcast_record(broadcast_id: str):
-    data=request.get_json(force=True); items=load_broadcasts(); item=next((x for x in items if x.get("broadcast_id")==broadcast_id),None)
-    if not item: return jsonify({"error":"NOT_FOUND"}),404
-    home_id=str(data.get("home_school_id",item.get("home_school_id","")) or ""); visitor_id=str(data.get("visitor_school_id",item.get("visitor_school_id","")) or "")
-    home=get_school(home_id) if home_id else None; visitor=get_school(visitor_id) if visitor_id else None
-    for key in ("sport","season","classification","week","level","division","date","scheduled_start","venue","venue_id","visual_mode","crew"):
-        if key in data: item[key]=data[key]
-    item.update({"home_school_id":home_id,"visitor_school_id":visitor_id,"home_team":(home or {}).get("broadcast_name") or data.get("home_team") or item.get("home_team"),"visitor_team":(visitor or {}).get("broadcast_name") or data.get("visitor_team") or item.get("visitor_team"),"home_identity":broadcast_identity(home,item.get("sport","Football")) if home else item.get("home_identity",{}),"visitor_identity":broadcast_identity(visitor,item.get("sport","Football")) if visitor else item.get("visitor_identity",{}),"updated_at":int(time.time())})
-    save_broadcasts(items); (DATA_DIR/"Broadcasts"/f"{broadcast_id}.json").write_text(json.dumps(item,indent=2),encoding="utf-8")
-    state=load_state()
-    if state.get("broadcast_id")==broadcast_id:
-        for key in ("sport","season","classification","week","level","division","date","scheduled_start","venue","venue_id","visual_mode","crew","home_school_id","visitor_school_id","home_team","visitor_team","home_identity","visitor_identity"):
-            if key in item: state[key]=copy.deepcopy(item[key])
-        save_state(state)
-    warnings=[]
-    for side,school in (("Home",home),("Visitor",visitor)):
-        if school and not logo_certification(school)[0]: warnings.append(f"{side} has no certified logo; {school_monogram(school.get('broadcast_name') or school.get('official_name',''))} monogram will be used.")
-    return jsonify({"broadcast":item,"warnings":warnings})
+    result = get_broadcast_service().update(
+        broadcast_id,
+        request.get_json(force=True) or {},
+    )
+    if result.code == "NOT_FOUND":
+        return jsonify({"error": "NOT_FOUND"}), 404
+    return jsonify(result.data)
+
 
 @app.put("/api/broadcasts/<broadcast_id>/status")
 @require_auth
 def set_broadcast_status(broadcast_id: str):
-    incoming=request.get_json(force=True); status=str(incoming.get("status", "")).lower()
-    if status == "prepared":
-        status = "planned"
-    if status not in {"planned","live","completed"}: return jsonify({"error":"INVALID_STATUS"}),400
-    items=load_broadcasts(); item=next((x for x in items if x.get("broadcast_id") == broadcast_id), None)
-    if not item: return jsonify({"error":"NOT_FOUND"}),404
-    item["status"]=status; item["updated_at"]=int(time.time()); save_broadcasts(items)
-    path=DATA_DIR/"Broadcasts"/f"{broadcast_id}.json"
-    if path.exists(): path.write_text(json.dumps(item,indent=2),encoding="utf-8")
-    return jsonify(item)
+    incoming = request.get_json(force=True) or {}
+    result = get_broadcast_service().set_status(
+        broadcast_id,
+        incoming.get("status", ""),
+    )
+    if result.code == "INVALID_STATUS":
+        return jsonify({"error": "INVALID_STATUS"}), 400
+    if result.code == "NOT_FOUND":
+        return jsonify({"error": "NOT_FOUND"}), 404
+    return jsonify(result.data["broadcast"])
+
 
 @app.delete("/api/broadcasts/<broadcast_id>")
 @require_auth
 def delete_broadcast_record(broadcast_id: str):
-    items=load_broadcasts()
-    item=next((x for x in items if x.get("broadcast_id")==broadcast_id),None)
-    if not item:
-        return jsonify({"error":"NOT_FOUND"}),404
-    items=[x for x in items if x.get("broadcast_id")!=broadcast_id]
-    save_broadcasts(items)
-    detail=DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
-    if detail.exists():
-        detail.unlink()
-    state=load_state()
-    if state.get("broadcast_id")==broadcast_id:
-        save_state(copy.deepcopy(DEFAULT_STATE))
-    return jsonify({"deleted":broadcast_id})
+    result = get_broadcast_service().delete(broadcast_id)
+    if result.code == "NOT_FOUND":
+        return jsonify({"error": "NOT_FOUND"}), 404
+    return jsonify(result.data)
+
 
 @app.get("/api/build-journal")
 @require_auth
