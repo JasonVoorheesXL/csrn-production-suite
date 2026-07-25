@@ -71,7 +71,10 @@ def venue_integration_present() -> bool:
         for marker in (
             "from venue_service import VenueService",
             "VENUE_SERVICE: VenueService | None = None",
-            "return jsonify(get_venue_service().list_payload())",
+            '@app.get("/api/venues/<venue_id>")',
+            'return jsonify(result.data["venues"])',
+            "return get_venue_service().for_school(school, sport)",
+            "get_venue_service().migrate_legacy_names()",
         )
     )
 
