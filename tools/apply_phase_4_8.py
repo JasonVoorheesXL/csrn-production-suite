@@ -237,7 +237,7 @@ def main() -> None:
     if "get_broadcast_service().update_linked_status(" not in source:
         source = replace_between(
             source,
-            "def update_linked_broadcast_status(\n",
+            "def update_linked_broadcast_status",
             "def migrate_venue_names() -> None:\n",
             LINKED_STATUS_HELPER,
         )
