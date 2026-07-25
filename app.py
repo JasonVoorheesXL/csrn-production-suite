@@ -41,6 +41,7 @@ from broadcast_service import BroadcastService
 from personnel_service import PersonnelService
 from asset_service import AssetService
 from graphics_service import GraphicsService
+from logo_service import LogoService
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -226,9 +227,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4k — Graphics Service"
+    "Version 1.13.0-alpha.4l — Logo Service"
 )
-RUNTIME_BUILD = "V1.13A4K-GRAPHICS-SERVICE"
+RUNTIME_BUILD = "V1.13A4L-LOGO-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -792,6 +793,22 @@ def load_logos() -> list[dict[str, Any]]:
 
 def save_logos(items: list[dict[str, Any]]) -> None:
     save_json(LOGOS_FILE, items)
+
+
+LOGO_SERVICE: LogoService | None = None
+
+
+def get_logo_service() -> LogoService:
+    global LOGO_SERVICE
+    if LOGO_SERVICE is None:
+        LOGO_SERVICE = LogoService(
+            load_schools=load_schools,
+            save_schools=save_schools,
+            load_logos=load_logos,
+            save_logos=save_logos,
+            normalize_school_id=normalize_school_id,
+        )
+    return LOGO_SERVICE
 
 def _normalize_broadcast_lifecycle(
     items: list[dict[str, Any]],
@@ -2607,66 +2624,15 @@ def enrich_mhsaa_5a():
 
 
 def _hex(rgb: tuple[int, int, int]) -> str:
-    return "#%02X%02X%02X" % rgb
+    return LogoService._hex(rgb)
+
 
 def extract_logo_colors(image: Image.Image) -> list[str]:
-    rgba = image.convert("RGBA")
-    sample = rgba.copy(); sample.thumbnail((240, 240))
-    chromatic=[]; white_count=0; black_count=0; visible=0
-    for r,g,b,a in sample.getdata():
-        if a < 64:
-            continue
-        visible += 1
-        mx=max(r,g,b); mn=min(r,g,b); saturation=mx-mn
-        if r >= 238 and g >= 238 and b >= 238:
-            white_count += 1
-            continue
-        if r <= 28 and g <= 28 and b <= 28:
-            black_count += 1
-            continue
-        if saturation < 16 and 45 < mx < 225:
-            continue
-        chromatic.append((r,g,b))
-    ranked=[]
-    if chromatic:
-        strip=Image.new("RGB",(len(chromatic),1)); strip.putdata(chromatic)
-        quant=strip.quantize(colors=10,method=Image.Quantize.MEDIANCUT).convert("RGB")
-        counts=quant.getcolors(maxcolors=256) or []
-        ranked=[rgb for _,rgb in sorted(counts,reverse=True)]
-    chosen=[]
-    for rgb in ranked:
-        if all(sum((rgb[i]-other[i])**2 for i in range(3)) > 2600 for other in chosen):
-            chosen.append(rgb)
-        if len(chosen)==2:
-            break
-    if not chosen:
-        chosen=[(128,128,128)]
-    neutral = (255,255,255) if white_count >= black_count else (0,0,0)
-    # Prefer a neutral secondary when it is visibly present; school branding commonly pairs one strong color with white/black.
-    neutral_share=(max(white_count,black_count)/visible) if visible else 0
-    if neutral_share >= 0.035:
-        secondary=neutral
-    elif len(chosen)>1:
-        secondary=chosen[1]
-    else:
-        secondary=(255,255,255)
-    return [_hex(chosen[0]), _hex(secondary)]
+    return LogoService.extract_colors(image)
+
 
 def normalize_round_logo(source: Image.Image, size: int) -> Image.Image:
-    img=source.convert("RGBA")
-    bbox=img.getbbox()
-    if bbox: img=img.crop(bbox)
-    max_content=int(size*0.92)
-    scale=min(max_content/max(1,img.width), max_content/max(1,img.height))
-    new_size=(max(1,round(img.width*scale)),max(1,round(img.height*scale)))
-    img=img.resize(new_size,Image.Resampling.LANCZOS)
-    canvas=Image.new("RGBA",(size,size),(0,0,0,0))
-    canvas.alpha_composite(img,((size-img.width)//2,(size-img.height)//2))
-    mask=Image.new("L",(size,size),0)
-    from PIL import ImageDraw
-    ImageDraw.Draw(mask).ellipse((0,0,size-1,size-1),fill=255)
-    canvas.putalpha(ImageChops.multiply(canvas.getchannel("A"),mask))
-    return canvas
+    return LogoService.normalize_round_logo(source, size)
 
 
 @app.get("/school-logos/<school_id>/<filename>")
@@ -2676,43 +2642,53 @@ def school_logo_file(school_id: str, filename: str):
 @app.post("/api/schools/<school_id>/logo/process")
 @require_auth
 def process_school_logo(school_id: str):
-    schools=load_schools(); school=next((x for x in schools if x.get("id")==school_id),None)
-    if not school: return jsonify({"error":"SCHOOL_NOT_FOUND"}),404
-    upload=request.files.get("logo")
-    if not upload or not upload.filename: return jsonify({"error":"LOGO_FILE_REQUIRED"}),400
-    try:
-        raw=upload.read()
-        image=Image.open(io.BytesIO(raw)); image.load()
-    except Exception:
-        return jsonify({"error":"INVALID_IMAGE"}),400
-    folder=DATA_DIR / "Logos" / normalize_school_id(school_id); folder.mkdir(parents=True,exist_ok=True)
-    ext=(Path(upload.filename).suffix.lower() or '.png')
-    if ext not in ('.png','.jpg','.jpeg','.webp'): ext='.png'
-    original=folder / f"original{ext}"; original.write_bytes(raw)
-    master=normalize_round_logo(image,1024); scorebug=normalize_round_logo(image,256)
-    master.save(folder/'round-master.png'); scorebug.save(folder/'round-scorebug.png')
-    colors=extract_logo_colors(master)
-    rel_master=f"/school-logos/{normalize_school_id(school_id)}/round-master.png"
-    rel_score=f"/school-logos/{normalize_school_id(school_id)}/round-scorebug.png"
-    logo_id=f"{school.get('csrn_id') or school_id}-primary"
-    school['primary_logo']=rel_master; school['default_broadcast_logo_id']=logo_id; school['logo_status']='candidate'
-    school['primary_color']=colors[0]; school['secondary_color']=colors[1]
-    school.setdefault('logo_metadata',{}).update({
-        'original_filename':upload.filename,'original_path':str(original.relative_to(BASE_DIR)).replace('\\','/'),
-        'round_master_path':rel_master,'scorebug_path':rel_score,'approval_status':'candidate',
-        'transparent_background_status':'normalized','shape_standard':'round','master_canvas':'1024x1024-round',
-        'safe_area':'circle-92-percent','scorebug_derivative':'256x256-round','extracted_colors':colors
-    })
-    save_schools(schools)
-    logos=load_logos(); record=next((x for x in logos if x.get('id')==logo_id),None)
-    payload={'id':logo_id,'school_id':school_id,'csrn_school_id':school.get('csrn_id',''),'designation':'primary',
-             'approval_status':'candidate','original_path':str(original.relative_to(BASE_DIR)).replace('\\','/'),
-             'round_master_path':rel_master,'scorebug_path':rel_score,'extracted_colors':colors}
-    if record: record.update(payload)
-    else: logos.append(payload)
-    save_logos(logos)
-    return jsonify({'school':school,'logo':payload,'primary_color':colors[0],'secondary_color':colors[1],
-                    'preview_url':rel_master,'message':'Round candidate logo created; review colors and approve before broadcast use.'})
+    upload = request.files.get("logo")
+    if not upload or not upload.filename:
+        return jsonify({"error": "LOGO_FILE_REQUIRED"}), 400
+
+    raw = upload.read()
+    normalized_school_id = normalize_school_id(school_id)
+    folder = DATA_DIR / "Logos" / normalized_school_id
+
+    def write_original(extension: str, payload: bytes) -> str:
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / f"original{extension}"
+        path.write_bytes(payload)
+        return str(path.relative_to(BASE_DIR)).replace("\\", "/")
+
+    def write_master(image: Image.Image) -> str:
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / "round-master.png"
+        image.save(path)
+        return f"/school-logos/{normalized_school_id}/round-master.png"
+
+    def write_scorebug(image: Image.Image) -> str:
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / "round-scorebug.png"
+        image.save(path)
+        return f"/school-logos/{normalized_school_id}/round-scorebug.png"
+
+    result = get_logo_service().process_candidate(
+        school_id,
+        raw=raw,
+        original_filename=upload.filename,
+        write_original=write_original,
+        write_master=write_master,
+        write_scorebug=write_scorebug,
+    )
+    if result.code == "SCHOOL_NOT_FOUND":
+        return jsonify({"error": result.code}), 404
+    if result.code == "INVALID_IMAGE":
+        return jsonify({"error": result.code}), 400
+    if result.code == "LOGO_STORAGE_FAILED":
+        return jsonify(
+            {
+                "error": result.code,
+                "message": result.data.get("message", ""),
+            }
+        ), 500
+    return jsonify(result.data)
+
 
 @app.get("/api/venues")
 @require_auth
@@ -2790,7 +2766,12 @@ def delete_venue(venue_id: str):
 @app.get("/api/logos")
 @require_auth
 def list_logos():
-    return jsonify(load_logos())
+    result = get_logo_service().list_records(
+        school_id=str(request.args.get("school_id", "")),
+        designation=str(request.args.get("designation", "")),
+        approval_status=str(request.args.get("approval_status", "")),
+    )
+    return jsonify(result.data["logos"])
 
 
 @app.get("/api/upgrade/candidate")
