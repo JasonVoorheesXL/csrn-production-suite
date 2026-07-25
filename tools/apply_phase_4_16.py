@@ -73,7 +73,7 @@ def diagnostic_status() -> dict[str, Any]:
         text,
         "def diagnostic_status() -> dict[str, Any]:\n",
         "def normalize_school_id(value: str) -> str:\n",
-        diagnostics_block + "def normalize_school_id(value: str) -> str:\n",
+        diagnostics_block,
     )
 
     readiness_block = '''def readiness_payload() -> dict[str, Any]:
@@ -85,7 +85,7 @@ def diagnostic_status() -> dict[str, Any]:
         text,
         "def readiness_payload() -> dict[str, Any]:\n",
         '@app.get("/api/readiness")\n',
-        readiness_block + '@app.get("/api/readiness")\n',
+        readiness_block,
     )
 
     old_route = '''def readiness():
