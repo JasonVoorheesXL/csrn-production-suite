@@ -1,0 +1,39 @@
+name: Phase 4.19 Compact Diagnostic
+
+on:
+  push:
+    branches:
+      - phase/4.19-rules-service
+  pull_request:
+    branches:
+      - develop-1.13
+
+permissions:
+  contents: read
+
+jobs:
+  compact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install -q -r requirements.txt pytest
+      - run: python tools/ci_prepare.py
+      - name: Run focused Rules Service tests
+        id: focused
+        continue-on-error: true
+        run: python -m pytest -q tests/test_rules_service.py tests/test_rules_routes.py tests/test_phase_4_19_migration.py --tb=short > pytest.log 2>&1
+      - name: Upload focused log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-4-19-pytest-log
+          path: pytest.log
+      - name: Report focused result
+        if: always()
+        run: |
+          cat pytest.log
+          test "${{ steps.focused.outcome }}" = "success"
