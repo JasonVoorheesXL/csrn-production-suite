@@ -228,9 +228,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.4l — Logo Service"
+    "Version 1.13.0-alpha.4m — OBS Service"
 )
-RUNTIME_BUILD = "V1.13A4L-LOGO-SERVICE"
+RUNTIME_BUILD = "V1.13A4M-OBS-SERVICE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
