@@ -8,6 +8,11 @@ from typing import Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 BRANCH = "phase/4.8-broadcast-service"
+IDENTITY_PATHS = {
+    "VERSION.txt",
+    "app.py",
+    "tests/test_core_repository_runtime.py",
+}
 
 
 class CompletionError(RuntimeError):
@@ -80,6 +85,32 @@ def broadcast_integration_present() -> bool:
     )
 
 
+def runtime_identity_present() -> bool:
+    app_text = (ROOT / "app.py").read_text(encoding="utf-8")
+    version_text = (ROOT / "VERSION.txt").read_text(encoding="utf-8").strip()
+    runtime_test = (
+        ROOT / "tests" / "test_core_repository_runtime.py"
+    ).read_text(encoding="utf-8")
+    return all(
+        marker in app_text
+        for marker in (
+            "Version 1.13.0-alpha.4h — Broadcast Service",
+            "V1.13A4H-BROADCAST-SERVICE",
+        )
+    ) and version_text == "1.13.0-alpha.4h" and all(
+        marker in runtime_test
+        for marker in (
+            "Version 1.13.0-alpha.4h — Broadcast Service",
+            "V1.13A4H-BROADCAST-SERVICE",
+        )
+    )
+
+
+def remove_tracked_file(path: str) -> None:
+    if (ROOT / path).exists():
+        run(("git", "rm", path))
+
+
 def main() -> None:
     branch = output("git", "branch", "--show-current")
     if branch != BRANCH:
@@ -88,11 +119,18 @@ def main() -> None:
         )
 
     initial_paths = status_paths()
-    if not initial_paths:
+    integrated = broadcast_integration_present()
+    versioned = runtime_identity_present()
+
+    if not initial_paths and not integrated:
         print("Applying BroadcastService integration...")
         run((sys.executable, "tools/apply_phase_4_8.py"))
-    elif initial_paths == {"app.py"} and broadcast_integration_present():
+    elif initial_paths == {"app.py"} and integrated and not versioned:
         print("Resuming from the already-applied BroadcastService integration...")
+    elif initial_paths == IDENTITY_PATHS and integrated and versioned:
+        print("Resuming after the interrupted Phase 4.8 full validation...")
+    elif not initial_paths and integrated:
+        print("Resuming from the committed BroadcastService integration...")
     else:
         rendered = ", ".join(sorted(initial_paths)) or "unknown files"
         raise CompletionError(
@@ -101,7 +139,7 @@ def main() -> None:
         )
 
     changed = status_paths()
-    if changed != {"app.py"}:
+    if changed not in (set(), {"app.py"}, IDENTITY_PATHS):
         raise CompletionError(
             "Broadcast integration changed unexpected files: "
             + ", ".join(sorted(changed))
@@ -134,27 +172,35 @@ def main() -> None:
         )
     )
 
-    run(("git", "add", "app.py"))
-    run(("git", "diff", "--cached", "--check"))
-    run(("git", "commit", "-m", "Phase 4.8: integrate Broadcast Service"))
+    if status_paths() == {"app.py"}:
+        run(("git", "add", "app.py"))
+        run(("git", "diff", "--cached", "--check"))
+        run(("git", "commit", "-m", "Phase 4.8: integrate Broadcast Service"))
 
-    print("Updating the Phase 4.8 runtime identity...")
-    run(
-        (
-            sys.executable,
-            "tools/dev_workflow.py",
-            "version",
-            "1.13.0-alpha.4h",
-            "Broadcast Service",
+    if not runtime_identity_present():
+        if status_paths():
+            raise CompletionError(
+                "Runtime identity cannot be updated while unrelated changes exist."
+            )
+        print("Updating the Phase 4.8 runtime identity...")
+        run(
+            (
+                sys.executable,
+                "tools/dev_workflow.py",
+                "version",
+                "1.13.0-alpha.4h",
+                "Broadcast Service",
+            )
         )
-    )
+    else:
+        print("Phase 4.8 runtime identity is already applied.")
 
     print("Running full repository validation...")
     run((sys.executable, "tools/dev_workflow.py", "validate"))
 
-    run(("git", "rm", "tools/apply_phase_4_8.py"))
-    run(("git", "rm", "tools/ci_apply.py"))
-    run(("git", "rm", "tests/test_phase_4_8_migration.py"))
+    remove_tracked_file("tools/apply_phase_4_8.py")
+    remove_tracked_file("tools/ci_apply.py")
+    remove_tracked_file("tests/test_phase_4_8_migration.py")
     run(
         (
             "git",
