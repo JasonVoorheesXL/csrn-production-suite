@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -7,11 +8,11 @@ ROOT = Path(__file__).resolve().parents[1]
 APP_FILE = ROOT / "app.py"
 
 
-STALE_IMPORTS: tuple[tuple[str, str], ...] = (
-    ("import io\n", "io."),
-    ("import socket\n", "socket."),
-    ("import qrcode\n", "qrcode."),
-    ("import qrcode.image.svg\n", "qrcode."),
+STALE_IMPORT_LINES: tuple[str, ...] = (
+    "import io\n",
+    "import socket\n",
+    "import qrcode\n",
+    "import qrcode.image.svg\n",
 )
 
 LEGACY_REPOSITORY_COMMENTS = '''# Phase 3.5: BroadcastRespository integrated
@@ -34,16 +35,17 @@ def apply(path: Path = APP_FILE) -> bool:
     text = path.read_text(encoding="utf-8")
     original = text
 
-    for import_line, usage_marker in STALE_IMPORTS:
-        if import_line not in text:
-            continue
-        candidate = text.replace(import_line, "", 1)
-        if usage_marker in candidate:
+    candidate = text
+    for import_line in STALE_IMPORT_LINES:
+        candidate = candidate.replace(import_line, "", 1)
+
+    for root in ("io", "socket", "qrcode"):
+        if re.search(rf"\b{re.escape(root)}\.", candidate):
             raise RuntimeError(
-                f"Cannot remove {import_line.strip()!r}; "
-                f"{usage_marker!r} is still used in app.py."
+                f"Cannot remove obsolete {root!r} import; "
+                f"{root!r} is still used in app.py."
             )
-        text = candidate
+    text = candidate
 
     if LEGACY_REPOSITORY_COMMENTS in text:
         text = text.replace(
