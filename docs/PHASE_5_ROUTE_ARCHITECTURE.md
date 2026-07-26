@@ -64,6 +64,16 @@ Manifest loading remains in the application composition root and is injected as 
 
 All mutation and query logic continues to delegate to the Phase 4 services. The Blueprint layer owns only request parsing, upload orchestration, authentication decoration, response serialization, and temporary-file cleanup when a personnel record is missing.
 
+## Phase 5.5 sponsor, asset, and logo routes
+
+`routes/sponsor_routes.py` owns sponsor CRUD, sponsor-to-asset linking, public legacy sponsor-logo serving, and sponsor-logo upload orchestration. Duplicate asset actions (`prompt`, `reuse`, and `replace`) preserve their current file and response behavior.
+
+`routes/asset_routes.py` owns asset CRUD, filtering, public asset-file serving, and uploaded-file attachment. Asset hashing, duplicate detection, reuse, replacement, and metadata persistence continue to delegate to `AssetService`.
+
+`routes/logo_routes.py` owns public school-logo serving, school-logo candidate processing, and logo-record filtering. The application composition root injects the base directory, school-logo directory resolution, and school-ID normalization so no route module imports application globals.
+
+The route layer still owns multipart parsing and filesystem orchestration because those are HTTP-bound concerns. Record validation, image processing, duplicate policy, and domain persistence remain in the Phase 4 services.
+
 ## Migration sequence
 
 Later Phase 5 stages should move one coherent route domain at a time, add focused Blueprint tests, retain route-contract coverage, and remove the corresponding `@app` decorators only after the Blueprint passes integrated validation.
