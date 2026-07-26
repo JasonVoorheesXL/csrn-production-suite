@@ -33,6 +33,7 @@ from routes.security_upgrade_routes import (
     SecurityUpgradeRoutesDependencies,
     create_security_upgrade_blueprint,
 )
+from routes.social_routes import SocialRoutesDependencies, create_social_blueprint
 from routes.sponsor_routes import SponsorRoutesDependencies, create_sponsor_blueprint
 from routes.support_routes import SupportRoutesDependencies, create_support_blueprint
 from routes.system_routes import SystemRoutesDependencies, create_system_blueprint
@@ -54,6 +55,7 @@ __all__ = [
     "RosterRoutesDependencies",
     "SchoolRoutesDependencies",
     "SecurityUpgradeRoutesDependencies",
+    "SocialRoutesDependencies",
     "SponsorRoutesDependencies",
     "SupportRoutesDependencies",
     "SystemRoutesDependencies",
@@ -73,6 +75,7 @@ __all__ = [
     "create_roster_blueprint",
     "create_school_blueprint",
     "create_security_upgrade_blueprint",
+    "create_social_blueprint",
     "create_sponsor_blueprint",
     "create_support_blueprint",
     "create_system_blueprint",
