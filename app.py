@@ -77,6 +77,18 @@ from routes.venue_routes import (
     VenueRoutesDependencies,
     create_venue_blueprint,
 )
+from routes.asset_routes import (
+    AssetRoutesDependencies,
+    create_asset_blueprint,
+)
+from routes.logo_routes import (
+    LogoRoutesDependencies,
+    create_logo_blueprint,
+)
+from routes.sponsor_routes import (
+    SponsorRoutesDependencies,
+    create_sponsor_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -254,9 +266,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.5d — Roster Personnel and Venue Routes"
+    "Version 1.13.0-alpha.5e — Sponsor Asset and Logo Routes"
 )
-RUNTIME_BUILD = "V1.13A5D-ROSTER-PERSONNEL-AND-VENUE-ROUTES"
+RUNTIME_BUILD = "V1.13A5E-SPONSOR-ASSET-AND-LOGO-ROUTES"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -1599,324 +1611,39 @@ def load_package_route(package_id: str):
     )
 
 
-@app.get("/api/sponsors")
-@require_auth
-def api_sponsors_list():
-    return jsonify(get_sponsor_service().list_payload())
-
-
-@app.post("/api/sponsors")
-@require_auth
-def api_sponsors_create():
-    result = get_sponsor_service().create(
-        request.get_json(silent=True) or {}
-    )
-    if result.code == "SPONSOR_NAME_REQUIRED":
-        return jsonify({"error": "Sponsor name is required."}), 400
-    if result.code == "DUPLICATE_SPONSOR":
-        return jsonify(
-            {
-                "error": result.code,
-                "duplicate_sponsor": result.data["duplicate_sponsor"],
-            }
-        ), 409
-    return jsonify({"sponsor": result.data["sponsor"]})
-
-
-@app.put("/api/sponsors/<sponsor_id>")
-@require_auth
-def api_sponsors_update(sponsor_id: str):
-    result = get_sponsor_service().update(
-        sponsor_id,
-        request.get_json(silent=True) or {},
-    )
-    if result.code == "SPONSOR_NOT_FOUND":
-        return jsonify({"error": "Sponsor not found."}), 404
-    if result.code == "DUPLICATE_SPONSOR":
-        return jsonify(
-            {
-                "error": result.code,
-                "duplicate_sponsor": result.data["duplicate_sponsor"],
-            }
-        ), 409
-    return jsonify({"sponsor": result.data["sponsor"]})
-
-
-@app.delete("/api/sponsors/<sponsor_id>")
-@require_auth
-def api_sponsors_delete(sponsor_id: str):
-    result = get_sponsor_service().delete(sponsor_id)
-    if result.code == "SPONSOR_NOT_FOUND":
-        return jsonify({"error": "Sponsor not found."}), 404
-    return jsonify({"ok": True})
-
-
-@app.post("/api/sponsors/<sponsor_id>/logo")
-@require_auth
-def api_sponsor_logo(sponsor_id: str):
-    upload = request.files.get("logo")
-    if not upload or not upload.filename:
-        return jsonify({"error": "Choose a logo file."}), 400
-    suffix = Path(upload.filename).suffix.lower()
-    if suffix not in {".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif"}:
-        return jsonify({"error": "Unsupported logo type."}), 400
-
-    duplicate_action = str(
-        request.form.get("duplicate_action", "prompt")
-    ).lower()
-    sponsor = next(
-        (
-            item
-            for item in load_sponsors()
-            if str(item.get("id")) == sponsor_id
-        ),
-        None,
-    )
-    if not sponsor:
-        return jsonify({"error": "Save the sponsor first."}), 404
-
-    ASSET_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    temp = ASSET_UPLOAD_DIR / f".upload-{secrets.token_hex(8)}{suffix}"
-    upload.save(temp)
-    sha256 = asset_file_hash(temp)
-    assets = load_assets()
-    existing = next(
-        (
-            item
-            for item in assets
-            if item.get("sha256") == sha256 and item.get("active", True)
-        ),
-        None,
-    )
-
-    if existing and duplicate_action == "prompt":
-        temp.unlink(missing_ok=True)
-        return jsonify(
-            {"error": "DUPLICATE_ASSET", "duplicate_asset": existing}
-        ), 409
-
-    if existing and duplicate_action == "reuse":
-        temp.unlink(missing_ok=True)
-        asset = existing
-    elif existing and duplicate_action == "replace":
-        current_url = str(existing.get("file_url", ""))
-        current_name = (
-            current_url.rsplit("/", 1)[-1]
-            if current_url.startswith("/asset-files/")
-            else ""
-        )
-        target = (
-            ASSET_UPLOAD_DIR / current_name
-            if current_name
-            else ASSET_UPLOAD_DIR / f"{existing['id']}{suffix}"
-        )
-        temp.replace(target)
-        existing.update(
-            {
-                "file_url": f"/asset-files/{target.name}",
-                "sha256": sha256,
-                "original_filename": upload.filename,
-                "updated_at": int(time.time()),
-            }
-        )
-        save_assets(assets)
-        asset = existing
-    else:
-        asset_id = f"asset-{int(time.time()*1000)}-{secrets.token_hex(2)}"
-        filename = f"{asset_id}{suffix}"
-        target = ASSET_UPLOAD_DIR / filename
-        temp.replace(target)
-        asset = clean_asset_record(
-            {
-                "id": asset_id,
-                "name": f"{sponsor.get('name', 'Sponsor')} Logo",
-                "category": "Sponsor",
-                "asset_type": "Logo",
-                "file_url": f"/asset-files/{filename}",
-                "rights_status": "Unverified",
-                "rights_owner": sponsor.get("name", ""),
-                "notes": "Created automatically from Sponsor Engine upload.",
-                "sha256": sha256,
-                "original_filename": upload.filename,
-                "active": True,
-            },
+SPONSOR_ROUTES_BLUEPRINT = create_sponsor_blueprint(
+    SponsorRoutesDependencies(
+        require_auth=require_auth,
+        get_sponsor_service=get_sponsor_service,
+        load_sponsors=lambda: load_sponsors(),
+        load_assets=lambda: load_assets(),
+        save_assets=lambda items: save_assets(items),
+        clean_asset_record=lambda payload, asset_id: clean_asset_record(
+            payload,
             asset_id,
-        )
-        assets.append(asset)
-        save_assets(assets)
-
-    result = get_sponsor_service().link_asset(
-        sponsor_id,
-        str(asset.get("id", "")),
+        ),
+        asset_file_hash=lambda path: asset_file_hash(path),
+        get_asset_upload_dir=lambda: ASSET_UPLOAD_DIR,
+        get_sponsor_upload_dir=lambda: SPONSOR_UPLOAD_DIR,
+        clock=lambda: time.time(),
+        token_hex=lambda length: secrets.token_hex(length),
     )
-    if result.code == "SPONSOR_NOT_FOUND":
-        return jsonify({"error": "Save the sponsor first."}), 404
+)
+app.register_blueprint(SPONSOR_ROUTES_BLUEPRINT)
 
-    return jsonify(
-        {
-            "logo_url": result.data["sponsor"].get("logo_url", ""),
-            "asset": asset,
-            "duplicate_reused": bool(
-                existing and duplicate_action == "reuse"
-            ),
-            "sponsor": result.data["sponsor"],
-        }
+ASSET_ROUTES_BLUEPRINT = create_asset_blueprint(
+    AssetRoutesDependencies(
+        require_auth=require_auth,
+        get_asset_service=get_asset_service,
+        get_upload_dir=lambda: ASSET_UPLOAD_DIR,
+        extension_allowed=AssetService.extension_allowed,
+        normalize_asset_id=AssetService.normalize_id,
+        clock=lambda: time.time(),
+        token_hex=lambda length: secrets.token_hex(length),
     )
+)
+app.register_blueprint(ASSET_ROUTES_BLUEPRINT)
 
-
-@app.put("/api/sponsors/<sponsor_id>/asset")
-@require_auth
-def api_sponsor_asset_link(sponsor_id: str):
-    asset_id = str(
-        (request.get_json(silent=True) or {}).get("asset_id", "")
-    ).strip()
-    result = get_sponsor_service().link_asset(sponsor_id, asset_id)
-    if result.code == "INVALID_SPONSOR_LOGO_ASSET":
-        return jsonify(
-            {"error": "Choose a valid Sponsor Logo asset."}
-        ), 400
-    if result.code == "SPONSOR_NOT_FOUND":
-        return jsonify({"error": "Sponsor not found."}), 404
-    return jsonify(result.data)
-
-
-@app.get("/sponsor-logos/<filename>")
-def sponsor_logo_file(filename: str):
-    return send_from_directory(SPONSOR_UPLOAD_DIR, filename)
-
-@app.get("/api/assets")
-@require_auth
-def api_assets_list():
-    include_inactive = str(
-        request.args.get("include_inactive", "true")
-    ).strip().lower() not in {"0", "false", "no", "off"}
-    result = get_asset_service().list_records(
-        include_inactive=include_inactive,
-        category=str(request.args.get("category", "")),
-        asset_type=str(request.args.get("asset_type", "")),
-        rights_status=str(request.args.get("rights_status", "")),
-    )
-    return jsonify(result.data)
-
-
-@app.post("/api/assets")
-@require_auth
-def api_assets_create():
-    result = get_asset_service().create(
-        request.get_json(silent=True) or {}
-    )
-    if result.code == "ASSET_NAME_REQUIRED":
-        return jsonify({"error": "Asset name is required."}), 400
-    return jsonify({"asset": result.data["asset"]})
-
-
-@app.put("/api/assets/<asset_id>")
-@require_auth
-def api_assets_update(asset_id: str):
-    result = get_asset_service().update(
-        asset_id,
-        request.get_json(silent=True) or {},
-    )
-    if result.code == "ASSET_NOT_FOUND":
-        return jsonify({"error": "Asset not found."}), 404
-    if result.code == "ASSET_NAME_REQUIRED":
-        return jsonify({"error": "Asset name is required."}), 400
-    return jsonify({"asset": result.data["asset"]})
-
-
-@app.delete("/api/assets/<asset_id>")
-@require_auth
-def api_assets_delete(asset_id: str):
-    result = get_asset_service().delete(asset_id)
-    if result.code == "ASSET_NOT_FOUND":
-        return jsonify({"error": "Asset not found."}), 404
-    return jsonify({"ok": True})
-
-
-@app.post("/api/assets/<asset_id>/upload")
-@require_auth
-def api_asset_upload(asset_id: str):
-    upload = request.files.get("asset")
-    if not upload or not upload.filename:
-        return jsonify({"error": "Choose a file to upload."}), 400
-    suffix = Path(upload.filename).suffix.lower()
-    if not AssetService.extension_allowed(upload.filename):
-        return jsonify({"error": "Unsupported asset file type."}), 400
-
-    duplicate_action = str(
-        request.form.get("duplicate_action", "prompt")
-    ).lower()
-    service = get_asset_service()
-    current_result = service.read(asset_id)
-    if current_result.code == "ASSET_NOT_FOUND":
-        return jsonify({"error": "Save the asset record before uploading."}), 404
-
-    safe_id = AssetService.normalize_id(asset_id)
-    temp = ASSET_UPLOAD_DIR / f".upload-{secrets.token_hex(8)}{suffix}"
-    upload.save(temp)
-    sha256 = service.file_hash(temp)
-    duplicate = service.duplicate_by_hash(sha256, exclude_id=asset_id)
-
-    if duplicate and duplicate_action == "prompt":
-        temp.unlink(missing_ok=True)
-        return jsonify(
-            {"error": "DUPLICATE_ASSET", "duplicate_asset": duplicate}
-        ), 409
-
-    if duplicate and duplicate_action == "reuse":
-        temp.unlink(missing_ok=True)
-        result = service.reuse_duplicate(asset_id, str(duplicate.get("id", "")))
-        return jsonify(
-            {
-                "file_url": result.data["asset"].get("file_url", ""),
-                **result.data,
-            }
-        )
-
-    if duplicate and duplicate_action == "replace":
-        existing_url = str(duplicate.get("file_url", ""))
-        existing_name = (
-            existing_url.rsplit("/", 1)[-1]
-            if existing_url.startswith("/asset-files/")
-            else f"{duplicate['id']}{suffix}"
-        )
-        target = ASSET_UPLOAD_DIR / existing_name
-        temp.replace(target)
-        result = service.replace_duplicate(
-            asset_id,
-            str(duplicate.get("id", "")),
-            file_url=f"/asset-files/{target.name}",
-            sha256=sha256,
-            original_filename=upload.filename,
-        )
-        return jsonify(
-            {
-                "file_url": result.data["asset"]["file_url"],
-                **result.data,
-            }
-        )
-
-    filename = f"{safe_id}-{int(time.time())}{suffix}"
-    target = ASSET_UPLOAD_DIR / filename
-    temp.replace(target)
-    result = service.attach_file(
-        asset_id,
-        file_url=f"/asset-files/{filename}",
-        sha256=sha256,
-        original_filename=upload.filename,
-    )
-    return jsonify(
-        {
-            "file_url": result.data["asset"]["file_url"],
-            "duplicate_asset": duplicate,
-            "duplicate_kept": bool(duplicate),
-        }
-    )
-
-
-@app.get("/asset-files/<filename>")
-def asset_file(filename: str):
-    return send_from_directory(ASSET_UPLOAD_DIR, filename)
 
 @app.get("/overlay")
 def overlay():
@@ -1994,70 +1721,18 @@ def normalize_round_logo(source: Image.Image, size: int) -> Image.Image:
     return LogoService.normalize_round_logo(source, size)
 
 
-@app.get("/school-logos/<school_id>/<filename>")
-def school_logo_file(school_id: str, filename: str):
-    return send_from_directory(DATA_DIR / "Logos" / normalize_school_id(school_id), filename)
-
-@app.post("/api/schools/<school_id>/logo/process")
-@require_auth
-def process_school_logo(school_id: str):
-    upload = request.files.get("logo")
-    if not upload or not upload.filename:
-        return jsonify({"error": "LOGO_FILE_REQUIRED"}), 400
-
-    raw = upload.read()
-    normalized_school_id = normalize_school_id(school_id)
-    folder = DATA_DIR / "Logos" / normalized_school_id
-
-    def write_original(extension: str, payload: bytes) -> str:
-        folder.mkdir(parents=True, exist_ok=True)
-        path = folder / f"original{extension}"
-        path.write_bytes(payload)
-        return str(path.relative_to(BASE_DIR)).replace("\\", "/")
-
-    def write_master(image: Image.Image) -> str:
-        folder.mkdir(parents=True, exist_ok=True)
-        path = folder / "round-master.png"
-        image.save(path)
-        return f"/school-logos/{normalized_school_id}/round-master.png"
-
-    def write_scorebug(image: Image.Image) -> str:
-        folder.mkdir(parents=True, exist_ok=True)
-        path = folder / "round-scorebug.png"
-        image.save(path)
-        return f"/school-logos/{normalized_school_id}/round-scorebug.png"
-
-    result = get_logo_service().process_candidate(
-        school_id,
-        raw=raw,
-        original_filename=upload.filename,
-        write_original=write_original,
-        write_master=write_master,
-        write_scorebug=write_scorebug,
+LOGO_ROUTES_BLUEPRINT = create_logo_blueprint(
+    LogoRoutesDependencies(
+        require_auth=require_auth,
+        get_logo_service=get_logo_service,
+        get_base_dir=lambda: BASE_DIR,
+        get_school_logo_dir=lambda school_id: (
+            DATA_DIR / "Logos" / normalize_school_id(school_id)
+        ),
+        normalize_school_id=normalize_school_id,
     )
-    if result.code == "SCHOOL_NOT_FOUND":
-        return jsonify({"error": result.code}), 404
-    if result.code == "INVALID_IMAGE":
-        return jsonify({"error": result.code}), 400
-    if result.code == "LOGO_STORAGE_FAILED":
-        return jsonify(
-            {
-                "error": result.code,
-                "message": result.data.get("message", ""),
-            }
-        ), 500
-    return jsonify(result.data)
-
-
-@app.get("/api/logos")
-@require_auth
-def list_logos():
-    result = get_logo_service().list_records(
-        school_id=str(request.args.get("school_id", "")),
-        designation=str(request.args.get("designation", "")),
-        approval_status=str(request.args.get("approval_status", "")),
-    )
-    return jsonify(result.data["logos"])
+)
+app.register_blueprint(LOGO_ROUTES_BLUEPRINT)
 
 
 UPGRADE_SERVICE: UpgradeService | None = None
