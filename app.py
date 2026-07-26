@@ -52,6 +52,7 @@ from support_media_service import SupportMediaService
 from game_day_safety_service import GameDaySafetyService
 from recovery_service import RecoveryService
 from commissioning_service import HardwareOBSCommissioningService
+from caption_service import CaptionService
 from broadcast_lifecycle_service import BroadcastLifecycleService
 from routes.system_routes import (
     SystemRoutesDependencies,
@@ -137,6 +138,10 @@ from routes.commissioning_routes import (
     CommissioningRoutesDependencies,
     create_commissioning_blueprint,
 )
+from routes.caption_routes import (
+    CaptionRoutesDependencies,
+    create_caption_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -183,6 +188,9 @@ VERSION_FILE = BASE_DIR / "VERSION.txt"
 GAME_DAY_BACKUP_DIR = DATA_DIR / "Backups" / "GameDay"
 GAME_DAY_RECOVERY_DIR = DATA_DIR / "Backups" / "Recovery"
 COMMISSIONING_FILE = DATA_DIR / "Settings" / "hardware_commissioning.json"
+CAPTION_PROFILE_FILE = DATA_DIR / "Settings" / "caption_profile.json"
+CAPTION_STATE_FILE = DATA_DIR / "Captions" / "caption_state.json"
+CAPTION_TRANSCRIPTS_DIR = DATA_DIR / "Captions" / "Transcripts"
 
 APPLICATION_BLUEPRINTS: list[Any] = []
 lock = Lock()
@@ -317,9 +325,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.6c — Hardware and OBS Commissioning"
+    "Version 1.13.0-alpha.6d — Channel-Based Captioning"
 )
-RUNTIME_BUILD = "V1.13A6C-HARDWARE-AND-OBS-COMMISSIONING"
+RUNTIME_BUILD = "V1.13A6D-CHANNEL-BASED-CAPTIONING"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -1955,6 +1963,30 @@ COMMISSIONING_ROUTES_BLUEPRINT = create_commissioning_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(COMMISSIONING_ROUTES_BLUEPRINT)
+
+
+CAPTION_SERVICE: CaptionService | None = None
+
+
+def get_caption_service() -> CaptionService:
+    global CAPTION_SERVICE
+    if CAPTION_SERVICE is None:
+        CAPTION_SERVICE = CaptionService(
+            profile_file=CAPTION_PROFILE_FILE,
+            state_file=CAPTION_STATE_FILE,
+            transcripts_dir=CAPTION_TRANSCRIPTS_DIR,
+            clock=time.time,
+        )
+    return CAPTION_SERVICE
+
+
+CAPTION_ROUTES_BLUEPRINT = create_caption_blueprint(
+    CaptionRoutesDependencies(
+        require_auth=require_auth,
+        get_caption_service=lambda: get_caption_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(CAPTION_ROUTES_BLUEPRINT)
 
 
 SUPPORT_MEDIA_SERVICE: SupportMediaService | None = None

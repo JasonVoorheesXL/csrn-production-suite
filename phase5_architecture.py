@@ -19,6 +19,7 @@ EXPECTED_BLUEPRINTS = {
     "broadcast_lifecycle_routes",
     "broadcast_package_routes",
     "broadcast_routes",
+    "caption_routes",
     "commissioning_routes",
     "graphics_routes",
     "game_day_safety_routes",
@@ -39,6 +40,8 @@ EXPECTED_BLUEPRINTS = {
 
 PUBLIC_ENDPOINTS = {
     "asset_routes.asset_file",
+    "caption_routes.caption_overlay",
+    "caption_routes.caption_overlay_state",
     "logo_routes.school_logo_file",
     "page_routes.control_panel",
     "page_routes.overlay",
