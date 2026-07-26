@@ -15,6 +15,7 @@ from routes.broadcast_package_routes import (
 )
 from routes.broadcast_routes import BroadcastRoutesDependencies, create_broadcast_blueprint
 from routes.graphics_routes import GraphicsRoutesDependencies, create_graphics_blueprint
+from routes.live_game_routes import LiveGameRoutesDependencies, create_live_game_blueprint
 from routes.logo_routes import LogoRoutesDependencies, create_logo_blueprint
 from routes.obs_routes import OBSRoutesDependencies, create_obs_blueprint
 from routes.personnel_routes import (
@@ -38,6 +39,7 @@ __all__ = [
     "BroadcastPackageRoutesDependencies",
     "BroadcastRoutesDependencies",
     "GraphicsRoutesDependencies",
+    "LiveGameRoutesDependencies",
     "LogoRoutesDependencies",
     "OBSRoutesDependencies",
     "PersonnelRoutesDependencies",
@@ -53,6 +55,7 @@ __all__ = [
     "create_broadcast_lifecycle_blueprint",
     "create_broadcast_package_blueprint",
     "create_graphics_blueprint",
+    "create_live_game_blueprint",
     "create_logo_blueprint",
     "create_obs_blueprint",
     "create_personnel_blueprint",

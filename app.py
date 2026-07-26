@@ -109,6 +109,10 @@ from routes.obs_routes import (
     OBSRoutesDependencies,
     create_obs_blueprint,
 )
+from routes.live_game_routes import (
+    LiveGameRoutesDependencies,
+    create_live_game_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -286,9 +290,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.5g — Graphics and OBS Routes"
+    "Version 1.13.0-alpha.5h — Live Game Routes"
 )
-RUNTIME_BUILD = "V1.13A5G-GRAPHICS-AND-OBS-ROUTES"
+RUNTIME_BUILD = "V1.13A5H-LIVE-GAME-ROUTES"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -1847,28 +1851,17 @@ def get_game_operations_service() -> GameOperationsService:
     return GAME_OPERATIONS_SERVICE
 
 
-@app.post("/api/score")
-@require_auth
-def update_score():
-    result = get_game_operations_service().score(
-        request.get_json(force=True) or {}
+LIVE_GAME_ROUTES_BLUEPRINT = create_live_game_blueprint(
+    LiveGameRoutesDependencies(
+        require_auth=require_auth,
+        get_game_operations_service=lambda: get_game_operations_service(),
+        get_event_service=lambda: get_event_service(),
+        get_rules_service=lambda: get_rules_service(),
+        get_statistics_service=lambda: get_statistics_service(),
+        load_state=lambda: load_state(),
     )
-    if result.code == "INVALID_SCORE_REQUEST":
-        return jsonify({"error": result.code}), 400
-    if result.code == "CONTROL_SOURCE_LOCKED":
-        return jsonify(result.data), 409
-    return jsonify(result.data["state"])
-
-
-@app.post("/api/set")
-@require_auth
-def set_value():
-    result = get_game_operations_service().set_values(
-        request.get_json(force=True) or {}
-    )
-    if result.code == "CONTROL_SOURCE_LOCKED":
-        return jsonify(result.data), 409
-    return jsonify(result.data["state"])
+)
+app.register_blueprint(LIVE_GAME_ROUTES_BLUEPRINT)
 
 
 SUPPORT_MEDIA_SERVICE: SupportMediaService | None = None
@@ -2168,11 +2161,6 @@ def local_addresses() -> list[str]:
     return get_support_media_service().local_addresses()
 
 
-@app.get("/api/statistics")
-@require_auth
-def statistics_report():
-    return jsonify(build_statistics(load_state()))
-
 EVENT_SERVICE: EventService | None = None
 
 
@@ -2209,63 +2197,6 @@ def authority_rejection(state: dict[str, Any]):
     return jsonify(EventService.locked_payload(state)), 409
 
 
-@app.post("/api/control-source")
-@require_auth
-def set_control_source():
-    data = request.get_json(force=True) or {}
-    result = get_event_service().set_control_source(data.get("authority", ""))
-    if result.code == "INVALID_CONTROL_SOURCE":
-        return jsonify({"error": result.code}), 400
-    return jsonify(result.data["state"])
-
-
-@app.post("/api/event-trigger")
-@require_auth
-def event_trigger():
-    result = get_event_service().trigger(request.get_json(force=True) or {})
-    if result.code == "INVALID_EVENT":
-        return jsonify({"error": result.code}), 400
-    if result.code == "NO_ACTIVE_BROADCAST":
-        return jsonify({"error": result.code}), 409
-    if result.code == "CONTROL_SOURCE_LOCKED":
-        return jsonify(result.data), 409
-    return jsonify(result.data)
-
-
-@app.post("/api/game-correction")
-@require_auth
-def game_correction():
-    result = get_event_service().quick_correction(
-        request.get_json(force=True) or {}
-    )
-    if result.code in {"INVALID_DOWN", "INVALID_POSSESSION"}:
-        return jsonify({"error": result.code}), 400
-    if result.code == "CONTROL_SOURCE_LOCKED":
-        return jsonify(result.data), 409
-    return jsonify(result.data["state"])
-
-
-@app.post("/api/events/<event_id>/edit")
-@require_auth
-def edit_event(event_id: str):
-    result = get_event_service().edit(
-        event_id,
-        request.get_json(force=True) or {},
-    )
-    if result.code == "EVENT_NOT_FOUND":
-        return jsonify({"error": result.code}), 404
-    if result.code == "CONTROL_SOURCE_LOCKED":
-        return jsonify(result.data), 409
-    return jsonify(result.data)
-
-
-@app.get("/api/corrections")
-@require_auth
-def corrections_report():
-    result = get_event_service().corrections()
-    return jsonify(result.data["corrections"])
-
-
 @app.get("/api/connection-info")
 @require_auth
 def connection_info():
@@ -2293,48 +2224,6 @@ def connection_qr():
         mimetype=result.data["mimetype"],
         headers=result.data["headers"],
     )
-
-
-@app.post("/api/toggle-scorebug")
-@require_auth
-def toggle_scorebug():
-    result = get_game_operations_service().toggle_scorebug()
-    if result.code == "OBS_COMMAND_BLOCKED":
-        return jsonify(
-            {
-                "error": result.code,
-                "message": result.data.get("message", ""),
-            }
-        ), 409
-    return jsonify(result.data["state"])
-
-
-@app.post("/api/toggle-halftime")
-@require_auth
-def toggle_halftime():
-    result = get_game_operations_service().toggle_halftime()
-    return jsonify(result.data["state"])
-
-
-@app.post("/api/end-game")
-@require_auth
-def end_game():
-    result = get_game_operations_service().end_game()
-    return jsonify(result.data["state"])
-
-
-@app.post("/api/reset-data")
-@require_auth
-def reset_data():
-    result = get_game_operations_service().reset_data()
-    return jsonify(result.data["state"])
-
-
-@app.post("/api/new-broadcast")
-@require_auth
-def new_broadcast():
-    result = get_game_operations_service().new_broadcast()
-    return jsonify(result.data["state"])
 
 
 def spot_to_coord(value: Any) -> int:
@@ -2374,46 +2263,6 @@ def get_rules_service() -> RulesService:
             transaction_lock=lock,
         )
     return RULES_SERVICE
-
-
-@app.post("/api/clock-control")
-@require_auth
-def clock_control():
-    result = get_rules_service().clock_control(
-        request.get_json(force=True) or {}
-    )
-    return jsonify(result.data["state"])
-
-
-@app.post("/api/field-direction")
-@require_auth
-def field_direction():
-    result = get_rules_service().field_direction(
-        request.get_json(force=True) or {}
-    )
-    if result.code == "INVALID_DIRECTION":
-        return jsonify({"error": result.code}), 400
-    return jsonify(result.data["state"])
-
-
-@app.post("/api/rules-play")
-@require_auth
-def rules_play():
-    result = get_rules_service().play(request.get_json(force=True) or {})
-    if result.code == "INVALID_PLAY":
-        return jsonify({"error": result.code}), 400
-    if result.code == "NO_ACTIVE_BROADCAST":
-        return jsonify({"error": result.code}), 409
-    if result.code == "CONTROL_SOURCE_LOCKED":
-        return jsonify(result.data), 409
-    return jsonify(result.data)
-
-
-@app.post("/api/undo")
-@require_auth
-def undo():
-    result = get_event_service().undo()
-    return jsonify(result.data["state"])
 
 
 def local_ip() -> str:
