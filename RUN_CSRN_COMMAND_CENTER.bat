@@ -49,7 +49,25 @@ if errorlevel 1 (
   exit /b 1
 )
 
+echo Recording game-day application startup...
+".venv\Scripts\python.exe" tools\game_day_recovery.py startup
+if errorlevel 1 (
+  echo.
+  echo Recovery startup tracking failed. The application was not started.
+  pause
+  exit /b 1
+)
+
 echo.
 echo Starting CSRN Production Suite - Command Center...
 ".venv\Scripts\python.exe" app.py
+set "CSRN_EXIT=%ERRORLEVEL%"
+if "%CSRN_EXIT%"=="0" (
+  echo Recording clean application shutdown...
+  ".venv\Scripts\python.exe" tools\game_day_recovery.py shutdown
+) else (
+  echo.
+  echo WARNING: CSRN ended unexpectedly. The recovery marker was retained.
+)
 pause
+exit /b %CSRN_EXIT%

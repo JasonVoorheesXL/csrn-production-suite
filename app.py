@@ -50,6 +50,7 @@ from statistics_service import StatisticsService
 from game_operations_service import GameOperationsService
 from support_media_service import SupportMediaService
 from game_day_safety_service import GameDaySafetyService
+from recovery_service import RecoveryService
 from broadcast_lifecycle_service import BroadcastLifecycleService
 from routes.system_routes import (
     SystemRoutesDependencies,
@@ -127,6 +128,10 @@ from routes.game_day_safety_routes import (
     GameDaySafetyRoutesDependencies,
     create_game_day_safety_blueprint,
 )
+from routes.recovery_routes import (
+    RecoveryRoutesDependencies,
+    create_recovery_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -171,6 +176,7 @@ PACKAGES_FILE = DATA_DIR / "Packages" / "broadcast_packages.json"
 BUILD_JOURNAL_FILE = DATA_DIR / "Logs" / "build_journal.json"
 VERSION_FILE = BASE_DIR / "VERSION.txt"
 GAME_DAY_BACKUP_DIR = DATA_DIR / "Backups" / "GameDay"
+GAME_DAY_RECOVERY_DIR = DATA_DIR / "Backups" / "Recovery"
 
 APPLICATION_BLUEPRINTS: list[Any] = []
 lock = Lock()
@@ -1889,6 +1895,36 @@ GAME_DAY_SAFETY_ROUTES_BLUEPRINT = create_game_day_safety_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(GAME_DAY_SAFETY_ROUTES_BLUEPRINT)
+
+
+RECOVERY_SERVICE: RecoveryService | None = None
+
+
+def get_recovery_service() -> RecoveryService:
+    global RECOVERY_SERVICE
+    if RECOVERY_SERVICE is None:
+        RECOVERY_SERVICE = RecoveryService(
+            safety_service=get_game_day_safety_service(),
+            data_dir=DATA_DIR,
+            backup_root=GAME_DAY_BACKUP_DIR,
+            recovery_root=GAME_DAY_RECOVERY_DIR,
+            state_file=STATE_FILE,
+            security_file=SECURITY_FILE,
+            version_file=VERSION_FILE,
+            load_state=load_state,
+            clock=time.time,
+            transaction_lock=lock,
+        )
+    return RECOVERY_SERVICE
+
+
+RECOVERY_ROUTES_BLUEPRINT = create_recovery_blueprint(
+    RecoveryRoutesDependencies(
+        require_auth=require_auth,
+        get_recovery_service=lambda: get_recovery_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(RECOVERY_ROUTES_BLUEPRINT)
 
 
 SUPPORT_MEDIA_SERVICE: SupportMediaService | None = None
