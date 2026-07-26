@@ -317,9 +317,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.6b — Recovery and Rollback"
+    "Version 1.13.0-alpha.6c — Hardware and OBS Commissioning"
 )
-RUNTIME_BUILD = "V1.13A6B-RECOVERY-AND-ROLLBACK"
+RUNTIME_BUILD = "V1.13A6C-HARDWARE-AND-OBS-COMMISSIONING"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
