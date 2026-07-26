@@ -74,6 +74,16 @@ All mutation and query logic continues to delegate to the Phase 4 services. The 
 
 The route layer still owns multipart parsing and filesystem orchestration because those are HTTP-bound concerns. Record validation, image processing, duplicate policy, and domain persistence remain in the Phase 4 services.
 
+## Phase 5.6 broadcast package and lifecycle routes
+
+`routes/broadcast_package_routes.py` owns broadcast-package listing, creation, update, deletion, duplication, and loading. Loaded game state is passed through the injected public-state filter before serialization.
+
+`routes/broadcast_routes.py` owns broadcast record creation, listing, reading, update, status changes, and deletion. Archive filtering and all existing status-code mappings remain unchanged.
+
+`routes/broadcast_lifecycle_routes.py` owns planned-broadcast loading, compatibility initialization, live start, and resume. Lifecycle state construction and OBS coordination remain in `BroadcastLifecycleService`.
+
+The application root continues to construct the package, broadcast, and lifecycle services. The Blueprints receive only callable service boundaries and retain the established authentication and response contracts.
+
 ## Migration sequence
 
 Later Phase 5 stages should move one coherent route domain at a time, add focused Blueprint tests, retain route-contract coverage, and remove the corresponding `@app` decorators only after the Blueprint passes integrated validation.
