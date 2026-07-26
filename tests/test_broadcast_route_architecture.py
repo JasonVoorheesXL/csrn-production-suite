@@ -47,14 +47,14 @@ def test_broadcast_routes_are_registered_through_blueprints() -> None:
     )
 
 
-def test_app_registers_each_broadcast_blueprint_once() -> None:
+def test_app_collects_each_broadcast_blueprint_once() -> None:
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     for name in (
         "BROADCAST_PACKAGE_ROUTES_BLUEPRINT",
         "BROADCAST_ROUTES_BLUEPRINT",
         "BROADCAST_LIFECYCLE_ROUTES_BLUEPRINT",
     ):
-        assert source.count(f"app.register_blueprint({name})") == 1
+        assert source.count(f"APPLICATION_BLUEPRINTS.append({name})") == 1
 
 
 def test_migrated_broadcast_route_decorators_are_removed_from_app() -> None:
