@@ -19,6 +19,7 @@ EXPECTED_BLUEPRINTS = {
     "broadcast_lifecycle_routes",
     "broadcast_package_routes",
     "broadcast_routes",
+    "commissioning_routes",
     "graphics_routes",
     "game_day_safety_routes",
     "live_game_routes",

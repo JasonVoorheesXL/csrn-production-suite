@@ -51,6 +51,7 @@ from game_operations_service import GameOperationsService
 from support_media_service import SupportMediaService
 from game_day_safety_service import GameDaySafetyService
 from recovery_service import RecoveryService
+from commissioning_service import HardwareOBSCommissioningService
 from broadcast_lifecycle_service import BroadcastLifecycleService
 from routes.system_routes import (
     SystemRoutesDependencies,
@@ -132,6 +133,10 @@ from routes.recovery_routes import (
     RecoveryRoutesDependencies,
     create_recovery_blueprint,
 )
+from routes.commissioning_routes import (
+    CommissioningRoutesDependencies,
+    create_commissioning_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -177,6 +182,7 @@ BUILD_JOURNAL_FILE = DATA_DIR / "Logs" / "build_journal.json"
 VERSION_FILE = BASE_DIR / "VERSION.txt"
 GAME_DAY_BACKUP_DIR = DATA_DIR / "Backups" / "GameDay"
 GAME_DAY_RECOVERY_DIR = DATA_DIR / "Backups" / "Recovery"
+COMMISSIONING_FILE = DATA_DIR / "Settings" / "hardware_commissioning.json"
 
 APPLICATION_BLUEPRINTS: list[Any] = []
 lock = Lock()
@@ -1925,6 +1931,30 @@ RECOVERY_ROUTES_BLUEPRINT = create_recovery_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(RECOVERY_ROUTES_BLUEPRINT)
+
+
+COMMISSIONING_SERVICE: HardwareOBSCommissioningService | None = None
+
+
+def get_commissioning_service() -> HardwareOBSCommissioningService:
+    global COMMISSIONING_SERVICE
+    if COMMISSIONING_SERVICE is None:
+        COMMISSIONING_SERVICE = HardwareOBSCommissioningService(
+            profile_file=COMMISSIONING_FILE,
+            load_config=load_config,
+            validate_obs=lambda: get_obs_service().test_connection().data["obs"],
+            clock=time.time,
+        )
+    return COMMISSIONING_SERVICE
+
+
+COMMISSIONING_ROUTES_BLUEPRINT = create_commissioning_blueprint(
+    CommissioningRoutesDependencies(
+        require_auth=require_auth,
+        get_commissioning_service=lambda: get_commissioning_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(COMMISSIONING_ROUTES_BLUEPRINT)
 
 
 SUPPORT_MEDIA_SERVICE: SupportMediaService | None = None
