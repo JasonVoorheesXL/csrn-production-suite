@@ -18,7 +18,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install dependencies
-        run: python -m pip install --disable-pip-version-check -q -r requirements.txt
+        run: python -m pip install --disable-pip-version-check -q -r requirements.txt pytest
 
       - name: Apply phase integration
         run: python tools/ci_apply.py
