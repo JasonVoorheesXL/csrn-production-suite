@@ -61,7 +61,9 @@ def create_social_blueprint(dependencies: SocialRoutesDependencies) -> Blueprint
         result = dependencies.get_social_service().create_event_draft(
             request.get_json(force=True) or {}
         )
-        return jsonify(result.data), 201 if result.ok else error_response(result)
+        if not result.ok:
+            return error_response(result)
+        return jsonify(result.data), 201
 
     @routes.get("/api/social/posts/<post_id>")
     @dependencies.require_auth
