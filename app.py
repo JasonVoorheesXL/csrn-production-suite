@@ -49,6 +49,7 @@ from rules_service import RulesService
 from statistics_service import StatisticsService
 from game_operations_service import GameOperationsService
 from support_media_service import SupportMediaService
+from game_day_safety_service import GameDaySafetyService
 from broadcast_lifecycle_service import BroadcastLifecycleService
 from routes.system_routes import (
     SystemRoutesDependencies,
@@ -122,6 +123,10 @@ from routes.support_routes import (
     SupportRoutesDependencies,
     create_support_blueprint,
 )
+from routes.game_day_safety_routes import (
+    GameDaySafetyRoutesDependencies,
+    create_game_day_safety_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -165,6 +170,7 @@ BROADCAST_INDEX_FILE = DATA_DIR / "Broadcasts" / "broadcasts.json"
 PACKAGES_FILE = DATA_DIR / "Packages" / "broadcast_packages.json"
 BUILD_JOURNAL_FILE = DATA_DIR / "Logs" / "build_journal.json"
 VERSION_FILE = BASE_DIR / "VERSION.txt"
+GAME_DAY_BACKUP_DIR = DATA_DIR / "Backups" / "GameDay"
 
 APPLICATION_BLUEPRINTS: list[Any] = []
 lock = Lock()
@@ -299,9 +305,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.5j — Application Factory Consolidation"
+    "Version 1.13.0-alpha.6a — Game Day Safety Foundation"
 )
-RUNTIME_BUILD = "V1.13A5J-APPLICATION-FACTORY-CONSOLIDATION"
+RUNTIME_BUILD = "V1.13A6A-GAME-DAY-SAFETY-FOUNDATION"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -1855,6 +1861,34 @@ LIVE_GAME_ROUTES_BLUEPRINT = create_live_game_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(LIVE_GAME_ROUTES_BLUEPRINT)
+
+
+GAME_DAY_SAFETY_SERVICE: GameDaySafetyService | None = None
+
+
+def get_game_day_safety_service() -> GameDaySafetyService:
+    global GAME_DAY_SAFETY_SERVICE
+    if GAME_DAY_SAFETY_SERVICE is None:
+        GAME_DAY_SAFETY_SERVICE = GameDaySafetyService(
+            base_dir=BASE_DIR,
+            data_dir=DATA_DIR,
+            backup_root=GAME_DAY_BACKUP_DIR,
+            state_file=STATE_FILE,
+            security_file=SECURITY_FILE,
+            config_file=CONFIG_FILE,
+            version_file=VERSION_FILE,
+            clock=time.time,
+        )
+    return GAME_DAY_SAFETY_SERVICE
+
+
+GAME_DAY_SAFETY_ROUTES_BLUEPRINT = create_game_day_safety_blueprint(
+    GameDaySafetyRoutesDependencies(
+        require_auth=require_auth,
+        get_safety_service=lambda: get_game_day_safety_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(GAME_DAY_SAFETY_ROUTES_BLUEPRINT)
 
 
 SUPPORT_MEDIA_SERVICE: SupportMediaService | None = None

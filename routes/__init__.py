@@ -14,6 +14,10 @@ from routes.broadcast_package_routes import (
     create_broadcast_package_blueprint,
 )
 from routes.broadcast_routes import BroadcastRoutesDependencies, create_broadcast_blueprint
+from routes.game_day_safety_routes import (
+    GameDaySafetyRoutesDependencies,
+    create_game_day_safety_blueprint,
+)
 from routes.graphics_routes import GraphicsRoutesDependencies, create_graphics_blueprint
 from routes.live_game_routes import LiveGameRoutesDependencies, create_live_game_blueprint
 from routes.logo_routes import LogoRoutesDependencies, create_logo_blueprint
@@ -40,6 +44,7 @@ __all__ = [
     "BroadcastLifecycleRoutesDependencies",
     "BroadcastPackageRoutesDependencies",
     "BroadcastRoutesDependencies",
+    "GameDaySafetyRoutesDependencies",
     "GraphicsRoutesDependencies",
     "LiveGameRoutesDependencies",
     "LogoRoutesDependencies",
@@ -58,6 +63,7 @@ __all__ = [
     "create_broadcast_blueprint",
     "create_broadcast_lifecycle_blueprint",
     "create_broadcast_package_blueprint",
+    "create_game_day_safety_blueprint",
     "create_graphics_blueprint",
     "create_live_game_blueprint",
     "create_logo_blueprint",
