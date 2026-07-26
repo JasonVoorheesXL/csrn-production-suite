@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from flask import Flask
 
 from routes.weather_routes import WeatherRoutesDependencies, create_weather_blueprint
 from weather_service import WeatherResult
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class Service:
@@ -57,7 +62,7 @@ class Service:
 
 
 def app_and_service():
-    app = Flask("weather_routes_test", template_folder="../templates")
+    app = Flask("weather_routes_test", template_folder=str(ROOT / "templates"))
     app.config.update(TESTING=True)
     service = Service()
 
