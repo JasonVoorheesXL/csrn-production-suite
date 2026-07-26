@@ -65,6 +65,18 @@ from routes.association_routes import (
     AssociationRoutesDependencies,
     create_association_blueprint,
 )
+from routes.personnel_routes import (
+    PersonnelRoutesDependencies,
+    create_personnel_blueprint,
+)
+from routes.roster_routes import (
+    RosterRoutesDependencies,
+    create_roster_blueprint,
+)
+from routes.venue_routes import (
+    VenueRoutesDependencies,
+    create_venue_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -242,9 +254,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.5c — School and Association Routes"
+    "Version 1.13.0-alpha.5d — Roster Personnel and Venue Routes"
 )
-RUNTIME_BUILD = "V1.13A5C-SCHOOL-AND-ASSOCIATION-ROUTES"
+RUNTIME_BUILD = "V1.13A5D-ROSTER-PERSONNEL-AND-VENUE-ROUTES"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -1910,194 +1922,31 @@ def asset_file(filename: str):
 def overlay():
     return render_template("overlay.html")
 
-@app.get("/api/broadcasters")
-@require_auth
-def list_broadcasters():
-    include_inactive = str(
-        request.args.get("include_inactive", "true")
-    ).strip().lower() not in {"0", "false", "no", "off"}
-    result = get_personnel_service().list_records(
-        include_inactive=include_inactive,
-        category=str(request.args.get("category", "")),
-        role=str(request.args.get("role", "")),
-        school_id=str(request.args.get("school_id", "")),
+PERSONNEL_ROUTES_BLUEPRINT = create_personnel_blueprint(
+    PersonnelRoutesDependencies(
+        require_auth=require_auth,
+        get_personnel_service=get_personnel_service,
+        get_headshots_dir=lambda: PERSONNEL_HEADSHOTS_DIR,
+        normalize_personnel_id=PersonnelService.normalize_id,
     )
-    return jsonify(result.data["personnel"])
+)
+app.register_blueprint(PERSONNEL_ROUTES_BLUEPRINT)
 
-
-@app.post("/api/broadcasters")
-@require_auth
-def create_broadcaster():
-    result = get_personnel_service().create(
-        request.get_json(force=True) or {}
+ROSTER_ROUTES_BLUEPRINT = create_roster_blueprint(
+    RosterRoutesDependencies(
+        require_auth=require_auth,
+        get_roster_service=get_roster_service,
     )
-    if result.code in {"STAFF_NAME_REQUIRED", "INVALID_STAFF_ROLE"}:
-        return jsonify({"error": result.code}), 400
-    if result.code == "INVALID_SOCIAL_URL":
-        return jsonify({"error": result.code, **result.data}), 400
-    return jsonify(result.data["personnel"]), 201
+)
+app.register_blueprint(ROSTER_ROUTES_BLUEPRINT)
 
-
-@app.put("/api/broadcasters/<broadcaster_id>")
-@require_auth
-def update_broadcaster(broadcaster_id: str):
-    result = get_personnel_service().update(
-        broadcaster_id,
-        request.get_json(force=True) or {},
+VENUE_ROUTES_BLUEPRINT = create_venue_blueprint(
+    VenueRoutesDependencies(
+        require_auth=require_auth,
+        get_venue_service=get_venue_service,
     )
-    if result.code == "BROADCASTER_NOT_FOUND":
-        return jsonify({"error": result.code}), 404
-    if result.code in {"STAFF_NAME_REQUIRED", "INVALID_STAFF_ROLE"}:
-        return jsonify({"error": result.code}), 400
-    if result.code == "INVALID_SOCIAL_URL":
-        return jsonify({"error": result.code, **result.data}), 400
-    return jsonify(result.data["personnel"])
-
-
-@app.delete("/api/broadcasters/<broadcaster_id>")
-@require_auth
-def delete_broadcaster(broadcaster_id: str):
-    result = get_personnel_service().delete(broadcaster_id)
-    if result.code == "BROADCASTER_NOT_FOUND":
-        return jsonify({"error": result.code}), 404
-    return jsonify({"ok": True})
-
-
-@app.get("/personnel-headshots/<filename>")
-def personnel_headshot_file(filename: str):
-    return send_from_directory(PERSONNEL_HEADSHOTS_DIR, filename)
-
-
-@app.post("/api/personnel/<personnel_id>/headshot")
-@require_auth
-def upload_personnel_headshot(personnel_id: str):
-    file = request.files.get("file")
-    if not file or not file.filename:
-        return jsonify({"error": "FILE_REQUIRED"}), 400
-    ext = Path(file.filename).suffix.lower()
-    if ext not in {".png", ".jpg", ".jpeg", ".webp"}:
-        return jsonify({"error": "UNSUPPORTED_IMAGE"}), 400
-    PERSONNEL_HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
-    target = PERSONNEL_HEADSHOTS_DIR / (
-        f"{PersonnelService.normalize_id(personnel_id)}{ext}"
-    )
-    file.save(target)
-    relative = "/personnel-headshots/" + target.name
-    result = get_personnel_service().attach_headshot(
-        personnel_id,
-        relative,
-    )
-    if result.code == "PERSONNEL_NOT_FOUND":
-        target.unlink(missing_ok=True)
-        return jsonify({"error": result.code}), 404
-    return jsonify({"path": result.data["path"]})
-
-
-@app.post("/api/validate-social")
-@require_auth
-def validate_social():
-    incoming = request.get_json(force=True) or {}
-    result = get_personnel_service().validate_social(
-        str(incoming.get("platform", "")),
-        str(incoming.get("value", "")),
-    )
-    return jsonify(result.data)
-
-
-@app.get("/api/rosters")
-@require_auth
-def list_rosters():
-    return jsonify(get_roster_service().list_rosters())
-
-
-@app.post("/api/rosters")
-@require_auth
-def create_roster():
-    result = get_roster_service().create(
-        request.get_json(force=True) or {}
-    )
-    if result.code == "SCHOOL_AND_SEASON_REQUIRED":
-        return jsonify({"error": result.code}), 400
-    if result.code == "ROSTER_ALREADY_EXISTS":
-        return jsonify(
-            {
-                "error": result.code,
-                "roster": result.data["roster"],
-            }
-        ), 409
-    return jsonify(result.data["roster"]), 201
-
-
-@app.put("/api/rosters/<roster_id>")
-@require_auth
-def update_roster(roster_id: str):
-    result = get_roster_service().update(
-        roster_id,
-        request.get_json(force=True) or {},
-    )
-    if result.code == "ROSTER_NOT_FOUND":
-        return jsonify({"error": result.code}), 404
-    return jsonify(result.data["roster"])
-
-
-@app.delete("/api/rosters/<roster_id>")
-@require_auth
-def delete_roster(roster_id: str):
-    result = get_roster_service().delete(roster_id)
-    if result.code == "ROSTER_NOT_FOUND":
-        return jsonify({"error": result.code}), 404
-    return jsonify({"ok": True})
-
-
-@app.post("/api/rosters/<roster_id>/players")
-@require_auth
-def create_roster_player(roster_id: str):
-    result = get_roster_service().create_player(
-        roster_id,
-        request.get_json(force=True) or {},
-    )
-    if result.code == "ROSTER_NOT_FOUND":
-        return jsonify({"error": result.code}), 404
-    if result.code == "PLAYER_NAME_REQUIRED":
-        return jsonify({"error": result.code}), 400
-    return jsonify(result.data), 201
-
-
-@app.put("/api/rosters/<roster_id>/players/<player_id>")
-@require_auth
-def update_roster_player(roster_id: str, player_id: str):
-    result = get_roster_service().update_player(
-        roster_id,
-        player_id,
-        request.get_json(force=True) or {},
-    )
-    if result.code in {"ROSTER_NOT_FOUND", "PLAYER_NOT_FOUND"}:
-        return jsonify({"error": result.code}), 404
-    return jsonify(result.data)
-
-
-@app.delete("/api/rosters/<roster_id>/players/<player_id>")
-@require_auth
-def delete_roster_player(roster_id: str, player_id: str):
-    result = get_roster_service().delete_player(roster_id, player_id)
-    if result.code in {"ROSTER_NOT_FOUND", "PLAYER_NOT_FOUND"}:
-        return jsonify({"error": result.code}), 404
-    return jsonify({"ok": True})
-
-
-@app.post("/api/rosters/<roster_id>/players/import")
-@require_auth
-def import_roster_players(roster_id: str):
-    incoming = request.get_json(force=True) or {}
-    result = get_roster_service().import_players(
-        roster_id,
-        incoming.get("players", []),
-    )
-    if result.code == "INVALID_PLAYER_LIST":
-        return jsonify({"error": result.code}), 400
-    if result.code == "ROSTER_NOT_FOUND":
-        return jsonify({"error": result.code}), 404
-    return jsonify(result.data)
+)
+app.register_blueprint(VENUE_ROUTES_BLUEPRINT)
 
 
 SCHOOL_ROUTES_BLUEPRINT = create_school_blueprint(
@@ -2197,79 +2046,6 @@ def process_school_logo(school_id: str):
                 "message": result.data.get("message", ""),
             }
         ), 500
-    return jsonify(result.data)
-
-
-@app.get("/api/venues")
-@require_auth
-def list_venues():
-    include_inactive = str(
-        request.args.get("include_inactive", "true")
-    ).strip().lower() not in {"0", "false", "no", "off"}
-    result = get_venue_service().list_venues(
-        school_id=str(request.args.get("school_id", "")),
-        sport=str(request.args.get("sport", "")),
-        include_inactive=include_inactive,
-    )
-    return jsonify(result.data["venues"])
-
-
-@app.get("/api/venues/<venue_id>")
-@require_auth
-def read_venue(venue_id: str):
-    result = get_venue_service().read(venue_id)
-    if result.code == "VENUE_NOT_FOUND":
-        return jsonify({"error": result.code}), 404
-    return jsonify(result.data["venue"])
-
-
-@app.post("/api/venues")
-@require_auth
-def create_venue():
-    result = get_venue_service().create(
-        request.get_json(silent=True) or {}
-    )
-    if result.code == "VENUE_NAME_REQUIRED":
-        return jsonify({"error": result.code}), 400
-    if result.code == "DUPLICATE_VENUE":
-        return jsonify(
-            {
-                "error": result.code,
-                "duplicate_venue": result.data["duplicate_venue"],
-            }
-        ), 409
-    return jsonify(result.data["venue"]), 201
-
-
-@app.put("/api/venues/<venue_id>")
-@require_auth
-def update_venue(venue_id: str):
-    result = get_venue_service().update(
-        venue_id,
-        request.get_json(silent=True) or {},
-    )
-    if result.code == "VENUE_NOT_FOUND":
-        return jsonify({"error": result.code}), 404
-    if result.code == "VENUE_NAME_REQUIRED":
-        return jsonify({"error": result.code}), 400
-    if result.code == "DUPLICATE_VENUE":
-        return jsonify(
-            {
-                "error": result.code,
-                "duplicate_venue": result.data["duplicate_venue"],
-            }
-        ), 409
-    return jsonify(result.data["venue"])
-
-
-@app.delete("/api/venues/<venue_id>")
-@require_auth
-def delete_venue(venue_id: str):
-    result = get_venue_service().delete(venue_id)
-    if result.code == "VENUE_NOT_FOUND":
-        return jsonify({"error": result.code}), 404
-    if result.code == "VENUE_IN_USE":
-        return jsonify({"error": result.code, **result.data}), 409
     return jsonify(result.data)
 
 

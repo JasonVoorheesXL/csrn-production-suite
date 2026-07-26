@@ -54,6 +54,16 @@ These routes remain public because they establish or report authentication state
 
 Manifest loading remains in the application composition root and is injected as callable boundaries. The route module does not know repository paths or create import services. Existing authentication, legacy response shapes, duplicate review behavior, and MHSAA compatibility semantics remain unchanged.
 
+## Phase 5.4 roster, personnel, and venue routes
+
+`routes/personnel_routes.py` owns broadcaster/personnel CRUD, social URL validation, public personnel-headshot serving, and authenticated headshot upload. The headshot storage directory and personnel-ID normalization are injected so the route module does not import the application root.
+
+`routes/roster_routes.py` owns roster CRUD, player CRUD, and player-list import routes under `/api/rosters`.
+
+`routes/venue_routes.py` owns venue listing, filtering, reading, creation, update, and deletion. Duplicate and in-use responses preserve their existing HTTP status mappings.
+
+All mutation and query logic continues to delegate to the Phase 4 services. The Blueprint layer owns only request parsing, upload orchestration, authentication decoration, response serialization, and temporary-file cleanup when a personnel record is missing.
+
 ## Migration sequence
 
 Later Phase 5 stages should move one coherent route domain at a time, add focused Blueprint tests, retain route-contract coverage, and remove the corresponding `@app` decorators only after the Blueprint passes integrated validation.
