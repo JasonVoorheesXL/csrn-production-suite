@@ -20,7 +20,7 @@ ROUTE_IMPORTS = '''from routes.social_routes import (
 )
 '''
 
-SOCIAL_BLOCK = '''SOCIAL_POST_REPOSITORY = SocialPostRepository(
+SOCIAL_BLOCK = r'''SOCIAL_POST_REPOSITORY = SocialPostRepository(
     CORE_PERSISTENCE,
     SOCIAL_POSTS_FILE,
 )
