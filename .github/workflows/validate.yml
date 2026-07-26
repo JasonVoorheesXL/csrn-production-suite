@@ -46,17 +46,5 @@ jobs:
       - name: Apply optional phase integration
         run: python tools/ci_prepare.py
 
-      - name: Capture Phase 6.5 focused validation
-        shell: bash
-        run: |
-          python -m pytest -q tests/test_weather_service.py tests/test_weather_routes.py tests/test_weather_worker.py tests/test_weather_architecture.py tests/test_phase_6_5_migration.py > phase65-${{ runner.os }}.log 2>&1 || true
-          cat phase65-${{ runner.os }}.log
-
-      - name: Upload Phase 6.5 focused validation
-        uses: actions/upload-artifact@v4
-        with:
-          name: phase-6-5-${{ runner.os }}
-          path: phase65-${{ runner.os }}.log
-
       - name: Validate repository
         run: python tools/dev_workflow.py validate
