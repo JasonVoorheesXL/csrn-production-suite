@@ -35,10 +35,14 @@ def test_graphics_and_obs_routes_are_registered_through_blueprints() -> None:
     )
 
 
-def test_app_registers_graphics_and_obs_blueprints_once() -> None:
+def test_app_collects_graphics_and_obs_blueprints_once() -> None:
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert source.count("app.register_blueprint(OBS_ROUTES_BLUEPRINT)") == 1
-    assert source.count("app.register_blueprint(GRAPHICS_ROUTES_BLUEPRINT)") == 1
+    assert source.count(
+        "APPLICATION_BLUEPRINTS.append(OBS_ROUTES_BLUEPRINT)"
+    ) == 1
+    assert source.count(
+        "APPLICATION_BLUEPRINTS.append(GRAPHICS_ROUTES_BLUEPRINT)"
+    ) == 1
     assert source.count("OBS_ROUTES_BLUEPRINT = create_obs_blueprint(") == 1
     assert source.count("GRAPHICS_ROUTES_BLUEPRINT = create_graphics_blueprint(") == 1
 
