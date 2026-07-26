@@ -33,10 +33,14 @@ def test_support_and_page_routes_are_registered_through_blueprints() -> None:
     )
 
 
-def test_app_registers_support_and_page_blueprints_once() -> None:
+def test_app_collects_support_and_page_blueprints_once() -> None:
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert source.count("app.register_blueprint(PAGE_ROUTES_BLUEPRINT)") == 1
-    assert source.count("app.register_blueprint(SUPPORT_ROUTES_BLUEPRINT)") == 1
+    assert source.count(
+        "APPLICATION_BLUEPRINTS.append(PAGE_ROUTES_BLUEPRINT)"
+    ) == 1
+    assert source.count(
+        "APPLICATION_BLUEPRINTS.append(SUPPORT_ROUTES_BLUEPRINT)"
+    ) == 1
     assert source.count("PAGE_ROUTES_BLUEPRINT = create_page_blueprint(") == 1
     assert source.count("SUPPORT_ROUTES_BLUEPRINT = create_support_blueprint(") == 1
 
