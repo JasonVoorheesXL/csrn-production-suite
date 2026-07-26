@@ -62,12 +62,13 @@ def test_recovery_blueprint_marks_all_routes_authenticated() -> None:
         assert getattr(app.view_functions[endpoint], "_csrn_requires_auth", False)
 
 
-def test_phase_6_roadmap_retains_caption_theme_and_social_requirements() -> None:
+def test_phase_6_roadmap_retains_caption_weather_theme_and_social_requirements() -> None:
     roadmap = (
         ROOT / "docs" / "PHASE_6_GAME_DAY_AND_COMMERCIAL_ROADMAP.md"
     ).read_text(encoding="utf-8")
     assert "### 6.4 Channel-Based Captioning" in roadmap
-    assert "### 6.7 Graphics Theme Engine" in roadmap
-    assert "### 6.8 Social Publishing Engine" in roadmap
+    assert "### 6.5 Venue Weather Monitoring and Alert Overlay" in roadmap
+    assert "### 6.8 Graphics Theme Engine" in roadmap
+    assert "### 6.9 Social Publishing Engine" in roadmap
     assert "player headshots" in roadmap
     assert "approved sponsor assets" in roadmap
