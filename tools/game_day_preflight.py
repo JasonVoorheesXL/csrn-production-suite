@@ -1,6 +1,13 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def main(service: Any | None = None) -> int:
@@ -15,7 +22,11 @@ def main(service: Any | None = None) -> int:
         status = "PASS" if check.get("ok") else (
             "WARN" if not check.get("required", True) else "FAIL"
         )
-        print(f"[{status}] {check.get('label', check.get('key', 'Check'))}: {check.get('note', '')}")
+        print(
+            f"[{status}] "
+            f"{check.get('label', check.get('key', 'Check'))}: "
+            f"{check.get('note', '')}"
+        )
 
     if result.code in {"PREFLIGHT_FAILED", "SNAPSHOT_FAILED"}:
         print(f"Game-day startup blocked: {result.code}")
