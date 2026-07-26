@@ -46,14 +46,5 @@ jobs:
       - name: Apply optional phase integration
         run: python tools/ci_prepare.py
 
-      - name: Capture full validation
-        shell: bash
-        run: |
-          python tools/dev_workflow.py validate > full-${{ runner.os }}.log 2>&1 || true
-          cat full-${{ runner.os }}.log
-
-      - name: Upload full validation
-        uses: actions/upload-artifact@v4
-        with:
-          name: phase-6-4-full-${{ runner.os }}
-          path: full-${{ runner.os }}.log
+      - name: Validate repository
+        run: python tools/dev_workflow.py validate
