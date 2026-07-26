@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CSRN Weather Overlay</title>
+  <style>
+    :root { color-scheme: dark; font-family: Arial, Helvetica, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }
+    #root { position: relative; width: 100%; height: 100%; }
+    .hidden { display: none !important; }
+    .panel { position: absolute; color: white; text-shadow: 0 2px 4px rgba(0,0,0,.8); }
+    .bug { right: 3%; top: 4%; min-width: 280px; padding: 14px 18px; border-radius: 10px; background: rgba(17,17,17,.92); border: 2px solid #bfc5cc; }
+    .bug .temp { font-size: 34px; font-weight: 800; }
+    .bug .detail { margin-top: 4px; font-size: 18px; }
+    .banner { left: 4%; right: 4%; bottom: 6%; padding: 18px 26px; border-radius: 10px; background: rgba(25,25,25,.95); border-left: 14px solid #d7a31a; }
+    .banner.emergency { background: rgba(122,0,0,.96); border-left-color: #fff; }
+    .eyebrow { font-weight: 900; letter-spacing: .08em; font-size: 20px; }
+    .headline { margin-top: 4px; font-size: 34px; font-weight: 900; }
+    .instruction { margin-top: 8px; font-size: 21px; }
+    .fullscreen { inset: 0; display: flex; align-items: center; justify-content: center; padding: 8%; text-align: center; background: rgba(12,12,12,.94); }
+    .fullscreen .headline { font-size: 64px; }
+    .fullscreen .instruction { font-size: 30px; max-width: 1300px; }
+    .stale { position: absolute; right: 3%; bottom: 2%; padding: 7px 11px; border-radius: 6px; background: rgba(120,0,0,.9); color: white; font-size: 15px; }
+    .timer { margin-top: 18px; font-size: 26px; font-weight: 700; }
+  </style>
+</head>
+<body>
+<div id="root">
+  <section id="bug" class="panel bug hidden">
+    <div id="bugTemp" class="temp"></div>
+    <div id="bugForecast" class="detail"></div>
+    <div id="bugWind" class="detail"></div>
+    <div id="bugRain" class="detail"></div>
+  </section>
+
+  <section id="banner" class="panel banner hidden">
+    <div id="bannerEyebrow" class="eyebrow">WEATHER ADVISORY</div>
+    <div id="bannerHeadline" class="headline"></div>
+    <div id="bannerInstruction" class="instruction"></div>
+  </section>
+
+  <section id="fullscreen" class="panel fullscreen hidden">
+    <div>
+      <div id="fullEyebrow" class="eyebrow">WEATHER UPDATE</div>
+      <div id="fullHeadline" class="headline"></div>
+      <div id="fullInstruction" class="instruction"></div>
+      <div id="lightningTimer" class="timer"></div>
+    </div>
+  </section>
+
+  <div id="stale" class="stale hidden">WEATHER DATA STALE</div>
+</div>
+<script>
+const byId = id => document.getElementById(id);
+const hideAll = () => ["bug","banner","fullscreen"].forEach(id => byId(id).classList.add("hidden"));
+const text = value => value == null ? "" : String(value);
+
+function render(data) {
+  hideAll();
+  const overlay = data.overlay || {};
+  const conditions = data.conditions || {};
+  const alert = data.alert || {};
+  const lightning = data.lightning || {};
+  byId("stale").classList.toggle("hidden", !data.stale);
+  if (!overlay.visible) return;
+
+  if (overlay.mode === "bug") {
+    byId("bugTemp").textContent = conditions.temperature == null ? "" : `${conditions.temperature}°${text(conditions.temperature_unit)}`;
+    byId("bugForecast").textContent = text(conditions.short_forecast);
+    byId("bugWind").textContent = conditions.wind_speed ? `Wind ${text(conditions.wind_direction)} ${text(conditions.wind_speed)}` : "";
+    byId("bugRain").textContent = conditions.precipitation_probability == null ? "" : `Rain ${conditions.precipitation_probability}%`;
+    byId("bug").classList.remove("hidden");
+    return;
+  }
+
+  if (["advisory","emergency"].includes(overlay.mode)) {
+    byId("banner").classList.toggle("emergency", overlay.mode === "emergency");
+    byId("bannerEyebrow").textContent = overlay.mode === "emergency" ? "SEVERE WEATHER ALERT" : "WEATHER ADVISORY";
+    byId("bannerHeadline").textContent = text(alert.headline || alert.event || overlay.message);
+    byId("bannerInstruction").textContent = text(alert.instruction || alert.area_desc || overlay.message);
+    byId("banner").classList.remove("hidden");
+    return;
+  }
+
+  const delay = data.delay || {};
+  byId("fullEyebrow").textContent = overlay.mode === "resumption" ? "GAME STATUS" : "WEATHER DELAY";
+  byId("fullHeadline").textContent = text(overlay.message || delay.message || (overlay.mode === "resumption" ? "GAME RESUMING" : "GAME DELAYED DUE TO WEATHER"));
+  byId("fullInstruction").textContent = overlay.mode === "resumption" ? "Follow school and venue instructions." : "Updates will be provided when available.";
+  const remaining = Number(lightning.remaining_seconds || 0);
+  const minutes = Math.floor(remaining / 60);
+  const seconds = remaining % 60;
+  byId("lightningTimer").textContent = lightning.active ? `Lightning timer: ${minutes}:${String(seconds).padStart(2,"0")} remaining` : "";
+  byId("fullscreen").classList.remove("hidden");
+}
+
+async function poll() {
+  try {
+    const response = await fetch("/api/weather/overlay-state", {cache: "no-store"});
+    if (response.ok) render(await response.json());
+  } catch (_) {}
+}
+poll();
+setInterval(poll, 1000);
+</script>
+</body>
+</html>

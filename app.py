@@ -53,6 +53,7 @@ from game_day_safety_service import GameDaySafetyService
 from recovery_service import RecoveryService
 from commissioning_service import HardwareOBSCommissioningService
 from caption_service import CaptionService
+from weather_service import VenueWeatherService
 from broadcast_lifecycle_service import BroadcastLifecycleService
 from routes.system_routes import (
     SystemRoutesDependencies,
@@ -142,6 +143,10 @@ from routes.caption_routes import (
     CaptionRoutesDependencies,
     create_caption_blueprint,
 )
+from routes.weather_routes import (
+    WeatherRoutesDependencies,
+    create_weather_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -191,6 +196,7 @@ COMMISSIONING_FILE = DATA_DIR / "Settings" / "hardware_commissioning.json"
 CAPTION_PROFILE_FILE = DATA_DIR / "Settings" / "caption_profile.json"
 CAPTION_STATE_FILE = DATA_DIR / "Captions" / "caption_state.json"
 CAPTION_TRANSCRIPTS_DIR = DATA_DIR / "Captions" / "Transcripts"
+WEATHER_STATE_FILE = DATA_DIR / "Weather" / "weather_state.json"
 
 APPLICATION_BLUEPRINTS: list[Any] = []
 lock = Lock()
@@ -325,9 +331,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.6d — Channel-Based Captioning"
+    "Version 1.13.0-alpha.6e — Venue Weather Monitoring"
 )
-RUNTIME_BUILD = "V1.13A6D-CHANNEL-BASED-CAPTIONING"
+RUNTIME_BUILD = "V1.13A6E-VENUE-WEATHER-MONITORING"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -372,6 +378,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "weather": {
         "use_home_venue_address": True,
         "default_alert_radius_miles": 25,
+        "refresh_seconds": 60,
+        "stale_after_seconds": 180,
+        "user_agent": "CSRN-Production-Suite/1.13 (operator-configurable)",
     },
     "social": {
         "facebook": "",
@@ -1987,6 +1996,33 @@ CAPTION_ROUTES_BLUEPRINT = create_caption_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(CAPTION_ROUTES_BLUEPRINT)
+
+
+WEATHER_SERVICE: VenueWeatherService | None = None
+
+
+def get_weather_service() -> VenueWeatherService:
+    global WEATHER_SERVICE
+    if WEATHER_SERVICE is None:
+        WEATHER_SERVICE = VenueWeatherService(
+            state_file=WEATHER_STATE_FILE,
+            load_state=load_state,
+            load_config=load_config,
+            load_venues=load_venues,
+            save_venues=save_venues,
+            load_schools=load_schools,
+            clock=time.time,
+        )
+    return WEATHER_SERVICE
+
+
+WEATHER_ROUTES_BLUEPRINT = create_weather_blueprint(
+    WeatherRoutesDependencies(
+        require_auth=require_auth,
+        get_weather_service=lambda: get_weather_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(WEATHER_ROUTES_BLUEPRINT)
 
 
 SUPPORT_MEDIA_SERVICE: SupportMediaService | None = None
