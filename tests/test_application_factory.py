@@ -50,7 +50,7 @@ def test_factory_configures_session_and_overrides() -> None:
     assert application.config["TESTING"] is True
     assert application.config["SESSION_COOKIE_HTTPONLY"] is True
     assert application.config["SESSION_COOKIE_SAMESITE"] == "Strict"
-    assert application.config["PERMANENT_SESSION_LIFETIME"].total_seconds() == 123
+    assert application.permanent_session_lifetime.total_seconds() == 123
 
 
 def test_factory_returns_independent_applications() -> None:
