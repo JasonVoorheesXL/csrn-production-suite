@@ -21,35 +21,35 @@ def post(post_id: str = "social-1", status: str = "draft") -> dict:
     }
 
 
+def repository(tmp_path: Path) -> SocialPostRepository:
+    return SocialPostRepository(
+        JsonPersistenceEngine(tmp_path / "backups"),
+        tmp_path / "social_posts.json",
+    )
+
+
 def test_social_post_repository_round_trip(tmp_path: Path) -> None:
-    path = tmp_path / "social_posts.json"
-    repository = SocialPostRepository(JsonPersistenceEngine(), path)
-    repository.save([post()])
-    assert repository.load() == [post()]
-    assert repository.get("social-1") == post()
+    storage = repository(tmp_path)
+    storage.save([post()])
+    assert storage.load() == [post()]
+    assert storage.get("social-1") == post()
 
 
 def test_social_post_repository_accepts_legacy_wrapper(tmp_path: Path) -> None:
     path = tmp_path / "social_posts.json"
     path.write_text(json.dumps({"posts": [post()]}), encoding="utf-8")
-    repository = SocialPostRepository(JsonPersistenceEngine(), path)
-    assert repository.load() == [post()]
+    storage = repository(tmp_path)
+    assert storage.load() == [post()]
     assert json.loads(path.read_text(encoding="utf-8")) == [post()]
 
 
 def test_social_post_repository_rejects_duplicate_ids(tmp_path: Path) -> None:
-    repository = SocialPostRepository(
-        JsonPersistenceEngine(),
-        tmp_path / "social_posts.json",
-    )
+    storage = repository(tmp_path)
     with pytest.raises(SocialPostRepositoryValidationError):
-        repository.save([post(), post()])
+        storage.save([post(), post()])
 
 
 def test_social_post_repository_rejects_invalid_status(tmp_path: Path) -> None:
-    repository = SocialPostRepository(
-        JsonPersistenceEngine(),
-        tmp_path / "social_posts.json",
-    )
+    storage = repository(tmp_path)
     with pytest.raises(SocialPostRepositoryValidationError):
-        repository.save([post(status="unknown")])
+        storage.save([post(status="unknown")])
