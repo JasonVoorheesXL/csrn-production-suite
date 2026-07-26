@@ -84,6 +84,14 @@ The route layer still owns multipart parsing and filesystem orchestration becaus
 
 The application root continues to construct the package, broadcast, and lifecycle services. The Blueprints receive only callable service boundaries and retain the established authentication and response contracts.
 
+## Phase 5.7 graphics and OBS routes
+
+`routes/obs_routes.py` owns OBS status, connection testing, scorebug-visibility commands, and program visual-mode commands. Boolean validation and blocked-command responses preserve their current HTTP mappings, while OBS configuration, command execution, and status persistence remain in `OBSService`.
+
+`routes/graphics_routes.py` owns lower-third, player, and personnel graphic updates. The application root injects state loading, persistence, public-state filtering, and the shared transaction lock. Graphic construction, exclusivity, duration handling, sponsor application, and record resolution remain in `GraphicsService`.
+
+The compatibility helper used by broadcast-start automation remains in the composition root and continues to delegate to `OBSService`; it is not an HTTP route.
+
 ## Migration sequence
 
 Later Phase 5 stages should move one coherent route domain at a time, add focused Blueprint tests, retain route-contract coverage, and remove the corresponding `@app` decorators only after the Blueprint passes integrated validation.

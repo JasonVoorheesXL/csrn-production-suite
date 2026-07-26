@@ -101,6 +101,14 @@ from routes.broadcast_routes import (
     BroadcastRoutesDependencies,
     create_broadcast_blueprint,
 )
+from routes.graphics_routes import (
+    GraphicsRoutesDependencies,
+    create_graphics_blueprint,
+)
+from routes.obs_routes import (
+    OBSRoutesDependencies,
+    create_obs_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -278,9 +286,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.5f — Broadcast Package and Lifecycle Routes"
+    "Version 1.13.0-alpha.5g — Graphics and OBS Routes"
 )
-RUNTIME_BUILD = "V1.13A5F-BROADCAST-PACKAGE-AND-LIFECYCLE-ROUTES"
+RUNTIME_BUILD = "V1.13A5G-GRAPHICS-AND-OBS-ROUTES"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -1723,18 +1731,13 @@ SECURITY_UPGRADE_ROUTES_BLUEPRINT = create_security_upgrade_blueprint(
 app.register_blueprint(SECURITY_UPGRADE_ROUTES_BLUEPRINT)
 
 
-@app.get("/api/obs/status")
-@require_auth
-def obs_status():
-    result = get_obs_service().status()
-    return jsonify(result.data["status"])
-
-
-@app.post("/api/obs/test")
-@require_auth
-def test_obs_connection():
-    result = get_obs_service().test_connection()
-    return jsonify(result.data["obs"])
+OBS_ROUTES_BLUEPRINT = create_obs_blueprint(
+    OBSRoutesDependencies(
+        require_auth=require_auth,
+        get_obs_service=lambda: get_obs_service(),
+    )
+)
+app.register_blueprint(OBS_ROUTES_BLUEPRINT)
 
 
 def command_scorebug_visibility(visible: bool) -> dict[str, Any]:
@@ -1744,38 +1747,6 @@ def command_scorebug_visibility(visible: bool) -> dict[str, Any]:
             str(result.data.get("message", result.code))
         )
     return result.data["obs"]
-
-
-@app.post("/api/obs/scorebug-visibility")
-@require_auth
-def obs_scorebug_visibility():
-    incoming = request.get_json(force=True) or {}
-    result = get_obs_service().scorebug_visibility(incoming.get("visible"))
-    if result.code == "VISIBLE_MUST_BE_BOOLEAN":
-        return jsonify({"error": result.code}), 400
-    if result.code == "OBS_COMMAND_BLOCKED":
-        return jsonify(
-            {
-                "error": result.code,
-                "message": result.data.get("message", ""),
-            }
-        ), 409
-    return jsonify(result.data["obs"])
-
-
-@app.post("/api/obs/program-visual-mode")
-@require_auth
-def obs_program_visual_mode():
-    incoming = request.get_json(force=True) or {}
-    result = get_obs_service().program_visual_mode(incoming.get("mode", ""))
-    if result.code == "OBS_COMMAND_BLOCKED":
-        return jsonify(
-            {
-                "error": result.code,
-                "message": result.data.get("message", ""),
-            }
-        ), 409
-    return jsonify(result.data)
 
 
 def update_linked_broadcast_status(
@@ -1962,49 +1933,17 @@ def activate_primary_graphic(state: dict[str, Any], active: str) -> None:
     state.update(updated)
 
 
-@app.post("/api/graphics/lower-third")
-@require_auth
-def update_lower_third():
-    data = request.get_json(force=True) or {}
-    with lock:
-        result = get_graphics_service().update_lower_third(load_state(), data)
-        state = result.data["state"]
-        save_state(state)
-    return jsonify(public_state(state))
-
-
-@app.post("/api/graphics/player")
-@require_auth
-def update_player_graphic():
-    data = request.get_json(force=True) or {}
-    with lock:
-        result = get_graphics_service().update_player(load_state(), data)
-        if result.code == "PLAYER_REQUIRED":
-            return jsonify({"error": result.code}), 400
-        state = result.data["state"]
-        save_state(state)
-    response = public_state(state)
-    warning = str(result.data.get("sponsor_warning", ""))
-    if warning:
-        response["sponsor_warning"] = warning
-    return jsonify(response)
-
-
-@app.post("/api/graphics/personnel")
-@require_auth
-def update_personnel_graphic():
-    data = request.get_json(force=True) or {}
-    with lock:
-        result = get_graphics_service().update_personnel(load_state(), data)
-        if result.code == "PERSONNEL_REQUIRED":
-            return jsonify({"error": result.code}), 400
-        state = result.data["state"]
-        save_state(state)
-    response = public_state(state)
-    warning = str(result.data.get("sponsor_warning", ""))
-    if warning:
-        response["sponsor_warning"] = warning
-    return jsonify(response)
+GRAPHICS_ROUTES_BLUEPRINT = create_graphics_blueprint(
+    GraphicsRoutesDependencies(
+        require_auth=require_auth,
+        get_graphics_service=lambda: get_graphics_service(),
+        load_state=lambda: load_state(),
+        save_state=lambda state: save_state(state),
+        public_state=lambda state: public_state(state),
+        transaction_lock=lock,
+    )
+)
+app.register_blueprint(GRAPHICS_ROUTES_BLUEPRINT)
 
 
 def automation_player(roster_id: str, player_id: str):
