@@ -59,7 +59,7 @@ def test_load_creates_normalized_default_profile(tmp_path: Path) -> None:
     result = instance.load()
     assert result.code == "OK"
     assert result.data["profile"]["device"]["model"] == "P4next"
-    assert result.data["profile"]["channels"][0]["speaker"] == "Jason"
+    assert result.data["profile"]["channels"][0]["speaker"] == "Announcer 1"
     assert (tmp_path / "commissioning.json").exists()
 
 
@@ -77,7 +77,7 @@ def test_update_profile_normalizes_device_and_channels(tmp_path: Path) -> None:
         {
             "device": {"model": "P4next", "sample_rate_hz": "48000"},
             "channels": [
-                {"channel": 1, "enabled": True, "speaker": " Jason "},
+                {"channel": 1, "enabled": True, "speaker": " Avery "},
                 {"channel": 7, "enabled": True, "speaker": "Ignored"},
             ],
             "notes": " Ready ",
@@ -86,7 +86,7 @@ def test_update_profile_normalizes_device_and_channels(tmp_path: Path) -> None:
     profile = result.data["profile"]
     assert result.code == "PROFILE_UPDATED"
     assert profile["device"]["sample_rate_hz"] == 48000
-    assert profile["channels"][0]["speaker"] == "Jason"
+    assert profile["channels"][0]["speaker"] == "Avery"
     assert len(profile["channels"]) == 4
     assert profile["notes"] == "Ready"
 
@@ -189,7 +189,7 @@ def test_duplicate_enabled_speakers_block_readiness(tmp_path: Path) -> None:
     instance = service(tmp_path)
     complete_required_checks(instance)
     profile = instance.load().data["profile"]
-    profile["channels"][1]["speaker"] = "Jason"
+    profile["channels"][1]["speaker"] = profile["channels"][0]["speaker"]
     instance.update_profile(profile)
     result = instance.report()
     assignment = next(

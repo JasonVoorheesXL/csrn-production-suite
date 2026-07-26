@@ -39,10 +39,10 @@ class CaptionService:
         "profanity_words": [],
         "theme": "standard",
         "channels": [
-            {"channel": 1, "speaker": "Jason", "enabled": True},
-            {"channel": 2, "speaker": "Jordan", "enabled": True},
-            {"channel": 3, "speaker": "Guest 1", "enabled": False},
-            {"channel": 4, "speaker": "Guest 2", "enabled": False},
+            {"channel": 1, "speaker": "Announcer 1", "enabled": True},
+            {"channel": 2, "speaker": "Announcer 2", "enabled": True},
+            {"channel": 3, "speaker": "Announcer 3", "enabled": False},
+            {"channel": 4, "speaker": "Announcer 4", "enabled": False},
         ],
     }
 

@@ -45,9 +45,21 @@ def test_status_creates_default_files(tmp_path: Path) -> None:
     service = make_service(tmp_path)
     result = service.status()
     assert result.ok
-    assert result.data["profile"]["channels"][0]["speaker"] == "Jason"
+    assert result.data["profile"]["channels"][0]["speaker"] == "Announcer 1"
     assert service.profile_file.exists()
     assert service.state_file.exists()
+
+
+def test_profile_speaker_names_are_user_assignable(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    profile = service.status().data["profile"]
+    profile["channels"][0]["speaker"] = "Alex"
+    profile["channels"][1]["speaker"] = "Morgan"
+    assert service.update_profile({"channels": profile["channels"]}).ok
+    enable(service)
+    result = service.ingest_segment(segment(channel=2))
+    assert result.ok
+    assert result.data["segment"]["speaker"] == "Morgan"
 
 
 def test_profile_update_enables_overlay(tmp_path: Path) -> None:
@@ -68,8 +80,8 @@ def test_profile_rejects_duplicate_channels(tmp_path: Path) -> None:
     result = service.update_profile(
         {
             "channels": [
-                {"channel": 1, "speaker": "Jason", "enabled": True},
-                {"channel": 1, "speaker": "Jordan", "enabled": True},
+                {"channel": 1, "speaker": "Alpha", "enabled": True},
+                {"channel": 1, "speaker": "Beta", "enabled": True},
             ]
         }
     )
@@ -81,7 +93,7 @@ def test_ingest_assigns_speaker_from_physical_channel(tmp_path: Path) -> None:
     enable(service)
     result = service.ingest_segment(segment(channel=2))
     assert result.ok
-    assert result.data["segment"]["speaker"] == "Jordan"
+    assert result.data["segment"]["speaker"] == "Announcer 2"
 
 
 def test_ingest_rejects_low_confidence(tmp_path: Path) -> None:
@@ -198,7 +210,7 @@ def test_srt_export_includes_speaker_and_timing(tmp_path: Path) -> None:
     service.ingest_segment(segment())
     content = service.export_srt("game-1").data["content"]
     assert "00:00:01,000 --> 00:00:02,500" in content
-    assert "Jason: Touchdown Caledonia" in content
+    assert "Announcer 1: Touchdown Caledonia" in content
 
 
 def test_vtt_export_includes_voice_tag(tmp_path: Path) -> None:
@@ -207,7 +219,7 @@ def test_vtt_export_includes_voice_tag(tmp_path: Path) -> None:
     service.ingest_segment(segment())
     content = service.export_vtt("game-1").data["content"]
     assert content.startswith("WEBVTT")
-    assert "<v Jason>Touchdown Caledonia" in content
+    assert "<v Announcer 1>Touchdown Caledonia" in content
 
 
 def test_broadcast_identifier_is_sanitized(tmp_path: Path) -> None:

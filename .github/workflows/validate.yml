@@ -46,8 +46,5 @@ jobs:
       - name: Apply optional phase integration
         run: python tools/ci_prepare.py
 
-      - name: Apply commercial channel defaults
-        run: python tools/fix_phase_6_4_commercial_defaults.py
-
       - name: Validate repository
         run: python tools/dev_workflow.py validate

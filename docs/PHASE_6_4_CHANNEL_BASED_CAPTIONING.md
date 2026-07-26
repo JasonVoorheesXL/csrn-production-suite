@@ -8,12 +8,12 @@ Speaker identity comes from the commissioned physical P4next input channel rathe
 
 Default assignments:
 
-- Channel 1 — Jason
-- Channel 2 — Jordan
-- Channel 3 — Guest 1, disabled until assigned
-- Channel 4 — Guest 2, disabled until assigned
+- Channel 1 — Announcer 1 placeholder
+- Channel 2 — Announcer 2 placeholder
+- Channel 3 — Announcer 3, disabled until assigned
+- Channel 4 — Announcer 4, disabled until assigned
 
-The profile supports channels 1–12 so later hardware can add sideline reporters, studio talent, or remote guests without changing the caption data model.
+The placeholder labels are never treated as customer identities. Each installation assigns its own speaker name, role, microphone, and enabled state through commissioning and caption settings. The profile supports channels 1–12 so later hardware can add sideline reporters, studio talent, or remote guests without changing the caption data model.
 
 ## Caption service
 
