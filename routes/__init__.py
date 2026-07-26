@@ -18,6 +18,7 @@ from routes.graphics_routes import GraphicsRoutesDependencies, create_graphics_b
 from routes.live_game_routes import LiveGameRoutesDependencies, create_live_game_blueprint
 from routes.logo_routes import LogoRoutesDependencies, create_logo_blueprint
 from routes.obs_routes import OBSRoutesDependencies, create_obs_blueprint
+from routes.page_routes import PageRoutesDependencies, create_page_blueprint
 from routes.personnel_routes import (
     PersonnelRoutesDependencies,
     create_personnel_blueprint,
@@ -29,6 +30,7 @@ from routes.security_upgrade_routes import (
     create_security_upgrade_blueprint,
 )
 from routes.sponsor_routes import SponsorRoutesDependencies, create_sponsor_blueprint
+from routes.support_routes import SupportRoutesDependencies, create_support_blueprint
 from routes.system_routes import SystemRoutesDependencies, create_system_blueprint
 from routes.venue_routes import VenueRoutesDependencies, create_venue_blueprint
 
@@ -42,11 +44,13 @@ __all__ = [
     "LiveGameRoutesDependencies",
     "LogoRoutesDependencies",
     "OBSRoutesDependencies",
+    "PageRoutesDependencies",
     "PersonnelRoutesDependencies",
     "RosterRoutesDependencies",
     "SchoolRoutesDependencies",
     "SecurityUpgradeRoutesDependencies",
     "SponsorRoutesDependencies",
+    "SupportRoutesDependencies",
     "SystemRoutesDependencies",
     "VenueRoutesDependencies",
     "create_asset_blueprint",
@@ -58,11 +62,13 @@ __all__ = [
     "create_live_game_blueprint",
     "create_logo_blueprint",
     "create_obs_blueprint",
+    "create_page_blueprint",
     "create_personnel_blueprint",
     "create_roster_blueprint",
     "create_school_blueprint",
     "create_security_upgrade_blueprint",
     "create_sponsor_blueprint",
+    "create_support_blueprint",
     "create_system_blueprint",
     "create_venue_blueprint",
 ]
