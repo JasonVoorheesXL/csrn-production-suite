@@ -5,6 +5,15 @@ from routes.association_routes import (
     AssociationRoutesDependencies,
     create_association_blueprint,
 )
+from routes.broadcast_lifecycle_routes import (
+    BroadcastLifecycleRoutesDependencies,
+    create_broadcast_lifecycle_blueprint,
+)
+from routes.broadcast_package_routes import (
+    BroadcastPackageRoutesDependencies,
+    create_broadcast_package_blueprint,
+)
+from routes.broadcast_routes import BroadcastRoutesDependencies, create_broadcast_blueprint
 from routes.logo_routes import LogoRoutesDependencies, create_logo_blueprint
 from routes.personnel_routes import (
     PersonnelRoutesDependencies,
@@ -23,6 +32,9 @@ from routes.venue_routes import VenueRoutesDependencies, create_venue_blueprint
 __all__ = [
     "AssetRoutesDependencies",
     "AssociationRoutesDependencies",
+    "BroadcastLifecycleRoutesDependencies",
+    "BroadcastPackageRoutesDependencies",
+    "BroadcastRoutesDependencies",
     "LogoRoutesDependencies",
     "PersonnelRoutesDependencies",
     "RosterRoutesDependencies",
@@ -33,6 +45,9 @@ __all__ = [
     "VenueRoutesDependencies",
     "create_asset_blueprint",
     "create_association_blueprint",
+    "create_broadcast_blueprint",
+    "create_broadcast_lifecycle_blueprint",
+    "create_broadcast_package_blueprint",
     "create_logo_blueprint",
     "create_personnel_blueprint",
     "create_roster_blueprint",
