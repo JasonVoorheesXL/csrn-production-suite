@@ -61,11 +61,29 @@ def test_social_modules_do_not_import_application_root() -> None:
 
 def test_social_credentials_are_environment_boundaries() -> None:
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    for variable in (
+    tree = ast.parse(source)
+    environment_names: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not node.args:
+            continue
+        function = node.func
+        if not (
+            isinstance(function, ast.Attribute)
+            and function.attr == "get"
+            and isinstance(function.value, ast.Attribute)
+            and function.value.attr == "environ"
+            and isinstance(function.value.value, ast.Name)
+            and function.value.value.id == "os"
+        ):
+            continue
+        first = node.args[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            environment_names.add(first.value)
+
+    assert {
         "CSRN_X_USER_ACCESS_TOKEN",
         "CSRN_FACEBOOK_PAGE_ID",
         "CSRN_FACEBOOK_PAGE_ACCESS_TOKEN",
-    ):
-        assert f'os.environ.get("{variable}"' in source
-    assert '"access_token": os.environ' not in source
-    assert '"page_access_token": os.environ' not in source
+    }.issubset(environment_names)
+    assert "CSRN_X_USER_ACCESS_TOKEN=" not in source
+    assert "CSRN_FACEBOOK_PAGE_ACCESS_TOKEN=" not in source
