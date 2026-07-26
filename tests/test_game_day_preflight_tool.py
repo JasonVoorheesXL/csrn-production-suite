@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
+import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from tools.game_day_preflight import main
@@ -97,3 +101,45 @@ def test_preflight_tool_blocks_snapshot_failure(capsys) -> None:
     output = capsys.readouterr().out
     assert "SNAPSHOT_FAILED" in output
     assert "Disk full" in output
+
+
+def test_direct_script_adds_repository_root_to_import_path(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "suite"
+    tools_dir = root / "tools"
+    tools_dir.mkdir(parents=True)
+    source = Path(__file__).resolve().parents[1] / "tools" / "game_day_preflight.py"
+    shutil.copy2(source, tools_dir / "game_day_preflight.py")
+    (root / "app.py").write_text(
+        """
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Result:
+    code: str = "SNAPSHOT_CURRENT"
+    data: dict = None
+
+class Service:
+    def ensure_startup_snapshot(self):
+        return Result(data={
+            "preflight": {"checks": []},
+            "snapshot": {"snapshot_id": "direct-script"},
+        })
+
+def get_game_day_safety_service():
+    return Service()
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [sys.executable, str(tools_dir / "game_day_preflight.py")],
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "snapshot is current: direct-script" in completed.stdout
