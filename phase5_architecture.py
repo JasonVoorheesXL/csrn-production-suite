@@ -36,6 +36,7 @@ EXPECTED_BLUEPRINTS = {
     "support_routes",
     "system_routes",
     "venue_routes",
+    "weather_routes",
 }
 
 PUBLIC_ENDPOINTS = {
@@ -56,6 +57,8 @@ PUBLIC_ENDPOINTS = {
     "sponsor_routes.sponsor_logo_file",
     "support_routes.roster_headshot_file",
     "system_routes.get_state",
+    "weather_routes.weather_overlay",
+    "weather_routes.weather_overlay_state",
 }
 
 
