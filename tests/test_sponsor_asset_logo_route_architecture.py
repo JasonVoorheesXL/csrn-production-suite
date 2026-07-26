@@ -34,19 +34,30 @@ def test_media_routes_are_registered_through_expected_blueprints() -> None:
 
     for path in SPONSOR_PATHS:
         assert path in endpoints
-        assert all(endpoint.startswith("sponsor_routes.") for endpoint in endpoints[path])
+        assert all(
+            endpoint.startswith("sponsor_routes.")
+            for endpoint in endpoints[path]
+        )
     for path in ASSET_PATHS:
         assert path in endpoints
-        assert all(endpoint.startswith("asset_routes.") for endpoint in endpoints[path])
+        assert all(
+            endpoint.startswith("asset_routes.")
+            for endpoint in endpoints[path]
+        )
     for path in LOGO_PATHS:
         assert path in endpoints
-        assert all(endpoint.startswith("logo_routes.") for endpoint in endpoints[path])
+        assert all(
+            endpoint.startswith("logo_routes.")
+            for endpoint in endpoints[path]
+        )
 
 
-def test_app_registers_each_media_blueprint_once() -> None:
+def test_app_collects_each_media_blueprint_once() -> None:
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     for name in ("SPONSOR", "ASSET", "LOGO"):
-        assert source.count(f"app.register_blueprint({name}_ROUTES_BLUEPRINT)") == 1
+        assert source.count(
+            f"APPLICATION_BLUEPRINTS.append({name}_ROUTES_BLUEPRINT)"
+        ) == 1
 
 
 def test_migrated_media_route_decorators_are_removed_from_app() -> None:
@@ -67,13 +78,19 @@ def test_migrated_media_route_decorators_are_removed_from_app() -> None:
 
 
 def test_media_route_modules_do_not_import_application_root() -> None:
-    for filename in ("sponsor_routes.py", "asset_routes.py", "logo_routes.py"):
+    for filename in (
+        "sponsor_routes.py",
+        "asset_routes.py",
+        "logo_routes.py",
+    ):
         source = (ROOT / "routes" / filename).read_text(encoding="utf-8")
         tree = ast.parse(source)
         imported_roots: set[str] = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                imported_roots.update(alias.name.split(".", 1)[0] for alias in node.names)
+                imported_roots.update(
+                    alias.name.split(".", 1)[0] for alias in node.names
+                )
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported_roots.add(node.module.split(".", 1)[0])
         assert "app" not in imported_roots
