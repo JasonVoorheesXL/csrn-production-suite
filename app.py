@@ -54,6 +54,7 @@ from recovery_service import RecoveryService
 from commissioning_service import HardwareOBSCommissioningService
 from caption_service import CaptionService
 from weather_service import VenueWeatherService
+from operational_rehearsal_service import OperationalRehearsalService
 from broadcast_lifecycle_service import BroadcastLifecycleService
 from routes.system_routes import (
     SystemRoutesDependencies,
@@ -147,6 +148,10 @@ from routes.weather_routes import (
     WeatherRoutesDependencies,
     create_weather_blueprint,
 )
+from routes.rehearsal_routes import (
+    RehearsalRoutesDependencies,
+    create_rehearsal_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -197,6 +202,8 @@ CAPTION_PROFILE_FILE = DATA_DIR / "Settings" / "caption_profile.json"
 CAPTION_STATE_FILE = DATA_DIR / "Captions" / "caption_state.json"
 CAPTION_TRANSCRIPTS_DIR = DATA_DIR / "Captions" / "Transcripts"
 WEATHER_STATE_FILE = DATA_DIR / "Weather" / "weather_state.json"
+REHEARSAL_STATE_FILE = DATA_DIR / "Rehearsals" / "rehearsals.json"
+RELEASE_MANIFEST_FILE = DATA_DIR / "Releases" / "game_day_release_manifest.json"
 
 APPLICATION_BLUEPRINTS: list[Any] = []
 lock = Lock()
@@ -331,9 +338,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.6e — Venue Weather Monitoring"
+    "Version 1.13.0-alpha.6f — Operational Rehearsal and Release Freeze"
 )
-RUNTIME_BUILD = "V1.13A6E-VENUE-WEATHER-MONITORING"
+RUNTIME_BUILD = "V1.13A6F-OPERATIONAL-REHEARSAL-RELEASE-FREEZE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -406,7 +413,7 @@ LOCKOUT_SECONDS = 60
 
 
 def ensure_data_architecture() -> None:
-    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings"):
+    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings", "Rehearsals", "Releases"):
         (DATA_DIR / name).mkdir(parents=True, exist_ok=True)
     ASSOCIATION_PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -2023,6 +2030,109 @@ WEATHER_ROUTES_BLUEPRINT = create_weather_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(WEATHER_ROUTES_BLUEPRINT)
+
+
+def rehearsal_system_gates() -> dict[str, Any]:
+    preflight = get_game_day_safety_service().preflight().data.get("preflight", {})
+    commissioning = get_commissioning_service().report().data.get("report", {})
+    recovery = get_recovery_service().status().data.get("recovery", {})
+    caption = get_caption_service().status().data
+    weather = get_weather_service().status().data.get("weather", {})
+
+    channels = [
+        item
+        for item in caption.get("profile", {}).get("channels", [])
+        if item.get("enabled")
+    ]
+    names = [str(item.get("speaker", "")).strip() for item in channels]
+    placeholders = {
+        f"Announcer {index}" for index in range(1, 13)
+    }
+    captions_ready = (
+        len(names) >= 2
+        and len({name.casefold() for name in names if name}) == len(names)
+        and all(name and name not in placeholders for name in names)
+    )
+
+    venue = weather.get("venue", {}) if isinstance(weather, dict) else {}
+    latitude = venue.get("latitude") if isinstance(venue, dict) else None
+    longitude = venue.get("longitude") if isinstance(venue, dict) else None
+    weather_ready = bool(
+        latitude is not None
+        and longitude is not None
+        and int(weather.get("last_success_at", 0) or 0) > 0
+        and not weather.get("stale", True)
+    )
+
+    recovery_ready = bool(
+        not recovery.get("unclean_shutdown")
+        and not recovery.get("live_broadcast_active", True)
+    )
+
+    return {
+        "game_day_preflight": {
+            "label": "Game-day preflight",
+            "ready": bool(preflight.get("ready", False)),
+            "note": "All required storage, state, and backup checks pass."
+            if preflight.get("ready")
+            else "Game-day preflight has a required failure.",
+        },
+        "hardware_obs_commissioning": {
+            "label": "Hardware and OBS commissioning",
+            "ready": bool(commissioning.get("ready", False)),
+            "note": "P4next, OBS, recording, and network commissioning is complete."
+            if commissioning.get("ready")
+            else "Hardware or OBS commissioning remains incomplete.",
+        },
+        "recovery_state": {
+            "label": "Recovery and shutdown state",
+            "ready": recovery_ready,
+            "note": "No unclean shutdown is unresolved and no broadcast is live."
+            if recovery_ready
+            else "Resolve the unclean-shutdown marker or stop the live broadcast.",
+        },
+        "caption_assignments": {
+            "label": "Customer-assigned caption channels",
+            "ready": captions_ready,
+            "note": "At least two unique customer-assigned speakers are configured."
+            if captions_ready
+            else "Assign at least two unique speaker names; neutral Announcer placeholders do not satisfy release readiness.",
+        },
+        "weather_monitoring": {
+            "label": "Venue weather monitoring",
+            "ready": weather_ready,
+            "note": "The active venue has coordinates and a fresh successful weather update."
+            if weather_ready
+            else "Verify venue coordinates and complete a non-stale weather refresh.",
+        },
+    }
+
+
+REHEARSAL_SERVICE: OperationalRehearsalService | None = None
+
+
+def get_rehearsal_service() -> OperationalRehearsalService:
+    global REHEARSAL_SERVICE
+    if REHEARSAL_SERVICE is None:
+        REHEARSAL_SERVICE = OperationalRehearsalService(
+            state_file=REHEARSAL_STATE_FILE,
+            release_manifest_file=RELEASE_MANIFEST_FILE,
+            version_file=VERSION_FILE,
+            load_system_gates=rehearsal_system_gates,
+            create_snapshot=lambda **kwargs: get_game_day_safety_service().create_snapshot(**kwargs),
+            register_known_good=lambda **kwargs: get_recovery_service().register_known_good(**kwargs),
+            clock=time.time,
+        )
+    return REHEARSAL_SERVICE
+
+
+REHEARSAL_ROUTES_BLUEPRINT = create_rehearsal_blueprint(
+    RehearsalRoutesDependencies(
+        require_auth=require_auth,
+        get_rehearsal_service=lambda: get_rehearsal_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(REHEARSAL_ROUTES_BLUEPRINT)
 
 
 SUPPORT_MEDIA_SERVICE: SupportMediaService | None = None
