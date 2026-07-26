@@ -88,7 +88,6 @@ class ChannelCaptionWorker:
         model = model_class(self.settings.model_name, device="auto", compute_type="int8")
         chunk_size = max(1, int(self.settings.sample_rate * self.settings.chunk_seconds))
         buffers = {channel: np.empty(0, dtype=np.float32) for channel in enabled_channels}
-        session_started_ms = int(self.clock() * 1000)
         processed_samples = {channel: 0 for channel in enabled_channels}
 
         with sd.InputStream(
@@ -127,7 +126,7 @@ class ChannelCaptionWorker:
                         if not text:
                             continue
                         confidence = self._confidence(recognized)
-                        start_ms = session_started_ms + int(
+                        start_ms = int(
                             (start_sample / self.settings.sample_rate) * 1000
                         )
                         end_ms = start_ms + int(self.settings.chunk_seconds * 1000)
