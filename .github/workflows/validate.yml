@@ -46,5 +46,17 @@ jobs:
       - name: Apply optional phase integration
         run: python tools/ci_prepare.py
 
+      - name: Focused diagnostic
+        shell: bash
+        run: |
+          python -m pytest -q tests/test_caption_service.py tests/test_caption_routes.py tests/test_caption_worker.py tests/test_caption_architecture.py tests/test_phase_6_4_migration.py > phase64-${{ runner.os }}.log 2>&1 || true
+          cat phase64-${{ runner.os }}.log
+
+      - name: Upload focused diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-6-4-${{ runner.os }}
+          path: phase64-${{ runner.os }}.log
+
       - name: Validate repository
         run: python tools/dev_workflow.py validate
