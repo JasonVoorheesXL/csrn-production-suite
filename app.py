@@ -325,9 +325,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.6c — Hardware and OBS Commissioning"
+    "Version 1.13.0-alpha.6d — Channel-Based Captioning"
 )
-RUNTIME_BUILD = "V1.13A6C-HARDWARE-AND-OBS-COMMISSIONING"
+RUNTIME_BUILD = "V1.13A6D-CHANNEL-BASED-CAPTIONING"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
