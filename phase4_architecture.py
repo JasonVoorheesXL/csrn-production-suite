@@ -38,10 +38,10 @@ SERVICE_BOUNDARIES: tuple[tuple[str, str], ...] = (
 )
 
 FINAL_DELEGATION_MARKERS: tuple[str, ...] = (
-    "get_broadcast_lifecycle_service().load(",
-    "get_broadcast_lifecycle_service().initialize(",
-    "get_broadcast_lifecycle_service().start(",
-    "get_broadcast_lifecycle_service().resume(",
+    "dependencies.get_lifecycle_service().load(",
+    "dependencies.get_lifecycle_service().initialize(",
+    "dependencies.get_lifecycle_service().start(",
+    "dependencies.get_lifecycle_service().resume(",
     "get_game_operations_service().score(",
     "get_game_operations_service().set_values(",
     "get_game_operations_service().toggle_scorebug(",
@@ -105,6 +105,15 @@ def _class_names(tree: ast.AST) -> set[str]:
     }
 
 
+def _delegation_source(root: Path, app_source: str) -> str:
+    sources = [app_source]
+    routes_dir = root / "routes"
+    if routes_dir.is_dir():
+        for route_path in sorted(routes_dir.glob("*.py")):
+            sources.append(route_path.read_text(encoding="utf-8"))
+    return "\n".join(sources)
+
+
 def audit_phase_4(root: Path) -> ArchitectureAuditResult:
     root = Path(root)
     errors: list[str] = []
@@ -143,8 +152,9 @@ def audit_phase_4(root: Path) -> ArchitectureAuditResult:
         if class_name not in imported_classes.get(module_name, set()):
             errors.append(f"app.py does not import {class_name} from {module_name}")
 
+    delegation_source = _delegation_source(root, app_source)
     for marker in FINAL_DELEGATION_MARKERS:
-        if marker not in app_source:
+        if marker not in delegation_source:
             errors.append(f"missing route delegation marker: {marker}")
 
     for marker in FORBIDDEN_APP_IMPLEMENTATION_MARKERS:

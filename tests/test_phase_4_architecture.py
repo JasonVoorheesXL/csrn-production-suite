@@ -61,7 +61,12 @@ def test_app_imports_every_service_class() -> None:
 
 
 def test_final_operational_routes_delegate_to_services() -> None:
-    source = (ROOT / "app.py").read_text(encoding="utf-8")
+    sources = [(ROOT / "app.py").read_text(encoding="utf-8")]
+    sources.extend(
+        path.read_text(encoding="utf-8")
+        for path in sorted((ROOT / "routes").glob("*.py"))
+    )
+    source = "\n".join(sources)
     missing = [marker for marker in FINAL_DELEGATION_MARKERS if marker not in source]
     assert missing == []
 
