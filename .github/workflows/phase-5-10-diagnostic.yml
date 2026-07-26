@@ -14,7 +14,7 @@ permissions:
 jobs:
   compact:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -22,20 +22,20 @@ jobs:
           python-version: "3.13"
       - run: python -m pip install -q -r requirements.txt pytest
       - run: python tools/ci_prepare.py
-      - name: Apply integration and run focused tests
-        id: focused
+      - name: Apply integration and run full validation
+        id: validation
         continue-on-error: true
         run: |
           python tools/ci_apply.py > phase5-10.log 2>&1
-          python -m pytest -q tests/test_application_factory.py tests/test_phase_5_architecture.py tests/test_phase_5_10_migration.py --tb=short >> phase5-10.log 2>&1
-      - name: Upload focused log
+          python tools/dev_workflow.py validate >> phase5-10.log 2>&1
+      - name: Upload validation log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: phase-5-10-log
           path: phase5-10.log
-      - name: Report focused result
+      - name: Report validation result
         if: always()
         run: |
-          cat phase5-10.log
-          test "${{ steps.focused.outcome }}" = "success"
+          tail -n 160 phase5-10.log
+          test "${{ steps.validation.outcome }}" = "success"
