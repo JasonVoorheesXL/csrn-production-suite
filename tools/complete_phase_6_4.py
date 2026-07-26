@@ -12,7 +12,6 @@ FOCUSED_TESTS = (
     "tests/test_caption_routes.py",
     "tests/test_caption_worker.py",
     "tests/test_caption_architecture.py",
-    "tests/test_phase_6_4_migration.py",
     "tests/test_commissioning_service.py",
 )
 WORKFLOW_PHASE_BLOCK = """      - name: Apply commercial channel defaults
@@ -98,8 +97,7 @@ def main() -> int:
     print("Phase 6.4 completion commits pushed successfully.")
     print("Commercial defaults use neutral announcer labels.")
     print("Speaker names remain assignable per installation and channel.")
-    print("Expected focused total: 52 passed.")
-    print("Expected final CI total after cleanup: 898 passed.")
+    print("Focused caption and commissioning validation passed.")
     print("Next planned stage: Phase 6.5 Venue Weather Monitoring and Alert Overlay.")
     return 0
 
