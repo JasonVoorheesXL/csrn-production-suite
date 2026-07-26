@@ -305,9 +305,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.5j — Application Factory Consolidation"
+    "Version 1.13.0-alpha.6a — Game Day Safety Foundation"
 )
-RUNTIME_BUILD = "V1.13A5J-APPLICATION-FACTORY-CONSOLIDATION"
+RUNTIME_BUILD = "V1.13A6A-GAME-DAY-SAFETY-FOUNDATION"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
