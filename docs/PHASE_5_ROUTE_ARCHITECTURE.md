@@ -4,64 +4,68 @@ Phase 5 moves Flask route definitions out of `app.py` while preserving the Phase
 
 ## Route module contract
 
-Each route group should:
+Each route group:
 
-- live under the `routes` package;
-- expose a Blueprint factory rather than a global application object;
-- receive services and application helpers through an immutable dependency object;
-- limit itself to HTTP parsing, authentication decoration, status-code mapping, and response serialization;
-- avoid importing `app.py` or constructing repositories and services;
-- preserve existing URLs, methods, payloads, and authentication behavior.
+- lives under the `routes` package;
+- exposes a Blueprint factory rather than a global application object;
+- receives services and application helpers through an immutable dependency object;
+- limits itself to HTTP parsing, authentication decoration, status-code mapping, and response serialization;
+- avoids importing `app.py` or constructing repositories and services;
+- preserves existing URLs, methods, payloads, and authentication behavior.
 
-## Phase 5.1 foundation
+## Completed route ownership
+
+### Phase 5.1 — System routes
 
 `routes/system_routes.py` owns configuration, diagnostics, public state, readiness, and build-journal endpoints.
 
-## Phase 5.2 security and upgrade routes
+### Phase 5.2 — Security and upgrade routes
 
 `routes/security_upgrade_routes.py` owns authentication state, PIN setup/login/logout, upgrade inspection, status, and migration endpoints.
 
-## Phase 5.3 school and association routes
+### Phase 5.3 — School and association routes
 
 `routes/school_routes.py` owns school CRUD and duplicate checking. `routes/association_routes.py` owns association profile, source, preview, approved-import, MHSAA compatibility, branding, and enrichment workflows.
 
-## Phase 5.4 roster, personnel, and venue routes
+### Phase 5.4 — Roster, personnel, and venue routes
 
 `routes/personnel_routes.py`, `routes/roster_routes.py`, and `routes/venue_routes.py` own their respective CRUD, import, validation, filtering, and upload endpoints.
 
-## Phase 5.5 sponsor, asset, and logo routes
+### Phase 5.5 — Sponsor, asset, and logo routes
 
 `routes/sponsor_routes.py`, `routes/asset_routes.py`, and `routes/logo_routes.py` own their domain CRUD, upload, duplicate-policy, linking, filtering, and public file-serving endpoints.
 
-## Phase 5.6 broadcast package and lifecycle routes
+### Phase 5.6 — Broadcast package and lifecycle routes
 
 `routes/broadcast_package_routes.py`, `routes/broadcast_routes.py`, and `routes/broadcast_lifecycle_routes.py` own broadcast-package CRUD/load, broadcast record CRUD/status, and planned/live lifecycle endpoints.
 
-## Phase 5.7 graphics and OBS routes
+### Phase 5.7 — Graphics and OBS routes
 
 `routes/obs_routes.py` owns OBS status, connection testing, scorebug-visibility commands, and program visual-mode commands. `routes/graphics_routes.py` owns lower-third, player, and personnel graphic updates.
 
-## Phase 5.8 live game routes
+### Phase 5.8 — Live game routes
 
-`routes/live_game_routes.py` owns the operational game endpoints for:
+`routes/live_game_routes.py` owns score and state changes, statistics, control-source selection, events and corrections, undo, scorebug and halftime controls, game completion and reset, clock control, field direction, and rules-driven play entry.
 
-- score and general state changes;
-- statistics reporting;
-- control-source selection;
-- event creation, correction, editing, reporting, and undo;
-- scorebug, halftime, game completion, reset, and new-broadcast controls;
-- clock control, field direction, and rules-driven play entry.
+### Phase 5.9 — Support and page routes
 
-The Blueprint receives the existing game-operations, event, rules, and statistics services through injected getters. It owns only request parsing, authentication, status-code mapping, and response serialization. State mutation, football rules, scoring authority, event persistence, statistics calculation, OBS coordination, and transaction locking remain in the Phase 4 services.
+`routes/page_routes.py` owns the public command-center and OBS overlay pages. `routes/support_routes.py` owns roster-headshot serving and upload, connection information, and QR generation.
 
-## Phase 5.9 support and page routes
+## Phase 5.10 — Application factory and consolidation
 
-`routes/page_routes.py` owns the public command-center and OBS overlay pages. Application identity remains an injected composition-root boundary.
+`application_factory.py` constructs and configures Flask instances, registers the complete Blueprint collection, rejects duplicate Blueprint names and duplicate rule/method combinations, and publishes a serializable route manifest.
 
-`routes/support_routes.py` owns public roster-headshot serving, authenticated player-headshot upload, connection information, and QR generation. Player lookup, image processing, storage, network-address discovery, and QR construction remain in `SupportMediaService`.
+`app.py` remains the composition root for repositories, services, dependency objects, and production startup. It now collects Blueprints rather than registering them throughout the module. `create_app()` performs the single application-construction step, while the module-level `app` remains available for Waitress, existing tests, and compatibility imports.
 
-After Phase 5.9, `app.py` contains no direct Flask route decorators. It remains the application composition and startup module until Phase 5.10 introduces the final application-factory and route-registration consolidation.
+The authentication decorator marks protected view functions with route metadata. The final architecture audit verifies:
 
-## Migration sequence
+- all 18 expected Blueprints are registered;
+- no direct `@app` route decorators remain;
+- no non-static endpoint bypasses Blueprint ownership;
+- no duplicate rule/method registrations exist;
+- the declared public endpoint set matches the actual route manifest;
+- multiple factory-created applications expose equivalent route contracts.
 
-Later Phase 5 stages should move one coherent route domain at a time, add focused Blueprint tests, retain route-contract coverage, and remove the corresponding `@app` decorators only after the Blueprint passes integrated validation.
+## End state
+
+Phase 5 is complete when the factory-backed application passes the permanent architecture audit and the complete repository validation suite on Windows and Ubuntu. Future feature work should add routes through injected Blueprint factories and preserve the route-manifest and authentication-policy checks.
