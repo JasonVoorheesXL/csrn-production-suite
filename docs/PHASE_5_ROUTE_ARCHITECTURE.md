@@ -54,6 +54,14 @@ Each route group should:
 
 The Blueprint receives the existing game-operations, event, rules, and statistics services through injected getters. It owns only request parsing, authentication, status-code mapping, and response serialization. State mutation, football rules, scoring authority, event persistence, statistics calculation, OBS coordination, and transaction locking remain in the Phase 4 services.
 
+## Phase 5.9 support and page routes
+
+`routes/page_routes.py` owns the public command-center and OBS overlay pages. Application identity remains an injected composition-root boundary.
+
+`routes/support_routes.py` owns public roster-headshot serving, authenticated player-headshot upload, connection information, and QR generation. Player lookup, image processing, storage, network-address discovery, and QR construction remain in `SupportMediaService`.
+
+After Phase 5.9, `app.py` contains no direct Flask route decorators. It remains the application composition and startup module until Phase 5.10 introduces the final application-factory and route-registration consolidation.
+
 ## Migration sequence
 
 Later Phase 5 stages should move one coherent route domain at a time, add focused Blueprint tests, retain route-contract coverage, and remove the corresponding `@app` decorators only after the Blueprint passes integrated validation.

@@ -113,6 +113,14 @@ from routes.live_game_routes import (
     LiveGameRoutesDependencies,
     create_live_game_blueprint,
 )
+from routes.page_routes import (
+    PageRoutesDependencies,
+    create_page_blueprint,
+)
+from routes.support_routes import (
+    SupportRoutesDependencies,
+    create_support_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -290,9 +298,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.5h — Live Game Routes"
+    "Version 1.13.0-alpha.5i — Support and Page Routes"
 )
-RUNTIME_BUILD = "V1.13A5H-LIVE-GAME-ROUTES"
+RUNTIME_BUILD = "V1.13A5I-SUPPORT-AND-PAGE-ROUTES"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -1554,17 +1562,13 @@ def get_obs_service() -> OBSService:
     return OBS_SERVICE
 
 
-@app.get("/")
-def control_panel():
-    identity = application_identity()
-    return render_template(
-        "index.html",
-        app_product=identity["product"],
-        app_version=identity["version"],
-        app_build=identity["build"],
-        copyright_year=2026,
-        copyright_owner="Jason Chrest",
+PAGE_ROUTES_BLUEPRINT = create_page_blueprint(
+    PageRoutesDependencies(
+        application_identity=lambda: application_identity(),
     )
+)
+app.register_blueprint(PAGE_ROUTES_BLUEPRINT)
+
 
 BROADCAST_PACKAGE_ROUTES_BLUEPRINT = create_broadcast_package_blueprint(
     BroadcastPackageRoutesDependencies(
@@ -1609,10 +1613,6 @@ ASSET_ROUTES_BLUEPRINT = create_asset_blueprint(
 )
 app.register_blueprint(ASSET_ROUTES_BLUEPRINT)
 
-
-@app.get("/overlay")
-def overlay():
-    return render_template("overlay.html")
 
 PERSONNEL_ROUTES_BLUEPRINT = create_personnel_blueprint(
     PersonnelRoutesDependencies(
@@ -1878,45 +1878,15 @@ def get_support_media_service() -> SupportMediaService:
     return SUPPORT_MEDIA_SERVICE
 
 
-@app.get("/roster-headshots/<filename>")
-def roster_headshot_file(filename: str):
-    return send_from_directory(HEADSHOTS_DIR, filename)
-
-
-@app.post("/api/rosters/<roster_id>/players/<player_id>/headshot")
-@require_auth
-def upload_player_headshot(roster_id: str, player_id: str):
-    upload = request.files.get("headshot")
-    if not upload or not upload.filename:
-        return jsonify({"error": "HEADSHOT_FILE_REQUIRED"}), 400
-    result = get_support_media_service().upload_headshot(
-        roster_id,
-        player_id,
-        original_filename=upload.filename,
-        raw=upload.read(),
+SUPPORT_ROUTES_BLUEPRINT = create_support_blueprint(
+    SupportRoutesDependencies(
+        require_auth=require_auth,
+        get_support_media_service=lambda: get_support_media_service(),
+        get_headshots_dir=lambda: HEADSHOTS_DIR,
+        connection_port=5050,
     )
-    if result.code in {
-        "HEADSHOT_FILE_REQUIRED",
-        "UNSUPPORTED_IMAGE_TYPE",
-        "INVALID_IMAGE",
-        "IMAGE_TOO_SMALL",
-    }:
-        return jsonify({"error": result.code}), 400
-    if result.code in {"ROSTER_NOT_FOUND", "PLAYER_NOT_FOUND"}:
-        return jsonify({"error": result.code}), 404
-    if result.code == "HEADSHOT_STORAGE_FAILED":
-        return jsonify(
-            {
-                "error": result.code,
-                "message": result.data.get("message", ""),
-            }
-        ), 500
-    return jsonify(
-        {
-            "headshot": result.data["headshot"],
-            "player": result.data["player"],
-        }
-    )
+)
+app.register_blueprint(SUPPORT_ROUTES_BLUEPRINT)
 
 
 def activate_primary_graphic(state: dict[str, Any], active: str) -> None:
@@ -2195,35 +2165,6 @@ def game_data_source_allowed(state: dict[str, Any], source: str) -> bool:
 
 def authority_rejection(state: dict[str, Any]):
     return jsonify(EventService.locked_payload(state)), 409
-
-
-@app.get("/api/connection-info")
-@require_auth
-def connection_info():
-    result = get_support_media_service().connection_info(5050)
-    return jsonify(result.data["connection"])
-
-
-@app.get("/api/connection-qr")
-@require_auth
-def connection_qr():
-    result = get_support_media_service().qr_svg(
-        request.args.get("url", "")
-    )
-    if result.code == "INVALID_URL":
-        return jsonify({"error": result.code}), 400
-    if result.code == "QR_GENERATION_FAILED":
-        return jsonify(
-            {
-                "error": result.code,
-                "message": result.data.get("message", ""),
-            }
-        ), 500
-    return Response(
-        result.data["svg"],
-        mimetype=result.data["mimetype"],
-        headers=result.data["headers"],
-    )
 
 
 def spot_to_coord(value: Any) -> int:
