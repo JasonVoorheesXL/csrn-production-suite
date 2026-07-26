@@ -31,10 +31,10 @@ def test_security_upgrade_routes_are_registered_through_blueprint() -> None:
     )
 
 
-def test_app_registers_security_upgrade_blueprint_once() -> None:
+def test_app_collects_security_upgrade_blueprint_once() -> None:
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert source.count(
-        "app.register_blueprint(SECURITY_UPGRADE_ROUTES_BLUEPRINT)"
+        "APPLICATION_BLUEPRINTS.append(SECURITY_UPGRADE_ROUTES_BLUEPRINT)"
     ) == 1
     assert source.count(
         "SECURITY_UPGRADE_ROUTES_BLUEPRINT = "

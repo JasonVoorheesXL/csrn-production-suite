@@ -41,10 +41,12 @@ def test_live_game_routes_are_registered_through_blueprint() -> None:
     )
 
 
-def test_app_registers_live_game_blueprint_once() -> None:
+def test_app_collects_live_game_blueprint_once() -> None:
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert source.count("LIVE_GAME_ROUTES_BLUEPRINT = create_live_game_blueprint(") == 1
-    assert source.count("app.register_blueprint(LIVE_GAME_ROUTES_BLUEPRINT)") == 1
+    assert source.count(
+        "APPLICATION_BLUEPRINTS.append(LIVE_GAME_ROUTES_BLUEPRINT)"
+    ) == 1
 
 
 def test_migrated_live_game_decorators_are_removed_from_app() -> None:

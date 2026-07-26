@@ -15,7 +15,8 @@ from threading import Lock
 from typing import Any, Callable
 from urllib.parse import urlparse, quote
 
-from flask import Flask, jsonify, render_template, request, session, send_from_directory, Response
+from flask import Flask, current_app, jsonify, session
+from application_factory import create_application
 from werkzeug.security import check_password_hash, generate_password_hash
 from PIL import Image, ImageChops
 from obs_client import (
@@ -165,7 +166,7 @@ PACKAGES_FILE = DATA_DIR / "Packages" / "broadcast_packages.json"
 BUILD_JOURNAL_FILE = DATA_DIR / "Logs" / "build_journal.json"
 VERSION_FILE = BASE_DIR / "VERSION.txt"
 
-app = Flask(__name__)
+APPLICATION_BLUEPRINTS: list[Any] = []
 lock = Lock()
 obs_status_lock = Lock()
 upgrade_lock = Lock()
@@ -298,9 +299,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.5i — Support and Page Routes"
+    "Version 1.13.0-alpha.5j — Application Factory Consolidation"
 )
-RUNTIME_BUILD = "V1.13A5I-SUPPORT-AND-PAGE-ROUTES"
+RUNTIME_BUILD = "V1.13A5J-APPLICATION-FACTORY-CONSOLIDATION"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -1485,15 +1486,6 @@ def load_security() -> dict[str, Any]:
 def save_security(sec: dict[str, Any]) -> None:
     SECURITY_REPOSITORY.save(sec)
 
-security = load_security()
-app.secret_key = security["secret_key"]
-app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Strict",
-    SESSION_COOKIE_SECURE=False,
-    PERMANENT_SESSION_LIFETIME=SESSION_SECONDS,
-)
-
 def pin_is_configured() -> bool:
     return SECURITY_SERVICE.pin_is_configured()
 
@@ -1508,6 +1500,7 @@ def require_auth(func: Callable):
         if not authenticated():
             return jsonify({"error": "AUTH_REQUIRED"}), 401
         return func(*args, **kwargs)
+    setattr(wrapper, "_csrn_requires_auth", True)
     return wrapper
 
 def push_history(state: dict[str, Any]) -> None:
@@ -1567,7 +1560,7 @@ PAGE_ROUTES_BLUEPRINT = create_page_blueprint(
         application_identity=lambda: application_identity(),
     )
 )
-app.register_blueprint(PAGE_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(PAGE_ROUTES_BLUEPRINT)
 
 
 BROADCAST_PACKAGE_ROUTES_BLUEPRINT = create_broadcast_package_blueprint(
@@ -1577,7 +1570,7 @@ BROADCAST_PACKAGE_ROUTES_BLUEPRINT = create_broadcast_package_blueprint(
         public_state=lambda state: public_state(state),
     )
 )
-app.register_blueprint(BROADCAST_PACKAGE_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(BROADCAST_PACKAGE_ROUTES_BLUEPRINT)
 
 
 SPONSOR_ROUTES_BLUEPRINT = create_sponsor_blueprint(
@@ -1598,7 +1591,7 @@ SPONSOR_ROUTES_BLUEPRINT = create_sponsor_blueprint(
         token_hex=lambda length: secrets.token_hex(length),
     )
 )
-app.register_blueprint(SPONSOR_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(SPONSOR_ROUTES_BLUEPRINT)
 
 ASSET_ROUTES_BLUEPRINT = create_asset_blueprint(
     AssetRoutesDependencies(
@@ -1611,7 +1604,7 @@ ASSET_ROUTES_BLUEPRINT = create_asset_blueprint(
         token_hex=lambda length: secrets.token_hex(length),
     )
 )
-app.register_blueprint(ASSET_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(ASSET_ROUTES_BLUEPRINT)
 
 
 PERSONNEL_ROUTES_BLUEPRINT = create_personnel_blueprint(
@@ -1622,7 +1615,7 @@ PERSONNEL_ROUTES_BLUEPRINT = create_personnel_blueprint(
         normalize_personnel_id=PersonnelService.normalize_id,
     )
 )
-app.register_blueprint(PERSONNEL_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(PERSONNEL_ROUTES_BLUEPRINT)
 
 ROSTER_ROUTES_BLUEPRINT = create_roster_blueprint(
     RosterRoutesDependencies(
@@ -1630,7 +1623,7 @@ ROSTER_ROUTES_BLUEPRINT = create_roster_blueprint(
         get_roster_service=get_roster_service,
     )
 )
-app.register_blueprint(ROSTER_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(ROSTER_ROUTES_BLUEPRINT)
 
 VENUE_ROUTES_BLUEPRINT = create_venue_blueprint(
     VenueRoutesDependencies(
@@ -1638,7 +1631,7 @@ VENUE_ROUTES_BLUEPRINT = create_venue_blueprint(
         get_venue_service=get_venue_service,
     )
 )
-app.register_blueprint(VENUE_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(VENUE_ROUTES_BLUEPRINT)
 
 
 SCHOOL_ROUTES_BLUEPRINT = create_school_blueprint(
@@ -1647,7 +1640,7 @@ SCHOOL_ROUTES_BLUEPRINT = create_school_blueprint(
         get_school_service=get_school_service,
     )
 )
-app.register_blueprint(SCHOOL_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(SCHOOL_ROUTES_BLUEPRINT)
 
 ASSOCIATION_ROUTES_BLUEPRINT = create_association_blueprint(
     AssociationRoutesDependencies(
@@ -1671,7 +1664,7 @@ ASSOCIATION_ROUTES_BLUEPRINT = create_association_blueprint(
         ),
     )
 )
-app.register_blueprint(ASSOCIATION_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(ASSOCIATION_ROUTES_BLUEPRINT)
 
 
 def _hex(rgb: tuple[int, int, int]) -> str:
@@ -1697,14 +1690,14 @@ LOGO_ROUTES_BLUEPRINT = create_logo_blueprint(
         normalize_school_id=normalize_school_id,
     )
 )
-app.register_blueprint(LOGO_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(LOGO_ROUTES_BLUEPRINT)
 
 
 UPGRADE_SERVICE: UpgradeService | None = None
 
 
 def activate_upgrade_secret_key(secret_key: str) -> None:
-    app.secret_key = secret_key
+    current_app.secret_key = secret_key
 
 
 def get_upgrade_service() -> UpgradeService:
@@ -1732,7 +1725,7 @@ SECURITY_UPGRADE_ROUTES_BLUEPRINT = create_security_upgrade_blueprint(
         get_upgrade_service=get_upgrade_service,
     )
 )
-app.register_blueprint(SECURITY_UPGRADE_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(SECURITY_UPGRADE_ROUTES_BLUEPRINT)
 
 
 OBS_ROUTES_BLUEPRINT = create_obs_blueprint(
@@ -1741,7 +1734,7 @@ OBS_ROUTES_BLUEPRINT = create_obs_blueprint(
         get_obs_service=lambda: get_obs_service(),
     )
 )
-app.register_blueprint(OBS_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(OBS_ROUTES_BLUEPRINT)
 
 
 def command_scorebug_visibility(visible: bool) -> dict[str, Any]:
@@ -1784,7 +1777,7 @@ SYSTEM_ROUTES_BLUEPRINT = create_system_blueprint(
         load_build_journal=load_build_journal,
     )
 )
-app.register_blueprint(SYSTEM_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(SYSTEM_ROUTES_BLUEPRINT)
 
 
 BROADCAST_LIFECYCLE_SERVICE: BroadcastLifecycleService | None = None
@@ -1819,7 +1812,7 @@ BROADCAST_LIFECYCLE_ROUTES_BLUEPRINT = create_broadcast_lifecycle_blueprint(
         get_lifecycle_service=get_broadcast_lifecycle_service,
     )
 )
-app.register_blueprint(BROADCAST_LIFECYCLE_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(BROADCAST_LIFECYCLE_ROUTES_BLUEPRINT)
 
 BROADCAST_ROUTES_BLUEPRINT = create_broadcast_blueprint(
     BroadcastRoutesDependencies(
@@ -1827,7 +1820,7 @@ BROADCAST_ROUTES_BLUEPRINT = create_broadcast_blueprint(
         get_broadcast_service=get_broadcast_service,
     )
 )
-app.register_blueprint(BROADCAST_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(BROADCAST_ROUTES_BLUEPRINT)
 
 
 GAME_OPERATIONS_SERVICE: GameOperationsService | None = None
@@ -1861,7 +1854,7 @@ LIVE_GAME_ROUTES_BLUEPRINT = create_live_game_blueprint(
         load_state=lambda: load_state(),
     )
 )
-app.register_blueprint(LIVE_GAME_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(LIVE_GAME_ROUTES_BLUEPRINT)
 
 
 SUPPORT_MEDIA_SERVICE: SupportMediaService | None = None
@@ -1886,7 +1879,7 @@ SUPPORT_ROUTES_BLUEPRINT = create_support_blueprint(
         connection_port=5050,
     )
 )
-app.register_blueprint(SUPPORT_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(SUPPORT_ROUTES_BLUEPRINT)
 
 
 def activate_primary_graphic(state: dict[str, Any], active: str) -> None:
@@ -1906,7 +1899,7 @@ GRAPHICS_ROUTES_BLUEPRINT = create_graphics_blueprint(
         transaction_lock=lock,
     )
 )
-app.register_blueprint(GRAPHICS_ROUTES_BLUEPRINT)
+APPLICATION_BLUEPRINTS.append(GRAPHICS_ROUTES_BLUEPRINT)
 
 
 def automation_player(roster_id: str, player_id: str):
@@ -2208,6 +2201,24 @@ def get_rules_service() -> RulesService:
 
 def local_ip() -> str:
     return SupportMediaService.local_ip()
+
+
+def create_app(
+    config_overrides: dict[str, Any] | None = None,
+) -> Flask:
+    """Build a configured CSRN application from the consolidated Blueprints."""
+
+    security = load_security()
+    return create_application(
+        __name__,
+        blueprints=tuple(APPLICATION_BLUEPRINTS),
+        secret_key=str(security["secret_key"]),
+        session_seconds=SESSION_SECONDS,
+        config_overrides=config_overrides,
+    )
+
+
+app = create_app()
 
 
 if __name__ == "__main__":
