@@ -106,16 +106,16 @@ class HardwareOBSCommissioningService:
                 {
                     "channel": 1,
                     "enabled": True,
-                    "speaker": "Jason",
+                    "speaker": "Announcer 1",
                     "role": "Play-by-Play",
-                    "microphone": "Audio-Technica BPHS1",
+                    "microphone": "",
                 },
                 {
                     "channel": 2,
                     "enabled": True,
-                    "speaker": "Jordan",
-                    "role": "Color Analyst",
-                    "microphone": "Audio-Technica BPHS1",
+                    "speaker": "Announcer 2",
+                    "role": "Analyst",
+                    "microphone": "",
                 },
                 {
                     "channel": 3,

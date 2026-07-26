@@ -18,12 +18,12 @@ Phase 6.3 creates a persistent commissioning record for the physical game-day sy
 
 The default channel map is:
 
-1. Jason — Play-by-Play
-2. Jordan — Color Analyst
-3. Sideline Reporter — disabled until assigned
-4. Guest — disabled until assigned
+1. Announcer 1 — Play-by-Play placeholder
+2. Announcer 2 — Analyst placeholder
+3. Announcer 3 — disabled until assigned
+4. Announcer 4 — disabled until assigned
 
-Channel assignments are persistent and become the speaker-identity source for Phase 6.4 captioning. At least two enabled channels must have unique, non-empty speaker names.
+These labels are neutral installation placeholders, not fixed identities. Each customer assigns its own broadcasters, roles, microphones, and enabled channels during commissioning. Channel assignments are persistent and become the speaker-identity source for Phase 6.4 captioning. At least two enabled channels must have unique, non-empty speaker names.
 
 ## Operator audio checks
 
@@ -93,4 +93,4 @@ The command optionally refreshes the read-only OBS check, prints every required 
 
 Phase 6.4 uses these physical channel assignments for speaker-separated captions. It must not fall back to voice diarization when isolated P4next channels are available.
 
-The commercial roadmap remains unchanged: the graphics theme engine is Phase 6.7, Social Publishing Engine is Phase 6.8, and grounded postgame recaps are Phase 6.9.
+The commercial roadmap remains unchanged: the graphics theme engine is Phase 6.8, Social Publishing Engine is Phase 6.9, and grounded postgame recaps are Phase 6.10.
