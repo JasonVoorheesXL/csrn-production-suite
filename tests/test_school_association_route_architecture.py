@@ -45,10 +45,14 @@ def test_school_and_association_routes_are_blueprint_owned() -> None:
         )
 
 
-def test_app_registers_each_phase_5_3_blueprint_once() -> None:
+def test_app_collects_each_phase_5_3_blueprint_once() -> None:
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert source.count("app.register_blueprint(SCHOOL_ROUTES_BLUEPRINT)") == 1
-    assert source.count("app.register_blueprint(ASSOCIATION_ROUTES_BLUEPRINT)") == 1
+    assert source.count(
+        "APPLICATION_BLUEPRINTS.append(SCHOOL_ROUTES_BLUEPRINT)"
+    ) == 1
+    assert source.count(
+        "APPLICATION_BLUEPRINTS.append(ASSOCIATION_ROUTES_BLUEPRINT)"
+    ) == 1
     assert source.count("SCHOOL_ROUTES_BLUEPRINT = create_school_blueprint(") == 1
     assert source.count(
         "ASSOCIATION_ROUTES_BLUEPRINT = create_association_blueprint("

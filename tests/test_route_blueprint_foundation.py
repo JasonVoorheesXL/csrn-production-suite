@@ -29,9 +29,11 @@ def test_system_routes_are_registered_through_blueprint() -> None:
     )
 
 
-def test_app_registers_system_blueprint_once() -> None:
+def test_app_collects_system_blueprint_once() -> None:
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert source.count("app.register_blueprint(SYSTEM_ROUTES_BLUEPRINT)") == 1
+    assert source.count(
+        "APPLICATION_BLUEPRINTS.append(SYSTEM_ROUTES_BLUEPRINT)"
+    ) == 1
     assert source.count("SYSTEM_ROUTES_BLUEPRINT = create_system_blueprint(") == 1
 
 

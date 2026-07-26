@@ -44,13 +44,20 @@ def test_migrated_routes_are_registered_through_expected_blueprints() -> None:
         "/api/venues": "venue_routes.",
         "/api/venues/<venue_id>": "venue_routes.",
     }
-    assert all(endpoints[path].startswith(prefix) for path, prefix in expected_prefixes.items())
+    assert all(
+        endpoints[path].startswith(prefix)
+        for path, prefix in expected_prefixes.items()
+    )
 
 
-def test_app_registers_each_phase_5_4_blueprint_once() -> None:
+def test_app_collects_each_phase_5_4_blueprint_once() -> None:
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    for name in ("PERSONNEL_ROUTES_BLUEPRINT", "ROSTER_ROUTES_BLUEPRINT", "VENUE_ROUTES_BLUEPRINT"):
-        assert source.count(f"app.register_blueprint({name})") == 1
+    for name in (
+        "PERSONNEL_ROUTES_BLUEPRINT",
+        "ROSTER_ROUTES_BLUEPRINT",
+        "VENUE_ROUTES_BLUEPRINT",
+    ):
+        assert source.count(f"APPLICATION_BLUEPRINTS.append({name})") == 1
 
 
 def test_migrated_route_decorators_are_removed_from_app() -> None:
@@ -70,13 +77,19 @@ def test_migrated_route_decorators_are_removed_from_app() -> None:
 
 
 def test_phase_5_4_route_modules_do_not_import_application_root() -> None:
-    for filename in ("personnel_routes.py", "roster_routes.py", "venue_routes.py"):
+    for filename in (
+        "personnel_routes.py",
+        "roster_routes.py",
+        "venue_routes.py",
+    ):
         source = (ROOT / "routes" / filename).read_text(encoding="utf-8")
         tree = ast.parse(source)
         imported_roots: set[str] = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                imported_roots.update(alias.name.split(".", 1)[0] for alias in node.names)
+                imported_roots.update(
+                    alias.name.split(".", 1)[0] for alias in node.names
+                )
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported_roots.add(node.module.split(".", 1)[0])
         assert "app" not in imported_roots
