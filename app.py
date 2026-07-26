@@ -298,9 +298,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.5h — Live Game Routes"
+    "Version 1.13.0-alpha.5i — Support and Page Routes"
 )
-RUNTIME_BUILD = "V1.13A5H-LIVE-GAME-ROUTES"
+RUNTIME_BUILD = "V1.13A5I-SUPPORT-AND-PAGE-ROUTES"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
