@@ -35,8 +35,8 @@ MEDIA_REGISTRATION = '''SPONSOR_ROUTES_BLUEPRINT = create_sponsor_blueprint(
         asset_file_hash=lambda path: asset_file_hash(path),
         get_asset_upload_dir=lambda: ASSET_UPLOAD_DIR,
         get_sponsor_upload_dir=lambda: SPONSOR_UPLOAD_DIR,
-        clock=time.time,
-        token_hex=secrets.token_hex,
+        clock=lambda: time.time(),
+        token_hex=lambda length: secrets.token_hex(length),
     )
 )
 app.register_blueprint(SPONSOR_ROUTES_BLUEPRINT)
@@ -48,8 +48,8 @@ ASSET_ROUTES_BLUEPRINT = create_asset_blueprint(
         get_upload_dir=lambda: ASSET_UPLOAD_DIR,
         extension_allowed=AssetService.extension_allowed,
         normalize_asset_id=AssetService.normalize_id,
-        clock=time.time,
-        token_hex=secrets.token_hex,
+        clock=lambda: time.time(),
+        token_hex=lambda length: secrets.token_hex(length),
     )
 )
 app.register_blueprint(ASSET_ROUTES_BLUEPRINT)
