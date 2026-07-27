@@ -52,12 +52,13 @@ def test_phase_6_6_documentation_retains_social_publishing_requirement() -> None
     assert "approved sponsors" in document
 
 
-def test_game_day_roadmap_keeps_social_and_recap_sequence() -> None:
+def test_game_day_roadmap_keeps_social_ux_and_recap_sequence() -> None:
     roadmap = (
         ROOT / "docs" / "PHASE_6_GAME_DAY_AND_COMMERCIAL_ROADMAP.md"
     ).read_text(encoding="utf-8")
     assert "### 6.6 Operational Rehearsal and Release Freeze" in roadmap
     assert "### 6.9 Social Publishing Engine" in roadmap
-    assert "### 6.10 Grounded Game Recap Engine" in roadmap
+    assert "### 6.10 Commercial UX, Navigation, and Account Onboarding" in roadmap
+    assert "### 6.11 Grounded Game Recap Engine" in roadmap
     assert "player headshots" in roadmap
     assert "approved sponsor assets" in roadmap
