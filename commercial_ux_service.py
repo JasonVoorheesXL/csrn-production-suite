@@ -75,6 +75,7 @@ class CommercialUxService:
         config = dict(self.load_config() or {})
         organization = config.get("organization", {}) if isinstance(config.get("organization"), dict) else {}
         application = config.get("application", {}) if isinstance(config.get("application"), dict) else {}
+        broadcast_defaults = config.get("broadcast_defaults", {}) if isinstance(config.get("broadcast_defaults"), dict) else {}
         theme = self._data(self.theme_status()).get("theme", {})
         oauth = self._data(self.oauth_status())
         social = self._data(self.social_status()).get("social", {})
@@ -83,7 +84,7 @@ class CommercialUxService:
         checks = [
             {"id": "organization", "label": "Organization identity", "complete": bool(organization.get("name"))},
             {"id": "theme", "label": "Graphics theme selected", "complete": bool((theme.get("active") or {}).get("id"))},
-            {"id": "timezone", "label": "Time zone selected", "complete": bool(application.get("timezone") or config.get("timezone"))},
+            {"id": "timezone", "label": "Time zone selected", "complete": bool(broadcast_defaults.get("timezone") or application.get("timezone") or config.get("timezone"))},
             {"id": "social", "label": "Social account connected", "complete": connected_count > 0, "optional": True},
             {"id": "backup", "label": "Automatic backups enabled", "complete": bool(application.get("automatic_backup", True))},
         ]
