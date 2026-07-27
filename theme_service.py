@@ -621,6 +621,6 @@ html,body {{ font-family: var(--csrn-theme-font) !important; }}
 #weather-overlay .panel,.bug,.banner,.fullscreen {{ font-family: var(--csrn-theme-font) !important; border-radius: var(--csrn-theme-radius) !important; box-shadow: var(--csrn-theme-shadow) !important; }}
 .bug,.banner {{ background: {tokens['secondary_rgba']} !important; color: var(--csrn-theme-text) !important; border-color: var(--csrn-theme-border) !important; }}
 .banner:not(.emergency) {{ border-left-color: var(--csrn-theme-primary) !important; }}
-.fullscreen {{ background: {self._rgba(tokens['surface'], 0.96) if False else tokens['surface']} !important; color: var(--csrn-theme-text) !important; }}
+.fullscreen {{ background: {tokens['surface']} !important; color: var(--csrn-theme-text) !important; }}
 #scorebug,#eventTicker,#lowerThird,#playerGraphic,#personnelGraphic,#captions,.panel {{ transition-duration: calc(.30s * var(--csrn-theme-motion)) !important; }}
 """
