@@ -20,7 +20,7 @@ jobs:
         run: python -m pip install -r requirements.txt pytest
       - name: Apply Phase 6.9 integration
         run: python tools/ci_apply.py
-      - name: Run focused tests
+      - name: Run focused and full diagnostics
         shell: bash
         run: |
           set +e
@@ -30,15 +30,23 @@ jobs:
             tests/test_social_service.py \
             tests/test_social_routes.py \
             tests/test_social_architecture.py \
-            tests/test_phase_6_9_migration.py > phase69-diagnostics.txt 2>&1
-          code=$?
-          tail -n 240 phase69-diagnostics.txt
-          echo "$code" > phase69-exit-code.txt
+            tests/test_phase_6_9_migration.py > phase69-focused.txt 2>&1
+          focused_code=$?
+          python tools/dev_workflow.py validate > phase69-full.txt 2>&1
+          full_code=$?
+          echo "$focused_code" > phase69-focused-exit-code.txt
+          echo "$full_code" > phase69-full-exit-code.txt
+          echo "--- focused ---"
+          tail -n 120 phase69-focused.txt
+          echo "--- full ---"
+          tail -n 260 phase69-full.txt
           exit 0
       - uses: actions/upload-artifact@v4
         with:
           name: phase69-diagnostics
           path: |
-            phase69-diagnostics.txt
-            phase69-exit-code.txt
+            phase69-focused.txt
+            phase69-full.txt
+            phase69-focused-exit-code.txt
+            phase69-full-exit-code.txt
           retention-days: 1
