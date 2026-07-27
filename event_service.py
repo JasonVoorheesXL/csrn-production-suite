@@ -53,6 +53,7 @@ class EventService:
         team_direction: Callable[[dict[str, Any], str], int],
         normalize_state: Callable[[Mapping[str, Any]], Mapping[str, Any]],
         default_player_graphic: Callable[[], Mapping[str, Any]],
+        on_event: Callable[[Mapping[str, Any]], Any] | None = None,
         transaction_lock: Any | None = None,
         now: Callable[[], float] = time.time,
     ) -> None:
@@ -70,6 +71,7 @@ class EventService:
         self._team_direction = team_direction
         self._normalize_state = normalize_state
         self._default_player_graphic = default_player_graphic
+        self._on_event = on_event
         self._transaction_lock = transaction_lock
         self._now = now
 
@@ -364,6 +366,13 @@ class EventService:
             state["events"] = (list(state.get("events") or []) + [payload])[-200:]
             state["plays"] = (list(state.get("plays") or []) + [play_record])[-500:]
             self._save_state(state)
+
+        if self._on_event is not None:
+            try:
+                self._on_event(copy.deepcopy(payload))
+            except Exception:
+                # Social draft creation can never invalidate the game event.
+                pass
 
         return EventResult(
             "OK",

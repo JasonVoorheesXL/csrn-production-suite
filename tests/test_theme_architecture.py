@@ -61,14 +61,15 @@ def test_theme_state_is_customer_data_not_template_code() -> None:
     assert '"Themes"' in source
 
 
-def test_runtime_identity_is_phase_6_8() -> None:
+def test_phase_6_8_theme_engine_remains_integrated_after_later_phases() -> None:
     source = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "Version 1.13.0-alpha.6h — Graphics Theme Engine" in source
-    assert "V1.13A6H-GRAPHICS-THEME-ENGINE" in source
-    assert (ROOT / "VERSION.txt").read_text(encoding="utf-8").strip() == "1.13.0-alpha.6h"
+    assert "GraphicsThemeService" in source
+    assert "create_theme_blueprint" in source
+    assert "get_theme_service" in source
+    assert "THEME_STATE_FILE" in source
 
 
-def test_social_publishing_remains_next_stage() -> None:
+def test_social_publishing_stage_and_theme_handoff_remain_documented() -> None:
     roadmap = (ROOT / "docs" / "PHASE_6_GAME_DAY_AND_COMMERCIAL_ROADMAP.md").read_text(encoding="utf-8")
     assert "### 6.8 Graphics Theme Engine" in roadmap
     assert "Theme Engine implementation status: Phase 6.8 foundation integrated." in roadmap

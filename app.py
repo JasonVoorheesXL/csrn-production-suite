@@ -60,6 +60,10 @@ from product_paths import resolve_product_paths
 from entitlement_service import EntitlementService
 from deployment_service import DeploymentService
 from theme_service import GraphicsThemeService
+from social_service import SocialPublishingService
+from social_card_renderer import SocialCardRenderer
+from social_asset_resolver import SocialAssetResolver
+from social_platforms import default_adapter_registry
 from broadcast_lifecycle_service import BroadcastLifecycleService
 from routes.system_routes import (
     SystemRoutesDependencies,
@@ -165,6 +169,10 @@ from routes.theme_routes import (
     ThemeRoutesDependencies,
     create_theme_blueprint,
 )
+from routes.social_routes import (
+    SocialRoutesDependencies,
+    create_social_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -223,6 +231,8 @@ WEATHER_STATE_FILE = DATA_DIR / "Weather" / "weather_state.json"
 REHEARSAL_STATE_FILE = DATA_DIR / "Rehearsals" / "rehearsals.json"
 RELEASE_MANIFEST_FILE = DATA_DIR / "Releases" / "game_day_release_manifest.json"
 THEME_STATE_FILE = DATA_DIR / "Themes" / "theme_state.json"
+SOCIAL_STATE_FILE = DATA_DIR / "Social" / "social_state.json"
+SOCIAL_CARDS_DIR = DATA_DIR / "Social" / "Cards"
 
 APPLICATION_BLUEPRINTS: list[Any] = []
 lock = Lock()
@@ -357,9 +367,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.6h — Graphics Theme Engine"
+    "Version 1.13.0-alpha.6i — Social Publishing Engine"
 )
-RUNTIME_BUILD = "V1.13A6H-GRAPHICS-THEME-ENGINE"
+RUNTIME_BUILD = "V1.13A6I-SOCIAL-PUBLISHING-ENGINE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -423,6 +433,14 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "youtube": "",
         "x": "",
         "website": "",
+        "publishing": {
+            "preview_first": True,
+            "auto_create_drafts": False,
+            "allow_auto_publish": False,
+            "x_credential_ref": "CSRN_X_ACCESS_TOKEN",
+            "facebook_credential_ref": "CSRN_FACEBOOK_PAGE_ACCESS_TOKEN",
+            "facebook_api_version": "v25.0",
+        },
     },
     "application": {
         "version": RUNTIME_VERSION,
@@ -442,13 +460,14 @@ LOCKOUT_SECONDS = 60
 
 
 def ensure_data_architecture() -> None:
-    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings", "Rehearsals", "Releases", "Themes"):
+    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings", "Rehearsals", "Releases", "Themes", "Social"):
         (DATA_DIR / name).mkdir(parents=True, exist_ok=True)
     ASSOCIATION_PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     PERSONNEL_HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     ASSET_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     SPONSOR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    SOCIAL_CARDS_DIR.mkdir(parents=True, exist_ok=True)
 
 CORE_BACKUP_DIR = DATA_DIR / "Backups" / "Core"
 CORE_QUARANTINE_DIR = DATA_DIR / "Backups" / "Quarantine"
@@ -2228,6 +2247,45 @@ THEME_ROUTES_BLUEPRINT = create_theme_blueprint(
 APPLICATION_BLUEPRINTS.append(THEME_ROUTES_BLUEPRINT)
 
 
+SOCIAL_SERVICE: SocialPublishingService | None = None
+
+
+def get_social_service() -> SocialPublishingService:
+    global SOCIAL_SERVICE
+    if SOCIAL_SERVICE is None:
+        resolver = SocialAssetResolver(
+            base_dir=BASE_DIR,
+            data_dir=DATA_DIR,
+            asset_upload_dir=ASSET_UPLOAD_DIR,
+            headshots_dir=HEADSHOTS_DIR,
+        )
+        SOCIAL_SERVICE = SocialPublishingService(
+            state_file=SOCIAL_STATE_FILE,
+            renderer=SocialCardRenderer(
+                output_dir=SOCIAL_CARDS_DIR,
+                asset_resolver=resolver,
+            ),
+            adapters=default_adapter_registry(),
+            load_broadcast_state=load_state,
+            load_config=load_config,
+            load_rosters=load_rosters,
+            load_sponsors=load_sponsors,
+            active_sponsor_by_id=active_sponsor_by_id,
+            get_theme_status=lambda: get_theme_service().status(),
+            clock=time.time,
+        )
+    return SOCIAL_SERVICE
+
+
+SOCIAL_ROUTES_BLUEPRINT = create_social_blueprint(
+    SocialRoutesDependencies(
+        require_auth=require_auth,
+        get_social_service=lambda: get_social_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(SOCIAL_ROUTES_BLUEPRINT)
+
+
 SUPPORT_MEDIA_SERVICE: SupportMediaService | None = None
 
 
@@ -2518,6 +2576,7 @@ def get_event_service() -> EventService:
             default_player_graphic=lambda: copy.deepcopy(
                 DEFAULT_STATE["player_graphic"]
             ),
+            on_event=lambda event: get_social_service().queue_event(event),
             transaction_lock=lock,
         )
     return EVENT_SERVICE
