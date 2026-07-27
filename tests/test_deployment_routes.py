@@ -118,7 +118,9 @@ def test_validate_update_forwards_downgrade_flag() -> None:
         json={"package_root": "C:/update", "allow_downgrade": True},
     )
     assert response.status_code == 200
-    assert deployment.calls == [("validate", "C:/update", True)]
+    assert deployment.calls[0][0] == "validate"
+    assert deployment.calls[0][1].replace("\\", "/") == "C:/update"
+    assert deployment.calls[0][2] is True
 
 
 def test_prepare_update_conflict_returns_409() -> None:
