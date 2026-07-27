@@ -59,6 +59,7 @@ from operational_rehearsal_service import OperationalRehearsalService
 from product_paths import resolve_product_paths
 from entitlement_service import EntitlementService
 from deployment_service import DeploymentService
+from theme_service import GraphicsThemeService
 from broadcast_lifecycle_service import BroadcastLifecycleService
 from routes.system_routes import (
     SystemRoutesDependencies,
@@ -160,6 +161,10 @@ from routes.deployment_routes import (
     DeploymentRoutesDependencies,
     create_deployment_blueprint,
 )
+from routes.theme_routes import (
+    ThemeRoutesDependencies,
+    create_theme_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -217,6 +222,7 @@ CAPTION_TRANSCRIPTS_DIR = DATA_DIR / "Captions" / "Transcripts"
 WEATHER_STATE_FILE = DATA_DIR / "Weather" / "weather_state.json"
 REHEARSAL_STATE_FILE = DATA_DIR / "Rehearsals" / "rehearsals.json"
 RELEASE_MANIFEST_FILE = DATA_DIR / "Releases" / "game_day_release_manifest.json"
+THEME_STATE_FILE = DATA_DIR / "Themes" / "theme_state.json"
 
 APPLICATION_BLUEPRINTS: list[Any] = []
 lock = Lock()
@@ -351,9 +357,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.6g — Installer, Updates, and Licensing Foundation"
+    "Version 1.13.0-alpha.6h — Graphics Theme Engine"
 )
-RUNTIME_BUILD = "V1.13A6G-INSTALLER-UPDATES-LICENSING"
+RUNTIME_BUILD = "V1.13A6H-GRAPHICS-THEME-ENGINE"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -407,6 +413,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "enforcement_mode": "installed_only",
         "activation_endpoint": "",
     },
+    "graphics_theme": {
+        "active_preset": "modern_network",
+        "school_color_adaptation": True,
+        "season_lock": False,
+    },
     "social": {
         "facebook": "",
         "youtube": "",
@@ -431,7 +442,7 @@ LOCKOUT_SECONDS = 60
 
 
 def ensure_data_architecture() -> None:
-    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings", "Rehearsals", "Releases"):
+    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings", "Rehearsals", "Releases", "Themes"):
         (DATA_DIR / name).mkdir(parents=True, exist_ok=True)
     ASSOCIATION_PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -2191,6 +2202,30 @@ DEPLOYMENT_ROUTES_BLUEPRINT = create_deployment_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(DEPLOYMENT_ROUTES_BLUEPRINT)
+
+
+THEME_SERVICE: GraphicsThemeService | None = None
+
+
+def get_theme_service() -> GraphicsThemeService:
+    global THEME_SERVICE
+    if THEME_SERVICE is None:
+        THEME_SERVICE = GraphicsThemeService(
+            state_file=THEME_STATE_FILE,
+            load_state=load_state,
+            load_config=load_config,
+            clock=time.time,
+        )
+    return THEME_SERVICE
+
+
+THEME_ROUTES_BLUEPRINT = create_theme_blueprint(
+    ThemeRoutesDependencies(
+        require_auth=require_auth,
+        get_theme_service=lambda: get_theme_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(THEME_ROUTES_BLUEPRINT)
 
 
 SUPPORT_MEDIA_SERVICE: SupportMediaService | None = None

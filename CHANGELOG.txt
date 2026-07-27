@@ -18,3 +18,8 @@ Phase 6.7 - Installer, Updates, and Licensing Foundation
 - External installed-mode customer data paths.
 - Hash-validated staged updates and customer-safe support bundles.
 - Provider-verified licensing and feature/sport entitlement boundaries.
+
+Phase 6.8 - Graphics Theme Engine
+- Eight original presets through one shared token engine.
+- Controlled overrides, saved variants, and season locking.
+- Shared scorebug, lower-third, caption, weather, and social-card styling.
