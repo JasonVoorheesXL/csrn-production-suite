@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - phase/6.10-commercial-ux-navigation-onboarding
+  pull_request:
+    branches:
+      - develop-1.13
 
 jobs:
   diagnose:
