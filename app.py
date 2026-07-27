@@ -4,6 +4,7 @@ import copy
 import json
 import hashlib
 import os
+import sys
 import re
 import secrets
 import time
@@ -55,6 +56,9 @@ from commissioning_service import HardwareOBSCommissioningService
 from caption_service import CaptionService
 from weather_service import VenueWeatherService
 from operational_rehearsal_service import OperationalRehearsalService
+from product_paths import resolve_product_paths
+from entitlement_service import EntitlementService
+from deployment_service import DeploymentService
 from broadcast_lifecycle_service import BroadcastLifecycleService
 from routes.system_routes import (
     SystemRoutesDependencies,
@@ -152,6 +156,10 @@ from routes.rehearsal_routes import (
     RehearsalRoutesDependencies,
     create_rehearsal_blueprint,
 )
+from routes.deployment_routes import (
+    DeploymentRoutesDependencies,
+    create_deployment_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -166,9 +174,14 @@ from broadcast_repository import BroadcastRepository
 # Phase 3 repository boundaries remain integrated below.
 
 BASE_DIR = Path(__file__).resolve().parent
-STATE_FILE = BASE_DIR / "state.json"
-SECURITY_FILE = BASE_DIR / "security.json"
-DATA_DIR = BASE_DIR / "Data"
+PRODUCT_PATHS = resolve_product_paths(
+    BASE_DIR,
+    frozen=bool(getattr(sys, "frozen", False) or "--installed" in sys.argv),
+)
+PRODUCT_PATHS.ensure()
+STATE_FILE = PRODUCT_PATHS.state_file
+SECURITY_FILE = PRODUCT_PATHS.security_file
+DATA_DIR = PRODUCT_PATHS.data_dir
 CONFIG_FILE = DATA_DIR / "Settings" / "config.json"
 SCHOOLS_FILE = DATA_DIR / "Schools" / "schools.json"
 BROADCASTERS_FILE = DATA_DIR / "Settings" / "broadcasters.json"
@@ -338,9 +351,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.6f — Operational Rehearsal and Release Freeze"
+    "Version 1.13.0-alpha.6g — Installer, Updates, and Licensing Foundation"
 )
-RUNTIME_BUILD = "V1.13A6F-OPERATIONAL-REHEARSAL-RELEASE-FREEZE"
+RUNTIME_BUILD = "V1.13A6G-INSTALLER-UPDATES-LICENSING"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -388,6 +401,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "refresh_seconds": 60,
         "stale_after_seconds": 180,
         "user_agent": "CSRN-Production-Suite/1.13 (operator-configurable)",
+    },
+    "licensing": {
+        "provider": "",
+        "enforcement_mode": "installed_only",
+        "activation_endpoint": "",
     },
     "social": {
         "facebook": "",
@@ -2133,6 +2151,46 @@ REHEARSAL_ROUTES_BLUEPRINT = create_rehearsal_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(REHEARSAL_ROUTES_BLUEPRINT)
+
+
+ENTITLEMENT_SERVICE: EntitlementService | None = None
+
+
+def get_entitlement_service() -> EntitlementService:
+    global ENTITLEMENT_SERVICE
+    if ENTITLEMENT_SERVICE is None:
+        ENTITLEMENT_SERVICE = EntitlementService(
+            paths=PRODUCT_PATHS,
+            verifier=None,
+            clock=time.time,
+        )
+    return ENTITLEMENT_SERVICE
+
+
+DEPLOYMENT_SERVICE: DeploymentService | None = None
+
+
+def get_deployment_service() -> DeploymentService:
+    global DEPLOYMENT_SERVICE
+    if DEPLOYMENT_SERVICE is None:
+        DEPLOYMENT_SERVICE = DeploymentService(
+            paths=PRODUCT_PATHS,
+            version_file=VERSION_FILE,
+            entitlement_service=get_entitlement_service(),
+            create_snapshot=lambda **kwargs: get_game_day_safety_service().create_snapshot(**kwargs),
+            clock=time.time,
+        )
+    return DEPLOYMENT_SERVICE
+
+
+DEPLOYMENT_ROUTES_BLUEPRINT = create_deployment_blueprint(
+    DeploymentRoutesDependencies(
+        require_auth=require_auth,
+        get_deployment_service=lambda: get_deployment_service(),
+        get_entitlement_service=lambda: get_entitlement_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(DEPLOYMENT_ROUTES_BLUEPRINT)
 
 
 SUPPORT_MEDIA_SERVICE: SupportMediaService | None = None

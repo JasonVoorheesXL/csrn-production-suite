@@ -1,0 +1,30 @@
+{
+  "venue": {},
+  "conditions": {},
+  "alerts": [],
+  "selected_alert_id": "",
+  "overlay": {
+    "visible": false,
+    "mode": "hidden",
+    "message": "",
+    "updated_at": 0
+  },
+  "delay": {
+    "active": false,
+    "started_at": 0,
+    "resumed_at": 0,
+    "message": "",
+    "source": ""
+  },
+  "lightning": {
+    "active": false,
+    "last_observed_at": 0,
+    "clear_at": 0,
+    "reset_at": 0
+  },
+  "history": [],
+  "last_attempt_at": 0,
+  "last_success_at": 0,
+  "stale": true,
+  "error": "Weather has not been refreshed."
+}

@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "rehearsals": [],
+  "release_freeze": {
+    "frozen": false,
+    "frozen_at": 0,
+    "operator": "",
+    "release_version": "",
+    "commit": "",
+    "manifest_path": "",
+    "snapshot_id": "",
+    "rehearsal_ids": [],
+    "notes": ""
+  },
+  "history": [],
+  "updated_at": 0
+}
