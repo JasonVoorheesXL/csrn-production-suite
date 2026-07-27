@@ -1,0 +1,50 @@
+name: Phase 6.10 Diagnostics
+
+on:
+  push:
+    branches:
+      - phase/6.10-commercial-ux-navigation-onboarding
+  pull_request:
+    branches:
+      - develop-1.13
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt pytest
+      - name: Apply Phase 6.10 integration
+        run: python tools/ci_apply.py
+      - name: Capture diagnostics
+        shell: bash
+        run: |
+          set +e
+          python -m pytest -q \
+            tests/test_credential_vault.py \
+            tests/test_oauth_onboarding_service.py \
+            tests/test_commercial_ux_service.py \
+            tests/test_commercial_ux_routes.py \
+            tests/test_commercial_ux_architecture.py \
+            tests/test_phase_6_10_migration.py > phase610-focused.txt 2>&1
+          focused_code=$?
+          python tools/dev_workflow.py validate > phase610-full.txt 2>&1
+          full_code=$?
+          echo "$focused_code" > phase610-focused-exit-code.txt
+          echo "$full_code" > phase610-full-exit-code.txt
+          tail -n 180 phase610-focused.txt
+          tail -n 260 phase610-full.txt
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase610-diagnostics
+          path: |
+            phase610-focused.txt
+            phase610-full.txt
+            phase610-focused-exit-code.txt
+            phase610-full-exit-code.txt
+          retention-days: 1
