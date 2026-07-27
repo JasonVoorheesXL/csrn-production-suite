@@ -1,0 +1,44 @@
+name: Phase 6.9 Focused Diagnostics
+
+on:
+  push:
+    branches:
+      - phase/6.9-social-publishing-engine
+  pull_request:
+    branches:
+      - develop-1.13
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Apply Phase 6.9 integration
+        run: python tools/ci_apply.py
+      - name: Run focused tests
+        shell: bash
+        run: |
+          set +e
+          python -m pytest -q \
+            tests/test_social_platforms.py \
+            tests/test_social_assets_and_cards.py \
+            tests/test_social_service.py \
+            tests/test_social_routes.py \
+            tests/test_social_architecture.py \
+            tests/test_phase_6_9_migration.py > phase69-diagnostics.txt 2>&1
+          code=$?
+          tail -n 240 phase69-diagnostics.txt
+          echo "$code" > phase69-exit-code.txt
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase69-diagnostics
+          path: |
+            phase69-diagnostics.txt
+            phase69-exit-code.txt
+          retention-days: 1
