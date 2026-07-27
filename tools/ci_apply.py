@@ -68,6 +68,15 @@ def apply_social_service_fixes() -> None:
     source = path.read_text(encoding="utf-8")
     source = replace_once(
         source,
+        "        if not event_id:\n"
+        "            last = broadcast.get(\"last_event\")\n"
+        "            return copy.deepcopy(dict(last)) if isinstance(last, Mapping) else {}\n",
+        "        if not event_id:\n"
+        "            return {}\n",
+        "manual draft event isolation",
+    )
+    source = replace_once(
+        source,
         "            selected = {str(value) for value in account_ids or []}\n"
         "            accounts = [copy.deepcopy(account) for account_id, account in state[\"accounts\"].items() if account.get(\"enabled\", True) and (not selected or account_id in selected)]\n",
         "            selection_requested = account_ids is not None\n"
