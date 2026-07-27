@@ -82,7 +82,7 @@ def test_setup_page_is_reachable_without_hidden_url_knowledge() -> None:
     app, _ = build_app()
     response = app.test_client().get("/setup")
     assert response.status_code == 200
-    assert b"Setup &amp; Integrations" in response.data
+    assert b"Setup & Integrations" in response.data
     assert b"Back to Command Center" in response.data
 
 
