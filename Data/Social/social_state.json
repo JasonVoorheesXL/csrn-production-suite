@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "accounts": {},
+  "settings": {
+    "auto_create_drafts": false,
+    "allow_auto_publish": false,
+    "default_hashtags": [
+      "#HighSchoolSports"
+    ],
+    "include_broadcast_link": true
+  },
+  "sponsor_rules": {
+    "event_sponsors": {},
+    "rotation": [],
+    "rotation_index": 0
+  },
+  "drafts": [],
+  "audit": [],
+  "updated_at": 0
+}
