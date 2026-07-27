@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Graphics Themes</title>
+  <style>
+    :root { color-scheme: dark; font-family: Arial, Helvetica, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0c0f14; color: #f4f6f8; }
+    header { padding: 24px 30px; border-bottom: 1px solid #343a44; background: #121720; }
+    h1 { margin: 0 0 6px; font-size: 28px; }
+    header p { margin: 0; color: #aeb7c2; }
+    main { padding: 24px 30px 40px; }
+    .status { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 22px; }
+    .pill { padding: 8px 12px; border: 1px solid #49515e; border-radius: 999px; background: #171d27; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 18px; }
+    .card { overflow: hidden; border: 1px solid #3a424e; border-radius: 14px; background: #141922; box-shadow: 0 12px 24px rgba(0,0,0,.25); }
+    .preview { height: 120px; display: grid; align-content: end; padding: 14px; }
+    .preview-bar { display: grid; grid-template-columns: 1fr 86px 1fr; min-height: 58px; border: 2px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); font-family: var(--font); }
+    .preview-team { display: flex; align-items: center; padding: 0 12px; background: linear-gradient(115deg,var(--primary),var(--surface)); font-weight: 900; }
+    .preview-center { display: grid; place-items: center; background: linear-gradient(180deg,var(--primary),var(--secondary)); font-weight: 900; }
+    .preview-away { justify-content: flex-end; background: linear-gradient(245deg,var(--secondary),var(--surface)); }
+    .copy { padding: 16px; }
+    .copy h2 { margin: 0 0 7px; font-size: 20px; }
+    .copy p { margin: 0; min-height: 58px; color: #b8c1cd; line-height: 1.35; }
+    .meta { margin-top: 10px; color: #8792a1; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
+    .actions { display: flex; gap: 8px; padding: 0 16px 16px; }
+    button { border: 1px solid #657184; border-radius: 8px; padding: 9px 13px; background: #242c39; color: white; cursor: pointer; font-weight: 800; }
+    button.primary { background: #b5121b; border-color: #e03e46; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .panel { margin-top: 24px; padding: 18px; border: 1px solid #3a424e; border-radius: 14px; background: #141922; }
+    .panel h2 { margin-top: 0; }
+    .form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+    label { display: grid; gap: 5px; color: #b8c1cd; font-size: 13px; }
+    input,select { min-width: 170px; padding: 9px 10px; border: 1px solid #4c5665; border-radius: 7px; background: #0d1118; color: white; }
+    #message { margin-top: 14px; min-height: 22px; color: #f3d27a; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Graphics Theme Engine</h1>
+  <p>Choose an original preset, preview it, apply school colors, save a variant, and lock the season design.</p>
+</header>
+<main>
+  <section class="status">
+    <div id="active" class="pill">Active theme: loading…</div>
+    <div id="lockState" class="pill">Season lock: loading…</div>
+    <a class="pill" href="/overlay" target="_blank" rel="noopener">Open scorebug overlay</a>
+    <a class="pill" href="/captions" target="_blank" rel="noopener">Open caption overlay</a>
+    <a class="pill" href="/weather-overlay" target="_blank" rel="noopener">Open weather overlay</a>
+  </section>
+  <section id="catalog" class="grid"></section>
+
+  <section class="panel">
+    <h2>Controlled Overrides</h2>
+    <div class="form-row">
+      <label>Primary color<input id="primaryColor" type="color" value="#B5121B"></label>
+      <label>Secondary color<input id="secondaryColor" type="color" value="#111111"></label>
+      <label>Accent color<input id="accentColor" type="color" value="#FFFFFF"></label>
+      <label>Typography<select id="fontKey"><option value="system_sans">System Sans</option><option value="condensed_sans">Condensed Sans</option><option value="serif">Serif</option><option value="slab">Slab</option><option value="mono">Monospace</option></select></label>
+      <label>Corner radius<input id="radius" type="number" min="0" max="28" value="14"></label>
+      <label>Panel opacity<input id="opacity" type="number" min="0.65" max="1" step="0.01" value="0.94"></label>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Variants and Season Lock</h2>
+    <div class="form-row">
+      <label>Variant name<input id="variantName" maxlength="48" placeholder="Home Broadcast"></label>
+      <button id="saveVariant">Save Current Variant</button>
+      <button id="lockButton">Lock Season Theme</button>
+      <button id="unlockButton">Unlock Season Theme</button>
+    </div>
+    <div id="message"></div>
+  </section>
+</main>
+<script>
+let catalog = [];
+let activePreset = 'modern_network';
+let locked = false;
+
+const overrides = () => ({
+  primary_color: document.getElementById('primaryColor').value,
+  secondary_color: document.getElementById('secondaryColor').value,
+  accent_color: document.getElementById('accentColor').value,
+  font_key: document.getElementById('fontKey').value,
+  radius_px: Number(document.getElementById('radius').value),
+  panel_opacity: Number(document.getElementById('opacity').value)
+});
+
+function message(text) { document.getElementById('message').textContent = text || ''; }
+async function api(url, options={}) {
+  const response = await fetch(url, {cache:'no-store', headers:{'Content-Type':'application/json'}, ...options});
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+  return payload;
+}
+
+function card(preset) {
+  const t = preset.tokens;
+  const article = document.createElement('article');
+  article.className = 'card';
+  article.innerHTML = `<div class="preview" style="--primary:#B5121B;--secondary:#111;--surface:${t.surface};--border:${t.border};--radius:${t.radius_px}px;--shadow:${t.shadow};--font:${t.font_key === 'serif' ? 'Georgia,serif' : t.font_key === 'mono' ? 'Consolas,monospace' : 'Arial,sans-serif'}"><div class="preview-bar"><div class="preview-team">HOME 14</div><div class="preview-center">Q3</div><div class="preview-team preview-away">10 AWAY</div></div></div><div class="copy"><h2>${preset.name}</h2><p>${preset.description}</p><div class="meta">${preset.category}</div></div><div class="actions"><button data-preview="${preset.id}">Preview</button><button class="primary" data-activate="${preset.id}">Activate</button></div>`;
+  article.querySelector('[data-preview]').onclick = async () => {
+    try { const result = await api('/api/themes/preview',{method:'POST',body:JSON.stringify({preset_id:preset.id,overrides:overrides()})}); message(`Preview ready: ${result.preview.name}. No live graphics were changed.`); }
+    catch (error) { message(error.message); }
+  };
+  article.querySelector('[data-activate]').onclick = async () => {
+    try {
+      const confirmation = locked ? prompt('Type CHANGE LOCKED SEASON THEME to continue:') : '';
+      await api('/api/themes/activate',{method:'POST',body:JSON.stringify({preset_id:preset.id,overrides:overrides(),confirmation})});
+      activePreset = preset.id; await loadStatus(); message(`${preset.name} activated.`);
+    } catch (error) { message(error.message); }
+  };
+  return article;
+}
+
+async function loadStatus() {
+  const result = await api('/api/themes/status');
+  const theme = result.theme;
+  activePreset = theme.active.id;
+  locked = Boolean(theme.locked);
+  document.getElementById('active').textContent = `Active theme: ${theme.active.name}`;
+  document.getElementById('lockState').textContent = `Season lock: ${locked ? 'Locked' : 'Unlocked'}`;
+  const o = theme.overrides || {};
+  if (o.primary_color) document.getElementById('primaryColor').value = o.primary_color;
+  if (o.secondary_color) document.getElementById('secondaryColor').value = o.secondary_color;
+  if (o.accent_color) document.getElementById('accentColor').value = o.accent_color;
+  if (o.font_key) document.getElementById('fontKey').value = o.font_key;
+  if (o.radius_px !== undefined) document.getElementById('radius').value = o.radius_px;
+  if (o.panel_opacity !== undefined) document.getElementById('opacity').value = o.panel_opacity;
+}
+
+async function load() {
+  try {
+    const result = await api('/api/themes/catalog'); catalog = result.presets;
+    const grid = document.getElementById('catalog'); grid.replaceChildren(...catalog.map(card));
+    await loadStatus();
+  } catch (error) { message(error.message); }
+}
+
+document.getElementById('saveVariant').onclick = async () => {
+  try {
+    const name = document.getElementById('variantName').value;
+    await api('/api/themes/variants',{method:'POST',body:JSON.stringify({name,preset_id:activePreset,overrides:overrides()})});
+    message(`Variant saved: ${name}`);
+  } catch (error) { message(error.message); }
+};
+document.getElementById('lockButton').onclick = async () => {
+  try { await api('/api/themes/lock',{method:'POST',body:JSON.stringify({locked:true,confirmation:'LOCK SEASON THEME'})}); await loadStatus(); message('Season theme locked.'); }
+  catch (error) { message(error.message); }
+};
+document.getElementById('unlockButton').onclick = async () => {
+  try {
+    const confirmation = prompt('Type UNLOCK SEASON THEME to continue:');
+    await api('/api/themes/lock',{method:'POST',body:JSON.stringify({locked:false,confirmation})}); await loadStatus(); message('Season theme unlocked.');
+  } catch (error) { message(error.message); }
+};
+load();
+</script>
+</body>
+</html>
