@@ -34,6 +34,7 @@ EXPECTED_BLUEPRINTS = {
     "roster_routes",
     "school_routes",
     "security_upgrade_routes",
+    "social_routes",
     "sponsor_routes",
     "support_routes",
     "system_routes",

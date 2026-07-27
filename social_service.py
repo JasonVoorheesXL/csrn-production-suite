@@ -405,8 +405,7 @@ class SocialPublishingService:
     @staticmethod
     def _find_event(broadcast: Mapping[str, Any], event_id: str) -> dict[str, Any]:
         if not event_id:
-            last = broadcast.get("last_event")
-            return copy.deepcopy(dict(last)) if isinstance(last, Mapping) else {}
+            return {}
         for event in broadcast.get("events", []) if isinstance(broadcast.get("events"), list) else []:
             if str(event.get("id", "")) == event_id:
                 return copy.deepcopy(event)
@@ -678,8 +677,14 @@ class SocialPublishingService:
             draft = copy.deepcopy(state["drafts"][index])
             if draft.get("status") not in {"APPROVED", "PARTIAL", "FAILED"}:
                 return SocialResult("DRAFT_NOT_APPROVED")
+            selection_requested = account_ids is not None
             selected = {str(value) for value in account_ids or []}
-            accounts = [copy.deepcopy(account) for account_id, account in state["accounts"].items() if account.get("enabled", True) and (not selected or account_id in selected)]
+            accounts = [
+                copy.deepcopy(account)
+                for account_id, account in state["accounts"].items()
+                if account.get("enabled", True)
+                and (not selection_requested or account_id in selected)
+            ]
         if not accounts:
             return SocialResult("NO_ENABLED_ACCOUNTS")
 
@@ -746,8 +751,19 @@ class SocialPublishingService:
             state = self._load()
             if not state["settings"].get("allow_auto_publish", False):
                 return SocialResult("AUTO_PUBLISH_DISABLED")
-            auto_accounts = [account_id for account_id, account in state["accounts"].items() if account.get("enabled", True) and account.get("auto_publish", False)]
-            candidates = [copy.deepcopy(draft) for draft in state["drafts"] if draft.get("status") == "APPROVED"][:limit]
+            auto_accounts = [
+                account_id
+                for account_id, account in state["accounts"].items()
+                if account.get("enabled", True)
+                and account.get("auto_publish", False)
+            ]
+            candidates = [
+                copy.deepcopy(draft)
+                for draft in state["drafts"]
+                if draft.get("status") == "APPROVED"
+            ][:limit]
+        if not auto_accounts:
+            return SocialResult("NO_AUTO_PUBLISH_ACCOUNTS")
         processed = []
         for draft in candidates:
             result = self.publish_draft(draft["id"], account_ids=auto_accounts)

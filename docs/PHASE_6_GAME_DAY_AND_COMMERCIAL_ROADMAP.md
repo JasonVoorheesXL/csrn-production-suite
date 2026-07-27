@@ -116,3 +116,5 @@ The recap generator may use only recorded game events and available statistics.
 Without a statistician it can summarize final score, scoring sequence, lead changes, turnovers, halftime score, weather delays, and recorded major events. With sufficient statistics it can add team totals, passing/rushing/receiving leaders, first downs, penalties, turnover margin, scoring drives, defensive leaders, and player-of-the-game candidates.
 
 Missing data is omitted. The engine must not invent yardage, player attribution, scoring events, or weather conditions. Every recap remains previewable and editable before publication.
+
+Social Publishing Engine implementation status: Phase 6.9 foundation integrated.
