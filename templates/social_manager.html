@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CSRN Social Publishing</title>
+  <style>
+    :root{color-scheme:dark;font-family:Arial,Helvetica,sans-serif;background:#111;color:#f5f5f5}
+    *{box-sizing:border-box}body{margin:0;padding:24px;background:#111}h1,h2{margin:.2rem 0 1rem}p{color:#bfc5cc}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px}.panel{background:#232323;border:1px solid #4a4a4a;border-radius:12px;padding:18px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}button,input,select,textarea{font:inherit;border-radius:7px;border:1px solid #666;background:#161616;color:#fff;padding:9px}button{cursor:pointer;background:#b5121b;border-color:#d3333c;font-weight:700}button.secondary{background:#333;border-color:#666}textarea{width:100%;min-height:90px}.draft{border-top:1px solid #454545;padding:14px 0}.draft:first-child{border-top:0}.badge{display:inline-block;padding:3px 8px;border-radius:99px;background:#444;font-size:.78rem}.error{color:#ff9c9c}.success{color:#8de2a0}img.card{width:100%;max-width:520px;border:1px solid #555;border-radius:8px;margin-top:8px}.muted{color:#aeb5be;font-size:.88rem}code{color:#ffd2d5}</style>
+</head>
+<body>
+  <h1>Social Publishing</h1>
+  <p>Preview and approve every post before publishing. Credentials are referenced externally and are never shown here.</p>
+  <div id="message"></div>
+  <div class="grid">
+    <section class="panel">
+      <h2>Account</h2>
+      <div class="row">
+        <select id="platform"><option value="x">X</option><option value="facebook">Facebook Page</option></select>
+        <input id="accountId" value="x-primary" placeholder="Account ID">
+      </div>
+      <input id="displayName" placeholder="Display name" style="width:100%;margin-top:8px">
+      <input id="credentialRef" value="CSRN_X_ACCESS_TOKEN" placeholder="Credential environment reference" style="width:100%;margin-top:8px">
+      <input id="username" placeholder="X username" style="width:100%;margin-top:8px">
+      <input id="pageId" placeholder="Facebook Page ID" style="width:100%;margin-top:8px">
+      <div class="row" style="margin-top:10px"><label><input type="checkbox" id="accountEnabled" checked> Enabled</label><label><input type="checkbox" id="autoPublish"> Auto-publish approved queue</label></div>
+      <button id="saveAccount" style="margin-top:10px">Save account</button>
+      <div id="accounts" class="muted" style="margin-top:12px"></div>
+    </section>
+    <section class="panel">
+      <h2>Create Draft</h2>
+      <select id="kind">
+        <option>TOUCHDOWN</option><option>TURNOVER</option><option>FIELD_GOAL</option><option>SAFETY</option><option>LEAD_CHANGE</option><option>HALFTIME</option><option>FINAL</option><option>MILESTONE</option><option>PLAYER_OF_GAME</option><option>WEATHER_DELAY</option><option>GAME_RESUMPTION</option><option>WEATHER_EMERGENCY</option>
+      </select>
+      <input id="eventId" placeholder="Recorded event ID (optional)" style="width:100%;margin-top:8px">
+      <textarea id="detail" placeholder="Grounded event detail or official weather message"></textarea>
+      <button id="createDraft">Create and render preview</button>
+      <h2 style="margin-top:20px">Eligible Recorded Events</h2>
+      <div id="eligible" class="muted"></div>
+    </section>
+  </div>
+  <section class="panel" style="margin-top:18px">
+    <div class="row"><h2 style="flex:1">Draft Queue</h2><button class="secondary" id="refresh">Refresh</button></div>
+    <div id="drafts"></div>
+  </section>
+<script>
+const api=async(url,options={})=>{const response=await fetch(url,{headers:{'Content-Type':'application/json'},...options});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||`HTTP ${response.status}`);return data};
+const message=(text,ok=true)=>{document.getElementById('message').innerHTML=`<p class="${ok?'success':'error'}">${text}</p>`};
+const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function load(){try{const [status,eligible]=await Promise.all([api('/api/social/status'),api('/api/social/eligible-events')]);const social=status.social||{};document.getElementById('accounts').innerHTML=(social.accounts||[]).map(a=>`<div>${escapeHtml(a.display_name)} · ${escapeHtml(a.platform)} · <code>${escapeHtml(a.credential_ref)}</code>${a.auto_publish?' · AUTO':''}</div>`).join('')||'No account configured.';document.getElementById('eligible').innerHTML=(eligible.events||[]).map(row=>`<div class="row" style="margin:6px 0"><span>${escapeHtml(row.kind)} · ${escapeHtml(row.event.description||row.event.id)}</span><button data-event="${escapeHtml(row.event.id)}" data-kind="${escapeHtml(row.kind)}">Draft</button></div>`).join('')||'No unqueued major events.';document.querySelectorAll('[data-event]').forEach(btn=>btn.onclick=async()=>{await api('/api/social/drafts',{method:'POST',body:JSON.stringify({kind:btn.dataset.kind,event_id:btn.dataset.event})});message('Draft created.');load()});document.getElementById('drafts').innerHTML=(social.drafts||[]).slice().reverse().map(renderDraft).join('')||'<p class="muted">No drafts.</p>';bindDraftActions()}catch(error){message(error.message,false)}}
+function renderDraft(d){const cards=d.cards||{};const card=cards.x||cards.facebook;const pubs=Object.values(d.publications||{});return `<article class="draft" data-draft="${escapeHtml(d.id)}"><div class="row"><strong>${escapeHtml(d.content?.headline||d.kind)}</strong><span class="badge">${escapeHtml(d.status)}</span><span class="muted">${escapeHtml(d.id)}</span></div><p>${escapeHtml(d.content?.detail||'')}</p><p class="muted">${escapeHtml(d.content?.score||'')}${d.sponsor?.name?` · Presented by ${escapeHtml(d.sponsor.name)}`:''}${d.sponsor_suppressed?' · Sponsor suppressed for emergency':''}</p>${card?`<img class="card" src="/api/social/drafts/${encodeURIComponent(d.id)}/cards/${encodeURIComponent(card.platform)}?t=${d.updated_at||0}">`:''}<div class="row"><button data-approve>Approve</button><button data-publish>Publish</button><button class="secondary" data-correct>Correction</button></div>${pubs.map(p=>`<div class="muted">${escapeHtml(p.platform)}: ${escapeHtml(p.post_id)} ${p.retracted_at?'(retracted)':''}</div>`).join('')}</article>`}
+function bindDraftActions(){document.querySelectorAll('[data-draft]').forEach(card=>{const id=card.dataset.draft;card.querySelector('[data-approve]').onclick=async()=>{await api(`/api/social/drafts/${encodeURIComponent(id)}/approve`,{method:'POST',body:JSON.stringify({operator:'operator',confirmation:'APPROVE SOCIAL POST'})});message('Draft approved.');load()};card.querySelector('[data-publish]').onclick=async()=>{await api(`/api/social/drafts/${encodeURIComponent(id)}/publish`,{method:'POST',body:'{}'});message('Publish attempt completed.');load()};card.querySelector('[data-correct]').onclick=async()=>{const detail=prompt('Corrected detail:');if(detail===null)return;await api(`/api/social/drafts/${encodeURIComponent(id)}/corrections`,{method:'POST',body:JSON.stringify({detail})});message('Correction draft created.');load()}})}
+document.getElementById('platform').onchange=event=>{const fb=event.target.value==='facebook';document.getElementById('accountId').value=fb?'facebook-page':'x-primary';document.getElementById('credentialRef').value=fb?'CSRN_FACEBOOK_PAGE_ACCESS_TOKEN':'CSRN_X_ACCESS_TOKEN'};
+document.getElementById('saveAccount').onclick=async()=>{try{await api('/api/social/accounts',{method:'POST',body:JSON.stringify({id:accountId.value,platform:platform.value,display_name:displayName.value,credential_ref:credentialRef.value,username:username.value,page_id:pageId.value,enabled:accountEnabled.checked,auto_publish:autoPublish.checked})});message('Account saved.');load()}catch(error){message(error.message,false)}};
+document.getElementById('createDraft').onclick=async()=>{try{await api('/api/social/drafts',{method:'POST',body:JSON.stringify({kind:kind.value,event_id:eventId.value,payload:{message:detail.value}})});message('Draft created.');load()}catch(error){message(error.message,false)}};
+document.getElementById('refresh').onclick=load;load();
+</script>
+</body>
+</html>
