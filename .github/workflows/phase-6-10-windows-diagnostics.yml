@@ -1,0 +1,38 @@
+name: Phase 6.10 Windows Diagnostics
+
+on:
+  push:
+    branches:
+      - phase/6.10-commercial-ux-navigation-onboarding
+
+jobs:
+  diagnose:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt pytest
+      - name: Apply integration
+        run: python tools/ci_apply.py
+      - name: Capture Windows validation
+        shell: pwsh
+        run: |
+          python -m pytest -q tests/test_credential_vault.py tests/test_oauth_onboarding_service.py tests/test_commercial_ux_service.py tests/test_commercial_ux_routes.py tests/test_commercial_ux_architecture.py tests/test_phase_6_10_migration.py *> phase610-windows-focused.txt
+          $focused=$LASTEXITCODE
+          python tools/dev_workflow.py validate *> phase610-windows-full.txt
+          $full=$LASTEXITCODE
+          "$focused" | Out-File phase610-windows-focused-code.txt
+          "$full" | Out-File phase610-windows-full-code.txt
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase610-windows-diagnostics
+          path: |
+            phase610-windows-focused.txt
+            phase610-windows-full.txt
+            phase610-windows-focused-code.txt
+            phase610-windows-full-code.txt
+          retention-days: 1
