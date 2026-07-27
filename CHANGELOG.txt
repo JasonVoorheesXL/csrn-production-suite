@@ -13,3 +13,8 @@ CSRN Production Suite 1.13.0-alpha.3g — Database Integrity Recovery
 - Preserves the existing football rules and special-teams fixes from Alpha.3f.
 
 Important: recovery can only restore roster data that still exists in a backup or prior installation folder.
+
+Phase 6.7 - Installer, Updates, and Licensing Foundation
+- External installed-mode customer data paths.
+- Hash-validated staged updates and customer-safe support bundles.
+- Provider-verified licensing and feature/sport entitlement boundaries.
