@@ -96,6 +96,8 @@ Initial preset directions:
 
 Theme tokens control scorebugs, lower thirds, player/personnel cards, sponsor panels, captions, weather graphics, social graphics, typography, borders, textures, transitions, and school-color adaptation. Presets must be original genre-inspired designs and must not copy a television network package.
 
+Theme Engine implementation status: Phase 6.8 foundation integrated.
+
 ### 6.9 Social Publishing Engine
 
 - preview-first one-click publishing to supported Facebook and X account types;
