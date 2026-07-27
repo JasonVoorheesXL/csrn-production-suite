@@ -109,6 +109,8 @@ Phase 6.10 - Commercial UX, Navigation, and Account Onboarding
         "tests/test_phase_6_10_migration.py",
         "tools/apply_phase_6_10.py",
         "tools/apply_phase_6_10_x_manual_policy.py",
+        "tools/apply_phase_6_10_social_test_policy.py",
+        "tools/fix_phase_6_10_idempotence.py",
         "tools/ci_apply.py",
         "tools/complete_phase_6_10.py",
     ):
@@ -126,8 +128,8 @@ Phase 6.10 - Commercial UX, Navigation, and Account Onboarding
     run("git", "push", "origin", EXPECTED_BRANCH)
 
     print("Phase 6.10 completion commits pushed successfully.")
-    print("Expected focused total: 41 passed.")
-    print("Expected final CI total after cleanup: 1181 passed.")
+    print("Expected focused total: 40 passed.")
+    print("Expected final CI total after cleanup: 1180 passed.")
     print("Next planned stage: Phase 6.11 Grounded Game Recap Engine.")
     print("Facebook live publishing requires the registered PossumFrog Meta application and OAuth broker.")
     print("X uses manual assisted publishing and requires no developer account or API credits.")
