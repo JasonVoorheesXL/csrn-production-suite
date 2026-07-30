@@ -42,8 +42,20 @@ class DeploymentService:
         "access_token",
         "refresh_token",
         "client_secret",
+        "app_secret",
+        "page_access_token",
         "api_key",
     }
+    SENSITIVE_FILENAMES = {
+        "security.json",
+        "facebook_credentials.dat",
+    }
+    LOG_SECRET_PATTERNS = (
+        re.compile(r"(?i)(access[_ -]?token|refresh[_ -]?token|client[_ -]?secret|app[_ -]?secret|api[_ -]?key|password)\s*[:=]\s*([^\s,;]+)"),
+        re.compile(r"(?i)(authorization\s*:\s*(?:bearer|oauth)\s+)([^\s,;]+)"),
+        re.compile(r"(?i)(client_secret=)([^&\s]+)"),
+        re.compile(r"(?i)(access_token=)([^&\s]+)"),
+    )
 
     def __init__(
         self,
@@ -236,6 +248,14 @@ class DeploymentService:
             return [cls._redact(item) for item in value]
         return value
 
+
+    @classmethod
+    def _redact_log_text(cls, text: str) -> str:
+        sanitized = str(text or "")
+        for pattern in cls.LOG_SECRET_PATTERNS:
+            sanitized = pattern.sub(lambda match: f"{match.group(1)}[REDACTED]", sanitized)
+        return sanitized
+
     def create_support_bundle(self, *, note: str = "") -> DeploymentResult:
         timestamp = time.strftime("%Y%m%d-%H%M%S", time.gmtime(self._clock()))
         destination = self.paths.support_dir / f"csrn-support-{timestamp}.zip"
@@ -267,8 +287,11 @@ class DeploymentService:
                 files_added += 1
             if self.paths.logs_dir.exists():
                 for path in sorted(self.paths.logs_dir.glob("*.log"))[-10:]:
+                    if path.name.casefold() in self.SENSITIVE_FILENAMES:
+                        continue
                     try:
-                        archive.write(path, f"logs/{path.name}")
+                        text = path.read_text(encoding="utf-8", errors="replace")
+                        archive.writestr(f"logs/{path.name}", self._redact_log_text(text))
                         files_added += 1
                     except OSError:
                         pass

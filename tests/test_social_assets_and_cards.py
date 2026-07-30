@@ -38,6 +38,7 @@ def test_resolver_maps_static_asset(tmp_path: Path) -> None:
 def test_resolver_maps_sponsor_asset(tmp_path: Path) -> None:
     service = resolver(tmp_path)
     path = make_png(tmp_path / "customer" / "Data" / "Assets" / "Files" / "sponsor.png")
+    make_png(tmp_path / "customer" / "Data" / "Assets" / "Files" / "sponsor-banner.png", (1200, 180))
     assert service("/asset-files/sponsor.png") == path.resolve()
 
 
@@ -104,6 +105,7 @@ def prepared_renderer(tmp_path: Path) -> SocialCardRenderer:
     make_png(tmp_path / "customer" / "Data" / "Logos" / "visitor" / "round-master.png")
     make_png(tmp_path / "customer" / "Data" / "Rosters" / "Headshots" / "player.png", (300, 500))
     make_png(tmp_path / "customer" / "Data" / "Assets" / "Files" / "sponsor.png")
+    make_png(tmp_path / "customer" / "Data" / "Assets" / "Files" / "sponsor-banner.png", (1200, 180))
     return SocialCardRenderer(output_dir=tmp_path / "cards", asset_resolver=service)
 
 
@@ -135,3 +137,55 @@ def test_emergency_sponsor_suppression_still_renders(tmp_path: Path) -> None:
     payload["sponsor_suppressed"] = True
     result = renderer.render(payload, platform="facebook", theme=theme())
     assert Path(result["path"]).is_file()
+
+
+def test_renderer_fits_long_team_names_with_headshot_and_sponsor(tmp_path: Path) -> None:
+    renderer = prepared_renderer(tmp_path)
+    payload = draft()
+    payload["home"]["name"] = "Cleveland Central High School"
+    payload["visitor"]["name"] = "Caledonia High School Confederates"
+    payload["content"]["score"] = "Cleveland Central High School 0 · Caledonia High School Confederates 12"
+    payload["content"]["headline"] = "PICK SIX"
+    payload["content"]["detail"] = "Jazz Johnson interception returned for a touchdown"
+    result = renderer.render(payload, platform="facebook", theme=theme())
+    layout = result["layout"]
+    assert Path(result["path"]).is_file()
+    assert 1 <= len(layout["score_lines"]) <= 2
+    assert "score_truncated" not in layout["warnings"]
+    assert layout["headshot_rendered"] is True
+    assert layout["sponsor_rendered"] is True
+
+
+def test_renderer_does_not_reserve_sponsor_footer_without_assignment(tmp_path: Path) -> None:
+    renderer = prepared_renderer(tmp_path)
+    result = renderer.render(draft(sponsor=False), platform="facebook", theme=theme())
+    assert result["layout"]["sponsor_rendered"] is False
+
+
+def test_renderer_supports_full_width_sponsor_graphic(tmp_path: Path) -> None:
+    renderer = prepared_renderer(tmp_path)
+    payload = draft()
+    payload["sponsor"]["layout"] = "banner"
+    payload["sponsor"]["banner_logo"] = "/asset-files/sponsor-banner.png"
+    result = renderer.render(payload, platform="facebook", theme=theme())
+    assert result["layout"]["sponsor_rendered"] is True
+    assert result["layout"]["sponsor_layout"] == "banner"
+    assert "sponsor_banner_asset_missing" not in result["layout"]["warnings"]
+
+
+def test_renderer_creates_mobile_safe_compact_extra_point_card(tmp_path: Path) -> None:
+    renderer = prepared_renderer(tmp_path)
+    payload = draft(sponsor=False, headshot=False)
+    payload["kind"] = "EXTRA_POINT"
+    payload["card_style"] = "compact_score"
+    payload["content"] = {
+        "eyebrow": "Q1",
+        "headline": "XP GOOD",
+        "detail": "Caledonia 19",
+        "score": "Cleveland Central 0 · Caledonia 19",
+    }
+    result = renderer.render(payload, platform="facebook", theme=theme())
+    assert Path(result["path"]).is_file()
+    assert result["layout"]["card_style"] == "compact_score"
+    assert result["layout"]["minimum_mobile_font"] >= 28
+    assert not result["layout"]["warnings"]

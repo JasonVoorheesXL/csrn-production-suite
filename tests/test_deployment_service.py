@@ -139,3 +139,26 @@ def test_support_bundle_does_not_include_security_file(tmp_path: Path) -> None:
     result = current.create_support_bundle()
     with zipfile.ZipFile(result.data["support_bundle"]["path"]) as archive:
         assert all("security.json" not in name for name in archive.namelist())
+
+
+def test_support_bundle_redacts_secrets_from_logs_and_excludes_facebook_vault(tmp_path: Path) -> None:
+    current = service(tmp_path)
+    log = current.paths.logs_dir / "application.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    log.write_text(
+        "access_token=EAATESTTOKEN\nAuthorization: Bearer EAABEARER\napp_secret: supersecret\n",
+        encoding="utf-8",
+    )
+    vault = current.paths.data_dir / "Social" / "facebook_credentials.dat"
+    vault.parent.mkdir(parents=True, exist_ok=True)
+    vault.write_bytes(b"encrypted-but-sensitive")
+
+    result = current.create_support_bundle()
+    with zipfile.ZipFile(result.data["support_bundle"]["path"]) as archive:
+        names = archive.namelist()
+        log_text = archive.read("logs/application.log").decode("utf-8")
+    assert all("facebook_credentials.dat" not in name for name in names)
+    assert "EAATESTTOKEN" not in log_text
+    assert "EAABEARER" not in log_text
+    assert "supersecret" not in log_text
+    assert log_text.count("[REDACTED]") == 3

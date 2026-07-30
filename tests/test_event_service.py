@@ -301,3 +301,52 @@ def test_undo_falls_back_to_history_snapshot() -> None:
     service.undo()
     assert store["down"] == "2nd"
     assert store["history"] == []
+
+
+def test_extra_point_no_good_records_event_without_score_change() -> None:
+    service, store, _, _ = build_service()
+    result = service.trigger({
+        "team": "home",
+        "event": "XP",
+        "player_id": "P1",
+        "conversion_outcome": "no_good",
+    })
+    assert result.ok
+    assert store["home_score"] == 0
+    event = store["events"][0]
+    assert event["score_delta"] == 0
+    assert event["conversion_outcome"] == "no_good"
+    assert event["label"] == "Extra Point No Good"
+    assert "no good" in event["description"].lower()
+
+
+def test_two_point_failed_records_event_without_score_change() -> None:
+    service, store, _, _ = build_service()
+    result = service.trigger({
+        "team": "visitor",
+        "event": "2PT",
+        "player_id": "P1",
+        "play_type": "rush",
+        "conversion_outcome": "failed",
+    })
+    assert result.ok
+    assert store["visitor_score"] == 0
+    event = store["events"][0]
+    assert event["score_delta"] == 0
+    assert event["conversion_outcome"] == "failed"
+    assert event["label"] == "Two-Point Conversion Failed"
+
+
+def test_successful_conversion_outcomes_award_points() -> None:
+    service, store, _, _ = build_service()
+    assert service.trigger({"team": "home", "event": "XP", "conversion_outcome": "good"}).ok
+    assert store["home_score"] == 1
+    assert service.trigger({"team": "visitor", "event": "2PT", "conversion_outcome": "good"}).ok
+    assert store["visitor_score"] == 2
+
+
+def test_invalid_conversion_outcome_is_rejected() -> None:
+    service, store, _, _ = build_service()
+    result = service.trigger({"team": "home", "event": "XP", "conversion_outcome": "failed"})
+    assert result.code == "INVALID_CONVERSION_OUTCOME"
+    assert store["home_score"] == 0

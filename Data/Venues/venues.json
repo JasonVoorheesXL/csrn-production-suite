@@ -473,5 +473,37 @@
     "venue_verified": false,
     "approval_status": "candidate",
     "broadcast_notes": "Defaulted to school address; verify whether the stadium is off campus."
+  },
+  {
+    "id": "test-northwood-stadium",
+    "name": "Knight Stadium",
+    "school_id": "test-northwood-knights",
+    "sport": "Football",
+    "city": "Bastrop",
+    "state": "TX",
+    "timezone": "America/Chicago",
+    "active": true,
+    "notes": "FICTIONAL TEST VENUE \u2014 CSRN-FICTIONAL-TEST",
+    "address": "100 Park Road 1A",
+    "zip": "78602",
+    "latitude": 30.1103,
+    "longitude": -97.2869,
+    "address_note": "Fixture-only valid public address; fictional venue is not affiliated with this location."
+  },
+  {
+    "id": "test-pine-valley-stadium",
+    "name": "Panther Field",
+    "school_id": "test-pine-valley-panthers",
+    "sport": "Football",
+    "address": "1570 West FM 1382",
+    "city": "Cedar Hill",
+    "state": "TX",
+    "zip": "75104",
+    "latitude": 32.6218,
+    "longitude": -96.9792,
+    "timezone": "America/Chicago",
+    "active": true,
+    "notes": "FICTIONAL TEST VENUE \u2014 CSRN-FICTIONAL-TEST",
+    "address_note": "Fixture-only valid public address; fictional venue is not affiliated with this location."
   }
 ]

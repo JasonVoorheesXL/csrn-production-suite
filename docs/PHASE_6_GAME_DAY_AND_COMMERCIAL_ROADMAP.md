@@ -100,14 +100,16 @@ Theme Engine implementation status: Phase 6.8 foundation integrated.
 
 ### 6.9 Social Publishing Engine
 
-- preview-first one-click publishing to supported Facebook and X account types;
+- preview-first approved automatic publishing to supported Facebook Page accounts;
+- assisted-manual X packages containing platform-sized graphics, prepared text, copy controls, and a public composer link;
 - event posts for touchdowns, turnovers, field goals, safeties, lead changes, halftime, final score, milestones, player of the game, weather delays, and game resumption;
 - player headshots, school branding, score context, broadcast links, and approved sponsor assets;
 - platform-specific copy and image dimensions;
 - draft queue, retry handling, audit history, and correction/replacement workflow;
 - configurable sponsor rotation and event sponsorship;
 - emergency warning posts do not include sponsor branding;
-- no automatic publication without an explicit account-level operator setting.
+- no automatic Facebook publication without an explicit account-level operator setting;
+- no X OAuth, X developer account, X API credits, automatic X posting, or X auto-queue.
 
 ### 6.10 Grounded Game Recap Engine
 
@@ -115,6 +117,8 @@ The recap generator may use only recorded game events and available statistics.
 
 Without a statistician it can summarize final score, scoring sequence, lead changes, turnovers, halftime score, weather delays, and recorded major events. With sufficient statistics it can add team totals, passing/rushing/receiving leaders, first downs, penalties, turnover margin, scoring drives, defensive leaders, and player-of-the-game candidates.
 
-Missing data is omitted. The engine must not invent yardage, player attribution, scoring events, or weather conditions. Every recap remains previewable and editable before publication.
+Missing data is omitted. The engine must not invent yardage, player attribution, scoring events, or weather conditions. Every recap remains previewable and editable before publication. Operator edits reset approval, and stale recaps cannot be approved until regenerated from the current recorded data.
 
-Social Publishing Engine implementation status: Phase 6.9 foundation integrated.
+Social Publishing Engine implementation status: Phase 6.9 foundation integrated and corrected for manual-only X.
+
+Grounded Game Recap Engine implementation status: Phase 6.10 foundation integrated.

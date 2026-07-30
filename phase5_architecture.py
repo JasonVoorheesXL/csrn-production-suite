@@ -30,6 +30,7 @@ EXPECTED_BLUEPRINTS = {
     "page_routes",
     "personnel_routes",
     "recovery_routes",
+    "recap_routes",
     "rehearsal_routes",
     "roster_routes",
     "school_routes",

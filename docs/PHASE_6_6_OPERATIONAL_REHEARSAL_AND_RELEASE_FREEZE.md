@@ -116,4 +116,4 @@ Phase 6.6 closes the game-day release gate. Commercial work follows in this orde
 - Phase 6.9 — Social Publishing Engine
 - Phase 6.10 — Grounded Game Recap Engine
 
-The Social Publishing Engine remains a required commercial feature. It includes preview-first Facebook and X publishing, event graphics, player headshots, approved sponsors, weather delay/resumption posts, retries, correction history, and audit records.
+The Social Publishing Engine remains a required commercial feature. It includes preview-first Facebook Page publishing and assisted-manual X packages, event graphics, player headshots, approved sponsors, weather delay/resumption posts, retries, correction history, and audit records. X does not use OAuth, developer credentials, paid API access, automatic posting, or an automatic queue.

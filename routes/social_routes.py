@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import secrets
+import time
+from threading import Lock
+from urllib.parse import urlencode
 from typing import Any, Callable
 
-from flask import Blueprint, jsonify, render_template, request, send_file
+from flask import Blueprint, jsonify, redirect, render_template, request, send_file
 
 
 RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
@@ -14,6 +18,7 @@ RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
 class SocialRoutesDependencies:
     require_auth: RouteDecorator
     get_social_service: Callable[[], Any]
+    get_facebook_connection_service: Callable[[], Any]
 
 
 def _response(result: Any):
@@ -24,6 +29,8 @@ def _response(result: Any):
         "CARD_NOT_FOUND": 404,
         "PUBLICATION_NOT_FOUND": 404,
         "PLATFORM_UNSUPPORTED": 400,
+        "X_MANUAL_ONLY": 400,
+        "MANUAL_PLATFORM_UNSUPPORTED": 400,
         "ACCOUNT_ID_INVALID": 400,
         "CREDENTIAL_REFERENCE_INVALID": 400,
         "PAGE_ID_REQUIRED": 400,
@@ -31,6 +38,7 @@ def _response(result: Any):
         "RAW_CREDENTIAL_REJECTED": 400,
         "SETTINGS_INVALID": 400,
         "HASHTAGS_INVALID": 400,
+        "PLAYER_NAME_POLICY_INVALID": 400,
         "SPONSOR_RULES_INVALID": 400,
         "SPONSOR_RULE_KIND_INVALID": 400,
         "DRAFT_KIND_INVALID": 400,
@@ -53,7 +61,28 @@ def _response(result: Any):
         "DRAFT_DELETE_CONFIRMATION_REQUIRED": 409,
         "ACTIVE_PUBLICATION_EXISTS": 409,
         "AUTO_PUBLISH_DISABLED": 409,
+        "X_MANUAL_DISABLED": 409,
         "PUBLISH_FAILED": 502,
+        "FACEBOOK_APP_ID_INVALID": 400,
+        "FACEBOOK_APP_SECRET_INVALID": 400,
+        "FACEBOOK_API_VERSION_INVALID": 400,
+        "FACEBOOK_REDIRECT_URI_INVALID": 400,
+        "FACEBOOK_APP_NOT_CONFIGURED": 409,
+        "FACEBOOK_AUTHORIZATION_CODE_MISSING": 400,
+        "FACEBOOK_OAUTH_STATE_INVALID": 400,
+        "FACEBOOK_CODE_EXCHANGE_FAILED": 502,
+        "FACEBOOK_PAGE_LIST_FAILED": 502,
+        "FACEBOOK_NO_MANAGED_PAGES": 409,
+        "FACEBOOK_PAGE_SELECTION_EXPIRED": 410,
+        "FACEBOOK_PAGE_SELECTION_INVALID": 400,
+        "FACEBOOK_SECURE_STORAGE_FAILED": 500,
+        "FACEBOOK_SOCIAL_ACCOUNT_SAVE_FAILED": 500,
+        "FACEBOOK_SOCIAL_ACCOUNT_REMOVE_FAILED": 500,
+        "FACEBOOK_PAGE_NOT_CONNECTED": 409,
+        "FACEBOOK_CONNECTION_TEST_FAILED": 502,
+        "FACEBOOK_DISCONNECT_CONFIRMATION_REQUIRED": 409,
+        "FACEBOOK_APP_REMOVE_CONFIRMATION_REQUIRED": 409,
+        "FACEBOOK_LOCALHOST_REQUIRED": 403,
     }
     if getattr(result, "ok", False):
         return jsonify(result.data)
@@ -62,6 +91,20 @@ def _response(result: Any):
 
 def create_social_blueprint(dependencies: SocialRoutesDependencies) -> Blueprint:
     routes = Blueprint("social_routes", __name__)
+    oauth_states: dict[str, float] = {}
+    oauth_states_lock = Lock()
+    oauth_state_ttl_seconds = 15 * 60
+
+    def localhost_required():
+        remote = str(request.remote_addr or "").strip().lower()
+        if remote not in {"127.0.0.1", "::1"}:
+            result = type("Result", (), {
+                "ok": False,
+                "code": "FACEBOOK_LOCALHOST_REQUIRED",
+                "data": {"message": "Facebook connection setup must be completed from the CSRN laptop at http://127.0.0.1:5050."},
+            })()
+            return _response(result)
+        return None
 
     @routes.get("/social")
     @dependencies.require_auth
@@ -72,6 +115,131 @@ def create_social_blueprint(dependencies: SocialRoutesDependencies) -> Blueprint
     @dependencies.require_auth
     def social_status():
         return _response(dependencies.get_social_service().status())
+
+    @routes.get("/api/social/facebook/status")
+    @dependencies.require_auth
+    def facebook_connection_status():
+        return _response(dependencies.get_facebook_connection_service().status())
+
+    @routes.post("/api/social/facebook/app")
+    @dependencies.require_auth
+    def configure_facebook_app():
+        guard = localhost_required()
+        if guard is not None:
+            return guard
+        return _response(
+            dependencies.get_facebook_connection_service().configure_app(
+                request.get_json(force=True, silent=True) or {}
+            )
+        )
+
+    @routes.delete("/api/social/facebook/app")
+    @dependencies.require_auth
+    def remove_facebook_app():
+        guard = localhost_required()
+        if guard is not None:
+            return guard
+        incoming = request.get_json(force=True, silent=True) or {}
+        return _response(
+            dependencies.get_facebook_connection_service().remove_app_configuration(
+                incoming.get("confirmation")
+            )
+        )
+
+    @routes.get("/api/social/facebook/start")
+    @dependencies.require_auth
+    def start_facebook_connection():
+        guard = localhost_required()
+        if guard is not None:
+            return guard
+        oauth_state = secrets.token_urlsafe(32)
+        now = time.time()
+        with oauth_states_lock:
+            expired = [
+                key for key, created_at in oauth_states.items()
+                if now - created_at > oauth_state_ttl_seconds
+            ]
+            for key in expired:
+                oauth_states.pop(key, None)
+            oauth_states[oauth_state] = now
+        result = dependencies.get_facebook_connection_service().authorization_url(oauth_state)
+        if not result.ok:
+            with oauth_states_lock:
+                oauth_states.pop(oauth_state, None)
+            return _response(result)
+        return redirect(result.data["authorization_url"])
+
+    @routes.get("/api/social/facebook/callback")
+    def complete_facebook_connection():
+        if request.args.get("error"):
+            return redirect("http://127.0.0.1:5050/?facebook=error&code=FACEBOOK_AUTHORIZATION_DENIED")
+        received_state = str(request.args.get("state") or "").strip()
+        with oauth_states_lock:
+            expected_state = received_state if oauth_states.pop(received_state, None) is not None else ""
+        result = dependencies.get_facebook_connection_service().complete_authorization(
+            code=request.args.get("code"),
+            received_state=received_state,
+            expected_state=expected_state,
+        )
+        if not result.ok:
+            return redirect(
+                "http://127.0.0.1:5050/?" + urlencode(
+                    {"facebook": "error", "code": result.code}
+                )
+            )
+        return redirect(
+            "http://127.0.0.1:5050/?" + urlencode(
+                {
+                    "facebook": "select",
+                    "selection_id": result.data["selection_id"],
+                    "warning": result.data.get("warning", ""),
+                }
+            )
+        )
+
+    @routes.get("/api/social/facebook/pages")
+    @dependencies.require_auth
+    def facebook_connection_pages():
+        guard = localhost_required()
+        if guard is not None:
+            return guard
+        selection_id = request.args.get("selection_id", "")
+        return _response(
+            dependencies.get_facebook_connection_service().pending_pages(selection_id)
+        )
+
+    @routes.post("/api/social/facebook/select")
+    @dependencies.require_auth
+    def select_facebook_page():
+        guard = localhost_required()
+        if guard is not None:
+            return guard
+        incoming = request.get_json(force=True, silent=True) or {}
+        result = dependencies.get_facebook_connection_service().connect_page(
+            incoming.get("selection_id"), incoming.get("page_id")
+        )
+        return _response(result)
+
+    @routes.post("/api/social/facebook/test")
+    @dependencies.require_auth
+    def test_facebook_connection():
+        guard = localhost_required()
+        if guard is not None:
+            return guard
+        return _response(dependencies.get_facebook_connection_service().test_connection())
+
+    @routes.post("/api/social/facebook/disconnect")
+    @dependencies.require_auth
+    def disconnect_facebook_page():
+        guard = localhost_required()
+        if guard is not None:
+            return guard
+        incoming = request.get_json(force=True, silent=True) or {}
+        return _response(
+            dependencies.get_facebook_connection_service().disconnect(
+                incoming.get("confirmation")
+            )
+        )
 
     @routes.post("/api/social/accounts")
     @dependencies.require_auth
@@ -126,7 +294,13 @@ def create_social_blueprint(dependencies: SocialRoutesDependencies) -> Blueprint
     @dependencies.require_auth
     def delete_social_draft(draft_id: str):
         incoming = request.get_json(force=True, silent=True) or {}
-        return _response(dependencies.get_social_service().delete_draft(draft_id, incoming.get("confirmation")))
+        return _response(dependencies.get_social_service().discard_draft(draft_id, incoming.get("confirmation")))
+
+    @routes.post("/api/social/drafts/<draft_id>/archive")
+    @dependencies.require_auth
+    def archive_social_draft(draft_id: str):
+        incoming = request.get_json(force=True, silent=True) or {}
+        return _response(dependencies.get_social_service().archive_draft(draft_id, incoming.get("confirmation")))
 
     @routes.post("/api/social/drafts/<draft_id>/approve")
     @dependencies.require_auth
@@ -152,6 +326,11 @@ def create_social_blueprint(dependencies: SocialRoutesDependencies) -> Blueprint
             )
         )
 
+    @routes.get("/api/social/drafts/<draft_id>/manual/x")
+    @dependencies.require_auth
+    def prepare_manual_x_package(draft_id: str):
+        return _response(dependencies.get_social_service().manual_package(draft_id, "x"))
+
     @routes.post("/api/social/auto-queue/process")
     @dependencies.require_auth
     def process_social_auto_queue():
@@ -176,7 +355,13 @@ def create_social_blueprint(dependencies: SocialRoutesDependencies) -> Blueprint
         if not result.ok:
             return _response(result)
         path = Path(result.data["path"])
-        return send_file(path, mimetype="image/png", download_name=result.data.get("filename", path.name), conditional=True)
+        return send_file(
+            path,
+            mimetype="image/png",
+            download_name=result.data.get("filename", path.name),
+            conditional=True,
+            as_attachment=str(request.args.get("download", "")).lower() in {"1", "true", "yes"},
+        )
 
     @routes.get("/api/social/postgame-handoff")
     @dependencies.require_auth
