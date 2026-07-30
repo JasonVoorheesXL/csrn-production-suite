@@ -5,7 +5,7 @@ Product: CSRN Production Suite
 Primary release target: Finished Windows-hosted football broadcasting product  
 Owner: Jason Chrest  
 Last audited: 2026-07-30  
-Current status: **READY TO MERGE — PR #88 passed the full Windows and Ubuntu CI suite**
+Current status: **GATE 3 ACTIVE — build a reproducible local environment and separate setup/update from normal startup**
 
 ---
 
@@ -98,22 +98,22 @@ Production launcher correction still required:
 
 The synchronized development folder was audited directly after Gate 1.
 
-### Active branch
+### Gate 3 working branch
 
 ```text
-recovery/alpha-8f-source-alignment
+gate3/reproducible-environment
 ```
 
-### Active committed HEAD
+### Authoritative merged Gate 2 commit
 
 ```text
-098390cac84f37f7aa8e9e13241a71aac4f15ad4 — fix: align OAuth and recap CI contracts
+ef9d4a5d11b7c0aa6535e501d0a6503907120f76 — Merge PR #88: recover and align CSRN 1.13.0-alpha.8f
 ```
 
 ### Tracking branch
 
 ```text
-origin/recovery/alpha-8f-source-alignment
+origin/gate3/reproducible-environment
 ```
 
 ### Canonical version identity
@@ -128,12 +128,13 @@ origin/recovery/alpha-8f-source-alignment
 V1.13A8F-SOURCE-ALIGNMENT
 ```
 
-### Worktree state at the validated PR #88 checkpoint
+### Worktree state after the guarded Gate 3 transition
 
 ```text
-Local and remote committed HEAD are
-`098390cac84f37f7aa8e9e13241a71aac4f15ad4`. GitHub Actions run
-`30565845144` passed the full suite on Windows and Ubuntu.
+The Gate 3 branch starts from merged commit
+`ef9d4a5d11b7c0aa6535e501d0a6503907120f76`. The guarded transition requires a
+clean worktree, creates `gate3/reproducible-environment`, commits this handoff,
+and pushes the branch before Gate 3 implementation begins.
 ```
 
 ### Branch lineage
@@ -161,23 +162,23 @@ PR #86 — stale documentation-only branch; closed without merge
 PR #87 — superseded after a remote-ref race prevented a trustworthy PR snapshot
 ```
 
-Active PR:
+Merged recovery PR:
 
 ```text
 https://github.com/JasonVoorheesXL/csrn-production-suite/pull/88
 ```
 
-PR #88 targets `develop-1.13` from
+PR #88 targeted `develop-1.13` from
 `recovery/alpha-8f-source-alignment`. Its first full Windows and Ubuntu CI run
 reached the complete test suite and reported `16 failed, 1197 passed`. The
 identity-rendering checks fixed at `0d16f17f` passed. The remaining failures
 were classified as a bounded mixture of OAuth callback defects, recap prose
 regressions, and stale architecture/documentation assertions.
 
-**PR #88 passed both required CI jobs and is approved for merge into
-`develop-1.13`.**
+**PR #88 passed both required CI jobs and merged into `develop-1.13` at
+`ef9d4a5d11b7c0aa6535e501d0a6503907120f76`.**
 
-The active recovery branch is:
+The merged recovery branch was:
 
 ```text
 recovery/alpha-8f-source-alignment
@@ -212,8 +213,9 @@ The product is not ready for:
 - a customer installer;
 - production deployment.
 
-The next engineering action is to complete the bounded PR #88 CI repair,
-push one guarded checkpoint, and require green Windows and Ubuntu jobs.
+The next engineering action is Gate 3: replace the broken local development
+environment with a reproducible declared setup, keep CI green, and separate
+dependency setup/update from normal Command Center startup.
 
 ---
 
@@ -733,6 +735,20 @@ Each update should add an entry to the decision/status log below.
   `ubuntu-latest / Python 3.13` and `windows-latest / Python 3.13`.
 - PR #88 is mergeable and ready to merge into `develop-1.13`.
 
+### 2026-07-30 — Gate 2 merged and Gate 3 opened
+
+- Revalidated final PR #88 head
+  `1dda30dde905ef52842ee142cc62accf18aed35e` with GitHub Actions run
+  `30566281259`.
+- Both `ubuntu-latest / Python 3.13` and
+  `windows-latest / Python 3.13` passed.
+- Merged PR #88 into `develop-1.13` with merge commit
+  `ef9d4a5d11b7c0aa6535e501d0a6503907120f76`.
+- Gate 1 source recovery and Gate 2 governance repair are complete.
+- Gate 3 reproducible environment and test/build workflow is active.
+- Gate 3 work must begin on `gate3/reproducible-environment` from the exact
+  merged commit and must not alter live runtime data.
+
 ---
 
 ## 15. Copy-ready prompt for a new chat
@@ -746,18 +762,17 @@ C:\Users\Darth\My Drive\CSRN\Development\CSRN-Production-Suite\CSRN_PROJECT_BIBL
 
 Read the entire Bible before recommending or changing anything. Treat it as the authoritative continuity and release-control document unless I explicitly change a decision.
 
-Gate 1 source recovery and the Gate 2 governance checkpoint are complete.
-The committed branch head is
-`098390cac84f37f7aa8e9e13241a71aac4f15ad4` on
-`recovery/alpha-8f-source-alignment`, with canonical identity
-`1.13.0-alpha.8f` / `V1.13A8F-SOURCE-ALIGNMENT`.
+Gate 1 source recovery and Gate 2 governance repair are complete. PR #88
+passed final GitHub Actions run `30566281259` on Windows and Ubuntu and merged
+into `develop-1.13` at
+`ef9d4a5d11b7c0aa6535e501d0a6503907120f76`.
 
-PR #88 targets `develop-1.13`. The bounded repair is committed at
-`098390cac84f37f7aa8e9e13241a71aac4f15ad4`, and GitHub Actions run
-`30565845144` passed on Windows and Ubuntu. PRs #86 and #87 are closed without
-merge. The next action is to merge PR #88, verify `develop-1.13`, and begin the
-next incomplete release gate. Do not add features, apply installer ZIPs, or
-modify live runtime data during the merge checkpoint.
+The active objective is Gate 3 on `gate3/reproducible-environment`: establish a
+clean declared local development/test environment, separate setup/update from
+normal startup, keep the full CI suite green, and add a deterministic build
+command. Maintain canonical identity `1.13.0-alpha.8f` /
+`V1.13A8F-SOURCE-ALIGNMENT`. Do not add product features, apply installer ZIPs,
+or modify live runtime data.
 
 Before acting, report:
 1. the development folder you inspected;
@@ -776,9 +791,10 @@ Then proceed only within the next incomplete gate documented in the Bible.
 The next action is:
 
 ```text
-Commit this final Bible checkpoint, require the resulting PR #88 Windows and
-Ubuntu jobs to pass, merge PR #88 into `develop-1.13`, and verify the exact
-merged commit before beginning Gate 3.
+Run the guarded post-merge transition to
+`gate3/reproducible-environment`, then audit the launcher, dependency
+declarations, CI workflow, virtual-environment assumptions, and build tooling
+before implementing the bounded Gate 3 repair.
 ```
 
 Do not begin visual fixes or new features until the recovery branch is merged
