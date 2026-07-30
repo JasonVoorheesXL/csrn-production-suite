@@ -87,12 +87,15 @@ def test_social_and_recap_blueprints_are_part_of_application_architecture() -> N
     assert "get_recap_service" in app
 
 
-def test_all_social_route_endpoints_remain_authenticated_by_design() -> None:
+def test_social_routes_keep_only_the_oauth_callback_public() -> None:
     source = (ROOT / "routes" / "social_routes.py").read_text(encoding="utf-8")
     route_count = source.count("@routes.")
     auth_count = source.count("@dependencies.require_auth")
     assert route_count >= 16
-    assert auth_count == route_count
+    assert auth_count == route_count - 1
+    callback_start = source.index('@routes.get("/api/social/facebook/callback")')
+    callback_end = source.index('@routes.get("/api/social/facebook/pages")')
+    assert "@dependencies.require_auth" not in source[callback_start:callback_end]
 
 
 def test_roadmap_records_manual_x_and_grounded_recap_requirements() -> None:

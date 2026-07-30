@@ -480,8 +480,34 @@ class GroundedGameRecapService:
             if flow_sentences:
                 article_paragraphs.append(" ".join(flow_sentences))
 
+        if lead_changes:
+            article_paragraphs.append(
+                f"The recorded scoring sequence produced {lead_changes} lead change"
+                f"{'s' if lead_changes != 1 else ''}."
+            )
+
         if turnovers:
-            article_paragraphs.append(f"The recorded game log included {len(turnovers)} turnover{'s' if len(turnovers) != 1 else ''}, an important part of the game flow.")
+            turnover_descriptions = [
+                self._event_description(row)
+                for row in turnovers
+                if self._event_description(row)
+            ]
+            article_paragraphs.append(
+                " ".join(f"{description.rstrip('.')}." for description in turnover_descriptions)
+                if turnover_descriptions
+                else f"The recorded game log included {len(turnovers)} turnover"
+                f"{'s' if len(turnovers) != 1 else ''}."
+            )
+
+        weather_descriptions = [
+            self._event_description(row)
+            for row in weather_rows
+            if self._event_description(row)
+        ]
+        if weather_descriptions:
+            article_paragraphs.append(
+                " ".join(f"{description.rstrip('.')}." for description in weather_descriptions)
+            )
 
         if team_paragraphs:
             article_paragraphs.append(" ".join(team_paragraphs))

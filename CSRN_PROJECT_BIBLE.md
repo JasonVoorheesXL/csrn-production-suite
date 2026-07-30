@@ -5,7 +5,7 @@ Product: CSRN Production Suite
 Primary release target: Finished Windows-hosted football broadcasting product  
 Owner: Jason Chrest  
 Last audited: 2026-07-30  
-Current status: **BLOCKED — source alignment, reproducibility, and identity-rendering gates must be completed before release testing**
+Current status: **BLOCKED — PR #88 CI remediation must pass on Windows and Ubuntu before the recovery branch can merge**
 
 ---
 
@@ -107,7 +107,7 @@ recovery/alpha-8f-source-alignment
 ### Active committed HEAD
 
 ```text
-9f37189c5b4fed6c76b8e6228fe8c3086f7c5290 — recovery: complete source hygiene
+0d16f17f23b7b60c5ea4720cdc695b55fbc4216a — ci: support canonical version metadata
 ```
 
 ### Tracking branch
@@ -128,12 +128,12 @@ origin/recovery/alpha-8f-source-alignment
 V1.13A8F-SOURCE-ALIGNMENT
 ```
 
-### Worktree state at the Gate 1 checkpoint
+### Worktree state during PR #88 remediation
 
 ```text
-clean
-local HEAD = origin recovery branch HEAD
-ahead/behind = 0/0
+Local committed HEAD is `0d16f17f23b7b60c5ea4720cdc695b55fbc4216a`.
+The worktree contains the bounded fixes for the 16 failures reported by PR #88
+and must be committed and pushed only after focused validation.
 ```
 
 ### Branch lineage
@@ -154,17 +154,27 @@ GitHub `main` remains the historical:
 v1.5.0-alpha
 ```
 
-Draft PR #86:
+Closed PRs:
 
 ```text
-https://github.com/JasonVoorheesXL/csrn-production-suite/pull/86
+PR #86 — stale documentation-only branch; closed without merge
+PR #87 — superseded after a remote-ref race prevented a trustworthy PR snapshot
 ```
 
-PR #86 was created from stale `main` and changes only six
-documentation/fixture files. It does not contain the operational Phase 6
-application and was closed without merge as superseded by the recovery branch.
+Active PR:
 
-**PR #86 is closed and must remain unmerged.**
+```text
+https://github.com/JasonVoorheesXL/csrn-production-suite/pull/88
+```
+
+PR #88 targets `develop-1.13` from
+`recovery/alpha-8f-source-alignment`. Its first full Windows and Ubuntu CI run
+reached the complete test suite and reported `16 failed, 1197 passed`. The
+identity-rendering checks fixed at `0d16f17f` passed. The remaining failures
+were classified as a bounded mixture of OAuth callback defects, recap prose
+regressions, and stale architecture/documentation assertions.
+
+**PR #88 must not merge until both CI jobs pass.**
 
 The active recovery branch is:
 
@@ -201,7 +211,8 @@ The product is not ready for:
 - a customer installer;
 - production deployment.
 
-The next engineering action is source recovery and alignment.
+The next engineering action is to complete the bounded PR #88 CI repair,
+push one guarded checkpoint, and require green Windows and Ubuntu jobs.
 
 ---
 
@@ -691,6 +702,32 @@ Each update should add an entry to the decision/status log below.
   the develop-only comparison contains no file changes, so no source payload
   must be imported from `develop-1.13`.
 
+### 2026-07-30 — PR #88 CI remediation checkpoint
+
+- Completed the Gate 2 governance checkpoint at
+  `d40467e5b2ab9128493ad82bfec0b6b6e514f547`.
+- Added canonical multiline `VERSION.txt` support to the development workflow
+  and committed it at `0d16f17f23b7b60c5ea4720cdc695b55fbc4216a`.
+- Closed PR #87 without merge after a remote-ref race made its snapshot
+  unreliable, then opened PR #88 from the verified branch head.
+- Verified that PR #88 passes Python compilation, clean-diff validation, and
+  canonical version/build identity checks on both CI platforms.
+- Classified the full-suite result of `16 failed, 1197 passed`.
+- Corrected the Facebook callback to return to `/social`, use one single-use
+  server-side OAuth state store, and remain the only intentional public social
+  endpoint.
+- Restored editable HTTPS callback configuration and removed the obsolete HTTP
+  loopback fallback from the Social Publishing interface.
+- Restored grounded lead-change, turnover, and weather descriptions to recap
+  prose.
+- Aligned route, navigation, social-policy, and documentation regression tests
+  with the current Facebook/assisted-manual-X architecture.
+- Local dependency-free validation passes all 12 recap-service tests and nine
+  focused architecture/grounding checks. Full Flask integration remains
+  delegated to GitHub CI because the synchronized `.venv` points to a missing
+  Python 3.14 installation.
+- This repair remains uncommitted until the guarded checkpoint script is run.
+
 ---
 
 ## 15. Copy-ready prompt for a new chat
@@ -704,13 +741,17 @@ C:\Users\Darth\My Drive\CSRN\Development\CSRN-Production-Suite\CSRN_PROJECT_BIBL
 
 Read the entire Bible before recommending or changing anything. Treat it as the authoritative continuity and release-control document unless I explicitly change a decision.
 
-Gate 1 source recovery is complete at
-`9f37189c5b4fed6c76b8e6228fe8c3086f7c5290`. The current objective is Gate 2
-governance repair on `recovery/alpha-8f-source-alignment`: maintain canonical
-identity `1.13.0-alpha.8f` / `V1.13A8F-SOURCE-ALIGNMENT`, validate the
-governance checkpoint, and review the recovery branch against `develop-1.13`.
-PR #86 is closed as superseded. Do not add features, apply installer ZIPs, or
-modify live runtime data.
+Gate 1 source recovery and the Gate 2 governance checkpoint are complete.
+The committed branch head is
+`0d16f17f23b7b60c5ea4720cdc695b55fbc4216a` on
+`recovery/alpha-8f-source-alignment`, with canonical identity
+`1.13.0-alpha.8f` / `V1.13A8F-SOURCE-ALIGNMENT`.
+
+PR #88 targets `develop-1.13`. Its first full CI run reported
+`16 failed, 1197 passed`; a bounded repair is in the worktree and requires a
+guarded commit/push followed by green Windows and Ubuntu CI. PRs #86 and #87
+are closed without merge. Do not add features, apply installer ZIPs, modify
+live runtime data, or merge PR #88 while checks are failing.
 
 Before acting, report:
 1. the development folder you inspected;
@@ -729,8 +770,9 @@ Then proceed only within the next incomplete gate documented in the Bible.
 The next action is:
 
 ```text
-Complete Gate 2 governance validation, commit and push the canonical identity
-checkpoint, then review the recovery branch against develop-1.13 before merge.
+Commit and push the bounded PR #88 CI repair, monitor both Windows and Ubuntu
+jobs, correct only evidenced failures, and merge into develop-1.13 only after
+all required checks pass.
 ```
 
 Do not begin visual fixes or new features until the recovery branch is merged

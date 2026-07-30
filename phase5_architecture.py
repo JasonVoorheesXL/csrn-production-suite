@@ -59,6 +59,7 @@ PUBLIC_ENDPOINTS = {
     "security_upgrade_routes.setup_pin",
     "security_upgrade_routes.upgrade_candidate",
     "security_upgrade_routes.upgrade_status",
+    "social_routes.complete_facebook_connection",
     "sponsor_routes.sponsor_logo_file",
     "support_routes.roster_headshot_file",
     "system_routes.get_state",

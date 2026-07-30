@@ -55,7 +55,7 @@ def test_generate_uses_recorded_final_score_and_events_only(tmp_path: Path) -> N
     result = svc.generate()
     assert result.code == "RECAP_GENERATED"
     recap = result.data["recap"]
-    assert recap["headline"] == "Caledonia defeats New Hope 28-21"
+    assert recap["headline"] == "Caledonia tops New Hope 28-21"
     assert "Caledonia scored the winning touchdown" in recap["body"]
     assert "Invented Player" not in recap["body"]
     assert "E11" not in recap["grounding"]["event_ids"]
@@ -65,7 +65,7 @@ def test_generate_uses_recorded_final_score_and_events_only(tmp_path: Path) -> N
 def test_halftime_leader_and_lead_changes_are_grounded(tmp_path: Path) -> None:
     svc, _ = service(tmp_path)
     recap = svc.generate().data["recap"]
-    assert "At halftime, New Hope led Caledonia 14-7." in recap["body"]
+    assert "New Hope led 14-7 at the break." in recap["body"]
     assert recap["facts"]["lead_changes"] == 2
     assert "2 lead changes" in recap["body"]
 

@@ -253,11 +253,16 @@ def test_raw_credential_rejection_maps_to_400(tmp_path: Path) -> None:
     assert response.get_json()["error"] == "RAW_CREDENTIAL_REJECTED"
 
 
-def test_all_social_routes_are_authenticated(tmp_path: Path) -> None:
+def test_only_facebook_oauth_callback_is_public(tmp_path: Path) -> None:
     app, _ = app_service(tmp_path)
     endpoints = [rule.endpoint for rule in app.url_map.iter_rules() if rule.endpoint.startswith("social_routes.")]
     assert endpoints
-    assert all(getattr(app.view_functions[name], "_csrn_requires_auth", False) for name in endpoints)
+    public = {
+        name
+        for name in endpoints
+        if not getattr(app.view_functions[name], "_csrn_requires_auth", False)
+    }
+    assert public == {"social_routes.complete_facebook_connection"}
 
 
 def test_facebook_status_route(tmp_path: Path) -> None:
@@ -279,10 +284,10 @@ def test_facebook_app_configuration_route(tmp_path: Path) -> None:
 
 def test_facebook_page_selection_route(tmp_path: Path) -> None:
     app, _ = app_service(tmp_path)
-    with app.test_client() as client:
-        with client.session_transaction() as session:
-            session["facebook_page_selection_id"] = "selection-1"
-        response = client.post("/api/social/facebook/select", json={"page_id": "page-1"})
-        assert response.status_code == 200
+    response = app.test_client().post(
+        "/api/social/facebook/select",
+        json={"selection_id": "selection-1", "page_id": "page-1"},
+    )
+    assert response.status_code == 200
     facebook = app.config["FACEBOOK_TEST_SERVICE"]
     assert facebook.calls == [("connect_page", "selection-1", "page-1")]

@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import secrets
-import time
-from threading import Lock
 from urllib.parse import urlencode
 from typing import Any, Callable
 
@@ -91,9 +89,6 @@ def _response(result: Any):
 
 def create_social_blueprint(dependencies: SocialRoutesDependencies) -> Blueprint:
     routes = Blueprint("social_routes", __name__)
-    oauth_states: dict[str, float] = {}
-    oauth_states_lock = Lock()
-    oauth_state_ttl_seconds = 15 * 60
 
     def localhost_required():
         remote = str(request.remote_addr or "").strip().lower()
@@ -153,42 +148,28 @@ def create_social_blueprint(dependencies: SocialRoutesDependencies) -> Blueprint
         if guard is not None:
             return guard
         oauth_state = secrets.token_urlsafe(32)
-        now = time.time()
-        with oauth_states_lock:
-            expired = [
-                key for key, created_at in oauth_states.items()
-                if now - created_at > oauth_state_ttl_seconds
-            ]
-            for key in expired:
-                oauth_states.pop(key, None)
-            oauth_states[oauth_state] = now
         result = dependencies.get_facebook_connection_service().authorization_url(oauth_state)
         if not result.ok:
-            with oauth_states_lock:
-                oauth_states.pop(oauth_state, None)
             return _response(result)
         return redirect(result.data["authorization_url"])
 
     @routes.get("/api/social/facebook/callback")
     def complete_facebook_connection():
         if request.args.get("error"):
-            return redirect("http://127.0.0.1:5050/?facebook=error&code=FACEBOOK_AUTHORIZATION_DENIED")
+            return redirect("http://127.0.0.1:5050/social?facebook=error&code=FACEBOOK_AUTHORIZATION_DENIED")
         received_state = str(request.args.get("state") or "").strip()
-        with oauth_states_lock:
-            expected_state = received_state if oauth_states.pop(received_state, None) is not None else ""
         result = dependencies.get_facebook_connection_service().complete_authorization(
             code=request.args.get("code"),
             received_state=received_state,
-            expected_state=expected_state,
         )
         if not result.ok:
             return redirect(
-                "http://127.0.0.1:5050/?" + urlencode(
+                "http://127.0.0.1:5050/social?" + urlencode(
                     {"facebook": "error", "code": result.code}
                 )
             )
         return redirect(
-            "http://127.0.0.1:5050/?" + urlencode(
+            "http://127.0.0.1:5050/social?" + urlencode(
                 {
                     "facebook": "select",
                     "selection_id": result.data["selection_id"],

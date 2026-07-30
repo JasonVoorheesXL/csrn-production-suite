@@ -54,9 +54,9 @@ def test_x_manual_only_boundary_remains_after_recap_integration() -> None:
 
 
 def test_command_center_navigation_exposes_social_and_recaps() -> None:
-    source = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
-    assert "window.location.href='/social'" in source
-    assert "window.location.href='/recaps'" in source
+    source = (ROOT / "static" / "csrn-navigation.js").read_text(encoding="utf-8")
+    assert "['social', 'Social Publishing', '/social']" in source
+    assert "['recaps', 'Game Recaps', '/recaps']" in source
 
 
 def test_release_freeze_document_uses_manual_x_boundary() -> None:

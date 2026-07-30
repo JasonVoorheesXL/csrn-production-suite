@@ -17,8 +17,8 @@ class Service:
         self.calls.append(("status",))
         return self.result
 
-    def generate(self, *, regenerate=False):
-        self.calls.append(("generate", regenerate))
+    def generate(self, *, regenerate=False, article_style="local_sports"):
+        self.calls.append(("generate", regenerate, article_style))
         return self.result
 
     def read(self, recap_id):
@@ -80,9 +80,12 @@ def test_manager_page_renders() -> None:
 
 def test_generate_forwards_regenerate_flag() -> None:
     app, service = app_service()
-    response = app.test_client().post("/api/recaps/generate", json={"regenerate": True})
+    response = app.test_client().post(
+        "/api/recaps/generate",
+        json={"regenerate": True, "article_style": "straight_news"},
+    )
     assert response.status_code == 200
-    assert service.calls == [("generate", True)]
+    assert service.calls == [("generate", True, "straight_news")]
 
 
 def test_update_forwards_editable_fields() -> None:
