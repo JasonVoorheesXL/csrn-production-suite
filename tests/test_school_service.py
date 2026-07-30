@@ -55,6 +55,8 @@ def existing_school(**overrides: Any) -> dict[str, Any]:
         "region": "1",
         "primary_color": "#C9203B",
         "secondary_color": "#FFFFFF",
+        "primary_logo": "/school-logos/caledonia/round-master.png",
+        "alternate_logo": "",
         "verification_status": "verified",
         "active": True,
     }
@@ -80,6 +82,8 @@ def test_list_and_read_preserve_school_contract() -> None:
             "nickname": "Confederates",
             "primary_color": "#C9203B",
             "secondary_color": "#FFFFFF",
+            "primary_logo": "/school-logos/caledonia/round-master.png",
+            "alternate_logo": "",
             "verification_status": "verified",
             "csrn_id": "MS5A-001",
             "classification": "5A",

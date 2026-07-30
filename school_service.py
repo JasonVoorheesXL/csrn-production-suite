@@ -213,6 +213,8 @@ class SchoolService:
             "nickname": mascot,
             "primary_color": school.get("primary_color", "#C9203B"),
             "secondary_color": school.get("secondary_color", "#FFFFFF"),
+            "primary_logo": school.get("primary_logo", ""),
+            "alternate_logo": school.get("alternate_logo", ""),
             "verification_status": school.get(
                 "verification_status",
                 "unverified",

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 300" role="img" aria-label="Neutral player silhouette">
+  <rect width="240" height="300" rx="20" fill="#1b2028"/>
+  <circle cx="120" cy="91" r="50" fill="#697484"/>
+  <path d="M37 270c7-76 38-116 83-116s76 40 83 116" fill="#697484"/>
+  <path d="M55 270h130" stroke="#8b96a6" stroke-width="8" stroke-linecap="round"/>
+</svg>
