@@ -1,5 +1,6 @@
 # Python
 .venv/
+.venv-stale-*/
 venv/
 __pycache__/
 *.py[cod]
@@ -46,3 +47,6 @@ Data/Sponsors/
 Data/Backups/
 Data/Social/
 Data/Recaps/
+
+# Local release output
+dist-release/

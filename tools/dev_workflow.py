@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import py_compile
 import re
 import subprocess
 import sys
@@ -196,7 +195,11 @@ def tracked_python_files(root: Path = ROOT) -> list[Path]:
 def compile_tracked_python(root: Path = ROOT) -> int:
     files = tracked_python_files(root)
     for path in files:
-        py_compile.compile(str(path), doraise=True)
+        compile(
+            path.read_text(encoding="utf-8"),
+            str(path),
+            "exec",
+        )
     return len(files)
 
 
@@ -228,7 +231,7 @@ def validate_repository(
                 "-m",
                 "pytest",
                 "-q",
-                "--ignore=qrcode",
+                "tests",
             ),
             root=root,
         )
