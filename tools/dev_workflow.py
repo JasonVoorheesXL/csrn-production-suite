@@ -134,15 +134,47 @@ def version_token(runtime_version: str) -> str:
     return match.group(1)
 
 
+def version_file_token(version_file: str) -> str:
+    lines = [
+        line.strip()
+        for line in version_file.splitlines()
+        if line.strip()
+    ]
+    version_line = next(
+        (line for line in lines if line.startswith("Version ")),
+        "",
+    )
+    if version_line:
+        return version_token(version_line)
+    if len(lines) == 1 and re.fullmatch(
+        r"\d+\.\d+\.\d+-alpha\.\d+[a-z]",
+        lines[0],
+    ):
+        return lines[0]
+    raise WorkflowError(
+        "VERSION.txt must contain either one semantic version token or a "
+        "canonical 'Version ...' line."
+    )
+
+
+def render_version_file(identity: RuntimeIdentity) -> str:
+    return (
+        "CSRN Production Suite\n"
+        f"{identity.version}\n"
+        f"Build {identity.build}\n"
+    )
+
+
 def validate_identity(root: Path = ROOT) -> RuntimeIdentity:
     identity = runtime_identity(root / "app.py")
     version_file = (root / "VERSION.txt").read_text(encoding="utf-8").strip()
     runtime_token = version_token(identity.version)
+    file_token = version_file_token(version_file)
 
-    if version_file != runtime_token:
+    if file_token != runtime_token:
         raise WorkflowError(
             "Version identity mismatch:\n"
-            f"  VERSION.txt: {version_file}\n"
+            f"  VERSION.txt: {file_token}\n"
             f"  app.py:      {runtime_token}"
         )
     return identity
@@ -258,7 +290,10 @@ def update_identity(
         test_text = test_text.replace(old.build, new.build)
         runtime_test.write_text(test_text, encoding="utf-8")
 
-    (root / "VERSION.txt").write_text(version + "\n", encoding="utf-8")
+    (root / "VERSION.txt").write_text(
+        render_version_file(new),
+        encoding="utf-8",
+    )
     return new
 
 

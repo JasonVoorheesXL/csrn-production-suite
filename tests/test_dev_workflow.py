@@ -9,9 +9,12 @@ from tools.dev_workflow import (
     WorkflowError,
     build_identity,
     conflict_ref_files,
+    render_version_file,
     runtime_identity,
     slugify,
     update_identity,
+    validate_identity,
+    version_file_token,
     version_token,
 )
 
@@ -30,7 +33,7 @@ def write_identity_fixture(root: Path) -> RuntimeIdentity:
         encoding="utf-8",
     )
     (root / "VERSION.txt").write_text(
-        "1.13.0-alpha.4a\n",
+        render_version_file(old),
         encoding="utf-8",
     )
     (root / "tests" / "test_core_repository_runtime.py").write_text(
@@ -65,6 +68,21 @@ def test_runtime_identity_reads_literal_constants(tmp_path: Path) -> None:
     assert runtime_identity(tmp_path / "app.py") == expected
 
 
+def test_validate_identity_reads_canonical_version_file(
+    tmp_path: Path,
+) -> None:
+    expected = write_identity_fixture(tmp_path)
+
+    assert validate_identity(tmp_path) == expected
+    assert version_file_token(
+        (tmp_path / "VERSION.txt").read_text(encoding="utf-8")
+    ) == "1.13.0-alpha.4a"
+
+
+def test_version_file_token_accepts_legacy_single_token() -> None:
+    assert version_file_token("1.13.0-alpha.4a\n") == "1.13.0-alpha.4a"
+
+
 def test_update_identity_synchronizes_expected_files(tmp_path: Path) -> None:
     old = write_identity_fixture(tmp_path)
 
@@ -79,7 +97,9 @@ def test_update_identity_synchronizes_expected_files(tmp_path: Path) -> None:
     )
     assert updated.build == "V1.13A4B-DEVELOPER-WORKFLOW-AUTOMATION"
     assert (tmp_path / "VERSION.txt").read_text(encoding="utf-8") == (
-        "1.13.0-alpha.4b\n"
+        "CSRN Production Suite\n"
+        "Version 1.13.0-alpha.4b — Developer Workflow Automation\n"
+        "Build V1.13A4B-DEVELOPER-WORKFLOW-AUTOMATION\n"
     )
 
     app_text = (tmp_path / "app.py").read_text(encoding="utf-8")
