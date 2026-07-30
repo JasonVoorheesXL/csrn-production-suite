@@ -650,6 +650,18 @@ Each update should add an entry to the decision/status log below.
 - Confirmed source recovery is the immediate next action.
 - Confirmed release status is blocked.
 
+### 2026-07-30 — Gate 0/1 preservation checkpoint
+
+- Reverified the operational checkout at commit `838708b047e7` on `phase/6.9-social-publishing-engine`.
+- Reverified 26 modified tracked paths and 68 actual untracked files (shown by Git as 22 summarized untracked paths after this Bible was added).
+- Created remote branch `recovery/alpha-8f-source-alignment` from `phase/6.9-social-publishing-engine`.
+- Captured all 94 changed and untracked files in verified commit `8ad61cdd3e07ee4f3f01ec25aba0a87ccc6b11a4`.
+- Verified recovery tree `7dc09dbf213d5656365175ce3896100fddcc2c4c` and a clean worktree against the captured commit.
+- Packaged the complete commit and history in `CSRN_GATE_1_RECOVERY.bundle`; the guarded completion script verifies its SHA-256 before importing it.
+- Local installation and remote push remain pending because the Codex runtime cannot write the operational checkout's hidden `.git` metadata or provide network access to spawned Git.
+- Prepared `COMPLETE_CSRN_GATE_1.ps1` to make a safety stash, import the verified bundle, switch to the recovery branch, verify the exact commit and clean status, and push it to `origin`.
+- Gate 0 is complete. Gate 1 is preserved and reproducible, but it is not complete until the guarded script succeeds.
+
 ---
 
 ## 15. Copy-ready prompt for a new chat
@@ -682,7 +694,8 @@ Then proceed only within the next incomplete gate documented in the Bible.
 The next action is:
 
 ```text
-Gate 0 and Gate 1 — preserve the exact current worktree, create the recovery branch from the Phase 6.9 lineage, and recover alpha.8f into a clean reproducible Git commit.
+Finish Gate 1 — run COMPLETE_CSRN_GATE_1.ps1, confirm the recovery branch
+is checked out with a clean worktree, and confirm it is pushed to origin.
 ```
 
 Do not begin with visual fixes or new features. Establish the recoverable source first.
