@@ -474,10 +474,9 @@ and merged into `develop-1.13` at
 
 Exit condition: no open blocking identity or interface defect.
 
-**Status: local exit audit complete; pull request and CI pending.** The final
-audit passed 54 focused tests and all 1,227 authoritative tests on Python
-3.13.14. Gate 4 is not complete until the branch is pushed, reviewed through
-GitHub Actions on Windows and Ubuntu, and merged into `develop-1.13`.
+**Status: complete.** PR #90 passed Windows and Ubuntu on Python 3.13.14 in
+GitHub Actions run `30579098825` and merged into `develop-1.13` at
+`10afa40c99877dca9b4362a1ad4ef4c950db362d`.
 
 ### Gate 5 — Complete frozen football scope
 
@@ -487,6 +486,82 @@ GitHub Actions on Windows and Ubuntu, and merged into `develop-1.13`.
 - tests and documentation.
 
 Exit condition: approved football scope is complete.
+
+**Status: active.** Branch `gate5/frozen-football-scope` was created and pushed
+from the exact Gate 4 merge
+`10afa40c99877dca9b4362a1ad4ef4c950db362d`.
+
+Initial audit:
+
+- schools persist classification and region, but broadcasts do not yet persist
+  home/visitor overall and region records or a rule controlling which result
+  affects which record;
+- no structured special-game designation exists in the broadcast record or
+  Create/Edit Broadcast interface;
+- the player graphic already renders `play_detail`, but the manual operator
+  path did not expose or persist the frozen-scope `Player Highlight` type.
+- Player Highlight is the first independent Gate 5 repair; the record and
+  designation model must be fixed before implementation so archived broadcasts
+  retain their original pregame context.
+
+#### Player Highlight operator workflow
+
+The production destination is a dedicated **Player Highlight** menu within
+Program Visual Controls. Player Identification Master remains the roster and
+identity source; it must not be Jordan's primary live highlight workflow.
+
+The Program Visual Controls menu must let the operator:
+
+- select the applicable roster and player;
+- select which prepared player information or saved highlight note to feature,
+  with a controlled custom-text option for an unplanned live achievement;
+- preview the complete graphic before air;
+- select its display duration; and
+- show, update, hide, or clear the highlight without editing the underlying
+  player identity.
+
+Prepared highlight information belongs with the player's reusable roster data
+so it can be entered before the broadcast and selected quickly during the
+event. The live custom-text field remains available for a new achievement that
+was not known during preparation.
+
+Player-event sequencing is deterministic. If a touchdown is recorded while a
+Player Highlight is on air, the touchdown graphic is queued rather than
+discarded or allowed to overwrite the active highlight. When the highlight
+ends—by duration expiry or operator hide—the queued touchdown graphic appears
+next. The queue must preserve the scoring player and event detail, prevent
+duplicate delivery, and expose a way to cancel an erroneous queued event before
+it reaches air. `Clear` behavior and queue advancement must be explicit in the
+operator interface and covered by tests.
+
+#### Sponsor Spotlight operator workflow
+
+Program Visual Controls must also provide a dedicated **Sponsor Spotlight**
+activity for filling a natural broadcast lull. It is separate from Player
+Highlight while following the same preview-first operator pattern.
+
+The Sponsor Spotlight menu must let the operator:
+
+- select an approved sponsor profile from the sponsor library;
+- select one of that sponsor's approved still graphics or video assets;
+- optionally select a prepared lead-in or caption;
+- preview the exact composition without putting it on air;
+- choose a display duration for still media and use either the approved clip
+  duration or a controlled cutoff for video; and
+- show, update, hide, clear, or cancel the activity.
+
+The on-air composition covers most of the program canvas but remains below the
+scorebug. The scorebug is a protected top layer and stays visible for the full
+Sponsor Spotlight. Sponsor media must preserve its aspect ratio, must not expose
+browser playback controls, and must end cleanly without leaving a black frame,
+stale audio, or a hidden scorebug.
+
+Sponsor Spotlight is a low-priority, lull-only activity. Live game-event
+graphics take precedence when play resumes. The graphics coordinator must
+define and test whether each event interrupts the spotlight immediately or is
+queued behind it; no event may be lost or silently overwrite another activity.
+Video audio policy, transition timing, replay behavior, and cancellation must
+be visible and deterministic in the operator interface.
 
 #### Deferred commercial presentation concept — starting lineups
 

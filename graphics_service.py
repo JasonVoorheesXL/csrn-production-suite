@@ -202,7 +202,13 @@ class GraphicsService:
         if action == "clear":
             graphic = self._graphic_default("player_graphic")
         else:
-            for key in ("graphic_type", "roster_id", "player_id", "eyebrow"):
+            for key in (
+                "graphic_type",
+                "roster_id",
+                "player_id",
+                "eyebrow",
+                "play_detail",
+            ):
                 if key in data:
                     graphic[key] = str(data.get(key, ""))[:240]
 

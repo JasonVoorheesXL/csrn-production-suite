@@ -250,6 +250,27 @@ def test_player_show_enriches_roster_identity_and_sponsor() -> None:
     assert len(calls) == 1
 
 
+def test_player_highlight_persists_type_eyebrow_and_detail() -> None:
+    result = service().update_player(
+        base_state(),
+        {
+            "action": "show",
+            "roster_id": "caledonia-football",
+            "player_id": "12-jason",
+            "graphic_type": "player_highlight",
+            "eyebrow": "PLAYER HIGHLIGHT",
+            "play_detail": "8 tackles · 2 sacks · forced fumble",
+            "duration": 8,
+        },
+    )
+    graphic = result.data["graphic"]
+    assert graphic["visible"] is True
+    assert graphic["graphic_type"] == "player_highlight"
+    assert graphic["eyebrow"] == "PLAYER HIGHLIGHT"
+    assert graphic["play_detail"] == "8 tackles · 2 sacks · forced fumble"
+    assert graphic["expires_at"] == 1008
+
+
 def test_player_hide_preserves_identity_and_resets_timer() -> None:
     state = base_state()
     state["player_graphic"].update(
