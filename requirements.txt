@@ -1,4 +1,13 @@
+# CSRN runtime lock for CPython 3.13.14.
+# Keep every production dependency exact so setup and CI resolve the same graph.
 Flask==3.0.3
+Werkzeug==3.1.8
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+itsdangerous==2.2.0
+click==8.4.2
+blinker==1.9.0
+colorama==0.4.6
 waitress==3.0.0
 websocket-client==1.8.0
-Pillow>=12.0.0,<13.0.0
+Pillow==12.3.0

@@ -1,0 +1,8 @@
+# CSRN development/test lock for CPython 3.13.14.
+-r requirements.txt
+
+pytest==9.1.1
+iniconfig==2.3.0
+packaging==26.2
+pluggy==1.6.0
+Pygments==2.20.0

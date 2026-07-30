@@ -65,9 +65,10 @@ No chat is itself a source of truth.
 
 1. Changes into its own project directory.
 2. Uses `.venv\Scripts\python.exe`.
-3. Installs packages from `requirements.txt`.
+3. Verifies Python 3.13.14 and the exact runtime dependency lock without
+   installing or upgrading anything.
 4. Runs game-day storage preflight and recovery startup tracking.
-5. launches `app.py`.
+5. Launches `app.py`.
 6. Serves the suite with Waitress on port 5050.
 7. Records clean shutdown when the application exits normally.
 
@@ -83,14 +84,16 @@ Therefore, the active Command Center interface is:
 templates\index.html
 ```
 
-The root-level `index.html` is currently a redundant, untracked duplicate. It must not be treated as the active Flask entrypoint.
+The obsolete root-level `index.html` duplicate was removed during Gate 1.
 
-Production launcher correction still required:
+Environment setup is now intentionally separate:
 
-- do not upgrade `pip`, setuptools, or wheel on every normal startup;
-- do not reinstall or modify production dependencies on every normal startup;
-- provide a separate explicit setup/update command;
-- launch from a verified locked environment.
+- `SETUP_CSRN_ENVIRONMENT.bat` creates/synchronizes the runtime environment;
+- `SETUP_CSRN_DEVELOPMENT_ENVIRONMENT.bat` adds the locked test toolchain;
+- an incompatible `.venv` is preserved as `.venv-stale-<timestamp>` rather than
+  deleted;
+- normal startup is offline and launches only from a verified locked
+  environment.
 
 ---
 
@@ -128,13 +131,14 @@ origin/gate3/reproducible-environment
 V1.13A8F-SOURCE-ALIGNMENT
 ```
 
-### Worktree state after the guarded Gate 3 transition
+### Current Gate 3 implementation state
 
 ```text
 The Gate 3 branch starts from merged commit
-`ef9d4a5d11b7c0aa6535e501d0a6503907120f76`. The guarded transition requires a
-clean worktree, creates `gate3/reproducible-environment`, commits this handoff,
-and pushes the branch before Gate 3 implementation begins.
+`ef9d4a5d11b7c0aa6535e501d0a6503907120f76`. The environment/startup/build
+repair is implemented in the working tree and awaits creation of a clean
+Python 3.13.14 development environment, the full test suite, commit, push, and
+GitHub CI.
 ```
 
 ### Branch lineage
@@ -241,9 +245,11 @@ The project is recoverable. The current problem is integration discipline and re
 
 ### 8.1 Source and release identity
 
-- No Git commit represents the running `alpha.8f` build.
-- GitHub `main`, the active branch, Drive documents, `VERSION.txt`, and PR #86 describe different product states.
-- A clean checkout cannot reproduce the running suite.
+Resolved in Gates 1 and 2:
+
+- `alpha.8f` is represented in Git and merged into `develop-1.13`;
+- the canonical runtime, documentation, version, and build identity agree;
+- PR #86 was closed without merge as stale.
 
 ### 8.2 Player and school identity rendering
 
@@ -286,16 +292,8 @@ This must be corrected so operators can verify player media without opening each
 
 ### 8.4 Obsolete headshot utility
 
-These remain in the active folder:
-
-```text
-MANAGE_PLAYER_HEADSHOTS.cmd
-tools\manage_player_headshots.py
-```
-
-The tool requires the player’s internal stored ID. It was added even though Edit Player already provides Upload Headshot.
-
-The utility is obsolete and must be removed after the integrated upload path is verified.
+Resolved in Gate 1: the obsolete standalone headshot utility was removed after
+the integrated player-edit upload path was retained.
 
 ### 8.5 Player-event visual defects
 
@@ -325,13 +323,17 @@ These must be made unique.
 
 ### 8.7 Test reproducibility
 
-- 139 tests exist.
-- `pytest` is not installed in the active virtual environment.
-- `pytest` is not declared in `requirements.txt`.
-- No dedicated development/test dependency declaration exists.
-- The synchronized virtual environment points to an external Python installation and an older original creation path.
+Implementation complete; execution evidence pending:
 
-The tests therefore cannot currently be reproduced from the declared project setup.
+- runtime dependencies are exactly pinned in `requirements.txt`;
+- pytest and all test dependencies are exactly pinned in
+  `requirements-dev.txt`;
+- local and CI development environments share the same declaration;
+- Python 3.13.14 is the single supported baseline;
+- the stale synchronized `.venv` will be preserved and replaced only by the
+  explicit setup command;
+- normal startup performs verification only and never installs packages;
+- full Windows and Ubuntu CI must pass before Gate 3 can merge.
 
 ### 8.8 Runtime data in source control
 
@@ -749,6 +751,35 @@ Each update should add an entry to the decision/status log below.
 - Gate 3 work must begin on `gate3/reproducible-environment` from the exact
   merged commit and must not alter live runtime data.
 
+### 2026-07-30 — Gate 3 reproducibility implementation checkpoint
+
+- Audited the operational launcher, dependency declarations, GitHub Actions,
+  synchronized virtual environment, and release builder.
+- Confirmed normal startup previously upgraded installer tools and installed
+  dependencies on every launch.
+- Confirmed the synchronized `.venv` points to an unavailable Python 3.14
+  installation and standardized local validation and CI on Python 3.13.14.
+- Added exact runtime and development dependency locks and one shared
+  environment verifier for local use and CI.
+- Added explicit runtime and development setup launchers. An incompatible
+  environment is renamed and preserved instead of recursively deleted.
+- Removed all package installation and upgrade behavior from normal Command
+  Center startup.
+- Made repository compilation validation read-only so it no longer creates
+  `__pycache__` files or depends on writable source directories.
+- Confined pytest discovery to the authoritative `tests` tree so synchronized
+  runtime data and historical installer backups cannot contaminate validation.
+- Rebuilt release packaging around exact committed Git-object bytes, a clean
+  tracked-tree guard, canonical version/build identity, commit-derived
+  timestamps, stable manifests, and fixed ZIP metadata.
+- Verified 383 Python files parse, all dependency declarations are exact, and
+  two independent builds of the same tracked fixture produce the same SHA-256
+  while excluding untracked and runtime data.
+- The clean Python 3.13.14 environment passed 28 focused Gate 3 tests and all
+  1,221 authoritative repository tests. GitHub CI remains pending.
+- Four Pillow `Image.getdata()` deprecation warnings are recorded for later
+  maintenance; they do not affect current behavior or Gate 3 acceptance.
+
 ---
 
 ## 15. Copy-ready prompt for a new chat
@@ -791,11 +822,11 @@ Then proceed only within the next incomplete gate documented in the Bible.
 The next action is:
 
 ```text
-Run the guarded post-merge transition to
-`gate3/reproducible-environment`, then audit the launcher, dependency
-declarations, CI workflow, virtual-environment assumptions, and build tooling
-before implementing the bounded Gate 3 repair.
+Install Python 3.13.14 with `py install 3.13.14`. Then close CSRN and Python
+processes, pause Google Drive sync, run
+`SETUP_CSRN_DEVELOPMENT_ENVIRONMENT.bat`, and run the focused and full
+validation suite before committing or pushing the Gate 3 repair.
 ```
 
-Do not begin visual fixes or new features until the recovery branch is merged
-and the next release gate is active.
+Do not begin Gate 4 visual fixes or new features until Gate 3 passes Windows
+and Ubuntu CI and merges into `develop-1.13`.
