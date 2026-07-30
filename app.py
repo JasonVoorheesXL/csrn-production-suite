@@ -379,9 +379,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.8e — Cross-Page Navigation Fix"
+    "Version 1.13.0-alpha.8f — Player Identity Repair and Source Alignment"
 )
-RUNTIME_BUILD = "V1.13A8A-FOOTBALL-RC-READINESS"
+RUNTIME_BUILD = "V1.13A8F-SOURCE-ALIGNMENT"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {

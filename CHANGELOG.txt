@@ -1,4 +1,8 @@
-Recovery checkpoint — Gate 1 source hygiene
+Version 1.13.0-alpha.8f — Player Identity Repair and Source Alignment
+Build V1.13A8F-SOURCE-ALIGNMENT
+- Corrected fictional player headshot URLs.
+- Corrected fictional school-logo URLs and renderer aliases.
+- Prevented missing fixture media from silently resolving to unrelated CSRN branding where valid team media exists.
 - Removed the unused root command-center page duplicate.
 - Removed the obsolete standalone headshot-management utility.
 - Replaced the temporary Facebook tunnel launcher with documented direct setup.
@@ -138,9 +142,3 @@ Phase 6.8 - Graphics Theme Engine
 - Eight original presets through one shared token engine.
 - Controlled overrides, saved variants, and season locking.
 - Shared scorebug, lower-third, caption, weather, and social-card styling.
-
-Version 1.13.0-alpha.8f
-- Corrected fictional player headshot URLs.
-- Corrected fictional school-logo URLs and renderer aliases.
-- Added a standalone roster headshot assignment utility for testing.
-- Prevented missing fixture media from silently resolving to unrelated CSRN branding where valid team media exists.

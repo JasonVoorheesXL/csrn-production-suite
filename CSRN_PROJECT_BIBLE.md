@@ -96,64 +96,59 @@ Production launcher correction still required:
 
 ## 4. Current audited Git and version state
 
-The synchronized development folder was audited directly.
+The synchronized development folder was audited directly after Gate 1.
 
 ### Active branch
 
 ```text
-phase/6.9-social-publishing-engine
+recovery/alpha-8f-source-alignment
 ```
 
 ### Active committed HEAD
 
 ```text
-838708b — Phase 6.9: complete Social Publishing Engine
+9f37189c5b4fed6c76b8e6228fe8c3086f7c5290 — recovery: complete source hygiene
 ```
 
 ### Tracking branch
 
 ```text
-origin/phase/6.9-social-publishing-engine
+origin/recovery/alpha-8f-source-alignment
 ```
 
-### Committed version identity
+### Canonical version identity
 
 ```text
-1.13.0-alpha.6i
+1.13.0-alpha.8f — Player Identity Repair and Source Alignment
 ```
 
-### Worktree version identity
+### Canonical build identity
 
 ```text
-1.13.0-alpha.8f — Player Identity Repair
+V1.13A8F-SOURCE-ALIGNMENT
 ```
 
-### Worktree drift
+### Worktree state at the Gate 1 checkpoint
 
 ```text
-26 modified tracked paths
-21 untracked paths
-47 total dirty entries
-approximately 7,059 tracked insertions
-approximately 560 tracked deletions
+clean
+local HEAD = origin recovery branch HEAD
+ahead/behind = 0/0
 ```
 
 ### Branch lineage
 
-The active branch is:
-
-- 699 commits ahead of `origin/main`;
-- 688 commits ahead of `origin/develop`;
-- 23 commits ahead of `origin/develop-1.13`;
-- identical to `origin/phase/6.9-social-publishing-engine` before considering worktree changes.
-
-This means the Phase 6 development is real and preserved in branch history, but the later `alpha.8f` worktree is not represented by a commit.
+The recovery branch was created from the verified Phase 6.9 lineage, captured
+the later operational worktree, completed source-hygiene cleanup, and was
+independently verified locally and through GitHub at `9f37189c`. The
+previously uncommitted `alpha.8f` application is now represented by a remote
+Git commit.
 
 ---
 
 ## 5. GitHub state and PR warning
 
-GitHub `main` remains the old:
+GitHub `main` remains the historical:
 
 ```text
 v1.5.0-alpha
@@ -165,25 +160,25 @@ Draft PR #86:
 https://github.com/JasonVoorheesXL/csrn-production-suite/pull/86
 ```
 
-PR #86 was created from stale `main` and changes only six documentation/fixture files. It does not contain the operational Phase 6 application.
+PR #86 was created from stale `main` and changes only six
+documentation/fixture files. It does not contain the operational Phase 6
+application and was closed without merge as superseded by the recovery branch.
 
-**Do not merge PR #86.**
+**PR #86 is closed and must remain unmerged.**
 
-It should be closed as superseded once the recovery branch exists.
-
-The required recovery branch is:
+The active recovery branch is:
 
 ```text
 recovery/alpha-8f-source-alignment
 ```
 
-It must start from:
+It was based on:
 
 ```text
 origin/phase/6.9-social-publishing-engine
 ```
 
-It must not start from `main`.
+It did not start from `main`.
 
 ---
 
@@ -674,7 +669,27 @@ Each update should add an entry to the decision/status log below.
 - Removed fictional fixture venues from operational venue data.
 - Removed `Data/Social/social_state.json` from Git tracking without deleting the local runtime file.
 - Added source-hygiene regression coverage.
-- Gate 1 is complete when this checkpoint is committed, pushed, the worktree is clean, and local/remote heads are identical. Gate 2 is then the next gate.
+- Committed and pushed `9f37189c5b4fed6c76b8e6228fe8c3086f7c5290`.
+- Independently verified the local worktree is clean, local/origin divergence is
+  `0/0`, and the connected GitHub branch resolves to the same commit.
+- Gate 1 is complete. Gate 2 governance repair is active.
+
+### 2026-07-30 — Gate 2 canonical identity decision
+
+- Selected `1.13.0-alpha.8f — Player Identity Repair and Source Alignment`.
+- Selected build `V1.13A8F-SOURCE-ALIGNMENT`.
+- Rejected `1.0/1.2 Alpha`, `v1.5.0-alpha`, runtime `alpha.8e`, and build
+  `V1.13A8A-FOOTBALL-RC-READINESS` as stale current-state identities.
+- Synchronized the runtime fallback, `VERSION.txt`, README files, roadmap,
+  changelogs, build journal, and this Bible.
+- Added regression coverage that fails when the canonical version or build
+  identity drifts across authoritative files.
+- Closed draft PR #86 without merge as superseded by the verified recovery
+  branch.
+- Compared the recovery branch with `develop-1.13` on GitHub. Before the Gate 2
+  commit, recovery is three commits ahead and one ancestry-only commit behind;
+  the develop-only comparison contains no file changes, so no source payload
+  must be imported from `develop-1.13`.
 
 ---
 
@@ -689,7 +704,13 @@ C:\Users\Darth\My Drive\CSRN\Development\CSRN-Production-Suite\CSRN_PROJECT_BIBL
 
 Read the entire Bible before recommending or changing anything. Treat it as the authoritative continuity and release-control document unless I explicitly change a decision.
 
-The current immediate objective is source recovery: preserve the existing Drive worktree and recover the `1.13.0-alpha.8f` operational state into `recovery/alpha-8f-source-alignment`, based on `origin/phase/6.9-social-publishing-engine`. Do not merge PR #86, do not add features, do not apply installer ZIPs, and do not modify live runtime data.
+Gate 1 source recovery is complete at
+`9f37189c5b4fed6c76b8e6228fe8c3086f7c5290`. The current objective is Gate 2
+governance repair on `recovery/alpha-8f-source-alignment`: maintain canonical
+identity `1.13.0-alpha.8f` / `V1.13A8F-SOURCE-ALIGNMENT`, validate the
+governance checkpoint, and review the recovery branch against `develop-1.13`.
+PR #86 is closed as superseded. Do not add features, apply installer ZIPs, or
+modify live runtime data.
 
 Before acting, report:
 1. the development folder you inspected;
@@ -708,8 +729,9 @@ Then proceed only within the next incomplete gate documented in the Bible.
 The next action is:
 
 ```text
-Verify the Gate 1 source-hygiene checkpoint. If the worktree is clean and the
-local recovery branch is identical to origin, begin Gate 2 governance repair.
+Complete Gate 2 governance validation, commit and push the canonical identity
+checkpoint, then review the recovery branch against develop-1.13 before merge.
 ```
 
-Do not begin with visual fixes or new features. Establish the recoverable source first.
+Do not begin visual fixes or new features until the recovery branch is merged
+and the next release gate is active.

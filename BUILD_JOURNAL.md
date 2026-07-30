@@ -95,3 +95,12 @@ Phase 6.12f - Player Identity Repair
 - Normalized fictional roster and school media paths.
 - Installed fixture media in supported local storage locations.
 - Added temporary non-event player headshot management utility.
+
+Gate 1/2 - Source Alignment and Governance
+- Canonicalized version 1.13.0-alpha.8f with build V1.13A8F-SOURCE-ALIGNMENT.
+- Captured the operational Phase 6 application in recovery/alpha-8f-source-alignment.
+- Removed runtime state and obsolete temporary utilities from source control.
+- Consolidated fictional rehearsal media into a self-contained versioned fixture.
+- Added regression coverage for source, runtime, and fixture separation.
+- Began governance alignment across runtime identity, README files, roadmap,
+  changelogs, build journal, and the project Bible.
