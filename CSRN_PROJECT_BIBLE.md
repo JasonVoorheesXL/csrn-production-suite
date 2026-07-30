@@ -662,6 +662,20 @@ Each update should add an entry to the decision/status log below.
 - Prepared `COMPLETE_CSRN_GATE_1.ps1` to make a safety stash, import the verified bundle, switch to the recovery branch, verify the exact commit and clean status, and push it to `origin`.
 - Gate 0 is complete. Gate 1 is preserved and reproducible, but it is not complete until the guarded script succeeds.
 
+### 2026-07-30 — Gate 1 source-hygiene checkpoint
+
+- Verified recovery commit `ce432e4aadc6024b868ec5a717e892f4517fb6fb` locally and on GitHub with zero divergence.
+- Retained safety stash `fb862149215d23eebbf4e5b714ca54079963ee08`.
+- Confirmed local recap, social-card, Facebook connection, and encrypted credential files are ignored and not tracked.
+- Removed the duplicate root `index.html`; Flask continues to serve `templates/index.html`.
+- Removed the obsolete standalone player-headshot utility.
+- Removed the temporary Facebook tunnel launcher and retained direct manual tunnel instructions.
+- Consolidated fictional headshots, school logos, and sponsor logos into the Northwood–Pine Valley fixture tree.
+- Removed fictional fixture venues from operational venue data.
+- Removed `Data/Social/social_state.json` from Git tracking without deleting the local runtime file.
+- Added source-hygiene regression coverage.
+- Gate 1 is complete when this checkpoint is committed, pushed, the worktree is clean, and local/remote heads are identical. Gate 2 is then the next gate.
+
 ---
 
 ## 15. Copy-ready prompt for a new chat
@@ -694,8 +708,8 @@ Then proceed only within the next incomplete gate documented in the Bible.
 The next action is:
 
 ```text
-Finish Gate 1 — run COMPLETE_CSRN_GATE_1.ps1, confirm the recovery branch
-is checked out with a clean worktree, and confirm it is pushed to origin.
+Verify the Gate 1 source-hygiene checkpoint. If the worktree is clean and the
+local recovery branch is identical to origin, begin Gate 2 governance repair.
 ```
 
 Do not begin with visual fixes or new features. Establish the recoverable source first.

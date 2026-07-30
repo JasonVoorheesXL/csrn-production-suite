@@ -1,3 +1,12 @@
+Recovery checkpoint — Gate 1 source hygiene
+- Removed the unused root command-center page duplicate.
+- Removed the obsolete standalone headshot-management utility.
+- Replaced the temporary Facebook tunnel launcher with documented direct setup.
+- Consolidated fictional rehearsal media under the versioned fixture tree.
+- Removed fictional venues from operational venue data.
+- Removed Social Publishing runtime state from Git tracking while preserving local data.
+- Added regression coverage for source/runtime/fixture separation.
+
 Version 1.13.0-alpha.8e
 - Closed grouped menus after selection, outside click, and Escape.
 - Replaced main-suite-only navigation buttons with real cross-page links.
