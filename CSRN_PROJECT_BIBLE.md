@@ -5,7 +5,7 @@ Product: CSRN Production Suite
 Primary release target: Finished Windows-hosted football broadcasting product  
 Owner: Jason Chrest  
 Last audited: 2026-07-30  
-Current status: **BLOCKED — PR #88 CI remediation must pass on Windows and Ubuntu before the recovery branch can merge**
+Current status: **READY TO MERGE — PR #88 passed the full Windows and Ubuntu CI suite**
 
 ---
 
@@ -107,7 +107,7 @@ recovery/alpha-8f-source-alignment
 ### Active committed HEAD
 
 ```text
-0d16f17f23b7b60c5ea4720cdc695b55fbc4216a — ci: support canonical version metadata
+098390cac84f37f7aa8e9e13241a71aac4f15ad4 — fix: align OAuth and recap CI contracts
 ```
 
 ### Tracking branch
@@ -128,12 +128,12 @@ origin/recovery/alpha-8f-source-alignment
 V1.13A8F-SOURCE-ALIGNMENT
 ```
 
-### Worktree state during PR #88 remediation
+### Worktree state at the validated PR #88 checkpoint
 
 ```text
-Local committed HEAD is `0d16f17f23b7b60c5ea4720cdc695b55fbc4216a`.
-The worktree contains the bounded fixes for the 16 failures reported by PR #88
-and must be committed and pushed only after focused validation.
+Local and remote committed HEAD are
+`098390cac84f37f7aa8e9e13241a71aac4f15ad4`. GitHub Actions run
+`30565845144` passed the full suite on Windows and Ubuntu.
 ```
 
 ### Branch lineage
@@ -174,7 +174,8 @@ identity-rendering checks fixed at `0d16f17f` passed. The remaining failures
 were classified as a bounded mixture of OAuth callback defects, recap prose
 regressions, and stale architecture/documentation assertions.
 
-**PR #88 must not merge until both CI jobs pass.**
+**PR #88 passed both required CI jobs and is approved for merge into
+`develop-1.13`.**
 
 The active recovery branch is:
 
@@ -726,7 +727,11 @@ Each update should add an entry to the decision/status log below.
   focused architecture/grounding checks. Full Flask integration remains
   delegated to GitHub CI because the synchronized `.venv` points to a missing
   Python 3.14 installation.
-- This repair remains uncommitted until the guarded checkpoint script is run.
+- Committed and pushed the bounded repair at
+  `098390cac84f37f7aa8e9e13241a71aac4f15ad4`.
+- GitHub Actions run `30565845144` passed on both
+  `ubuntu-latest / Python 3.13` and `windows-latest / Python 3.13`.
+- PR #88 is mergeable and ready to merge into `develop-1.13`.
 
 ---
 
@@ -743,15 +748,16 @@ Read the entire Bible before recommending or changing anything. Treat it as the 
 
 Gate 1 source recovery and the Gate 2 governance checkpoint are complete.
 The committed branch head is
-`0d16f17f23b7b60c5ea4720cdc695b55fbc4216a` on
+`098390cac84f37f7aa8e9e13241a71aac4f15ad4` on
 `recovery/alpha-8f-source-alignment`, with canonical identity
 `1.13.0-alpha.8f` / `V1.13A8F-SOURCE-ALIGNMENT`.
 
-PR #88 targets `develop-1.13`. Its first full CI run reported
-`16 failed, 1197 passed`; a bounded repair is in the worktree and requires a
-guarded commit/push followed by green Windows and Ubuntu CI. PRs #86 and #87
-are closed without merge. Do not add features, apply installer ZIPs, modify
-live runtime data, or merge PR #88 while checks are failing.
+PR #88 targets `develop-1.13`. The bounded repair is committed at
+`098390cac84f37f7aa8e9e13241a71aac4f15ad4`, and GitHub Actions run
+`30565845144` passed on Windows and Ubuntu. PRs #86 and #87 are closed without
+merge. The next action is to merge PR #88, verify `develop-1.13`, and begin the
+next incomplete release gate. Do not add features, apply installer ZIPs, or
+modify live runtime data during the merge checkpoint.
 
 Before acting, report:
 1. the development folder you inspected;
@@ -770,9 +776,9 @@ Then proceed only within the next incomplete gate documented in the Bible.
 The next action is:
 
 ```text
-Commit and push the bounded PR #88 CI repair, monitor both Windows and Ubuntu
-jobs, correct only evidenced failures, and merge into develop-1.13 only after
-all required checks pass.
+Commit this final Bible checkpoint, require the resulting PR #88 Windows and
+Ubuntu jobs to pass, merge PR #88 into `develop-1.13`, and verify the exact
+merged commit before beginning Gate 3.
 ```
 
 Do not begin visual fixes or new features until the recovery branch is merged
