@@ -64,6 +64,11 @@ from social_service import SocialPublishingService
 from social_card_renderer import SocialCardRenderer
 from social_asset_resolver import SocialAssetResolver
 from social_platforms import default_adapter_registry
+from facebook_connection_service import (
+    FacebookConnectionService,
+    FacebookCredentialVault,
+)
+from recap_service import GroundedGameRecapService
 from broadcast_lifecycle_service import BroadcastLifecycleService
 from routes.system_routes import (
     SystemRoutesDependencies,
@@ -173,6 +178,10 @@ from routes.social_routes import (
     SocialRoutesDependencies,
     create_social_blueprint,
 )
+from routes.recap_routes import (
+    RecapRoutesDependencies,
+    create_recap_blueprint,
+)
 from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
@@ -233,6 +242,9 @@ RELEASE_MANIFEST_FILE = DATA_DIR / "Releases" / "game_day_release_manifest.json"
 THEME_STATE_FILE = DATA_DIR / "Themes" / "theme_state.json"
 SOCIAL_STATE_FILE = DATA_DIR / "Social" / "social_state.json"
 SOCIAL_CARDS_DIR = DATA_DIR / "Social" / "Cards"
+FACEBOOK_CONNECTION_FILE = DATA_DIR / "Social" / "facebook_connection.json"
+FACEBOOK_CREDENTIAL_FILE = DATA_DIR / "Social" / "facebook_credentials.dat"
+RECAP_STATE_FILE = DATA_DIR / "Recaps" / "recaps.json"
 
 APPLICATION_BLUEPRINTS: list[Any] = []
 lock = Lock()
@@ -367,9 +379,9 @@ DEFAULT_SECURITY: dict[str, Any] = {
 
 
 RUNTIME_VERSION = (
-    "Version 1.13.0-alpha.6i — Social Publishing Engine"
+    "Version 1.13.0-alpha.8f — Player Identity Repair and Source Alignment"
 )
-RUNTIME_BUILD = "V1.13A6I-SOCIAL-PUBLISHING-ENGINE"
+RUNTIME_BUILD = "V1.13A8F-SOURCE-ALIGNMENT"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -437,9 +449,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "preview_first": True,
             "auto_create_drafts": False,
             "allow_auto_publish": False,
-            "x_credential_ref": "CSRN_X_ACCESS_TOKEN",
-            "facebook_credential_ref": "CSRN_FACEBOOK_PAGE_ACCESS_TOKEN",
+            "facebook_credential_ref": "CSRN_FACEBOOK_SECURE_PAGE_TOKEN",
             "facebook_api_version": "v25.0",
+            "facebook_connection": "local_oauth_test",
+            "x_mode": "assisted_manual",
+            "x_oauth": False,
+            "x_api": False,
+            "x_auto_queue": False,
         },
     },
     "application": {
@@ -460,7 +476,7 @@ LOCKOUT_SECONDS = 60
 
 
 def ensure_data_architecture() -> None:
-    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings", "Rehearsals", "Releases", "Themes", "Social"):
+    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings", "Rehearsals", "Releases", "Themes", "Social", "Recaps"):
         (DATA_DIR / name).mkdir(parents=True, exist_ok=True)
     ASSOCIATION_PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -2248,6 +2264,8 @@ APPLICATION_BLUEPRINTS.append(THEME_ROUTES_BLUEPRINT)
 
 
 SOCIAL_SERVICE: SocialPublishingService | None = None
+FACEBOOK_CONNECTION_SERVICE: FacebookConnectionService | None = None
+FACEBOOK_CREDENTIAL_VAULT = FacebookCredentialVault(FACEBOOK_CREDENTIAL_FILE)
 
 
 def get_social_service() -> SocialPublishingService:
@@ -2265,25 +2283,85 @@ def get_social_service() -> SocialPublishingService:
                 output_dir=SOCIAL_CARDS_DIR,
                 asset_resolver=resolver,
             ),
-            adapters=default_adapter_registry(),
+            adapters=default_adapter_registry(
+                credential_resolver=FACEBOOK_CREDENTIAL_VAULT.resolve
+            ),
             load_broadcast_state=load_state,
             load_config=load_config,
             load_rosters=load_rosters,
             load_sponsors=load_sponsors,
             active_sponsor_by_id=active_sponsor_by_id,
             get_theme_status=lambda: get_theme_service().status(),
+            credential_available=FACEBOOK_CREDENTIAL_VAULT.available,
             clock=time.time,
         )
     return SOCIAL_SERVICE
 
 
+
+
+def get_facebook_connection_service() -> FacebookConnectionService:
+    global FACEBOOK_CONNECTION_SERVICE
+    if FACEBOOK_CONNECTION_SERVICE is None:
+        FACEBOOK_CONNECTION_SERVICE = FacebookConnectionService(
+            settings_file=FACEBOOK_CONNECTION_FILE,
+            vault=FACEBOOK_CREDENTIAL_VAULT,
+            save_social_account=lambda payload: get_social_service().configure_account(payload),
+            remove_social_account=lambda account_id, confirmation: get_social_service().remove_account(
+                account_id, confirmation
+            ),
+            clock=time.time,
+        )
+    return FACEBOOK_CONNECTION_SERVICE
+
 SOCIAL_ROUTES_BLUEPRINT = create_social_blueprint(
     SocialRoutesDependencies(
         require_auth=require_auth,
         get_social_service=lambda: get_social_service(),
+        get_facebook_connection_service=lambda: get_facebook_connection_service(),
     )
 )
 APPLICATION_BLUEPRINTS.append(SOCIAL_ROUTES_BLUEPRINT)
+
+
+RECAP_SERVICE: GroundedGameRecapService | None = None
+
+
+def _create_recap_social_draft(recap: dict[str, Any]):
+    summary = str(recap.get("social_summary") or recap.get("lead") or "").strip()
+    return get_social_service().create_draft(
+        "FINAL",
+        payload={
+            "headline": str(recap.get("headline") or "FINAL").strip(),
+            "message": summary,
+            "detail": summary,
+            "postgame_summary": True,
+            "recap_id": str(recap.get("id") or ""),
+            "broadcast_id": str(recap.get("broadcast_id") or ""),
+        },
+        force_duplicate=True,
+    )
+
+
+def get_recap_service() -> GroundedGameRecapService:
+    global RECAP_SERVICE
+    if RECAP_SERVICE is None:
+        RECAP_SERVICE = GroundedGameRecapService(
+            state_file=RECAP_STATE_FILE,
+            load_broadcast_state=load_state,
+            create_social_draft=_create_recap_social_draft,
+            clock=time.time,
+        )
+    return RECAP_SERVICE
+
+
+RECAP_ROUTES_BLUEPRINT = create_recap_blueprint(
+    RecapRoutesDependencies(
+        require_auth=require_auth,
+        get_recap_service=lambda: get_recap_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(RECAP_ROUTES_BLUEPRINT)
 
 
 SUPPORT_MEDIA_SERVICE: SupportMediaService | None = None

@@ -1,16 +1,18 @@
 CSRN PRODUCTION SUITE
-Version 1.2 Alpha — Event Engine v1 Hotfix 4 — Event Engine v1 Hotfix 1
+Version 1.13.0-alpha.8f — Player Identity Repair and Source Alignment
+Build V1.13A8F-SOURCE-ALIGNMENT
 ==========================================
 
 PURPOSE
 CSRN Production Suite is a local broadcast operations platform for managing
 schools, venues, branding, game schedules, live scorebug data, and OBS output.
 
-STABLE BASELINE
-- Version: 1.0 Alpha
-- Milestone: Phase 3.1 — Event Engine v1
-- Internal build ID: V1.0A-P2-STABLE
-- Promoted from: Build 0019 Corrected R4 Hotfix 6
+CURRENT RECOVERY BASELINE
+- Version: 1.13.0-alpha.8f
+- Milestone: Gate 2 — Governance Repair
+- Internal build ID: V1.13A8F-SOURCE-ALIGNMENT
+- Source checkpoint: 9f37189c5b4fed6c76b8e6228fe8c3086f7c5290
+- Branch: recovery/alpha-8f-source-alignment
 
 START THE APPLICATION
 1. Extract this folder to a permanent location.

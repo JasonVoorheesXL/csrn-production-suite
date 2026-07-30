@@ -6,6 +6,8 @@
   <title>CSRN Production Suite — Command Center</title>
   <link rel="icon" type="image/png" href="/static/csrn-logo.png">
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/csrn-navigation.css">
+  <script defer src="/static/csrn-navigation.js"></script>
 </head>
 <body>
   <main class="shell">
@@ -27,22 +29,7 @@
       </div>
     </header>
 
-    <nav id="moduleNav" class="module-nav hidden">
-      <button id="navCommand" class="nav-active" onclick="showModule('command')">Command Center</button>
-      <button id="navStatistician" onclick="showModule('statistician')">Statistician</button>
-      <button id="navStatistics" onclick="showModule('statistics')">Statistics</button>
-      <button id="navPackages" onclick="showModule('packages')">Broadcast Packages</button>
-      <button id="navGames" onclick="showModule('games')">Game Manager</button>
-      <button id="navSchools" onclick="showModule('schools')">School Database</button>
-      <button id="navRosters" onclick="showModule('rosters')">Rosters</button>
-      <button id="navBroadcasters" onclick="showModule('broadcasters')">Personnel</button>
-      <button id="navGraphics" onclick="showModule('graphics')">Graphics</button>
-      <button id="navAssets" onclick="showModule('assets')">Assets</button>
-      <button id="navSponsors" onclick="showModule('sponsors')">Sponsors</button>
-      <button id="navOBS" onclick="showModule('obs')">OBS Manager</button>
-      <button id="navSettings" onclick="showModule('settings')">Settings</button>
-      <button id="navDiagnostics" onclick="showModule('diagnostics')">Diagnostics</button>
-    </nav>
+    <nav id="moduleNav" class="hidden" data-csrn-navigation data-active="command" aria-label="CSRN modules"></nav>
 
     <section id="setupPinPanel" class="panel auth-panel hidden">
       <img class="auth-logo" src="/static/csrn-logo.png" alt="CSRN logo">
@@ -1042,10 +1029,14 @@
 
     <section id="diagnosticsModule" class="hidden">
       <section class="panel settings-panel">
-        <h1>Diagnostics</h1>
+        <div class="section-heading-row"><div><h1>Football Release Readiness</h1><p class="section-note">Run this before a rehearsal or live broadcast. Failures require correction; warnings require an operator decision.</p></div><span id="releaseGateBadge" class="phase-badge phase-pregame">NOT RUN</span></div>
+        <div id="releaseReadinessSummary" class="diagnostic-summary"></div>
+        <div id="releaseReadinessChecks"></div>
+        <div class="row"><button class="primary" onclick="loadReleaseReadiness()">Run Release Preflight</button><button onclick="exportReleaseReport()">Export Rehearsal Report</button><button onclick="showModule('games')">Open Game Manager</button></div>
+        <h2>Technical Diagnostics</h2>
         <div id="diagnosticSummary" class="diagnostic-summary"></div>
         <div id="diagnosticChecks"></div><h2>Engine Status</h2><div id="diagnosticEngines" class="engine-status-grid"></div>
-        <button class="primary" onclick="loadDiagnostics()">Refresh Diagnostics</button>
+        <button onclick="loadDiagnostics()">Refresh Technical Diagnostics</button>
       </section>
     </section>
 
@@ -1225,6 +1216,14 @@ let currentState = null;
 let authenticated = false;
 let appInitialized = false;
 
+
+function requestedModuleFromLocation() {
+  const raw = new URLSearchParams(window.location.search).get('module') || 'command';
+  const requested = raw === 'readiness' ? 'diagnostics' : raw;
+  const allowed = new Set(['command','statistician','statistics','packages','games','schools','rosters','broadcasters','graphics','assets','sponsors','obs','settings','diagnostics']);
+  return allowed.has(requested) ? requested : 'command';
+}
+
 async function initializeAuthenticatedApp() {
   if (appInitialized) return;
   await poll();
@@ -1233,7 +1232,7 @@ async function initializeAuthenticatedApp() {
   await loadGameManager();
   await populatePlannedBroadcasts();
   moveSetupPanelToGameManager();
-  showModule('command');
+  showModule(requestedModuleFromLocation());
   appInitialized = true;
   handleConnectionLanding();
 }
@@ -2046,6 +2045,7 @@ function applySponsorProfile(selectId,nameId,logoId,leadId){const id=document.ge
 
 function showModule(module) {
   currentModule = module;
+  window.CSRNNavigation?.setActive(module);
   document.getElementById('commandModule').classList.toggle('hidden', module !== 'command');
   document.getElementById('packagesModule').classList.toggle('hidden', module !== 'packages');
   document.getElementById('gamesModule').classList.toggle('hidden', module !== 'games');
@@ -2061,20 +2061,7 @@ function showModule(module) {
   document.getElementById('statisticianModule').classList.toggle('hidden', module !== 'statistician');
   document.getElementById('statisticsModule').classList.toggle('hidden', module !== 'statistics');
   document.getElementById('diagnosticsModule').classList.toggle('hidden', module !== 'diagnostics');
-  document.getElementById('navCommand').classList.toggle('nav-active', module === 'command');
-  document.getElementById('navPackages').classList.toggle('nav-active', module === 'packages');
-  document.getElementById('navGames').classList.toggle('nav-active', module === 'games');
-  document.getElementById('navSchools').classList.toggle('nav-active', module === 'schools');
-  document.getElementById('navRosters').classList.toggle('nav-active', module === 'rosters');
-  document.getElementById('navBroadcasters').classList.toggle('nav-active', module === 'broadcasters');
-  document.getElementById('navGraphics').classList.toggle('nav-active', module === 'graphics');
-  document.getElementById('navAssets').classList.toggle('nav-active', module === 'assets');
-  document.getElementById('navSponsors').classList.toggle('nav-active', module === 'sponsors');
-  document.getElementById('navOBS').classList.toggle('nav-active', module === 'obs');
-  document.getElementById('navSettings').classList.toggle('nav-active', module === 'settings');
-  document.getElementById('navStatistician').classList.toggle('nav-active', module === 'statistician');
-  document.getElementById('navStatistics').classList.toggle('nav-active', module === 'statistics');
-  document.getElementById('navDiagnostics').classList.toggle('nav-active', module === 'diagnostics');
+  if (window.CSRNNavigation) window.CSRNNavigation.setActive(module);
   if (module === 'packages') loadPackages();
   if (module === 'games') { moveSetupPanelToGameManager(); loadGameManager(); }
   if (module === 'command') { document.getElementById('setupPanel').classList.add('hidden'); populatePlannedBroadcasts(); loadBroadcastConnectionInfo(); if(currentState&&currentState.broadcast_id) refreshReadiness(); else renderNeutralReadiness(); }
@@ -2088,7 +2075,7 @@ function showModule(module) {
   if (module === 'settings') loadConfig();
   if (module === 'statistics') loadStatistics();
   if (module === 'statistician') { renderStatisticianRegister(); loadCorrections(); loadConnectionInfo(); }
-  if (module === 'diagnostics') loadDiagnostics();
+  if (module === 'diagnostics') { loadDiagnostics(); loadReleaseReadiness(); }
 }
 
 async function loadConfig() {
@@ -2207,6 +2194,34 @@ async function saveConfig() {
   document.getElementById('sport').value = currentConfig.broadcast_defaults.sport;
   document.getElementById('visualMode').value = currentConfig.broadcast_defaults.visual_mode || 'graphic';
 }
+
+
+let releaseReportPayload=null;
+async function optionalApi(url){try{return {ok:true,data:await api(url)}}catch(error){return {ok:false,error:error.message}}}
+function releaseCheck(label,status,note){return {label,status,note}}
+async function loadReleaseReadiness(){
+  const badge=document.getElementById('releaseGateBadge'),box=document.getElementById('releaseReadinessChecks'),summary=document.getElementById('releaseReadinessSummary');
+  badge.textContent='RUNNING';badge.className='phase-badge phase-halftime';box.innerHTML='<p class="section-note">Checking the active football broadcast and supporting services…</p>';
+  const [ready,diag,state,social,recaps]=await Promise.all([optionalApi('/api/readiness'),optionalApi('/api/diagnostics'),optionalApi('/api/state'),optionalApi('/api/social/status'),optionalApi('/api/recaps/status')]);
+  const checks=[];const st=state.data||{},d=diag.data||{},r=ready.data||{};
+  checks.push(releaseCheck('Active broadcast',st.broadcast_id?'pass':'fail',st.broadcast_id?`${st.home_team||'Home'} vs ${st.visitor_team||'Visitor'}`:'Create or load a game before broadcast.'));
+  checks.push(releaseCheck('Football mode',String(st.sport||'').toLowerCase()==='football'?'pass':'warning',st.sport?`Configured sport: ${st.sport}`:'No sport is loaded.'));
+  checks.push(releaseCheck('Team identities',st.home_team&&st.visitor_team?'pass':'fail',st.home_team&&st.visitor_team?'Both teams are present.':'Home and visitor teams are required.'));
+  checks.push(releaseCheck('Roster availability',st.home_roster_id||st.visitor_roster_id?'pass':'warning','Verify both game rosters and player selectors before kickoff.'));
+  checks.push(releaseCheck('Venue',st.venue?'pass':'warning',st.venue||'No venue is recorded.'));
+  const fileFails=(d.checks||[]).filter(x=>!x.ok);checks.push(releaseCheck('Writable application data',diag.ok&&fileFails.length===0?'pass':'fail',fileFails.length?`${fileFails.length} file or folder checks failed.`:'Application data checks passed.'));
+  const obs=d.obs||{};checks.push(releaseCheck('OBS connection',obs.reachable&&obs.authenticated?'pass':'fail',obs.reachable?(obs.authenticated?'OBS is connected and authenticated.':'OBS authentication failed.'):'OBS is not reachable.'));
+  checks.push(releaseCheck('Required OBS output',obs.required_scene_exists&&obs.browser_source_exists?'pass':'fail','Verify the scorebug scene and browser source.'));
+  checks.push(releaseCheck('Social Publishing',social.ok?'pass':'warning',social.ok?'Social Publishing service responded.':`Social Publishing unavailable: ${social.error}`));
+  checks.push(releaseCheck('Game Recaps',recaps.ok?'pass':'warning',recaps.ok?'Recap service responded.':`Game Recaps unavailable: ${recaps.error}`));
+  const native=(r.checks||[]);native.forEach(c=>{if(!checks.some(x=>x.label===c.label))checks.push(releaseCheck(c.label,c.ok?'pass':'fail',c.note||c.action||''))});
+  const fails=checks.filter(x=>x.status==='fail').length,warns=checks.filter(x=>x.status==='warning').length;
+  const gate=fails?'BLOCKED':warns?'REVIEW':'READY';badge.textContent=gate;badge.className=`phase-badge ${fails?'phase-final':warns?'phase-halftime':'phase-live'}`;
+  summary.innerHTML=`<strong>${gate}</strong><br>${checks.length} checks · ${fails} failures · ${warns} warnings<br><span class="section-note">Version ${escapeHtml(d.version||'unknown')} · ${new Date().toLocaleString()}</span>`;
+  box.innerHTML=checks.map(c=>`<article class="readiness-item ${c.status==='pass'?'pass':'fail'}"><div><strong>${c.status==='pass'?'✓':c.status==='warning'?'!':'✕'} ${escapeHtml(c.label)}</strong><p>${escapeHtml(c.note)}</p></div><span class="badge">${c.status.toUpperCase()}</span></article>`).join('');
+  releaseReportPayload={generated_at:new Date().toISOString(),gate,failures:fails,warnings:warns,version:d.version||'',build:d.build||'',broadcast:{id:st.broadcast_id||'',home:st.home_team||'',visitor:st.visitor_team||'',sport:st.sport||'',venue:st.venue||'',phase:st.broadcast_phase||''},checks};
+}
+function exportReleaseReport(){if(!releaseReportPayload){loadReleaseReadiness().then(exportReleaseReport);return}const lines=[`CSRN Football Release Readiness Report`,`Generated: ${releaseReportPayload.generated_at}`,`Gate: ${releaseReportPayload.gate}`,`Version: ${releaseReportPayload.version}`,`Build: ${releaseReportPayload.build}`,`Broadcast: ${releaseReportPayload.broadcast.home} vs ${releaseReportPayload.broadcast.visitor}`,`Sport: ${releaseReportPayload.broadcast.sport}`,`Venue: ${releaseReportPayload.broadcast.venue}`,'',...releaseReportPayload.checks.map(c=>`[${c.status.toUpperCase()}] ${c.label}: ${c.note}`)];const blob=new Blob([lines.join('\r\n')],{type:'text/plain'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`CSRN-Release-Readiness-${new Date().toISOString().slice(0,10)}.txt`;a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
 
 async function loadDiagnostics() {
   const d = await api('/api/diagnostics');

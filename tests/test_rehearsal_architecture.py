@@ -47,7 +47,8 @@ def test_phase_6_6_documentation_retains_social_publishing_requirement() -> None
     ).read_text(encoding="utf-8")
     assert "two operator-recorded" in document
     assert "Phase 6.9 — Social Publishing Engine" in document
-    assert "Facebook and X" in document
+    assert "preview-first Facebook Page publishing" in document
+    assert "assisted-manual X packages" in document
     assert "player headshots" in document
     assert "approved sponsors" in document
 

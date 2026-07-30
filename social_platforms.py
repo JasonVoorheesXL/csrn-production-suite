@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 import mimetypes
 import os
@@ -10,6 +9,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol
+from urllib.parse import urlencode
 
 
 CredentialResolver = Callable[[str], str]
@@ -54,15 +54,27 @@ class SocialPlatformAdapter(Protocol):
 
 
 class EnvCredentialResolver:
-    """Resolve credential references from the process environment.
+    """Resolve supported automatic-publisher credentials from the environment.
 
-    The queue persists only a reference name, never the credential value. A future
-    commercial OAuth provider can replace this resolver without changing the queue.
+    CSRN persists only the configured reference name. The current automatic
+    publisher is Facebook Page. A commercial OAuth/account-connection provider
+    can replace this resolver without changing the queue or recap engine.
     """
 
     def __call__(self, reference: str) -> str:
         reference = str(reference or "").strip()
         return os.environ.get(reference, "") if reference else ""
+
+
+def build_x_compose_url(text: str) -> str:
+    """Return the public X composer URL used by the assisted-manual workflow.
+
+    This helper does not authenticate, call an API, upload media, or publish.
+    The operator remains responsible for attaching the generated card and
+    submitting the post in X.
+    """
+
+    return "https://x.com/intent/post?" + urlencode({"text": str(text or "")})
 
 
 def urllib_transport(
@@ -118,7 +130,10 @@ def _failure(response: HttpResponse, *, prefix: str) -> PlatformResult:
     retryable = status == 0 or status == 429 or status >= 500
     safe_details = {
         "http_status": status,
-        "error": payload.get("error") or payload.get("errors") or payload.get("title") or "",
+        "error": payload.get("error")
+        or payload.get("errors")
+        or payload.get("title")
+        or "",
     }
     return PlatformResult(
         f"{prefix}_FAILED",
@@ -126,94 +141,6 @@ def _failure(response: HttpResponse, *, prefix: str) -> PlatformResult:
         retry_after=_retry_after(response.headers),
         details=safe_details,
     )
-
-
-class XPlatformAdapter:
-    platform = "x"
-
-    def __init__(
-        self,
-        *,
-        credential_resolver: CredentialResolver | None = None,
-        transport: Transport = urllib_transport,
-    ) -> None:
-        self._credentials = credential_resolver or EnvCredentialResolver()
-        self._transport = transport
-
-    def publish(
-        self,
-        account: Mapping[str, Any],
-        *,
-        text: str,
-        image_path: Path,
-    ) -> PlatformResult:
-        token = self._credentials(str(account.get("credential_ref", "")))
-        if not token:
-            return PlatformResult("CREDENTIAL_UNAVAILABLE")
-        image_path = Path(image_path)
-        if not image_path.is_file():
-            return PlatformResult("IMAGE_NOT_FOUND")
-        image = image_path.read_bytes()
-        if len(image) > 5 * 1024 * 1024:
-            return PlatformResult("IMAGE_TOO_LARGE")
-
-        base = str(account.get("api_base") or "https://api.x.com").rstrip("/")
-        media_type = mimetypes.guess_type(image_path.name)[0] or "image/png"
-        upload_payload = json.dumps(
-            {
-                "media": base64.b64encode(image).decode("ascii"),
-                "media_category": "tweet_image",
-                "media_type": media_type,
-                "shared": False,
-            },
-            separators=(",", ":"),
-        ).encode("utf-8")
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-            "User-Agent": "CSRN-Production-Suite/1.13",
-        }
-        upload = self._transport("POST", f"{base}/2/media/upload", headers, upload_payload)
-        if upload.status not in {200, 201}:
-            return _failure(upload, prefix="MEDIA_UPLOAD")
-        media_id = str((_json_body(upload).get("data") or {}).get("id", ""))
-        if not media_id:
-            return PlatformResult("MEDIA_ID_MISSING")
-
-        post_payload = json.dumps(
-            {"text": text, "media": {"media_ids": [media_id]}},
-            separators=(",", ":"),
-        ).encode("utf-8")
-        post = self._transport("POST", f"{base}/2/tweets", headers, post_payload)
-        if post.status not in {200, 201}:
-            return _failure(post, prefix="POST")
-        data = _json_body(post).get("data") or {}
-        post_id = str(data.get("id", ""))
-        username = str(account.get("username", "")).strip().lstrip("@")
-        url = f"https://x.com/{username}/status/{post_id}" if username and post_id else ""
-        return PlatformResult("PUBLISHED", post_id=post_id, url=url, details={"media_id": media_id})
-
-    def delete(self, account: Mapping[str, Any], *, post_id: str) -> PlatformResult:
-        token = self._credentials(str(account.get("credential_ref", "")))
-        if not token:
-            return PlatformResult("CREDENTIAL_UNAVAILABLE")
-        post_id = str(post_id or "").strip()
-        if not post_id:
-            return PlatformResult("POST_ID_REQUIRED")
-        base = str(account.get("api_base") or "https://api.x.com").rstrip("/")
-        response = self._transport(
-            "DELETE",
-            f"{base}/2/tweets/{post_id}",
-            {
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-                "User-Agent": "CSRN-Production-Suite/1.13",
-            },
-            None,
-        )
-        if response.status not in {200, 204}:
-            return _failure(response, prefix="DELETE")
-        return PlatformResult("DELETED", post_id=post_id)
 
 
 class FacebookPageAdapter:
@@ -291,7 +218,11 @@ class FacebookPageAdapter:
             return _failure(response, prefix="POST")
         payload = _json_body(response)
         post_id = str(payload.get("post_id") or payload.get("id") or "")
-        return PlatformResult("PUBLISHED", post_id=post_id, details={"photo_id": payload.get("id", "")})
+        return PlatformResult(
+            "PUBLISHED",
+            post_id=post_id,
+            url=str(account.get("page_url", "")),
+        )
 
     def delete(self, account: Mapping[str, Any], *, post_id: str) -> PlatformResult:
         token = self._credentials(str(account.get("credential_ref", "")))
@@ -318,10 +249,14 @@ class FacebookPageAdapter:
 
 
 def default_adapter_registry(
+    *,
     credential_resolver: CredentialResolver | None = None,
+    transport: Transport = urllib_transport,
 ) -> dict[str, SocialPlatformAdapter]:
     resolver = credential_resolver or EnvCredentialResolver()
     return {
-        "x": XPlatformAdapter(credential_resolver=resolver),
-        "facebook": FacebookPageAdapter(credential_resolver=resolver),
+        "facebook": FacebookPageAdapter(
+            credential_resolver=resolver,
+            transport=transport,
+        ),
     }

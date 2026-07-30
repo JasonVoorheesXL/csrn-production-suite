@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CSRN Production Suite — Game Recaps</title>
+  <link rel="icon" type="image/png" href="/static/csrn-logo.png">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/csrn-navigation.css">
+  <script defer src="/static/csrn-navigation.js"></script>
+  <style>
+    .module-nav{overflow-x:auto}.module-nav a{appearance:none;background:#171717;border:1px solid #4d4d4d;border-radius:8px;color:#f5f5f5;font:inherit;font-weight:700;padding:9px 12px;text-decoration:none;white-space:nowrap}.module-nav a:hover{border-color:#b5121b}.module-nav a.nav-active{background:#b5121b;border-color:#d3333c}.workspace-page{display:grid;gap:18px}.page-heading{display:flex;gap:18px;align-items:flex-start;justify-content:space-between}.page-heading p{max-width:920px}.grid{display:grid;grid-template-columns:minmax(300px,.9fr) minmax(500px,2fr);gap:18px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.stack{display:grid;gap:10px}.field-label{display:block;color:#d9dde2;font-size:.88rem;margin-bottom:4px}.badge{display:inline-block;padding:3px 8px;border-radius:99px;background:#444;font-size:.78rem}.error{color:#ff9c9c}.success{color:#8de2a0}.muted{color:#aeb5be;font-size:.88rem}.policy{padding:11px 13px;border-left:4px solid #b5121b;background:#171717}.body-editor{min-height:360px}.grounding-summary{display:grid;gap:8px}.grounding-row{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #414141;padding:7px 0}.grounding-row:last-child{border-bottom:0}.grounding-raw{white-space:pre-wrap;background:#151515;border:1px solid #555;border-radius:8px;padding:12px;max-height:300px;overflow:auto}.quick-steps{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px}.quick-steps span{background:#181818;border:1px solid #444;border-radius:8px;padding:9px;font-size:.85rem;color:#d4d7db}.quick-steps strong{color:#fff}.recap-health{padding:12px;border:1px solid #4d4d4d;border-radius:8px;background:#171717}.recap-health.warning{border-color:#7f6a2a;background:#282515}.recap-health.ready{border-color:#376f47;background:#17251c}.postgame-handoff{padding:14px;border:1px solid #4d4d4d;border-radius:9px;background:#171717}.postgame-handoff.ready{border-color:#376f47;background:#17251c}.page-message:empty{display:none}@media(max-width:950px){.grid{grid-template-columns:1fr}.page-heading{display:block}.quick-steps{margin-top:12px}}@media(max-width:650px){.quick-steps{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="suite-header">
+    <div class="brand-lockup">
+      <img class="header-logo" src="/static/csrn-logo.png" alt="Caledonia Sports Radio Network logo">
+      <div class="brand-copy"><div class="product-name">CSRN PRODUCTION SUITE</div><div class="module-name">GAME RECAPS</div></div>
+    </div>
+    <div class="broadcast-context">
+      <div class="subhead" id="matchup">No broadcast loaded</div>
+      <div class="header-actions"><div id="phaseBadge" class="phase-badge phase-pregame">PREGAME</div><button class="small-button header-logout" id="logoutButton">Log Out</button></div>
+    </div>
+  </header>
+
+  <nav data-csrn-navigation data-active="recaps" aria-label="CSRN modules"></nav>
+
+  <div class="workspace-page">
+    <section class="panel page-heading">
+      <div><h1>Grounded Game Recaps</h1><p>Create a recap from the active broadcast’s recorded events and available statistics. Missing information is omitted instead of estimated.</p></div>
+      <div class="quick-steps"><span><strong>1.</strong> Generate</span><span><strong>2.</strong> Review</span><span><strong>3.</strong> Approve</span><span><strong>4.</strong> Export</span></div>
+    </section>
+    <div class="policy"><strong>Grounding rule:</strong> no invented yardage, player attribution, scoring events, statistics, or weather conditions. Any operator edit resets approval and must be reviewed again.</div>
+    <div id="message" class="page-message"></div>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Recap Workspace</h2>
+        <div class="stack">
+          <label><span class="field-label">Saved recap</span><select id="recapSelect"><option value="">No recap selected</option></select></label>
+          <button id="generate">Generate from active game</button>
+          <button class="secondary" id="regenerate">Regenerate from current recorded data</button>
+        </div>
+        <div id="recapHealth" class="recap-health" style="margin-top:14px">Load or generate a recap to begin.</div>
+        <div id="summary" class="muted" style="margin-top:14px"></div>
+        <h2 style="margin-top:22px">Grounding Summary</h2>
+        <div id="groundingSummary" class="grounding-summary muted">Select or generate a recap.</div>
+        <details style="margin-top:12px"><summary>Technical grounding details</summary><div id="grounding" class="grounding-raw muted" style="margin-top:10px">Select or generate a recap.</div></details>
+      </section>
+
+      <section class="panel">
+        <div class="row"><h2 style="flex:1">Recap Editor</h2><span id="statusBadge" class="badge">NONE</span></div>
+        <div class="stack">
+          <label><span class="field-label">Article style</span><select id="articleStyle"><option value="straight_news">Straight news</option><option value="local_sports">Local sports coverage</option><option value="feature_recap">Feature recap</option><option value="brief_report">Brief postgame report</option></select></label><label><span class="field-label">Postgame article sponsor</span><select id="articleSponsor"><option value="">No sponsor</option></select></label><label><span class="field-label">Headline</span><input id="headline"></label>
+          <label><span class="field-label">Lead paragraph</span><textarea id="lead"></textarea></label>
+          <label><span class="field-label">Article body</span><textarea id="body" class="body-editor"></textarea></label>
+          <label><span class="field-label">Closing</span><textarea id="closing"></textarea></label>
+          <label><span class="field-label">Social summary</span><textarea id="socialSummary"></textarea></label>
+          <div class="row"><button id="save">Save edits</button><button id="approve">Approve grounded recap</button><button class="secondary" id="socialDraft">Create final-score social draft</button><a id="exportLink" href="#"><button type="button" class="secondary">Export text</button></a></div><div id="postgameHandoff" class="postgame-handoff"><strong>Postgame publishing handoff</strong><p class="muted">Generate, review, and approve the recap. Then create one final-score social draft and finish it in Social Publishing.</p><div class="row"><button type="button" class="secondary" id="openSocial">Open Social Publishing</button><button type="button" class="secondary" id="copySocialSummary">Copy social summary</button></div></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+<script>
+const byId=id=>document.getElementById(id);
+const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const api=async(url,options={})=>{const response=await fetch(url,{credentials:'same-origin',headers:{'Content-Type':'application/json'},...options});const data=await response.json().catch(()=>({}));if(response.status===401){window.location.href='/';throw new Error('Authentication required')}if(!response.ok)throw new Error(friendlyError(data.error)||data.error||`HTTP ${response.status}`);return data};
+const message=(text,ok=true)=>{byId('message').innerHTML=`<p class="${ok?'success':'error'}">${escapeHtml(text)}</p>`};
+let current=null;
+function friendlyError(code){return ({BROADCAST_NOT_READY:'Load a broadcast before generating a recap.',FINAL_SCORE_UNAVAILABLE:'A final score is not available yet.',RECAP_ALREADY_EXISTS:'A recap already exists for this broadcast. Select it or regenerate it.',RECAP_NOT_APPROVED:'Approve the recap before creating a social draft.',RECAP_STALE:'The game data changed after this recap was generated. Regenerate it before approval.',SOCIAL_DRAFT_FAILED:'The final-score social draft could not be created.'})[code]||''}
+function phaseClass(phase){return `phase-badge phase-${['pregame','live','halftime','postgame','final'].includes(phase)?phase:'pregame'}`}
+async function loadHeader(){try{const state=await api('/api/state');const home=state.home_team||'Home',visitor=state.visitor_team||'Visitor';byId('matchup').textContent=state.broadcast_created?`${home} vs ${visitor}`:'No broadcast loaded';const phase=state.broadcast_phase||'pregame';byId('phaseBadge').textContent=phase.toUpperCase();byId('phaseBadge').className=phaseClass(phase)}catch(_){}}
+function recapLabel(recap){return `${recap.broadcast_id} · ${recap.status}${recap.stale?' · STALE':''}`}
+function healthMarkup(recap){if(!recap)return {className:'recap-health',html:'Load or generate a recap to begin.'};if(recap.stale)return {className:'recap-health warning',html:'<strong>Regeneration required.</strong><br>The recorded game data changed after this recap was generated.'};if(recap.status==='APPROVED')return {className:'recap-health ready',html:'<strong>Approved and current.</strong><br>This recap is ready to export or send to Social Publishing.'};return {className:'recap-health',html:'<strong>Review required.</strong><br>Check the wording and grounding summary, then approve the recap.'}}
+function populate(recap){current=recap||null;byId('articleStyle').value=recap?.article_style||'local_sports';byId('articleSponsor').value=recap?.sponsor_id||'';byId('headline').value=recap?.headline||'';byId('lead').value=recap?.lead||'';byId('body').value=recap?.body||'';byId('closing').value=recap?.closing||'';byId('socialSummary').value=recap?.social_summary||'';byId('statusBadge').textContent=recap?`${recap.status}${recap.stale?' · STALE':''}`:'NONE';byId('exportLink').href=recap?`/api/recaps/${encodeURIComponent(recap.id)}/export.txt`:'#';const health=healthMarkup(recap);byId('recapHealth').className=health.className;byId('recapHealth').innerHTML=health.html;const facts=recap?.facts||{},omitted=recap?.grounding?.omitted||[],edits=recap?.grounding?.operator_edited_fields||[];byId('summary').innerHTML=recap?`<strong>${escapeHtml(recap.headline)}</strong><br>Final ${escapeHtml(facts.home_score)}–${escapeHtml(facts.visitor_score)} · ${escapeHtml(facts.scoring_events)} recorded scoring events · ${escapeHtml(facts.turnovers)} recorded turnovers${recap.social_draft_id?`<br>Social draft: ${escapeHtml(recap.social_draft_id)}`:''}`:'No recap selected.';byId('groundingSummary').innerHTML=recap?`<div class="grounding-row"><span>Recorded events used</span><strong>${escapeHtml((recap.grounding?.event_ids||[]).length)}</strong></div><div class="grounding-row"><span>Recorded plays used</span><strong>${escapeHtml((recap.grounding?.play_ids||[]).length)}</strong></div><div class="grounding-row"><span>Statistic fields used</span><strong>${escapeHtml((recap.grounding?.stat_paths||[]).length)}</strong></div><div class="grounding-row"><span>Missing items omitted</span><strong>${escapeHtml(omitted.length)}</strong></div><div class="grounding-row"><span>Operator-edited sections</span><strong>${escapeHtml(edits.length)}</strong></div>`:'Select or generate a recap.';byId('grounding').textContent=recap?JSON.stringify({source_hash:recap.grounding?.source_hash,event_ids:recap.grounding?.event_ids,play_ids:recap.grounding?.play_ids,stat_paths:recap.grounding?.stat_paths,omitted,operator_edited_fields:edits,stale:Boolean(recap.stale)},null,2):'Select or generate a recap.';const has=Boolean(recap);byId('regenerate').disabled=!has;byId('save').disabled=!has;byId('approve').disabled=!has||recap?.status==='APPROVED'||recap?.stale;byId('socialDraft').disabled=!has||recap?.status!=='APPROVED'||recap?.stale;const handoff=byId('postgameHandoff');handoff.className='postgame-handoff'+(recap?.social_draft_id?' ready':'');handoff.querySelector('p').textContent=recap?.social_draft_id?'Final-score social draft created. Open Social Publishing to review, approve, and publish it.':'Generate, review, and approve the recap. Then create one final-score social draft and finish it in Social Publishing.'}
+
+async function loadSponsors(){try{const data=await api('/api/sponsors');const rows=(data.sponsors||[]).filter(s=>s.active!==false);byId('articleSponsor').innerHTML='<option value="">No sponsor</option>'+rows.map(s=>`<option value="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join('');if(current)byId('articleSponsor').value=current.sponsor_id||''}catch(_){}}
+
+async function load(selectId=''){try{const data=await api('/api/recaps/status');const recaps=(data.recaps||[]).filter(r=>r.status!=='DELETED');byId('recapSelect').innerHTML='<option value="">No recap selected</option>'+recaps.slice().reverse().map(r=>`<option value="${escapeHtml(r.id)}">${escapeHtml(recapLabel(r))}</option>`).join('');const id=selectId||current?.id||recaps.at(-1)?.id||'';byId('recapSelect').value=id;populate(recaps.find(r=>r.id===id)||null)}catch(error){message(error.message,false)}}
+byId('recapSelect').onchange=async e=>{if(!e.target.value){populate(null);return}try{const data=await api(`/api/recaps/${encodeURIComponent(e.target.value)}`);populate(data.recap)}catch(error){message(error.message,false)}};
+byId('generate').onclick=async()=>{try{const data=await api('/api/recaps/generate',{method:'POST',body:JSON.stringify({regenerate:false,article_style:byId('articleStyle').value})});message('Grounded recap generated.');load(data.recap.id)}catch(error){message(error.message,false)}};
+byId('regenerate').onclick=async()=>{if(!current)return;try{const data=await api('/api/recaps/generate',{method:'POST',body:JSON.stringify({regenerate:true,article_style:byId('articleStyle').value})});message('Recap regenerated from current recorded data.');load(data.recap.id)}catch(error){message(error.message,false)}};
+byId('save').onclick=async()=>{if(!current)return;try{const data=await api(`/api/recaps/${encodeURIComponent(current.id)}`,{method:'PATCH',body:JSON.stringify({article_style:byId('articleStyle').value,sponsor_id:byId('articleSponsor').value,sponsor_name:byId('articleSponsor').selectedOptions[0]?.dataset?.name||'',headline:byId('headline').value,lead:byId('lead').value,body:byId('body').value,closing:byId('closing').value,social_summary:byId('socialSummary').value})});message('Recap edits saved. Approval was reset for review.');populate(data.recap);load(data.recap.id)}catch(error){message(error.message,false)}};
+byId('approve').onclick=async()=>{if(!current)return;try{const data=await api(`/api/recaps/${encodeURIComponent(current.id)}/approve`,{method:'POST',body:JSON.stringify({operator:'operator',confirmation:'APPROVE GROUNDED RECAP'})});message('Grounded recap approved.');populate(data.recap);load(data.recap.id)}catch(error){message(error.message,false)}};
+byId('socialDraft').onclick=async()=>{if(!current)return;try{const data=await api(`/api/recaps/${encodeURIComponent(current.id)}/social-draft`,{method:'POST',body:'{}'});message('Final-score social draft created. Opening Social Publishing…');populate(data.recap);window.setTimeout(()=>{window.location.href='/social'},500)}catch(error){message(error.message,false)}};
+byId('openSocial').onclick=()=>{window.location.href='/social'};byId('copySocialSummary').onclick=async()=>{const text=byId('socialSummary').value||'';try{await navigator.clipboard.writeText(text);message('Postgame social summary copied.')}catch(_){byId('socialSummary').select();document.execCommand('copy');message('Postgame social summary copied.')}};byId('logoutButton').onclick=async()=>{try{await fetch('/api/logout',{method:'POST',credentials:'same-origin'})}finally{window.location.href='/'}};
+loadHeader();load();
+</script>
+</body>
+</html>

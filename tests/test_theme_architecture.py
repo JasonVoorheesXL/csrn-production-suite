@@ -74,7 +74,8 @@ def test_social_publishing_stage_and_theme_handoff_remain_documented() -> None:
     assert "### 6.8 Graphics Theme Engine" in roadmap
     assert "Theme Engine implementation status: Phase 6.8 foundation integrated." in roadmap
     assert "### 6.9 Social Publishing Engine" in roadmap
-    assert "preview-first one-click publishing" in roadmap
+    assert "preview-first approved automatic publishing to supported Facebook Page accounts" in roadmap
+    assert "assisted-manual X packages" in roadmap
 
 
 def test_theme_documentation_covers_originality_and_social_handoff() -> None:

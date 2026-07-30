@@ -149,15 +149,23 @@ class EventService:
             return_td = bool(incoming.get("return_td")) and str(
                 incoming.get("turnover_type", "")
             ) != "downs"
+            conversion_outcome = str(
+                incoming.get("conversion_outcome", "good") or "good"
+            ).lower()
+            if event_code == "XP" and conversion_outcome not in {"good", "no_good"}:
+                return EventResult("INVALID_CONVERSION_OUTCOME", {})
+            if event_code == "2PT" and conversion_outcome not in {"good", "failed"}:
+                return EventResult("INVALID_CONVERSION_OUTCOME", {})
+            conversion_good = conversion_outcome == "good"
             delta = (
                 6
                 if event_code == "TD" or (event_code == "TURNOVER" and return_td)
                 else 3
                 if event_code == "FG"
                 else 2
-                if event_code == "2PT"
+                if event_code == "2PT" and conversion_good
                 else 1
-                if event_code == "XP"
+                if event_code == "XP" and conversion_good
                 else 0
             )
             if delta:
@@ -486,12 +494,7 @@ class EventService:
                 )
                 if yards not in {"", "0"}:
                     event["description"] = (
-                        f"{yards}-yard "
-                        + (
-                            description[0].lower() + description[1:]
-                            if description
-                            else "play"
-                        )
+                        f"{yards}-yard {description}" if description else f"{yards}-yard play"
                     )
             for field in ("description", "quarter"):
                 if field in incoming:
@@ -532,7 +535,7 @@ class EventService:
                     play["ball_spot"] = str(incoming.get("start_spot", ""))[:40]
                 if "end_spot" in incoming:
                     play["end_spot"] = str(incoming.get("end_spot", ""))[:40]
-                if "description" in incoming:
+                if "description" in incoming or "yards" in incoming:
                     play["result"] = event.get(
                         "description",
                         play.get("result", ""),
@@ -727,6 +730,9 @@ class EventService:
 
         if event_code in {"TD", "2PT"}:
             conversion = event_code == "2PT"
+            conversion_outcome = str(incoming.get("conversion_outcome", "good") or "good").lower()
+            if conversion and conversion_outcome == "failed":
+                return "Two-Point Conversion Failed", f"Two-point conversion failed for {team_name}"
             label = "Two-Point Conversion" if conversion else "Touchdown"
             phrase = "two-point conversion" if conversion else "touchdown"
             if play_type == "reception":
@@ -740,7 +746,7 @@ class EventService:
             else:
                 description = f"{scorer_name or team_name} {phrase}"
             if yards:
-                description = f"{yards}-yard {description[0].lower() + description[1:]}"
+                description = f"{yards}-yard {description}"
             return label, description
 
         if event_code == "TURNOVER":
@@ -755,7 +761,7 @@ class EventService:
             if return_td:
                 description += " returned for a touchdown"
             if yards and return_td:
-                description = f"{yards}-yard {description.lower()}"
+                description = f"{yards}-yard {description}"
             return label, description
 
         if event_code == "FIRST_DOWN":
@@ -816,7 +822,10 @@ class EventService:
                 description = f"{yards}-yard field goal by {scorer_name or team_name}"
             return "Field Goal", description
 
-        return "Extra Point", f"Extra point by {scorer_name or team_name}"
+        conversion_outcome = str(incoming.get("conversion_outcome", "good") or "good").lower()
+        if conversion_outcome == "no_good":
+            return "Extra Point No Good", f"Extra point no good for {team_name}"
+        return "Extra Point", f"Extra point good by {scorer_name or team_name}"
 
     def _event_payload(self, **values: Any) -> dict[str, Any]:
         state = values["state"]
@@ -835,6 +844,11 @@ class EventService:
             "label": values["label"],
             "description": values["description"],
             "score_delta": values["delta"],
+            "conversion_outcome": (
+                str(incoming.get("conversion_outcome", "good") or "good").lower()
+                if event_code in {"XP", "2PT"}
+                else ""
+            ),
             "created_at": values["created_at"],
             "quarter": str(state.get("quarter", "1") or "1"),
             "broadcast_id": state.get("broadcast_id", ""),
@@ -891,6 +905,11 @@ class EventService:
                 "fumble": bool(incoming.get("fumble")),
                 "fumble_lost": bool(incoming.get("fumble_lost")),
                 "first_down": bool(incoming.get("first_down")),
+                "conversion_outcome": (
+                    str(incoming.get("conversion_outcome", "good") or "good").lower()
+                    if event_code in {"XP", "2PT"}
+                    else ""
+                ),
                 "turnover": (
                     bool(incoming.get("turnover"))
                     or bool(incoming.get("fumble_lost"))

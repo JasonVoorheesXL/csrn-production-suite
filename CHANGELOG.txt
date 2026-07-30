@@ -1,3 +1,122 @@
+Version 1.13.0-alpha.8f — Player Identity Repair and Source Alignment
+Build V1.13A8F-SOURCE-ALIGNMENT
+- Corrected fictional player headshot URLs.
+- Corrected fictional school-logo URLs and renderer aliases.
+- Prevented missing fixture media from silently resolving to unrelated CSRN branding where valid team media exists.
+- Removed the unused root command-center page duplicate.
+- Removed the obsolete standalone headshot-management utility.
+- Replaced the temporary Facebook tunnel launcher with documented direct setup.
+- Consolidated fictional rehearsal media under the versioned fixture tree.
+- Removed fictional venues from operational venue data.
+- Removed Social Publishing runtime state from Git tracking while preserving local data.
+- Added regression coverage for source/runtime/fixture separation.
+
+Version 1.13.0-alpha.8e
+- Closed grouped menus after selection, outside click, and Escape.
+- Replaced main-suite-only navigation buttons with real cross-page links.
+- Preserved local no-reload module switching on the main suite.
+- Restored navigation from Social Publishing and Game Recaps to all suite sections.
+
+Version 1.13.0-alpha.8d
+- Rebuilt from the verified Phase 6.12a grouped-navigation and readiness payload.
+- Installed the active page to both root index.html and templates/index.html.
+- Preserved Release Readiness state after selection and refresh.
+- Added installer verification for grouped navigation and readiness functions.
+
+Version 1.13.0-alpha.8a
+- Added grouped responsive navigation across the main suite, Social Publishing, and Game Recaps.
+- Added a Football Release Readiness preflight with pass, warning, and fail results.
+- Added downloadable rehearsal/readiness reports.
+- Reordered navigation around game-day operator priority.
+Version 1.13.0-alpha.7b
+- Added deterministic article-style postgame recaps with controlled sentence variation.
+- Added recorded Player of the Game inclusion and postgame sponsor selection.
+- Added article-to-social sponsor provenance and reliable full-page discard redirect.
+- Preserved zero-account, zero-subscription article generation.
+Version 1.13.0-alpha.7a
+- Adds a clear grounded postgame recap-to-social publishing handoff.
+- Creates FINAL social drafts with recap and broadcast provenance metadata.
+- Refreshes Social Publishing after a confirmed draft discard.
+- Adds optional Copy graphic support to the assisted-manual X package.
+- Keeps X text-only/manual with no OAuth, API credits, or automatic posting.
+
+Version 1.13.0-alpha.6z
+- Allows assisted-manual X packages to be prepared from fresh unapproved drafts.
+- Removes discarded cards from the active queue immediately after server confirmation.
+- Adds visible X preparation feedback and clearer package eligibility.
+
+Version 1.13.0-alpha.6y
+- Replaces the assisted-manual X package panel with a true top-layer dialog.
+- Adds a visible preparing state and success/error feedback to the X package action.
+- Makes every X dialog action an explicit non-submit control.
+- Adds a fallback open state when the browser cannot use showModal().
+
+Version 1.13.0-alpha.6x
+- Restores the complete Social Draft Lifecycle service after the conversion-outcome build regression.
+- Expires unpublished live-event drafts at game final, after eight hours, or when another game becomes active.
+- Rejects expired and wrong-game drafts at approval, Facebook publishing, automatic queue, and X-package boundaries.
+- Opens assisted-manual X packages in a visible modal with copy, download, and compose actions.
+- Keeps expired, discarded, and archived records outside the active queue while preserving audit history.
+
+Version 1.13.0-alpha.6v
+- Adds Discard draft for unpublished items while retaining audit history.
+- Adds live Facebook post removal with explicit confirmation and recorded retraction status.
+- Adds Archive draft after all public posts have been removed.
+- Separates active drafts from archived and discarded records in Social Publishing.
+- Prevents duplicate publishing actions and preserves lifecycle timestamps and prior statuses.
+
+Version 1.13.0-alpha.6u
+- Prefixes bare jersey-number references with # even when an imported event has no roster linkage.
+- Rebuilds standard sponsor presentation as a large unified logo-and-name lockup.
+- Increases sponsor footer depth and mobile-readable sponsor typography.
+
+Version 1.13.0-alpha.6t
+- Rebuilds standard sponsor presentation as a unified commercial lockup.
+- Enlarges the sponsor footer and sponsor-name typography for phone readability.
+- Places standard sponsor artwork inside a large high-contrast panel instead of a token-size corner mark.
+- Keeps full-width mode reserved for dedicated horizontal sponsor banner artwork.
+
+Version 1.13.0-alpha.6s
+- Prefixes number-only player references with # in public draft copy.
+- Uses the scoring/event team logo instead of always displaying the home organization logo.
+- Requires a dedicated wide sponsor-banner asset for full-width sponsor footer mode.
+- Enlarges standard sponsor marks for phone readability and warns when banner artwork is missing.
+- Adds operator guidance for collecting 1200 x 180 transparent PNG sponsor banners.
+
+Version 1.13.0-alpha.6r
+- Adds compact, iPhone-legible standalone cards for recorded extra points and two-point conversions.
+- Uses the conversion event score snapshot so touchdown and conversion posts show the score at that moment.
+- Adds standard and full-width sponsor-footer layout options to manual, highlight, edit, and correction workflows.
+- Crops transparent padding from sponsor artwork and increases sponsor/footer mobile-safe sizing.
+- Raises minimum social-card text sizes and reports the minimum rendered font in layout metadata.
+
+Version 1.13.0-alpha.6q
+- Replaces the ambiguous browser correction prompt with a full draft editor.
+- Edits unpublished drafts in place and creates clearly labeled correction drafts for published posts.
+- Includes a recorded extra point or two-point conversion in touchdown social copy.
+- Applies the selected sponsor consistently to manual and eligible-play draft creation.
+- Lists only sponsors that are actually active and eligible for attachment.
+
+Version 1.13.0-alpha.6p
+- Fits long team names and scores without clipping on Facebook and X cards.
+- Uses headshot-aware copy widths and controlled multiline headline, score, matchup, and detail layout.
+- Adds organization-level player-name policies: preferred first plus last, official roster name, or exact preferred display name.
+- Converts interception-return touchdowns to the public headline PICK SIX and preserves the roster-authoritative player name in draft copy.
+- Adds active-sponsor selection to draft creation and reserves a dedicated sponsor footer with lead-in, name, and logo.
+- Surfaces renderer fit warnings in the Draft Queue before approval.
+
+Version 1.13.0-alpha.6o
+- Preserves roster and preferred-display-name capitalization in yardage-prefixed touchdown descriptions.
+- Preserves player-name capitalization in turnover-return touchdown descriptions.
+- Preserves existing event-description capitalization when yardage is corrected.
+- Adds regression coverage for roster-name fidelity across event creation and correction.
+
+Version 1.13.0-alpha.6n
+- Preserves Facebook OAuth Page-selection handoff across operator login.
+- Routes Facebook callback results through the public Command Center login page.
+- Passes the pending selection ID to Page-list and Page-select endpoints.
+- Preserves protected-page return targets when an operator session expires.
+
 Version 1.13.0-alpha.3h
 - Fixed roster read loop that rewrote the database and created a snapshot on every API read.
 - Bounded one-time recovery scanning, added mtime cache, atomic writes, and no-op write detection.

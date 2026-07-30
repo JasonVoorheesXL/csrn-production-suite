@@ -63,6 +63,10 @@ class Service:
         self.calls.append(("publish", draft_id, account_ids))
         return self.result
 
+    def manual_package(self, draft_id, platform="x"):
+        self.calls.append(("manual", draft_id, platform))
+        return self.result
+
     def process_auto_queue(self, *, limit=10):
         self.calls.append(("auto", limit))
         return self.result
@@ -84,10 +88,53 @@ class Service:
         return self.result
 
 
+class FacebookService:
+    def __init__(self):
+        self.calls = []
+        self.result = SimpleNamespace(code="OK", data={"facebook": {}}, ok=True)
+
+    def status(self):
+        self.calls.append(("facebook_status",))
+        return self.result
+
+    def configure_app(self, data):
+        self.calls.append(("configure_app", data))
+        return self.result
+
+    def remove_app_configuration(self, confirmation):
+        self.calls.append(("remove_app", confirmation))
+        return self.result
+
+    def authorization_url(self, state):
+        self.calls.append(("authorization_url", state))
+        return SimpleNamespace(code="AUTHORIZATION_READY", data={"authorization_url": "https://www.facebook.com/test"}, ok=True)
+
+    def complete_authorization(self, **kwargs):
+        self.calls.append(("complete_authorization", kwargs))
+        return SimpleNamespace(code="OK", data={"selection_id": "selection-1", "warning": ""}, ok=True)
+
+    def pending_pages(self, selection_id):
+        self.calls.append(("pending_pages", selection_id))
+        return SimpleNamespace(code="OK", data={"pages": [{"id": "page-1", "name": "Page"}]}, ok=True)
+
+    def connect_page(self, selection_id, page_id):
+        self.calls.append(("connect_page", selection_id, page_id))
+        return self.result
+
+    def test_connection(self):
+        self.calls.append(("test_connection",))
+        return self.result
+
+    def disconnect(self, confirmation):
+        self.calls.append(("disconnect", confirmation))
+        return self.result
+
+
 def app_service(tmp_path: Path):
     app = Flask("social_routes_test", template_folder=str(Path(__file__).resolve().parents[1] / "templates"))
     app.config.update(TESTING=True)
     service = Service(tmp_path)
+    facebook = FacebookService()
 
     def require_auth(func):
         setattr(func, "_csrn_requires_auth", True)
@@ -98,9 +145,11 @@ def app_service(tmp_path: Path):
             SocialRoutesDependencies(
                 require_auth=require_auth,
                 get_social_service=lambda: service,
+                get_facebook_connection_service=lambda: facebook,
             )
         )
     )
+    app.config["FACEBOOK_TEST_SERVICE"] = facebook
     return app, service
 
 
@@ -119,7 +168,7 @@ def test_status_calls_service(tmp_path: Path) -> None:
 
 def test_account_payload_is_forwarded(tmp_path: Path) -> None:
     app, service = app_service(tmp_path)
-    payload = {"id": "x-primary", "platform": "x"}
+    payload = {"id": "facebook-primary", "platform": "facebook", "page_id": "page-1"}
     assert app.test_client().post("/api/social/accounts", json=payload).status_code == 200
     assert service.calls == [("account", payload)]
 
@@ -127,11 +176,11 @@ def test_account_payload_is_forwarded(tmp_path: Path) -> None:
 def test_account_remove_confirmation_is_forwarded(tmp_path: Path) -> None:
     app, service = app_service(tmp_path)
     response = app.test_client().delete(
-        "/api/social/accounts/x-primary",
+        "/api/social/accounts/facebook-primary",
         json={"confirmation": "REMOVE SOCIAL ACCOUNT"},
     )
     assert response.status_code == 200
-    assert service.calls == [("remove_account", "x-primary", "REMOVE SOCIAL ACCOUNT")]
+    assert service.calls == [("remove_account", "facebook-primary", "REMOVE SOCIAL ACCOUNT")]
 
 
 def test_create_draft_forwards_event_and_payload(tmp_path: Path) -> None:
@@ -150,8 +199,8 @@ def test_approval_phrase_is_forwarded(tmp_path: Path) -> None:
 
 def test_publish_account_selection_is_forwarded(tmp_path: Path) -> None:
     app, service = app_service(tmp_path)
-    assert app.test_client().post("/api/social/drafts/SOC-1/publish", json={"account_ids": ["x-primary"]}).status_code == 200
-    assert service.calls == [("publish", "SOC-1", ["x-primary"])]
+    assert app.test_client().post("/api/social/drafts/SOC-1/publish", json={"account_ids": ["facebook-primary"]}).status_code == 200
+    assert service.calls == [("publish", "SOC-1", ["facebook-primary"])]
 
 
 def test_correction_and_retraction_are_forwarded(tmp_path: Path) -> None:
@@ -159,14 +208,21 @@ def test_correction_and_retraction_are_forwarded(tmp_path: Path) -> None:
     client = app.test_client()
     assert client.post("/api/social/drafts/SOC-1/corrections", json={"detail": "Corrected"}).status_code == 200
     assert client.post(
-        "/api/social/drafts/SOC-1/publications/x-primary/retract",
+        "/api/social/drafts/SOC-1/publications/facebook-primary/retract",
         json={"confirmation": "RETRACT SOCIAL POST"},
     ).status_code == 200
     assert service.calls == [
         ("correction", "SOC-1", {"detail": "Corrected"}),
-        ("retract", "SOC-1", "x-primary", "RETRACT SOCIAL POST"),
+        ("retract", "SOC-1", "facebook-primary", "RETRACT SOCIAL POST"),
     ]
 
+
+
+def test_manual_x_package_route_is_forwarded(tmp_path: Path) -> None:
+    app, service = app_service(tmp_path)
+    response = app.test_client().get("/api/social/drafts/SOC-1/manual/x")
+    assert response.status_code == 200
+    assert service.calls == [("manual", "SOC-1", "x")]
 
 def test_card_route_sends_png(tmp_path: Path) -> None:
     app, service = app_service(tmp_path)
@@ -182,6 +238,13 @@ def test_service_conflict_maps_to_409(tmp_path: Path) -> None:
     assert app.test_client().post("/api/social/drafts/SOC-1/approve", json={}).status_code == 409
 
 
+
+def test_x_manual_only_maps_to_400(tmp_path: Path) -> None:
+    app, service = app_service(tmp_path)
+    service.result = SimpleNamespace(code="X_MANUAL_ONLY", data={"message": "manual"}, ok=False)
+    response = app.test_client().post("/api/social/accounts", json={"platform": "x"})
+    assert response.status_code == 400
+
 def test_raw_credential_rejection_maps_to_400(tmp_path: Path) -> None:
     app, service = app_service(tmp_path)
     service.result = SimpleNamespace(code="RAW_CREDENTIAL_REJECTED", data={"fields": ["access_token"]}, ok=False)
@@ -190,8 +253,41 @@ def test_raw_credential_rejection_maps_to_400(tmp_path: Path) -> None:
     assert response.get_json()["error"] == "RAW_CREDENTIAL_REJECTED"
 
 
-def test_all_social_routes_are_authenticated(tmp_path: Path) -> None:
+def test_only_facebook_oauth_callback_is_public(tmp_path: Path) -> None:
     app, _ = app_service(tmp_path)
     endpoints = [rule.endpoint for rule in app.url_map.iter_rules() if rule.endpoint.startswith("social_routes.")]
     assert endpoints
-    assert all(getattr(app.view_functions[name], "_csrn_requires_auth", False) for name in endpoints)
+    public = {
+        name
+        for name in endpoints
+        if not getattr(app.view_functions[name], "_csrn_requires_auth", False)
+    }
+    assert public == {"social_routes.complete_facebook_connection"}
+
+
+def test_facebook_status_route(tmp_path: Path) -> None:
+    app, _ = app_service(tmp_path)
+    response = app.test_client().get("/api/social/facebook/status")
+    assert response.status_code == 200
+    facebook = app.config["FACEBOOK_TEST_SERVICE"]
+    assert facebook.calls == [("facebook_status",)]
+
+
+def test_facebook_app_configuration_route(tmp_path: Path) -> None:
+    app, _ = app_service(tmp_path)
+    payload = {"app_id": "123", "app_secret": "secret"}
+    response = app.test_client().post("/api/social/facebook/app", json=payload)
+    assert response.status_code == 200
+    facebook = app.config["FACEBOOK_TEST_SERVICE"]
+    assert facebook.calls == [("configure_app", payload)]
+
+
+def test_facebook_page_selection_route(tmp_path: Path) -> None:
+    app, _ = app_service(tmp_path)
+    response = app.test_client().post(
+        "/api/social/facebook/select",
+        json={"selection_id": "selection-1", "page_id": "page-1"},
+    )
+    assert response.status_code == 200
+    facebook = app.config["FACEBOOK_TEST_SERVICE"]
+    assert facebook.calls == [("connect_page", "selection-1", "page-1")]
