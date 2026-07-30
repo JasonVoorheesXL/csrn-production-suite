@@ -5,7 +5,7 @@ Product: CSRN Production Suite
 Primary release target: Finished Windows-hosted football broadcasting product  
 Owner: Jason Chrest  
 Last audited: 2026-07-30  
-Current status: **GATE 3 ACTIVE — build a reproducible local environment and separate setup/update from normal startup**
+Current status: **GATE 4 ACTIVE — repair blocking identity and Command Center interface defects**
 
 ---
 
@@ -101,22 +101,22 @@ Environment setup is now intentionally separate:
 
 The synchronized development folder was audited directly after Gate 1.
 
-### Gate 3 working branch
+### Gate 4 working branch
 
 ```text
-gate3/reproducible-environment
+gate4/blocking-product-repairs
 ```
 
-### Authoritative merged Gate 2 commit
+### Authoritative merged Gate 3 commit
 
 ```text
-ef9d4a5d11b7c0aa6535e501d0a6503907120f76 — Merge PR #88: recover and align CSRN 1.13.0-alpha.8f
+09329821e2b13ebe066dc7c8d42b872afb789618 — Merge PR #89: make CSRN environment and releases reproducible
 ```
 
 ### Tracking branch
 
 ```text
-origin/gate3/reproducible-environment
+origin/gate4/blocking-product-repairs
 ```
 
 ### Canonical version identity
@@ -263,8 +263,7 @@ Player portrait area:
 
 1. Player headshot
 2. Selected player’s team logo
-3. Team monogram
-4. Neutral player silhouette
+3. Neutral player silhouette
 
 Team watermark area:
 
@@ -456,6 +455,10 @@ Exit condition: documents and application identify the same commit and version.
 - Separate setup/update from normal application startup.
 
 Exit condition: a clean clone can install, test, build, and launch.
+
+**Status: complete.** PR #89 passed Windows and Ubuntu on Python 3.13.14
+and merged into `develop-1.13` at
+`09329821e2b13ebe066dc7c8d42b872afb789618`.
 
 ### Gate 4 — Repair blocking product defects
 
@@ -779,6 +782,45 @@ Each update should add an entry to the decision/status log below.
   1,221 authoritative repository tests. GitHub CI remains pending.
 - Four Pillow `Image.getdata()` deprecation warnings are recorded for later
   maintenance; they do not affect current behavior or Gate 3 acceptance.
+
+### 2026-07-30 — Gate 3 merged and Gate 4 opened
+
+- Opened PR #89 from `gate3/reproducible-environment` at
+  `db85bc28a6a867c3787ea1b990ea3f0a63c39bb1`.
+- GitHub Actions run `30568541729` passed on Windows and Ubuntu with Python
+  3.13.14.
+- Merged PR #89 into `develop-1.13` at
+  `09329821e2b13ebe066dc7c8d42b872afb789618`.
+- Created and pushed `gate4/blocking-product-repairs` from that exact merge.
+- Re-audited Gate 4 blockers: play-detail styling and obsolete utility removal
+  are already resolved; player/team CSRN-logo fallbacks, duplicate import IDs,
+  and missing roster-media visibility remained active.
+- Removed the duplicate personnel-module school-import controls, added roster
+  headshot/team fallback visibility and an explicit missing-headshot state,
+  and introduced neutral player silhouette/monogram treatments.
+- Added Gate 4 regression contracts for unique IDs, neutral identity fallback,
+  roster media visibility, and the versioned silhouette asset.
+- Passed 32 focused Gate 4 tests and all 1,225 authoritative repository tests
+  locally on Python 3.13.14. The four previously recorded Pillow deprecation
+  warnings remain non-blocking.
+- Visual verification of the roster rows and player graphic fallbacks is the
+  final acceptance step before the first Gate 4 checkpoint commit.
+- Visual review confirmed player photos and neutral silhouette rendering, and
+  exposed two follow-up defects: approved Caledonia branding was stored in
+  `primary_logo` but not resolved by the preview, and narrow preview columns
+  allowed position/number/details to overflow.
+- Corrected the identity order to player photo, team logo, then silhouette.
+  Team monograms are reserved for the separate team-logo/watermark treatment.
+- Added `primary_logo` resolution and a compact two-column preview layout for
+  constrained Command Center widths.
+- Follow-up visual review showed the school list API omitted `primary_logo`
+  even though the Caledonia asset and file route were valid. Added the approved
+  logo fields to the school display payload.
+- Moved the Player Preview below the Show/Update controls at full workspace
+  width; the compact two-column treatment is now limited to phone-width views.
+- Visual acceptance confirmed the full-width preview and approved team-logo
+  fallback. Blank positions and explicit generic `Athlete` position values are
+  standardized as `ATH` in both the Command Center preview and live overlay.
 
 ---
 
