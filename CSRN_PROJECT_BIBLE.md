@@ -485,6 +485,40 @@ Exit condition: no open blocking identity or interface defect.
 
 Exit condition: approved football scope is complete.
 
+#### Deferred commercial presentation concept — starting lineups
+
+This is recorded for later design discussion and is not a Gate 4 blocker or
+part of the currently approved frozen-football scope.
+
+- Present starting lineups as full-screen broadcast graphics.
+- Split the presentation into three units:
+  - offense: 11 starters;
+  - defense: 11 starters;
+  - special teams: 4 roles only — punter, kicker, holder, and long snapper.
+- Determine during commercial-version design whether each unit appears as one
+  complete full-screen board, cycles through smaller player groups, or uses a
+  controlled sequence combining both treatments.
+- Preserve operator control so a unit can be shown, advanced, repeated, or
+  skipped without disturbing the scorebug or live game state.
+
+#### Deferred usability repair — template discovery and preview
+
+Operators must not be required to know or type a template/theme name before
+they can evaluate it. The current Settings interface exposes a free-text theme
+field, while the separate Graphics Theme Manager already has catalog cards and
+a non-live preview action; those experiences must be consolidated and made
+discoverable.
+
+- Replace normal free-text template selection with a catalog-backed selector
+  or visual card browser.
+- Show a thumbnail or representative rendered preview, template name,
+  category, intended use, aspect ratio, and active/selected state.
+- Allow full-size preview before activation without changing on-air graphics.
+- Provide filters for graphic type and production context.
+- Keep direct template IDs/names available only in an explicitly labeled
+  advanced control.
+- Include representative template states in Gate 6 visual-regression approval.
+
 ### Gate 6 — Visual regression
 
 Render and approve:
@@ -821,6 +855,13 @@ Each update should add an entry to the decision/status log below.
 - Visual acceptance confirmed the full-width preview and approved team-logo
   fallback. Blank positions and explicit generic `Athlete` position values are
   standardized as `ATH` in both the Command Center preview and live overlay.
+- Checkpointed and pushed the accepted identity/UI repairs on
+  `gate4/blocking-product-repairs` at
+  `977ffb9aa7526ac4a3d41388b3f31c13afbe36fc`; 39 focused tests and all 1,226
+  authoritative tests passed on Python 3.13.14.
+- Began the next Gate 4 repair set: fixed event-label contrast independent of
+  team accent, explicit event/name/detail spacing, dynamic long-name fitting,
+  play-detail containment, and invalid home/visitor logo hiding.
 
 ---
 

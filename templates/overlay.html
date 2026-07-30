@@ -91,6 +91,31 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent
   background:linear-gradient(90deg,rgba(255,255,255,.14),rgba(255,255,255,.06) 72%,transparent)!important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.13)!important;
 }
+#playerGraphic .pg-onair-eyebrow{
+  color:#ff4059!important;
+  background:rgba(8,10,14,.62)!important;
+  -webkit-text-fill-color:#ff4059!important;
+  text-shadow:0 2px 2px #000,0 0 8px rgba(0,0,0,.82)!important;
+}
+#playerGraphic .pg-onair-name{
+  margin-top:10px!important;
+  overflow-wrap:anywhere;
+  word-break:normal;
+}
+#playerGraphic .pg-onair-details{margin-top:10px!important}
+#playerGraphic .pg-onair-play-detail{
+  margin-top:8px;
+  font-size:16px;
+  font-weight:850;
+  line-height:1.15;
+  letter-spacing:.025em;
+  text-transform:uppercase;
+  color:#d9dde3;
+  overflow-wrap:anywhere;
+  text-shadow:0 2px 3px rgba(0,0,0,.85);
+}
+.graphic-mode#playerGraphic .pg-onair-play-detail{font-size:21px}
+.team-logo[data-media-state="invalid"]{display:none!important}
 </style>
   <link rel="stylesheet" href="/themes/current.css">
 </head>
@@ -110,6 +135,10 @@ function sportBall(sport){const value=String(sport||'football').toLowerCase();if
 function identityMonogramData(name){const initials=String(name||'').trim().split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase().replace(/[^A-Z0-9]/g,'')||'TEAM';return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><rect width="160" height="160" rx="22" fill="#242b35"/><text x="80" y="99" text-anchor="middle" font-family="Arial,sans-serif" font-size="${initials.length>2?48:64}" font-weight="900" fill="#fff">${initials}</text></svg>`)}`}
 function guardPlayerIdentityFallbacks(){const photo=document.getElementById('pgOnAirPhoto');const watermark=document.getElementById('pgOnAirWatermark');if(photo?.src.includes('/static/csrn-logo.png'))photo.src='/static/player-silhouette.svg';if(watermark?.src.includes('/static/csrn-logo.png'))watermark.src=identityMonogramData('TEAM')}
 new MutationObserver(guardPlayerIdentityFallbacks).observe(document.getElementById('playerGraphic'),{subtree:true,attributes:true,attributeFilter:['src']});
+function fitPlayerGraphicName(){const el=document.getElementById('pgOnAirName');const graphic=document.getElementById('playerGraphic');if(!el||!graphic)return;const large=graphic.classList.contains('graphic-mode');let size=large?57:39;const minimum=large?36:27;const maximumHeight=large?120:82;el.style.fontSize=`${size}px`;while(size>minimum&&(el.scrollHeight>maximumHeight||el.scrollWidth>el.clientWidth)){size-=1;el.style.fontSize=`${size}px`}}
+new MutationObserver(fitPlayerGraphicName).observe(document.getElementById('pgOnAirName'),{subtree:true,childList:true,characterData:true});
+if(window.ResizeObserver)new ResizeObserver(fitPlayerGraphicName).observe(document.getElementById('playerGraphic'));
+for(const id of ['homeLogo','visitorLogo']){const logo=document.getElementById(id);logo.addEventListener('load',()=>{logo.dataset.mediaState='ready'});logo.addEventListener('error',()=>{logo.dataset.mediaState='invalid';logo.style.display='none'})}
 function glowColor(hex){const m=String(hex||'').match(/^#?([0-9a-f]{6})$/i);if(!m)return {solid:'#ffffff',glow:'rgba(255,255,255,.72)'};let n=parseInt(m[1],16),r=n>>16,g=(n>>8)&255,b=n&255;const lum=.2126*r+.7152*g+.0722*b;const factor=lum<90?1.8:lum>210?.62:1.18;r=Math.max(0,Math.min(255,Math.round(r*factor)));g=Math.max(0,Math.min(255,Math.round(g*factor)));b=Math.max(0,Math.min(255,Math.round(b*factor)));return {solid:`rgb(${r},${g},${b})`,glow:`rgba(${r},${g},${b},.78)`}}
 function fitName(el,text,large){
   el.textContent=text||'';

@@ -829,3 +829,21 @@ body.automation-modal-open{overflow:hidden!important}.automation-event-sheet{max
 .slider-direction-badge{--spot-pct:50%;position:absolute;top:29px;left:clamp(48px,var(--spot-pct),calc(100% - 48px));transform:translate(-50%,-100%);z-index:3;min-width:82px;padding:5px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.22);background:rgba(67,25,20,.94);color:#fff;font-weight:900;text-align:center;line-height:1;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.32)}
 .spot-control input[type=range]{margin-top:8px}
 .jersey-resolution{display:block;min-height:1.2em;margin-top:6px;font-size:.82rem;color:#9aa4b2}.jersey-resolution.resolved{color:#54d68a;font-weight:700}.jersey-resolution.unresolved{color:#f3b34c;font-weight:700}
+
+/* Gate 4 — player-event readability and containment */
+.player-graphic-preview .pgp-eyebrow{
+  color:#ff4059!important;
+  background:rgba(8,10,14,.58)!important;
+  -webkit-text-fill-color:#ff4059!important;
+  text-shadow:0 2px 2px #000,0 0 7px rgba(0,0,0,.78)!important;
+}
+.player-graphic-preview .pgp-name{
+  margin-top:10px;
+  overflow-wrap:anywhere;
+  word-break:normal;
+}
+.player-graphic-preview .pgp-details{margin-top:10px}
+.player-graphic-preview .pgp-play-detail{
+  margin-top:8px;
+  overflow-wrap:anywhere;
+}

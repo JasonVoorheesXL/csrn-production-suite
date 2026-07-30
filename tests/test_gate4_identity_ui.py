@@ -70,3 +70,22 @@ def test_neutral_player_silhouette_is_versioned() -> None:
     silhouette = ROOT / "static" / "player-silhouette.svg"
     assert silhouette.is_file()
     assert "Neutral player silhouette" in silhouette.read_text(encoding="utf-8")
+
+
+def test_player_event_visual_contract_is_independent_and_contained() -> None:
+    style = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
+    gate4_style = style[style.index("/* Gate 4 — player-event readability") :]
+    assert "color:#ff4059!important" in gate4_style
+    assert "overflow-wrap:anywhere" in gate4_style
+    assert ".player-graphic-preview .pgp-name" in gate4_style
+    assert ".player-graphic-preview .pgp-play-detail" in gate4_style
+    assert "var(--pgp-accent)" not in gate4_style
+
+    overlay = (ROOT / "templates" / "overlay.html").read_text(encoding="utf-8")
+    assert "#playerGraphic .pg-onair-eyebrow" in overlay
+    assert "#playerGraphic .pg-onair-play-detail" in overlay
+    assert "function fitPlayerGraphicName()" in overlay
+    assert "minimum=large?36:27" in overlay
+    assert "['homeLogo','visitorLogo']" in overlay
+    assert "logo.dataset.mediaState='invalid'" in overlay
+    assert '.team-logo[data-media-state="invalid"]' in overlay
