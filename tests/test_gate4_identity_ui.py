@@ -37,10 +37,24 @@ def test_player_identity_never_falls_back_to_csrn_branding() -> None:
 
     overlay = (ROOT / "templates" / "overlay.html").read_text(encoding="utf-8")
     assert 'src="/static/player-silhouette.svg"' in overlay
-    assert "guardPlayerIdentityFallbacks" in overlay
-    assert "identityMonogramData('TEAM')" in overlay
+    assert "function applyPlayerIdentityMedia(pg)" in overlay
+    assert "pg?.headshot" in overlay
+    assert "photo.src=teamLogo" in overlay
+    assert "photo.src=silhouette" in overlay
+    assert "watermark.src=teamLogo||monogram" in overlay
+    assert "identityMonogramData(pg?.team_name||'TEAM')" in overlay
+    assert "guardPlayerIdentityFallbacks" not in overlay
     assert "join(' / ')||'ATH'" in overlay
     assert "toUpperCase()==='ATHLETE'?'ATH':value" in overlay
+    player_refresh = overlay[
+        overlay.index("const pg=s.player_graphic||{}") :
+        overlay.index(
+            "const sponsorBar=document.getElementById('pgSponsorBar')",
+            overlay.index("const pg=s.player_graphic||{}"),
+        )
+    ]
+    assert "applyPlayerIdentityMedia(pg)" in player_refresh
+    assert "csrn-logo.png" not in player_refresh
 
 
 def test_roster_rows_show_media_and_missing_headshot_status() -> None:

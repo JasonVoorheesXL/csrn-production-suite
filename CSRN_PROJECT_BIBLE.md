@@ -253,11 +253,15 @@ Resolved in Gates 1 and 2:
 
 ### 8.2 Player and school identity rendering
 
-- The overlay still uses `/static/csrn-logo.png` as a final automatic fallback for player portraits and team watermarks.
-- The Command Center player preview also falls back to the CSRN logo.
-- Unrelated CSRN branding must not automatically replace a missing player or school identity.
+Resolved in Gate 4:
 
-Required fallback order:
+- The Command Center preview and live overlay no longer use unrelated CSRN
+  branding for missing player or school identity.
+- Approved school-logo fields are included in the school display payload.
+- The live overlay applies the identity order directly without a transitional
+  mutation observer or intermediate CSRN-logo assignment.
+
+Enforced fallback order:
 
 Player portrait area:
 
@@ -273,21 +277,10 @@ Team watermark area:
 
 ### 8.3 Roster headshot visibility
 
-The roster list currently displays:
-
-- jersey number;
-- player name;
-- position;
-- class;
-- active/inactive status.
-
-It does not display:
-
-- headshot thumbnail;
-- team-logo fallback;
-- explicit missing-headshot indicator.
-
-This must be corrected so operators can verify player media without opening each record.
+Resolved in Gate 4: roster rows show the jersey number, player name, position,
+class, status, headshot thumbnail, team-logo fallback, and explicit
+missing-headshot state. Integrated uploads persist the stored URL and player
+metadata, and failed repository saves remove the newly written file.
 
 ### 8.4 Obsolete headshot utility
 
@@ -296,15 +289,20 @@ the integrated player-edit upload path was retained.
 
 ### 8.5 Player-event visual defects
 
-- Event-label color is derived from team accent color and can become unreadable on dark treatments.
-- Event label, player name, and supporting details require explicit independent spacing.
-- Long player names need shrink/wrap containment.
-- `pg-onair-play-detail` is populated but has no CSS rule.
-- Missing and invalid media states require visual regression coverage.
+Resolved in Gate 4:
+
+- event-label color and backing are independent from team accent color;
+- event label, player name, details, and play detail have explicit spacing;
+- long player names wrap and dynamically fit within the on-air treatment;
+- `pg-onair-play-detail` has an explicit preview/on-air style contract;
+- invalid home/visitor logos hide cleanly, and player/team media follow tested
+  fallbacks. Gate 6 retains the full screenshot matrix.
 
 ### 8.6 Duplicate HTML IDs
 
-The active Command Center contains duplicate IDs for the school-import interface:
+Resolved in Gate 4: the duplicate school-import control block was removed, and
+the active Command Center is protected by a unique-ID regression test. The
+former duplicate IDs were:
 
 ```text
 schoolImportPanel
@@ -318,7 +316,7 @@ schoolImportSummary
 schoolImportResults
 ```
 
-These must be made unique.
+Each now appears at most once.
 
 ### 8.7 Test reproducibility
 
@@ -475,6 +473,11 @@ and merged into `develop-1.13` at
 - regression tests.
 
 Exit condition: no open blocking identity or interface defect.
+
+**Status: local exit audit complete; pull request and CI pending.** The final
+audit passed 54 focused tests and all 1,227 authoritative tests on Python
+3.13.14. Gate 4 is not complete until the branch is pushed, reviewed through
+GitHub Actions on Windows and Ubuntu, and merged into `develop-1.13`.
 
 ### Gate 5 — Complete frozen football scope
 
@@ -862,6 +865,12 @@ Each update should add an entry to the decision/status log below.
 - Began the next Gate 4 repair set: fixed event-label contrast independent of
   team accent, explicit event/name/detail spacing, dynamic long-name fitting,
   play-detail containment, and invalid home/visitor logo hiding.
+- Checkpointed and pushed that accepted event/media repair set at
+  `222c85143c840b080d6ee9714076d3039b9dd52b`; 40 focused tests and all 1,227
+  authoritative tests passed on Python 3.13.14.
+- Gate 4 exit audit found and removed the overlay's transitional mutation
+  observer: player portrait and watermark media now follow the required
+  fallback order directly, without first assigning unrelated CSRN branding.
 
 ---
 
