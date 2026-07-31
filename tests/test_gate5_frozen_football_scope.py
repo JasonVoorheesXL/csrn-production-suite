@@ -70,7 +70,7 @@ def test_sponsor_spotlight_stays_below_the_scorebug() -> None:
     assert "#scorebug,#eventTicker{z-index:100}" in overlay
     assert "sponsorSpotlight.media_type==='video'" in overlay
     assert '<link rel="stylesheet" href="/themes/current.css">' in overlay
-    assert "const OVERLAY_SCHEMA_REVISION='gate5-program-visual-v10';" in overlay
+    assert "const OVERLAY_SCHEMA_REVISION='gate6-visual-regression-v1';" in overlay
     assert (
         "s.overlay_revision&&s.overlay_revision!==OVERLAY_SCHEMA_REVISION"
         in overlay
@@ -204,4 +204,4 @@ def test_gate5_record_policy_and_scorebug_contract() -> None:
     assert "id=\"visitorRecord\"" in overlay
     assert "scorebugRecord(s,'home')" in overlay
     assert "official&&Boolean(state.region_game)" in overlay
-    assert "gate5-program-visual-v10" in overlay
+    assert "gate6-visual-regression-v1" in overlay

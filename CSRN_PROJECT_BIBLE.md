@@ -5,7 +5,7 @@ Product: CSRN Production Suite
 Primary release target: Finished Windows-hosted football broadcasting product  
 Owner: Jason Chrest  
 Last audited: 2026-07-30  
-Current status: **GATE 5 IMPLEMENTATION COMPLETE — branch validation and merge pending**
+Current status: **GATE 6 ACTIVE — first scorebug visual-regression slice accepted; branch validation pending**
 
 ---
 
@@ -865,6 +865,67 @@ discoverable.
   advanced control.
 - Include representative template states in Gate 6 visual-regression approval.
 
+#### Gate 6 first implementation slice — scorebug identity hierarchy
+
+Gate 6 begins from merged Gate 5 commit
+`2124d6a2ca1c33944fc76f7ea85cc040f40e6362` on branch
+`gate6/visual-regression`.
+
+The first bounded visual-regression slice changes only the internal team-identity
+hierarchy in the football scorebug:
+
+- team name remains first;
+- mascot appears directly beneath the team name;
+- persisted pregame record appears beneath the mascot;
+- an empty mascot or record collapses without reserving vertical space;
+- compact scorebug geometry remains 484 / 174 / 484 pixels wide and 112 pixels
+  high;
+- graphic-mode geometry remains 738 / 248 / 738 pixels wide and 224 pixels
+  high;
+- score columns, center module, logos, possession treatment, ticker clearance,
+  and Gate 5 record-policy formatting remain unchanged;
+- overlay revision `gate6-visual-regression-v1` forces stale OBS browser sources
+  to refresh the new hierarchy.
+
+Acceptance requires focused and authoritative tests plus operator screenshots in
+compact and graphic modes covering short and long names, long and missing
+mascots, official region and non-region records, explicit 0-0, legacy missing
+records, valid and missing logos, and both possession states. No commit or push
+is allowed before visual approval.
+#### Gate 6 slice 1 acceptance — scorebug identity hierarchy
+
+The first Gate 6 visual-regression slice is accepted for branch checkpoint.
+
+Accepted production behavior:
+
+- the operational Graphic-mode scorebug now renders team name, mascot, then
+  pregame record for both home and visitor;
+- overall and region record display rules remain unchanged from Gate 5;
+- score values, center game-status module, scorebug height, logos, possession
+  indicators, and event ticker alignment remain unchanged;
+- long school names and long mascot names remain readable in the supported
+  Graphic-mode production path;
+- empty mascot and legacy missing-record handling remain defensive automated
+  behaviors and do not require operator screenshots because current production
+  school records are expected to include mascots;
+- overlay revision `gate6-visual-regression-v1` forces stale OBS browser sources
+  to reload the revised hierarchy.
+
+Validation evidence:
+
+- focused Gate 6 suite: 18 passed;
+- full authoritative suite: 1,265 passed with the four unchanged Pillow
+  `Image.getdata()` deprecation warnings;
+- Graphic-mode operator inspection approved the name/mascot/record ordering,
+  fixed geometry, region-record visibility, and home/visitor possession states.
+
+Deferred visual state:
+
+- the smaller internal scorebug geometry is not an operator-accessible Compact
+  mode today. Camera mode has not been implemented, so manual compact/camera
+  visual approval is deferred until that workflow exists. Automated geometry
+  tests continue to protect the dormant layout contract without treating it as
+  a supported production state.
 ### Gate 6 — Visual regression
 
 Render and approve:
