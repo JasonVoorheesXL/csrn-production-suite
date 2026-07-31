@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from typing import Any
 
@@ -73,7 +73,7 @@ def test_state_endpoint_returns_public_service_state(state_client) -> None:
         "broadcast_id": "B1",
         "graphics_queue": [],
         "home_score": 6,
-        "overlay_revision": "gate5-program-visual-v9",
+        "overlay_revision": "gate5-program-visual-v10",
         "public": True,
     }
     assert service.calls == [

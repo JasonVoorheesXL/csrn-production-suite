@@ -200,7 +200,7 @@ PRODUCT_PATHS = resolve_product_paths(
     BASE_DIR,
     frozen=bool(getattr(sys, "frozen", False) or "--installed" in sys.argv),
 )
-OVERLAY_SCHEMA_REVISION = "gate5-program-visual-v9"
+OVERLAY_SCHEMA_REVISION = "gate5-program-visual-v10"
 PRODUCT_PATHS.ensure()
 STATE_FILE = PRODUCT_PATHS.state_file
 SECURITY_FILE = PRODUCT_PATHS.security_file
@@ -307,6 +307,19 @@ DEFAULT_STATE: dict[str, Any] = {
     "season": "",
     "week": "1",
     "classification": "",
+    "home_classification": "",
+    "home_region": "",
+    "visitor_classification": "",
+    "visitor_region": "",
+    "home_pregame_record": {"wins": 0, "losses": 0, "ties": 0},
+    "home_pregame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+    "visitor_pregame_record": {"wins": 0, "losses": 0, "ties": 0},
+    "visitor_pregame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+    "contest_type": "official",
+    "record_policy": "official",
+    "region_game": False,
+    "special_designations": [],
+    "record_tracking": {},
     "venue_id": "",
     "status": "planned",
     "history": [],

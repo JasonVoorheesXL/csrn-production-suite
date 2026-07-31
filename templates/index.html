@@ -125,6 +125,37 @@
         </label>
       </div>
 
+      <h2>Game Classification and Pregame Records</h2>
+      <div class="setup-grid">
+        <label>Contest Type
+          <select id="contestType" onchange="updateRecordPolicyNotice()"><option value="official">Official game</option><option value="scrimmage">Scrimmage</option><option value="exhibition">Exhibition</option></select>
+        </label>
+        <label class="check-row planning-check"><input id="regionGame" type="checkbox"> Region game</label>
+      </div>
+      <div id="recordPolicyNotice" class="status">Select the teams and enter their records entering this game.</div>
+      <div class="record-snapshot-grid">
+        <section class="record-snapshot-card">
+          <h3>Home Pregame Snapshot</h3>
+          <div class="setup-grid"><label>Classification<input id="homeClassificationSnapshot"></label><label>Region<input id="homeRegionSnapshot"></label></div>
+          <h4>Overall Record</h4><div class="record-wlt"><label>Wins<input id="homeOverallWins" type="number" min="0" value="0"></label><label>Losses<input id="homeOverallLosses" type="number" min="0" value="0"></label><label>Ties<input id="homeOverallTies" type="number" min="0" value="0"></label></div>
+          <h4>Region Record</h4><div class="record-wlt"><label>Wins<input id="homeRegionWins" type="number" min="0" value="0"></label><label>Losses<input id="homeRegionLosses" type="number" min="0" value="0"></label><label>Ties<input id="homeRegionTies" type="number" min="0" value="0"></label></div>
+        </section>
+        <section class="record-snapshot-card">
+          <h3>Visitor Pregame Snapshot</h3>
+          <div class="setup-grid"><label>Classification<input id="visitorClassificationSnapshot"></label><label>Region<input id="visitorRegionSnapshot"></label></div>
+          <h4>Overall Record</h4><div class="record-wlt"><label>Wins<input id="visitorOverallWins" type="number" min="0" value="0"></label><label>Losses<input id="visitorOverallLosses" type="number" min="0" value="0"></label><label>Ties<input id="visitorOverallTies" type="number" min="0" value="0"></label></div>
+          <h4>Region Record</h4><div class="record-wlt"><label>Wins<input id="visitorRegionWins" type="number" min="0" value="0"></label><label>Losses<input id="visitorRegionLosses" type="number" min="0" value="0"></label><label>Ties<input id="visitorRegionTies" type="number" min="0" value="0"></label></div>
+        </section>
+      </div>
+      <h3>Special Game Designations</h3>
+      <div class="designation-grid">
+        <label class="check-row"><input id="designationHomecoming" type="checkbox" value="homecoming"> Homecoming</label>
+        <label class="check-row"><input id="designationSeniorNight" type="checkbox" value="senior_night"> Senior Night</label>
+        <label class="check-row"><input id="designationRivalry" type="checkbox" value="rivalry"> Rivalry</label>
+        <label class="check-row"><input id="designationPlayoff" type="checkbox" value="playoff"> Playoff</label>
+        <label class="check-row"><input id="designationChampionship" type="checkbox" value="championship"> Championship</label>
+      </div>
+
       <h2>Broadcast Crew</h2>
       <div class="setup-grid">
         <label>Play-by-Play<select id="crewPlayByPlay"></select></label>
@@ -1451,6 +1482,17 @@ async function createBroadcast() {
     save_manual_home: document.getElementById('homeSaveSchool').checked,
     save_manual_visitor: document.getElementById('visitorSaveSchool').checked,
     visual_mode: document.getElementById('visualMode').value,
+    contest_type: document.getElementById('contestType').value,
+    region_game: document.getElementById('contestType').value==='official'&&document.getElementById('regionGame').checked,
+    special_designations: readSpecialDesignations(),
+    home_classification: document.getElementById('homeClassificationSnapshot').value.trim(),
+    home_region: document.getElementById('homeRegionSnapshot').value.trim(),
+    visitor_classification: document.getElementById('visitorClassificationSnapshot').value.trim(),
+    visitor_region: document.getElementById('visitorRegionSnapshot').value.trim(),
+    home_pregame_record: readPlanningRecord('home','Overall'),
+    home_pregame_region_record: readPlanningRecord('home','Region'),
+    visitor_pregame_record: readPlanningRecord('visitor','Overall'),
+    visitor_pregame_region_record: readPlanningRecord('visitor','Region'),
     crew: {
       play_by_play: document.getElementById('crewPlayByPlay').value,
       color_analyst: document.getElementById('crewColorAnalyst').value,
@@ -2664,15 +2706,18 @@ async function teamSelectionChanged(side, preserveManual = false) {
   if (saveBox) saveBox.classList.toggle('hidden', !manual);
   if (manual) {
     if (!preserveManual) input.value = '';
+    updatePlanningSchoolSnapshot(side);
     input.focus();
     return;
   }
   if (!select.value) {
     input.value = '';
+    updatePlanningSchoolSnapshot(side);
     return;
   }
   const summary = schools.find(s => s.id === select.value);
   input.value = summary ? summary.broadcast_name : '';
+  updatePlanningSchoolSnapshot(side);
   if (side === 'home' && summary) {
     document.getElementById('classification').value = summary.classification || '5A';
     const full = schools.find(s => s.id === summary.id);
@@ -3411,6 +3456,15 @@ setInterval(checkSecurity, 15000);
 let availableBroadcastCount=0;
 let gameManagerRecords=[];
 let editingBroadcastId=null;
+const planningDesignationFields={homecoming:'designationHomecoming',senior_night:'designationSeniorNight',rivalry:'designationRivalry',playoff:'designationPlayoff',championship:'designationChampionship'};
+function planningCount(value){const parsed=Number.parseInt(value,10);return Number.isFinite(parsed)&&parsed>=0?parsed:0}
+function readPlanningRecord(side,scope){return {wins:planningCount(document.getElementById(`${side}${scope}Wins`).value),losses:planningCount(document.getElementById(`${side}${scope}Losses`).value),ties:planningCount(document.getElementById(`${side}${scope}Ties`).value)}}
+function writePlanningRecord(side,scope,record={}){for(const [field,key] of [['Wins','wins'],['Losses','losses'],['Ties','ties']])document.getElementById(`${side}${scope}${field}`).value=planningCount(record[key])}
+function readSpecialDesignations(){return Object.entries(planningDesignationFields).filter(([,id])=>document.getElementById(id).checked).map(([value])=>value)}
+function writeSpecialDesignations(values=[]){const selected=new Set(values||[]);for(const [value,id] of Object.entries(planningDesignationFields))document.getElementById(id).checked=selected.has(value)}
+function updatePlanningSchoolSnapshot(side){const select=document.getElementById(`${side}SchoolSelect`),school=schools.find(item=>item.id===select?.value);if(school){document.getElementById(`${side}ClassificationSnapshot`).value=school.classification||'';document.getElementById(`${side}RegionSnapshot`).value=school.region||''}else if(!editingBroadcastId){document.getElementById(`${side}ClassificationSnapshot`).value='';document.getElementById(`${side}RegionSnapshot`).value=''}updateRecordPolicyNotice()}
+function updateRecordPolicyNotice(){const primaryId=currentConfig?.broadcast_defaults?.home_school_id||'',homeId=document.getElementById('homeSchoolSelect')?.value||'',visitorId=document.getElementById('visitorSchoolSelect')?.value||'',contest=document.getElementById('contestType')?.value||'official',side=primaryId&&primaryId===homeId?'Home':primaryId&&primaryId===visitorId?'Visitor':'';const notice=document.getElementById('recordPolicyNotice'),region=document.getElementById('regionGame'),planningCheck=region?.closest('.planning-check');if(region){if(contest!=='official'){region.checked=false;region.disabled=true;planningCheck?.classList.add('disabled')}else{region.disabled=false;planningCheck?.classList.remove('disabled')}}if(!notice)return;if(contest!=='official'){notice.textContent='Official overall and region win/loss/tie records will not be updated when this game is completed.'}else if(side){notice.textContent=`${side} is the configured primary team. CSRN will inherit its latest tracked record when available; the opponent record is a manual pregame snapshot.`}else{notice.textContent='The configured primary team is not in this broadcast. Both records are manual pregame snapshots.'}}
+function populateBroadcastPlanning(record={}){document.getElementById('contestType').value=record.contest_type||'official';document.getElementById('regionGame').checked=Boolean(record.region_game)&&(record.contest_type||'official')==='official';document.getElementById('homeClassificationSnapshot').value=record.home_classification||'';document.getElementById('homeRegionSnapshot').value=record.home_region||'';document.getElementById('visitorClassificationSnapshot').value=record.visitor_classification||'';document.getElementById('visitorRegionSnapshot').value=record.visitor_region||'';writePlanningRecord('home','Overall',record.home_pregame_record);writePlanningRecord('home','Region',record.home_pregame_region_record);writePlanningRecord('visitor','Overall',record.visitor_pregame_record);writePlanningRecord('visitor','Region',record.visitor_pregame_region_record);writeSpecialDesignations(record.special_designations);updateRecordPolicyNotice()}
 function moveSetupPanelToGameManager(){
   const host=document.getElementById('gameCreationHost'); const panel=document.getElementById('setupPanel');
   if(host&&panel&&panel.parentElement!==host) host.appendChild(panel);
@@ -3429,12 +3483,13 @@ function renderGameManager(){
   const host=document.getElementById('gameManagerList'); if(!host) return;
   const filter=document.getElementById('gameStatusFilter').value;
   const rows=gameManagerRecords.filter(r=>!r.archived&&(filter==='all'||r.status===filter));
-  host.innerHTML=rows.length?rows.map(r=>`<article class="game-card status-${r.status||'planned'}"><div class="game-card-top"><strong>${r.visitor_team} @ ${r.home_team}</strong><span class="game-status">${prettyStatus(r.status)}</span></div><div class="game-meta"><span>${r.broadcast_id}</span><span>${r.date||'Date TBD'} · ${r.scheduled_start||'Time TBD'}</span><span>${r.venue||'Venue TBD'}</span></div><div class="button-row"><button class="primary" onclick="openGameInCommandCenter('${r.broadcast_id}')">Open in Command Center</button><button onclick="editGame('${r.broadcast_id}')">Edit</button><button onclick="updateGameStatus('${r.broadcast_id}','planned')">Planned</button><button onclick="updateGameStatus('${r.broadcast_id}','live')">Live</button><button onclick="updateGameStatus('${r.broadcast_id}','completed')">Completed</button><button class="danger" onclick="deleteGame('${r.broadcast_id}')">Delete</button></div></article>`).join(''):'<p class="section-note">No broadcasts match this filter.</p>';
+  host.innerHTML=rows.length?rows.map(r=>`<article class="game-card status-${r.status||'planned'}"><div class="game-card-top"><strong>${r.visitor_team} @ ${r.home_team}</strong><span class="game-status">${prettyStatus(r.status)}</span></div><div class="game-meta"><span>${r.broadcast_id}</span><span>${r.date||'Date TBD'} · ${r.scheduled_start||'Time TBD'}</span><span>${r.venue||'Venue TBD'}</span><span>${String(r.contest_type||'official').replace('_',' ')}${r.region_game?' · Region game':''}${(r.special_designations||[]).length?' · '+r.special_designations.map(x=>x.replaceAll('_',' ')).join(', '):''}</span></div><div class="button-row"><button class="primary" onclick="openGameInCommandCenter('${r.broadcast_id}')">Open in Command Center</button><button onclick="editGame('${r.broadcast_id}')">Edit</button><button onclick="updateGameStatus('${r.broadcast_id}','planned')">Planned</button><button onclick="updateGameStatus('${r.broadcast_id}','live')">Live</button><button onclick="updateGameStatus('${r.broadcast_id}','completed')">Completed</button><button class="danger" onclick="deleteGame('${r.broadcast_id}')">Delete</button></div></article>`).join(''):'<p class="section-note">No broadcasts match this filter.</p>';
 }
 async function editGame(id){
   const r=gameManagerRecords.find(x=>x.broadcast_id===id); if(!r) return; editingBroadcastId=id; moveSetupPanelToGameManager(); const p=document.getElementById('setupPanel'); p.classList.remove('hidden');
   for(const [k,v] of Object.entries({sport:r.sport||'Football',season:r.season||String(new Date().getFullYear()),classification:r.classification||'5A',week:r.week||'1',level:r.level||'Varsity',division:r.division||'Boys',date:r.date||'',venue:r.venue||'',visualMode:r.visual_mode||'graphic',homeTeam:r.home_team||'',visitorTeam:r.visitor_team||''})){const e=document.getElementById(k);if(e)e.value=v;}
   document.getElementById('homeSchoolSelect').value=r.home_school_id||'__manual__'; document.getElementById('visitorSchoolSelect').value=r.visitor_school_id||'__manual__'; const m=(r.scheduled_start||'7:00 PM').match(/(\d+):(\d+)\s*(AM|PM)/i); if(m){startHour.value=String(Number(m[1]));startMinute.value=m[2];startAmPm.value=m[3].toUpperCase();}
+  populateBroadcastPlanning(r);
   saveBroadcastButton.textContent='Save Broadcast Changes'; cancelEditBroadcastButton.classList.remove('hidden'); p.scrollIntoView({behavior:'smooth'});
 }
 function cancelGameEdit(){editingBroadcastId=null;saveBroadcastButton.textContent='Create Broadcast';cancelEditBroadcastButton.classList.add('hidden');setupPanel.classList.add('hidden');}

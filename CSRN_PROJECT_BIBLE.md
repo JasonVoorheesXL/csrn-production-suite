@@ -5,7 +5,7 @@ Product: CSRN Production Suite
 Primary release target: Finished Windows-hosted football broadcasting product  
 Owner: Jason Chrest  
 Last audited: 2026-07-30  
-Current status: **GATE 4 ACTIVE — repair blocking identity and Command Center interface defects**
+Current status: **GATE 5 IMPLEMENTATION COMPLETE — branch validation and merge pending**
 
 ---
 
@@ -487,7 +487,7 @@ GitHub Actions run `30579098825` and merged into `develop-1.13` at
 
 Exit condition: approved football scope is complete.
 
-**Status: active.** Branch `gate5/frozen-football-scope` was created and pushed
+**Status: implementation complete; commit, push, CI, and merge pending.** Branch `gate5/frozen-football-scope` was created and pushed
 from the exact Gate 4 merge
 `10afa40c99877dca9b4362a1ad4ef4c950db362d`.
 
@@ -670,9 +670,10 @@ Validation evidence:
 - Full authoritative suite: 1,250 passed with the four unchanged Pillow
   `Image.getdata()` deprecation warnings.
 - Git diff and runtime identity checks passed.
-- The slice remains intentionally uncommitted pending operator visual approval
-  of Asset Manager associations, sponsor rendition selection, Player Highlight
-  playback, scorebug protection, and touchdown queue advancement.
+- Player Highlight workflow checkpoint `8ad488164df65c488c93f08233e0f81199923517`
+  is committed and pushed on `gate5/frozen-football-scope`. Operator review in
+  OBS approved the complete 16:9 source frame, scorebug protection, and roster-
+  owned preparation workflow. The Gate 5 branch remains intentionally unmerged.
 
 #### Next Gate 5 implementation slice — game classification and record policy
 
@@ -712,6 +713,97 @@ Authoritative record decision:
   adopted after its season has begun; and
 - scrimmages and exhibitions never alter official overall or region records.
 
+Implementation status:
+
+- Create/Edit Broadcast now stores per-team classification and region snapshots,
+  overall and region pregame records with wins/losses/ties, an explicit region-
+  game flag, contest type, derived record policy, and multiple structured
+  special-game designations.
+- `broadcast_defaults.home_school_id` is the primary-team authority. The first
+  official broadcast accepts an operator baseline; later broadcasts inherit the
+  latest calculated postgame overall and region records whether the primary team
+  appears as home or visitor. Opponent records remain manual snapshots.
+- Completing an official broadcast advances only the primary team's record and
+  supports wins, losses, and ties. Region records advance only for an explicitly
+  marked region game. Scrimmages and exhibitions preserve the baseline.
+- Broadcast load, active-state synchronization, reset, detail records, and
+  archived records retain this planning context. Legacy records receive safe
+  defaults without rewriting their stored school-era snapshots.
+
+#### Approved refinement — scorebug record context and nonofficial clarity
+
+- Scrimmage and exhibition planning now states explicitly that official overall
+  and region win/loss/tie records will not be updated at completion.
+- Nonofficial contests force `region_game` false in the interface, service, and
+  active-state lifecycle; returning to Official Game re-enables the control but
+  does not restore a stale checked value.
+- The scorebug displays each team's persisted pregame overall record beneath
+  the team name. For an official region game it appends the persisted region
+  record in compact form; non-region and nonofficial contests omit the region
+  segment. Legacy broadcasts without structured snapshots hide the record line,
+  while an explicit 0-0 snapshot remains visible.
+- This refinement is implemented but remains uncommitted pending focused/full
+  validation and operator visual approval of compact and graphic scorebug modes.
+
+#### Gate 5 final implementation acceptance
+
+Gate 5 frozen-football implementation is accepted for branch closeout.
+
+Final accepted behavior:
+
+- broadcasts snapshot each team's classification, region, overall record, and
+  region record so later School Database changes do not rewrite archived game
+  context;
+- wins, losses, and ties are represented structurally;
+- official region games may advance the configured primary team's overall and
+  region records;
+- official non-region games may advance only the overall record;
+- scrimmages and exhibitions force `region_game` to false and never advance
+  official overall or region records;
+- the operator warning states: "Official overall and region win/loss/tie
+  records will not be updated when this game is completed.";
+- multiple structured special-game designations persist through create, edit,
+  load, active-state, detail, and archive workflows;
+- the scorebug renders each team's persisted pregame overall record and adds
+  the region record only for an official region game;
+- zero ties are omitted from the compact scorebug string, explicit `0-0`
+  records remain visible, and legacy broadcasts without structured record data
+  do not display a fabricated record;
+- overlay schema revision `gate5-program-visual-v10` refreshes stale OBS browser
+  sources for the scorebug record contract.
+
+Validation and operator evidence:
+
+- Windows development runtime: Python 3.13.14;
+- focused Gate 5 and state-route suite: 64 passed;
+- full authoritative repository suite: 1,260 passed with the four unchanged
+  Pillow `Image.getdata()` deprecation warnings;
+- Create Broadcast, Edit Broadcast, active-state reload, and snapshot retention
+  were manually accepted;
+- official/nonofficial record messaging and Region Game disabling were accepted;
+- compact scorebug record rendering was visually accepted without score or
+  module alignment failure.
+
+Gate 6 visual-regression item:
+
+- move the scorebug record line below the mascot rather than between the team
+  name and mascot, while preserving current score alignment, fixed scorebug
+  height, long-name fitting, compact mode, and graphic mode.
+
+Nonblocking follow-up risk:
+
+- `tests/test_venue_repository.py::test_cache_invalidates_when_file_changes`
+  can fail when run alone on the current Windows filesystem but passed in the
+  final authoritative suite. Investigate file-change cache invalidation and
+  timestamp-resolution assumptions before release freeze; this is not caused by
+  the Gate 5 classification/record-policy changes.
+
+Production-tree cleanup performed for this checkpoint:
+
+- temporary `CSRN_GATE5_WORKTREE.zip` removed;
+- repository-local pytest and Python cache directories removed outside `.venv`;
+- no temporary patch archive is included in the commit;
+- final untracked-file and diff-integrity checks are required before commit.
 #### Sponsor broadcast creative package
 
 One sponsor logo must not be stretched, cropped, or repurposed across every

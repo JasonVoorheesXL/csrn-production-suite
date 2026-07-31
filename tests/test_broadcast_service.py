@@ -15,6 +15,7 @@ class Harness:
                 "broadcast_name": "Caledonia",
                 "official_name": "Caledonia High School",
                 "classification": "5A",
+                "region": "Region 1",
                 "logo_ok": True,
             },
             "new-hope": {
@@ -22,6 +23,7 @@ class Harness:
                 "broadcast_name": "New Hope",
                 "official_name": "New Hope High School",
                 "classification": "5A",
+                "region": "Region 2",
                 "logo_ok": False,
             },
         }
@@ -78,6 +80,7 @@ class Harness:
                 "sport": "Football",
                 "venue": "Default Venue",
                 "visual_mode": "graphic",
+                "home_school_id": "caledonia",
             },
             "obs": {"profile": "CSRN Test"},
         }
@@ -204,6 +207,13 @@ def test_create_builds_planned_record_and_branding_warning() -> None:
     assert record["venue"] == "Caledonia Football Field"
     assert record["obs_profile"] == "CSRN Test"
     assert record["crew"]["play_by_play"] == "Jason"
+    assert record["home_classification"] == "5A"
+    assert record["home_region"] == "Region 1"
+    assert record["visitor_region"] == "Region 2"
+    assert record["contest_type"] == "official"
+    assert record["record_policy"] == "official"
+    assert record["home_pregame_record"] == {"wins": 0, "losses": 0, "ties": 0}
+    assert record["record_tracking"]["primary_side"] == "home"
     assert result.data["warnings"] == [
         "Visitor has no certified logo; NH monogram will be used."
     ]
@@ -225,6 +235,137 @@ def test_create_supports_manual_teams_and_defaults() -> None:
     assert record["visitor_team"] == "Faculty"
     assert record["venue"] == "Default Venue"
     assert result.data["warnings"] == []
+
+
+def test_create_normalizes_records_ties_policy_and_designations() -> None:
+    harness = Harness()
+    result = harness.service().create(
+        {
+            "home_school_id": "caledonia",
+            "visitor_school_id": "new-hope",
+            "contest_type": "scrimmage",
+            "region_game": True,
+            "home_pregame_record": {"wins": "3", "losses": 1, "ties": 2},
+            "visitor_pregame_record": {"wins": -2, "losses": "bad", "ties": 1},
+            "special_designations": ["Homecoming", "rivalry", "unknown", "rivalry"],
+        }
+    )
+    record = result.data["broadcast"]
+    assert record["record_policy"] == "non_record"
+    assert record["region_game"] is False
+    assert record["home_pregame_record"] == {"wins": 3, "losses": 1, "ties": 2}
+    assert record["visitor_pregame_record"] == {"wins": 0, "losses": 0, "ties": 1}
+    assert record["special_designations"] == ["homecoming", "rivalry"]
+
+
+def test_create_inherits_latest_primary_record_but_not_opponent_record() -> None:
+    harness = Harness()
+    harness.broadcasts = [
+        {
+            "broadcast_id": "previous",
+            "status": "completed",
+            "completed_at": 100,
+            "sport": "Football",
+            "season": "2026",
+            "home_school_id": "new-hope",
+            "visitor_school_id": "caledonia",
+            "visitor_postgame_record": {"wins": 5, "losses": 1, "ties": 1},
+            "visitor_postgame_region_record": {"wins": 2, "losses": 0, "ties": 1},
+        }
+    ]
+    result = harness.service().create(
+        {
+            "home_school_id": "caledonia",
+            "visitor_school_id": "new-hope",
+            "season": "2026",
+            "visitor_pregame_record": {"wins": 8, "losses": 0, "ties": 0},
+        }
+    )
+    record = result.data["broadcast"]
+    assert record["home_pregame_record"] == {"wins": 5, "losses": 1, "ties": 1}
+    assert record["home_pregame_region_record"] == {"wins": 2, "losses": 0, "ties": 1}
+    assert record["visitor_pregame_record"] == {"wins": 8, "losses": 0, "ties": 0}
+    assert record["record_tracking"]["home_source"] == "automatic"
+
+
+def test_completed_official_region_game_advances_primary_record_with_tie() -> None:
+    harness = Harness()
+    harness.broadcasts = [
+        {
+            "broadcast_id": "game-1",
+            "status": "live",
+            "record_policy": "official",
+            "region_game": True,
+            "record_tracking": {"primary_side": "visitor"},
+            "visitor_pregame_record": {"wins": 4, "losses": 2, "ties": 0},
+            "visitor_pregame_region_record": {"wins": 2, "losses": 1, "ties": 0},
+        }
+    ]
+    completed = harness.service().update_linked_status(
+        "game-1", "completed", {"final_home_score": 21, "final_visitor_score": 21}
+    ).data["broadcast"]
+    assert completed["visitor_postgame_record"] == {"wins": 4, "losses": 2, "ties": 1}
+    assert completed["visitor_postgame_region_record"] == {"wins": 2, "losses": 1, "ties": 1}
+    assert completed["record_tracking_applied"] is True
+
+
+def test_scrimmage_completion_preserves_primary_record() -> None:
+    harness = Harness()
+    harness.broadcasts = [
+        {
+            "broadcast_id": "game-1",
+            "status": "live",
+            "record_policy": "non_record",
+            "region_game": True,
+            "record_tracking": {"primary_side": "home"},
+            "home_pregame_record": {"wins": 1, "losses": 0, "ties": 0},
+            "home_pregame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+        }
+    ]
+    completed = harness.service().update_linked_status(
+        "game-1", "completed", {"final_home_score": 50, "final_visitor_score": 0}
+    ).data["broadcast"]
+    assert completed["home_postgame_record"] == {"wins": 1, "losses": 0, "ties": 0}
+    assert completed["home_postgame_region_record"] == {"wins": 0, "losses": 0, "ties": 0}
+    assert completed["record_tracking_applied"] is False
+
+
+def test_official_non_region_loss_advances_only_overall_record() -> None:
+    harness = Harness()
+    harness.broadcasts = [
+        {
+            "broadcast_id": "game-1",
+            "status": "live",
+            "record_policy": "official",
+            "region_game": False,
+            "record_tracking": {"primary_side": "home"},
+            "home_pregame_record": {"wins": 6, "losses": 1, "ties": 0},
+            "home_pregame_region_record": {"wins": 3, "losses": 0, "ties": 0},
+        }
+    ]
+    completed = harness.service().update_linked_status(
+        "game-1", "completed", {"final_home_score": 7, "final_visitor_score": 14}
+    ).data["broadcast"]
+    assert completed["home_postgame_record"] == {"wins": 6, "losses": 2, "ties": 0}
+    assert completed["home_postgame_region_record"] == {"wins": 3, "losses": 0, "ties": 0}
+
+
+def test_editing_same_school_preserves_archived_classification_snapshot() -> None:
+    harness = Harness()
+    harness.broadcasts = [
+        {
+            "broadcast_id": "game-1",
+            "sport": "Football",
+            "home_school_id": "caledonia",
+            "visitor_school_id": "new-hope",
+            "home_classification": "4A",
+            "home_region": "Historic Region",
+        }
+    ]
+    harness.schools["caledonia"]["classification"] = "6A"
+    result = harness.service().update("game-1", {"date": "2026-10-01"})
+    assert result.data["broadcast"]["home_classification"] == "4A"
+    assert result.data["broadcast"]["home_region"] == "Historic Region"
 
 
 def test_update_preserves_contract_and_syncs_active_state() -> None:
@@ -354,3 +495,21 @@ def test_delete_removes_detail_and_resets_matching_active_state() -> None:
     assert harness.detail_deletes == ["game-1"]
     assert harness.state == {"broadcast_id": "", "broadcast_created": False}
     assert service.delete("missing").code == "NOT_FOUND"
+
+
+def test_update_nonofficial_contest_forces_region_game_false() -> None:
+    harness = Harness()
+    harness.broadcasts = [{
+        "broadcast_id": "game-1",
+        "sport": "Football",
+        "home_school_id": "caledonia",
+        "visitor_school_id": "new-hope",
+        "contest_type": "official",
+        "region_game": True,
+    }]
+    record = harness.service().update(
+        "game-1", {"contest_type": "exhibition", "region_game": True}
+    ).data["broadcast"]
+    assert record["contest_type"] == "exhibition"
+    assert record["record_policy"] == "non_record"
+    assert record["region_game"] is False

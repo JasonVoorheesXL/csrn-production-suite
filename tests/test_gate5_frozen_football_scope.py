@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 
@@ -70,7 +70,7 @@ def test_sponsor_spotlight_stays_below_the_scorebug() -> None:
     assert "#scorebug,#eventTicker{z-index:100}" in overlay
     assert "sponsorSpotlight.media_type==='video'" in overlay
     assert '<link rel="stylesheet" href="/themes/current.css">' in overlay
-    assert "const OVERLAY_SCHEMA_REVISION='gate5-program-visual-v9';" in overlay
+    assert "const OVERLAY_SCHEMA_REVISION='gate5-program-visual-v10';" in overlay
     assert (
         "s.overlay_revision&&s.overlay_revision!==OVERLAY_SCHEMA_REVISION"
         in overlay
@@ -173,3 +173,35 @@ def test_broadcaster_penalty_buttons_use_context_free_labels() -> None:
         """onclick="openPenalty('visitor','broadcaster')">Penalty</button>"""
         in command_center
     )
+
+
+def test_broadcast_planning_exposes_record_policy_and_special_designations() -> None:
+    command_center = (ROOT / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    service = (ROOT / "broadcast_service.py").read_text(encoding="utf-8")
+    assert 'id="contestType"' in command_center
+    assert 'id="regionGame"' in command_center
+    assert 'id="homeOverallTies"' in command_center
+    assert 'id="visitorRegionTies"' in command_center
+    assert 'id="designationHomecoming"' in command_center
+    assert 'id="designationChampionship"' in command_center
+    assert "home_pregame_record: readPlanningRecord('home','Overall')" in command_center
+    assert "special_designations: readSpecialDesignations()" in command_center
+    assert '"record_policy": "official" if contest_type == "official" else "non_record"' in service
+    assert '"ties"' in service
+    assert "def _latest_primary_records(" in service
+    assert "def _apply_completion_records(" in service
+
+
+def test_gate5_record_policy_and_scorebug_contract() -> None:
+    root = Path(__file__).resolve().parents[1]
+    command = (root / "templates" / "index.html").read_text(encoding="utf-8")
+    overlay = (root / "templates" / "overlay.html").read_text(encoding="utf-8")
+    assert "Official overall and region win/loss/tie records will not be updated" in command
+    assert "region.checked=false;region.disabled=true" in command
+    assert "id=\"homeRecord\"" in overlay
+    assert "id=\"visitorRecord\"" in overlay
+    assert "scorebugRecord(s,'home')" in overlay
+    assert "official&&Boolean(state.region_game)" in overlay
+    assert "gate5-program-visual-v10" in overlay
