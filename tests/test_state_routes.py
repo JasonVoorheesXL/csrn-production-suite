@@ -73,7 +73,7 @@ def test_state_endpoint_returns_public_service_state(state_client) -> None:
         "broadcast_id": "B1",
         "graphics_queue": [],
         "home_score": 6,
-        "overlay_revision": "gate6-visual-regression-v1",
+        "overlay_revision": "gate6-runtime-resilience-v2",
         "public": True,
     }
     assert service.calls == [

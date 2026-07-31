@@ -926,6 +926,127 @@ Deferred visual state:
   visual approval is deferred until that workflow exists. Automated geometry
   tests continue to protect the dormant layout contract without treating it as
   a supported production state.
+
+#### Gate 6 runtime repair — state polling and worker exhaustion
+
+Scorebug/ticker visual review exposed a blocking runtime defect before the
+remaining ticker matrix could be completed. With no browser clients open,
+`/api/state` measured approximately 1.77–1.89 seconds while
+`/api/security-status` remained near 15 milliseconds. During normal Command
+Center and overlay polling, Waitress reported a growing task queue, the local
+port remained open, and state requests stopped completing.
+
+Root cause and approved repair scope:
+
+- `StateService.load()` advanced a running clock and replaced the complete state
+  file on every read; therefore each polling client continuously wrote state to
+  synchronized storage;
+- the overlay started `/api/state` every 300 milliseconds with `setInterval`,
+  allowing requests to overlap when a response exceeded the interval;
+- Command Center polling also lacked an in-flight guard and bounded timeout;
+- running-clock reads must derive the visible clock without writing; explicit
+  mutations remain responsible for persistence;
+- overlay polling becomes completion-scheduled, single-flight, timeout-bounded,
+  and backed off after failures;
+- Command Center polling becomes single-flight and timeout-bounded;
+- overlay revision `gate6-runtime-resilience-v1` refreshes stale browser sources;
+- focused tests must prove repeated running-clock reads perform no repository
+  replacements and both browser pollers reject overlap.
+
+This repair is implemented locally but is not accepted, committed, or pushed.
+Runtime latency, worker-queue stability, operator responsiveness, focused tests,
+and the full authoritative suite must pass before ticker visual review resumes.
+
+
+#### Gate 6 runtime acceptance and halftime/ticker refinement
+
+Operator stability testing accepted the single-flight runtime repair under a
+Command Center, overlay, and direct state-request workload:
+
+- controls responded immediately;
+- state changes appeared promptly on the overlay;
+- no Waitress task-queue warnings occurred;
+- no state requests failed; and
+- measured loaded `/api/state` latency ranged from approximately 690 to 1,274
+  milliseconds. Further latency optimization remains desirable, but bounded
+  single-flight polling prevented worker exhaustion.
+
+The same review identified two bounded presentation defects before scorebug and
+ticker visual regression can close:
+
+- entering halftime must keep the scorebug visible and replace the center game
+  status with `HALFTIME`; clock and down/distance are suppressed in the overlay
+  for halftime without destroying the underlying game fields, so normal status
+  returns when halftime ends and the game advances to the third quarter;
+- the Fast ticker preset increases from 126 to 189 pixels per second, exactly
+  1.5 times the prior value; Very Slow, Slow, and Normal remain unchanged.
+
+Overlay revision `gate6-runtime-resilience-v2` refreshes stale browser sources
+for this presentation contract. This refinement is implemented locally and must
+pass focused/full tests plus operator halftime and Fast ticker review before
+commit or push.
+
+#### Gate 6 runtime resilience and halftime/ticker acceptance
+
+The runtime-resilience and remaining scorebug/ticker state slice is accepted.
+
+Root cause and repair:
+
+- `/api/state` previously advanced the running clock and wrote the complete state
+  file on every read;
+- Graphic overlay polling at 300 milliseconds and Command Center polling at 750
+  milliseconds caused overlapping Google Drive-backed writes, Waitress worker
+  exhaustion, queued requests, delayed operator actions, and apparent connection
+  failures;
+- state reads now advance the visible clock without replacing the persisted state
+  file;
+- Command Center and overlay polling are single-flight and use request timeouts;
+- overlay failures use controlled retry/backoff rather than accumulating requests;
+- no Waitress thread-count increase was used to mask the underlying defect.
+
+Measured and operator-accepted behavior:
+
+- unloaded `/api/state` latency improved from approximately 1.8 seconds to
+  approximately 0.35-0.40 seconds;
+- under the supported live Command Center and overlay load, controls remained
+  responsive with no Waitress queue warnings, request failures, or unexpected
+  connection-loss banner;
+- quarter changes through Q1-Q4 and OT updated promptly;
+- scorebug-only, ticker-only, both-visible, and both-hidden states worked;
+- scorebug and ticker state changes appeared live without overlay refresh;
+- runtime polling no longer exhausted the server worker pool.
+
+Halftime presentation:
+
+- entering halftime keeps the scorebug visible;
+- the center status displays `HALFTIME`;
+- clock and down/distance are suppressed during halftime;
+- scores, team identities, records, possession treatment, and ticker remain
+  visible;
+- exiting halftime resumes Q3 and normal center-module presentation;
+- halftime exit resets football field state to `1st & 10`.
+
+Ticker speed:
+
+- Very Slow, Slow, and Normal remain unchanged;
+- Fast increases from 126 to 189 pixels per second, exactly 1.5 times the prior
+  speed;
+- operator review accepted Fast as visibly faster while still readable, with no
+  overlap, blank loop, or visible jump.
+
+Validation evidence:
+
+- focused runtime, state, game-operations, and Gate 6 suites: 78 passed;
+- full authoritative repository suite: 1,269 passed;
+- the four existing Pillow `Image.getdata()` deprecation warnings remain
+  unchanged;
+- final live operator verification accepted halftime entry, Q3 `1st & 10`
+  resume, ticker speed, runtime responsiveness, and queue stability.
+
+This checkpoint does not claim that `/api/state` has reached its long-term
+performance target. Further optimization may reduce loaded latency, but the
+worker-exhaustion failure mode is corrected and the supported production path is
+stable enough for continued Gate 6 visual-regression work.
 ### Gate 6 — Visual regression
 
 Render and approve:
@@ -1334,3 +1455,12 @@ complete output before any commit or push.
 After this slice is checkpointed, continue the frozen Gate 5 game-classification
 and record-policy work documented above. Do not begin Gate 6 visual regression
 until every Gate 5 frozen-football slice is complete.
+
+#### Gate 6 halftime resume field normalization
+
+Operator validation confirmed that the revised halftime presentation remains visible,
+clearly displays `HALFTIME`, suppresses clock and down/distance presentation, resumes
+Q3, and keeps the ticker responsive without Waitress queue warnings. One final state
+normalization was required: ending halftime now begins the third quarter at `1st & 10`
+instead of retaining the pre-halftime down and distance. Entering halftime still preserves
+the underlying live-game fields until the explicit third-quarter resume transition.
