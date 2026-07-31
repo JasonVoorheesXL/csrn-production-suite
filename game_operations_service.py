@@ -206,10 +206,15 @@ class GameOperationsService:
             if state.get("broadcast_phase") == "halftime":
                 state["broadcast_phase"] = "live"
                 state["quarter"] = "3"
+                state["down"] = "1st"
+                state["distance"] = "10"
                 state["scorebug_visible"] = True
             else:
                 state["broadcast_phase"] = "halftime"
-                state["scorebug_visible"] = False
+                # Halftime remains an on-air game state. Keep the scorebug
+                # visible; the overlay replaces quarter/clock/down content with
+                # a dedicated HALFTIME presentation.
+                state["scorebug_visible"] = True
             self._save_state(state)
             return GameOperationsResult(
                 "OK",

@@ -95,7 +95,7 @@ def test_events_are_migrated_to_plays() -> None:
     assert state["plays"][0]["yards"] == 12
 
 
-def test_running_clock_advances_and_persists() -> None:
+def test_running_clock_advances_without_persisting_on_read() -> None:
     initial = defaults() | {
         "clock_running": True,
         "clock_started_at": 90,
@@ -105,7 +105,8 @@ def test_running_clock_advances_and_persists() -> None:
     state = service.load().data["state"]
     assert state["clock_seconds"] == 10
     assert state["clock_started_at"] == 100
-    assert store["clock_seconds"] == 10
+    assert store["clock_seconds"] == 20
+    assert store["clock_started_at"] == 90
 
 
 def test_running_clock_stops_at_zero() -> None:
@@ -121,11 +122,38 @@ def test_running_clock_stops_at_zero() -> None:
     assert state["clock_started_at"] == 0
 
 
-def test_running_clock_without_start_time_is_armed() -> None:
+def test_running_clock_without_start_time_is_derived_without_write() -> None:
     initial = defaults() | {"clock_running": True, "clock_started_at": 0}
     service, store = build(initial, now=100)
-    service.load()
-    assert store["clock_started_at"] == 100
+    state = service.load().data["state"]
+    assert state["clock_started_at"] == 100
+    assert store["clock_started_at"] == 0
+
+
+def test_repeated_running_clock_reads_never_replace_raw_state() -> None:
+    initial = defaults() | {
+        "clock_running": True,
+        "clock_started_at": 90,
+        "clock_seconds": 20,
+    }
+    store = copy.deepcopy(initial)
+    replacements = []
+
+    service = StateService(
+        load_raw=lambda: copy.deepcopy(store),
+        replace_raw=lambda value: replacements.append(copy.deepcopy(dict(value))) or dict(value),
+        default_state=defaults,
+        canonical_team_key=lambda state, value: str(value),
+        canonical_team_name=lambda state, value: str(value).title(),
+        now=lambda: 100,
+    )
+
+    for _ in range(20):
+        state = service.load().data["state"]
+        assert state["clock_seconds"] == 10
+
+    assert replacements == []
+    assert store == initial
 
 
 def test_save_persists_linked_broadcast_snapshot() -> None:

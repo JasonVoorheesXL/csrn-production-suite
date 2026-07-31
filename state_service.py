@@ -114,8 +114,12 @@ class StateService:
                 state["clock_started_at"] = now
                 changed = True
 
-            if changed:
-                self._replace_raw(self.normalize(state))
+            # Reading public state must never write the full state file. The
+            # running clock is derived from its persisted baseline and is saved
+            # only by an explicit mutation such as pause, reset, or game action.
+            # Polling clients may call this method several times per second.
+            # Writing here turns every viewer into a continuous disk writer and
+            # can exhaust the WSGI worker pool on synchronized storage.
 
         return StateResult("OK", {"state": copy.deepcopy(state)})
 

@@ -248,24 +248,35 @@ def test_toggle_scorebug_command_failure_does_not_mutate_state() -> None:
     assert history == []
 
 
-def test_toggle_halftime_enters_halftime_and_hides_scorebug() -> None:
+def test_toggle_halftime_enters_halftime_and_keeps_scorebug_visible() -> None:
     state = base_state()
     state["broadcast_phase"] = "live"
     state["scorebug_visible"] = True
+    state["clock_visible"] = True
+    state["down"] = "2nd"
+    state["distance"] = "6"
     service, current, _, _, _, _ = build_service(state)
     service.toggle_halftime()
     assert current["broadcast_phase"] == "halftime"
-    assert current["scorebug_visible"] is False
+    assert current["scorebug_visible"] is True
+    # Preserve game fields so ending halftime restores the normal presentation.
+    assert current["clock_visible"] is True
+    assert current["down"] == "2nd"
+    assert current["distance"] == "6"
 
 
-def test_toggle_halftime_resumes_third_quarter() -> None:
+def test_toggle_halftime_resumes_third_quarter_at_first_and_ten() -> None:
     state = base_state()
     state["broadcast_phase"] = "halftime"
     state["quarter"] = "2"
+    state["down"] = "2nd"
+    state["distance"] = "5"
     service, current, _, _, _, _ = build_service(state)
     service.toggle_halftime()
     assert current["broadcast_phase"] == "live"
     assert current["quarter"] == "3"
+    assert current["down"] == "1st"
+    assert current["distance"] == "10"
     assert current["scorebug_visible"] is True
 
 

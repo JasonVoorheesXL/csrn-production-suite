@@ -2268,12 +2268,25 @@ function renderProgramVisualActivities(){
   const list=document.getElementById('graphicsQueueList');if(list)list.innerHTML=queue.length?queue.map(item=>`<div class="graphics-queue-item"><span><strong>${escapeHtml(item.label||'PLAYER EVENT')}</strong><small>${escapeHtml(item.player_name||'')}</small></span><button class="danger" onclick="cancelGraphicsQueueItem('${escapeHtml(item.id)}')">Cancel</button></div>`).join(''):'<span class="section-note">Queue empty.</span>';
 }
 
+let statePollInFlight=false;
+let statePollFailures=0;
 async function poll() {
-  if (!authenticated) return;
+  if (!authenticated || statePollInFlight) return;
+  statePollInFlight=true;
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),2000);
   try {
-    currentState = await api('/api/state');
+    const response=await fetch('/api/state',{credentials:'same-origin',cache:'no-store',signal:controller.signal});
+    if(!response.ok)throw new Error(`State request failed (${response.status})`);
+    currentState=await response.json();
+    statePollFailures=0;
     render();
-  } catch (_) {}
+  } catch (_) {
+    statePollFailures=Math.min(statePollFailures+1,6);
+  } finally {
+    clearTimeout(timeout);
+    statePollInFlight=false;
+  }
 }
 
 

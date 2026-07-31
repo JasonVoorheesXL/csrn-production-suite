@@ -54,8 +54,8 @@ def test_gate6_overlay_revision_is_published_consistently() -> None:
     overlay = (ROOT / "templates" / "overlay.html").read_text(encoding="utf-8")
     app = (ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert "const OVERLAY_SCHEMA_REVISION='gate6-visual-regression-v1';" in overlay
-    assert 'OVERLAY_SCHEMA_REVISION = "gate6-visual-regression-v1"' in app
+    assert "const OVERLAY_SCHEMA_REVISION='gate6-runtime-resilience-v2';" in overlay
+    assert 'OVERLAY_SCHEMA_REVISION = "gate6-runtime-resilience-v2"' in app
 
 
 def test_gate5_record_rendering_rules_remain_unchanged() -> None:
@@ -67,3 +67,34 @@ def test_gate5_record_rendering_rules_remain_unchanged() -> None:
     assert "return region?`${overall} • REG ${region}`:overall" in overlay
     assert "scorebugRecord(s,'home')" in overlay
     assert "scorebugRecord(s,'visitor')" in overlay
+
+def test_runtime_state_polling_is_bounded_and_non_overlapping() -> None:
+    overlay = (ROOT / "templates" / "overlay.html").read_text(encoding="utf-8")
+    command = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+
+    assert "refreshInFlight" in overlay
+    assert "AbortController" in overlay
+    assert "setTimeout(refresh,delay)" in overlay
+    assert "setInterval(refresh,300)" not in overlay
+    assert "statePollInFlight" in command
+    assert "AbortController" in command
+    assert "if (!authenticated || statePollInFlight) return" in command
+
+
+def test_halftime_keeps_scorebug_and_replaces_center_game_status() -> None:
+    overlay = (ROOT / "templates" / "overlay.html").read_text(encoding="utf-8")
+    service = (ROOT / "game_operations_service.py").read_text(encoding="utf-8")
+
+    assert "state[\"scorebug_visible\"] = True" in service
+    assert "halftime?'HALFTIME'" in overlay
+    assert "center.classList.toggle('halftime',halftime)" in overlay
+    assert "center.classList.toggle('no-clock',halftime||!s.clock_visible)" in overlay
+    assert "const downOff=halftime||" in overlay
+    assert ".center.halftime .quarter" in overlay
+
+
+def test_fast_ticker_speed_is_one_and_a_half_times_the_prior_preset() -> None:
+    overlay = (ROOT / "templates" / "overlay.html").read_text(encoding="utf-8")
+
+    assert "{very_slow:24,slow:36,normal:84,fast:189}" in overlay
+    assert "{very_slow:24,slow:36,normal:84,fast:126}" not in overlay
