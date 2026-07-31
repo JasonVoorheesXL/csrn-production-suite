@@ -59,7 +59,13 @@ class StateService:
         if merged.get("possession") not in self.VALID_POSSESSION:
             merged["possession"] = "home"
 
-        for field in ("history", "events", "plays", "correction_log"):
+        for field in (
+            "history",
+            "events",
+            "plays",
+            "correction_log",
+            "graphics_queue",
+        ):
             if not isinstance(merged.get(field), list):
                 merged[field] = []
 
@@ -165,6 +171,23 @@ class StateService:
         if isinstance(graphic, dict):
             for field in ("headshot", "team_logo", "sponsor_logo"):
                 graphic[field] = self._safe_media_value(graphic.get(field, ""))
+
+        spotlight = result.get("sponsor_spotlight")
+        if isinstance(spotlight, dict):
+            for field in ("sponsor_logo", "media_url"):
+                spotlight[field] = self._safe_media_value(
+                    spotlight.get(field, "")
+                )
+
+        for item in result.get("graphics_queue", []):
+            if not isinstance(item, dict):
+                continue
+            queued_graphic = item.get("graphic")
+            if isinstance(queued_graphic, dict):
+                for field in ("headshot", "team_logo", "sponsor_logo"):
+                    queued_graphic[field] = self._safe_media_value(
+                        queued_graphic.get(field, "")
+                    )
 
         result["plays"] = [
             self._enrich_play(result, source)

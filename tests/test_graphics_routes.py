@@ -45,6 +45,21 @@ class StubGraphicsService:
                 "sponsor_warning": "",
             },
         )
+        self.spotlight_result = GraphicsResult(
+            "OK",
+            {
+                "state": {
+                    "channel": "sponsor",
+                    "sponsor_spotlight": {"visible": True},
+                },
+                "graphic": {"visible": True},
+                "sponsor_warning": "",
+            },
+        )
+        self.queue_result = GraphicsResult(
+            "OK",
+            {"state": {"graphics_queue": []}},
+        )
 
     def update_lower_third(self, state: dict, incoming: dict) -> GraphicsResult:
         self.calls.append(("update_lower_third", (copy.deepcopy(state), incoming)))
@@ -57,6 +72,20 @@ class StubGraphicsService:
     def update_personnel(self, state: dict, incoming: dict) -> GraphicsResult:
         self.calls.append(("update_personnel", (copy.deepcopy(state), incoming)))
         return self.personnel_result
+
+    def update_sponsor_spotlight(
+        self,
+        state: dict,
+        incoming: dict,
+    ) -> GraphicsResult:
+        self.calls.append(
+            ("update_sponsor_spotlight", (copy.deepcopy(state), incoming))
+        )
+        return self.spotlight_result
+
+    def update_queue(self, state: dict, incoming: dict) -> GraphicsResult:
+        self.calls.append(("update_queue", (copy.deepcopy(state), incoming)))
+        return self.queue_result
 
 
 @pytest.fixture
@@ -175,3 +204,37 @@ def test_personnel_route_saves_and_returns_warning(graphics_client) -> None:
         "sponsor_warning": "SPONSOR_INACTIVE",
     }
     assert saved == [{"channel": "personnel"}]
+
+
+def test_sponsor_spotlight_and_queue_routes_delegate_and_save(graphics_client) -> None:
+    client, service, source_state, saved = graphics_client
+    spotlight_payload = {
+        "action": "show",
+        "sponsor_id": "bank",
+        "media_asset_id": "bank-video",
+    }
+    spotlight_response = client.post(
+        "/api/graphics/sponsor-spotlight",
+        json=spotlight_payload,
+    )
+    queue_response = client.post(
+        "/api/graphics/queue",
+        json={"action": "cancel", "id": "GQ-1"},
+    )
+
+    assert spotlight_response.status_code == 200
+    assert queue_response.status_code == 200
+    assert service.calls[-2:] == [
+        (
+            "update_sponsor_spotlight",
+            (source_state, spotlight_payload),
+        ),
+        (
+            "update_queue",
+            (source_state, {"action": "cancel", "id": "GQ-1"}),
+        ),
+    ]
+    assert saved[-2:] == [
+        service.spotlight_result.data["state"],
+        service.queue_result.data["state"],
+    ]

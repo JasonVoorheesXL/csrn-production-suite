@@ -401,8 +401,8 @@ These may be implemented only after source recovery and baseline repair:
 3. Overall and regional record tracking.
 4. Scrimmage/exhibition rules that do not alter official records.
 5. Special-game designations such as Homecoming, Senior Night, rivalry, playoff, and championship.
-6. Player Highlight using the existing Player Identification Card.
-7. Team-filtered player selection for Player Highlight.
+6. Player Spotlight using the existing Player Identification Card.
+7. Team-filtered player selection for Player Spotlight.
 8. Manual show, hide, and clear controls.
 9. Verified statistics only.
 
@@ -482,7 +482,7 @@ GitHub Actions run `30579098825` and merged into `develop-1.13` at
 
 - regional data and record rules;
 - special-game designations;
-- Player Highlight;
+- Player Spotlight card and Player Highlight video;
 - tests and documentation.
 
 Exit condition: approved football scope is complete.
@@ -499,14 +499,14 @@ Initial audit:
 - no structured special-game designation exists in the broadcast record or
   Create/Edit Broadcast interface;
 - the player graphic already renders `play_detail`, but the manual operator
-  path did not expose or persist the frozen-scope `Player Highlight` type.
-- Player Highlight is the first independent Gate 5 repair; the record and
+  path did not expose or persist the frozen-scope `Player Spotlight` type.
+- Player Spotlight is the first independent Gate 5 repair; the record and
   designation model must be fixed before implementation so archived broadcasts
   retain their original pregame context.
 
-#### Player Highlight operator workflow
+#### Player Spotlight operator workflow
 
-The production destination is a dedicated **Player Highlight** menu within
+The production destination is a dedicated **Player Spotlight** menu within
 Program Visual Controls. Player Identification Master remains the roster and
 identity source; it must not be Jordan's primary live highlight workflow.
 
@@ -517,17 +517,17 @@ The Program Visual Controls menu must let the operator:
   with a controlled custom-text option for an unplanned live achievement;
 - preview the complete graphic before air;
 - select its display duration; and
-- show, update, hide, or clear the highlight without editing the underlying
+- show, update, hide, or clear the spotlight without editing the underlying
   player identity.
 
-Prepared highlight information belongs with the player's reusable roster data
+Prepared spotlight information belongs with the player's reusable roster data
 so it can be entered before the broadcast and selected quickly during the
 event. The live custom-text field remains available for a new achievement that
 was not known during preparation.
 
 Player-event sequencing is deterministic. If a touchdown is recorded while a
-Player Highlight is on air, the touchdown graphic is queued rather than
-discarded or allowed to overwrite the active highlight. When the highlight
+Player Spotlight is on air, the touchdown graphic is queued rather than
+discarded or allowed to overwrite the active spotlight. When the spotlight
 ends—by duration expiry or operator hide—the queued touchdown graphic appears
 next. The queue must preserve the scoring player and event detail, prevent
 duplicate delivery, and expose a way to cancel an erroneous queued event before
@@ -562,6 +562,82 @@ define and test whether each event interrupts the spotlight immediately or is
 queued behind it; no event may be lost or silently overwrite another activity.
 Video audio policy, transition timing, replay behavior, and cancellation must
 be visible and deterministic in the operator interface.
+
+Gate 5 implementation checkpoint:
+
+- Program Visual Controls now owns dedicated Player Spotlight and Sponsor
+  Spotlight operator panels with preview-first selection and duration controls.
+- A persisted graphics queue holds a touchdown recorded while Player Spotlight
+  is active. Expiry or operator hide advances the queued event exactly once;
+  each pending item can be cancelled before air.
+- Sponsor Spotlight accepts active sponsors and Sponsor-category image/video
+  assets whose rights status is Owned, Licensed, Permission Granted, or Public
+  Domain. Unverified media is blocked from air.
+- Sponsor Spotlight is interrupted by a live automated scoring-player graphic.
+  The scorebug and event ticker are protected above the spotlight layer.
+- Sponsor video begins muted in this checkpoint. Enabling program audio requires
+  a separate explicit operator control and OBS audio-path validation.
+- Player Spotlight duration choices are consistent between Program Visual
+  Controls and Player Identification Master through the 30-second option.
+- The live overlay publishes and checks an overlay schema revision. After one
+  manual OBS browser-source refresh for this checkpoint, later incompatible
+  overlay updates automatically reload instead of retaining stale HTML.
+- Sponsor Spotlight uses a shared feature-stage layout: a theme-driven lead-in,
+  sponsor name, and caption band overlays the top of the media; the still image
+  or video fits at the largest aspect-preserving size beneath that band; and the
+  stage ends at the top of the protected scorebug in compact and graphic modes.
+  The band consumes the operator-selected theme's surface, accent, text, border,
+  radius, shadow, and font tokens.
+- Broadcaster penalty buttons use the context-free label `Penalty`; the home or
+  visitor column supplies team context, preventing stale fixture or generic
+  team names from leaking into the live controls.
+
+#### Frozen follow-on — Player Highlight video
+
+Player Highlight means actual season highlight video. It is separate from the
+roster-driven Player Spotlight card and is not a general-purpose video player.
+
+- Operators select a roster and player first, then choose an approved
+  player/season-linked highlight clip.
+- The clip uses the same feature-stage geometry as Sponsor Spotlight: a
+  theme-driven player identity/information band at the top, aspect-preserving
+  video below it, and the protected scorebug beneath the stage.
+- Player name, number, position, grade, and the operator-entered recognition
+  note remain visible in the top band without being burned into the source
+  video.
+- A touchdown recorded during the clip follows the existing Player Spotlight
+  rule: it enters the graphics queue and plays exactly once after the clip ends
+  or the operator hides it.
+- Clip approval, season/player association, playback cutoff, replay behavior,
+  cancellation, muted/default audio, and OBS program-audio routing require
+  focused tests before this presentation can be marked available.
+
+#### Sponsor broadcast creative package
+
+One sponsor logo must not be stretched, cropped, or repurposed across every
+broadcast placement. Each commercial sponsor should provide or approve a
+placement-tagged creative package. Until an exact rendition exists, the system
+must letterbox the closest approved asset without cropping it.
+
+Required package renditions:
+
+- **Primary transparent logo:** square 1200 × 1200 PNG, with at least 8 percent
+  transparent safe space on every edge;
+- **Feature-stage still:** 1600 × 500 PNG or high-quality JPEG, designed for the
+  Sponsor Spotlight media region below its top information band;
+- **Feature-stage video:** 1600 × 500 H.264 MP4 or WebM, with critical content
+  inside a 5 percent safe area and a separately declared audio policy;
+- **Lower-third sponsor mark:** 1200 × 300 transparent PNG;
+- **Scorebug sponsor bug:** 600 × 180 transparent PNG; and
+- **Full 16:9 master:** 1920 × 1080 still/video retained as the archival master
+  and for future true full-screen uses.
+
+Asset records must gain an explicit placement/rendition role rather than
+inferring suitability from filename or generic `Logo`, `Background`, `Overlay`,
+or `Video` type alone. Sponsor Spotlight should prefer the feature-stage still
+or video, while other graphics expose only renditions compatible with their
+placement. Rights approval remains per asset or may be inherited from a
+documented sponsor-package approval covering the submitted package.
 
 #### Deferred commercial presentation concept — starting lineups
 
@@ -605,7 +681,8 @@ Render and approve:
 - headshot present/missing;
 - school logo present/missing;
 - short and long names;
-- touchdown, turnover, field goal, player highlight, and Player of the Game;
+- touchdown, turnover, field goal, Player Spotlight card, Player Highlight
+  video, and Player of the Game;
 - scorebug, ticker, lower third, sponsor, caption, weather, and social states;
 - desktop, phone, and production-resolution views.
 

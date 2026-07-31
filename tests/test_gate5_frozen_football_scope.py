@@ -6,17 +6,112 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_player_highlight_is_selectable_previewed_and_submitted() -> None:
+def test_player_spotlight_is_selectable_previewed_and_submitted() -> None:
     command_center = (ROOT / "templates" / "index.html").read_text(
         encoding="utf-8"
     )
-    assert '<option value="player_highlight">Player Highlight</option>' in command_center
+    assert '<option value="player_spotlight">Player Spotlight</option>' in command_center
     assert 'id="pgPlayDetail"' in command_center
     assert 'id="pgpPlayDetail" class="pgp-play-detail"' in command_center
-    assert "player_highlight:'PLAYER HIGHLIGHT'" in command_center
+    assert "player_spotlight:'PLAYER SPOTLIGHT'" in command_center
     assert "play_detail:document.getElementById('pgPlayDetail').value.trim()" in command_center
     assert (
         "document.getElementById('pgpPlayDetail').textContent="
         "document.getElementById('pgPlayDetail')?.value.trim()||''"
+        in command_center
+    )
+
+
+def test_program_visual_controls_expose_highlight_spotlight_and_queue() -> None:
+    command_center = (ROOT / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert 'id="pvhRoster"' in command_center
+    assert 'id="pvhPlayer"' in command_center
+    assert 'id="pvhDetail"' in command_center
+    assert 'id="pvhDuration"' in command_center
+    assert (
+        'id="pvhDuration"><option value="5">5 seconds</option>'
+        '<option value="8" selected>8 seconds</option>'
+        '<option value="12">12 seconds</option>'
+        '<option value="15">15 seconds</option>'
+        '<option value="30">30 seconds</option>'
+        in command_center
+    )
+    assert (
+        'id="pgDuration"><option value="0">Persistent</option>'
+        '<option value="5">5 seconds</option>'
+        '<option value="8">8 seconds</option>'
+        '<option value="12">12 seconds</option>'
+        '<option value="15">15 seconds</option>'
+        '<option value="30">30 seconds</option>'
+        in command_center
+    )
+    assert "showProgramPlayerHighlight()" in command_center
+    assert 'id="spsSponsor"' in command_center
+    assert 'id="spsMedia"' in command_center
+    assert 'id="spsDuration"' in command_center
+    assert "showSponsorSpotlight()" in command_center
+    assert 'id="graphicsQueueList"' in command_center
+    assert "cancelGraphicsQueueItem(" in command_center
+
+
+def test_sponsor_spotlight_stays_below_the_scorebug() -> None:
+    overlay = (ROOT / "templates" / "overlay.html").read_text(encoding="utf-8")
+    assert 'id="sponsorSpotlight"' in overlay
+    assert 'id="sponsorSpotlightImage"' in overlay
+    assert 'id="sponsorSpotlightVideo"' in overlay
+    assert "#sponsorSpotlight{" in overlay
+    assert "#scorebug,#eventTicker{z-index:100}" in overlay
+    assert "sponsorSpotlight.media_type==='video'" in overlay
+    assert '<link rel="stylesheet" href="/themes/current.css">' in overlay
+    assert "const OVERLAY_SCHEMA_REVISION='gate5-program-visual-v6';" in overlay
+    assert (
+        "s.overlay_revision&&s.overlay_revision!==OVERLAY_SCHEMA_REVISION"
+        in overlay
+    )
+    assert "#sponsorSpotlight.scorebug-active{bottom:176px}" in overlay
+    assert (
+        "#sponsorSpotlight.scorebug-active.graphic-mode{bottom:310px}"
+        in overlay
+    )
+    assert (
+        ".sponsor-spotlight-media{position:absolute;inset:190px 3vw 2vh;"
+        "box-sizing:border-box"
+        in overlay
+    )
+    assert "width:auto!important;height:100%!important" in overlay
+    assert "object-fit:contain!important;object-position:center" in overlay
+    assert ".sponsor-spotlight-copy{position:absolute" in overlay
+    assert "left:0;right:0;top:0" in overlay
+    assert (
+        "sponsorSpotlightEl.classList.toggle('scorebug-active',"
+        "Boolean(s.scorebug_visible))"
+        in overlay
+    )
+
+
+def test_graphics_routes_expose_spotlight_and_queue_coordinator() -> None:
+    routes = (ROOT / "routes" / "graphics_routes.py").read_text(
+        encoding="utf-8"
+    )
+    assert '@routes.post("/api/graphics/sponsor-spotlight")' in routes
+    assert '@routes.post("/api/graphics/queue")' in routes
+    assert "update_sponsor_spotlight(" in routes
+    assert "update_queue(" in routes
+
+
+def test_broadcaster_penalty_buttons_use_context_free_labels() -> None:
+    command_center = (ROOT / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert "Penalty Caledonia" not in command_center
+    assert "Penalty Visitor" not in command_center
+    assert (
+        """onclick="openPenalty('home','broadcaster')">Penalty</button>"""
+        in command_center
+    )
+    assert (
+        """onclick="openPenalty('visitor','broadcaster')">Penalty</button>"""
         in command_center
     )

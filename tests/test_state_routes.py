@@ -71,10 +71,19 @@ def test_state_endpoint_returns_public_service_state(state_client) -> None:
     assert response.status_code == 200
     assert response.get_json() == {
         "broadcast_id": "B1",
+        "graphics_queue": [],
         "home_score": 6,
+        "overlay_revision": "gate5-program-visual-v6",
         "public": True,
     }
     assert service.calls == [
         ("load", None),
-        ("public", {"broadcast_id": "B1", "home_score": 6}),
+        (
+            "public",
+            {
+                "broadcast_id": "B1",
+                "graphics_queue": [],
+                "home_score": 6,
+            },
+        ),
     ]

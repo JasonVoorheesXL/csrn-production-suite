@@ -145,6 +145,12 @@ class EventService:
                 "player_graphic": copy.deepcopy(
                     state.get("player_graphic") or {}
                 ),
+                "sponsor_spotlight": copy.deepcopy(
+                    state.get("sponsor_spotlight") or {}
+                ),
+                "graphics_queue": copy.deepcopy(
+                    state.get("graphics_queue") or []
+                ),
             }
             return_td = bool(incoming.get("return_td")) and str(
                 incoming.get("turnover_type", "")
@@ -634,6 +640,14 @@ class EventService:
                     state["player_graphic"] = copy.deepcopy(
                         before.get("player_graphic")
                         or dict(self._default_player_graphic())
+                    )
+                if "sponsor_spotlight" in before:
+                    state["sponsor_spotlight"] = copy.deepcopy(
+                        before.get("sponsor_spotlight") or {}
+                    )
+                if "graphics_queue" in before:
+                    state["graphics_queue"] = copy.deepcopy(
+                        before.get("graphics_queue") or []
                     )
                 target_id = target.get("id", "")
                 target_play_number = self._clamp_int(

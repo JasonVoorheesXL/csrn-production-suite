@@ -66,6 +66,22 @@ DEFAULTS = {
         "expires_at": 0,
         "updated_at": 0,
     },
+    "sponsor_spotlight": {
+        "visible": False,
+        "sponsor_id": "",
+        "sponsor_name": "",
+        "sponsor_logo": "",
+        "lead_in": "SPONSOR SPOTLIGHT",
+        "caption": "",
+        "media_asset_id": "",
+        "media_name": "",
+        "media_url": "",
+        "media_type": "image",
+        "duration": 0,
+        "expires_at": 0,
+        "updated_at": 0,
+    },
+    "graphics_queue": [],
 }
 
 
@@ -119,10 +135,12 @@ def base_state() -> dict:
         "lower_third": copy.deepcopy(DEFAULTS["lower_third"]),
         "player_graphic": copy.deepcopy(DEFAULTS["player_graphic"]),
         "personnel_graphic": copy.deepcopy(DEFAULTS["personnel_graphic"]),
+        "sponsor_spotlight": copy.deepcopy(DEFAULTS["sponsor_spotlight"]),
+        "graphics_queue": [],
     }
 
 
-def service(*, now: float = 1000.0, sponsors=None) -> GraphicsService:
+def service(*, now: float = 1000.0, sponsors=None, assets=None) -> GraphicsService:
     def apply_sponsor(graphic: dict, incoming: dict) -> str:
         if sponsors is not None:
             sponsors.append((copy.deepcopy(graphic), copy.deepcopy(incoming)))
@@ -144,6 +162,7 @@ def service(*, now: float = 1000.0, sponsors=None) -> GraphicsService:
             "sport": sport,
         },
         apply_sponsor=apply_sponsor,
+        load_assets=lambda: copy.deepcopy(assets or []),
         clock=lambda: now,
     )
 
@@ -250,25 +269,112 @@ def test_player_show_enriches_roster_identity_and_sponsor() -> None:
     assert len(calls) == 1
 
 
-def test_player_highlight_persists_type_eyebrow_and_detail() -> None:
+def test_player_spotlight_persists_type_eyebrow_and_detail() -> None:
     result = service().update_player(
         base_state(),
         {
             "action": "show",
             "roster_id": "caledonia-football",
             "player_id": "12-jason",
-            "graphic_type": "player_highlight",
-            "eyebrow": "PLAYER HIGHLIGHT",
+            "graphic_type": "player_spotlight",
+            "eyebrow": "PLAYER SPOTLIGHT",
             "play_detail": "8 tackles · 2 sacks · forced fumble",
             "duration": 8,
         },
     )
     graphic = result.data["graphic"]
     assert graphic["visible"] is True
-    assert graphic["graphic_type"] == "player_highlight"
-    assert graphic["eyebrow"] == "PLAYER HIGHLIGHT"
+    assert graphic["graphic_type"] == "player_spotlight"
+    assert graphic["eyebrow"] == "PLAYER SPOTLIGHT"
     assert graphic["play_detail"] == "8 tackles · 2 sacks · forced fumble"
     assert graphic["expires_at"] == 1008
+
+
+def test_touchdown_queues_behind_active_player_spotlight_and_advances_once() -> None:
+    state = base_state()
+    state["player_graphic"].update(
+        {
+            "visible": True,
+            "graphic_type": "player_spotlight",
+            "player_id": "12-jason",
+            "expires_at": 1005,
+        }
+    )
+    queued = service(now=1000).show_automation_player(
+        state,
+        roster(),
+        roster()["players"][0],
+        "touchdown",
+        8,
+        eyebrow="TOUCHDOWN",
+        play_detail="42-yard touchdown",
+    )
+    assert queued.data["queued"] is True
+    assert queued.data["state"]["player_graphic"]["graphic_type"] == "player_spotlight"
+    assert len(queued.data["state"]["graphics_queue"]) == 1
+
+    advanced = service(now=1005).reconcile_queue(queued.data["state"])
+    player = advanced.data["state"]["player_graphic"]
+    assert player["graphic_type"] == "touchdown"
+    assert player["play_detail"] == "42-yard touchdown"
+    assert player["visible"] is True
+    assert player["expires_at"] == 1013
+    assert advanced.data["state"]["graphics_queue"] == []
+
+
+def test_queue_cancel_prevents_delivery() -> None:
+    state = base_state()
+    state["graphics_queue"] = [
+        {
+            "id": "GQ-1",
+            "channel": "player",
+            "graphic": {"duration": 8, "player_id": "12-jason"},
+        }
+    ]
+    result = service().update_queue(state, {"action": "cancel", "id": "GQ-1"})
+    assert result.data["state"]["graphics_queue"] == []
+    assert result.data["state"]["player_graphic"]["visible"] is False
+
+
+def test_sponsor_spotlight_requires_approved_media_and_preserves_scorebug() -> None:
+    approved = {
+        "id": "bank-video",
+        "name": "Bank Spotlight",
+        "category": "Sponsor",
+        "asset_type": "Video",
+        "rights_status": "Licensed",
+        "file_url": "/asset-files/bank.webm",
+        "active": True,
+    }
+    state = base_state()
+    state["scorebug_visible"] = True
+    result = service(assets=[approved]).update_sponsor_spotlight(
+        state,
+        {
+            "action": "show",
+            "sponsor_id": "bank",
+            "media_asset_id": "bank-video",
+            "caption": "Community banking since 1954",
+            "duration": 12,
+        },
+    )
+    spotlight = result.data["state"]["sponsor_spotlight"]
+    assert spotlight["visible"] is True
+    assert spotlight["media_type"] == "video"
+    assert spotlight["expires_at"] == 1012
+    assert result.data["state"]["scorebug_visible"] is True
+
+    rejected = service(
+        assets=[dict(approved, rights_status="Unverified")]
+    ).update_sponsor_spotlight(
+        state,
+        {
+            "action": "show",
+            "sponsor_id": "bank",
+            "media_asset_id": "bank-video",
+        },
+    )
+    assert rejected.code == "SPONSOR_MEDIA_NOT_APPROVED"
 
 
 def test_player_hide_preserves_identity_and_resets_timer() -> None:

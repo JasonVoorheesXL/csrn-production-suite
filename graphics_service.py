@@ -32,6 +32,13 @@ class GraphicsService:
         "lower_third": "lower_third",
         "player": "player_graphic",
         "personnel": "personnel_graphic",
+        "sponsor": "sponsor_spotlight",
+    }
+    APPROVED_RIGHTS = {
+        "Owned",
+        "Licensed",
+        "Permission Granted",
+        "Public Domain",
     }
 
     def __init__(
@@ -43,6 +50,7 @@ class GraphicsService:
         load_personnel: RecordLoader,
         build_identity: IdentityBuilder,
         apply_sponsor: SponsorApplier,
+        load_assets: RecordLoader | None = None,
         clock: Clock | None = None,
     ) -> None:
         self._default_state = default_state
@@ -51,6 +59,7 @@ class GraphicsService:
         self._load_personnel = load_personnel
         self._build_identity = build_identity
         self._apply_sponsor = apply_sponsor
+        self._load_assets = load_assets or (lambda: [])
         self._clock = clock or time.time
 
     def _graphic_default(self, key: str) -> Record:
@@ -120,6 +129,82 @@ class GraphicsService:
             updated[key] = item
         updated["primary_graphic_channel"] = active
         return updated
+
+    @staticmethod
+    def _active(graphic: Record, now: int) -> bool:
+        if not graphic.get("visible"):
+            return False
+        try:
+            expires_at = int(graphic.get("expires_at", 0) or 0)
+        except (TypeError, ValueError):
+            expires_at = 0
+        return not expires_at or expires_at > now
+
+    def reconcile_queue(self, state: State) -> GraphicsResult:
+        updated = copy.deepcopy(state)
+        now = int(self._clock())
+        changed = False
+
+        for key in ("player_graphic", "sponsor_spotlight"):
+            graphic = dict(updated.get(key) or {})
+            if graphic.get("visible") and not self._active(graphic, now):
+                graphic["visible"] = False
+                graphic["expires_at"] = 0
+                updated[key] = graphic
+                changed = True
+
+        queue = [
+            copy.deepcopy(item)
+            for item in list(updated.get("graphics_queue") or [])
+            if isinstance(item, dict)
+        ][-20:]
+        primary_active = any(
+            self._active(dict(updated.get(key) or {}), now)
+            for key in self.PRIMARY_CHANNELS.values()
+        )
+        if not primary_active and queue:
+            item = queue.pop(0)
+            if item.get("channel") == "player":
+                graphic = copy.deepcopy(dict(item.get("graphic") or {}))
+                duration = self._duration(graphic.get("duration"), 8)
+                graphic["visible"] = True
+                graphic["duration"] = duration
+                graphic["expires_at"] = now + duration if duration else 0
+                graphic["updated_at"] = now
+                updated = self.activate_primary(updated, "player")
+                updated["player_graphic"] = graphic
+                changed = True
+        if queue != list(updated.get("graphics_queue") or []):
+            changed = True
+        updated["graphics_queue"] = queue
+        return GraphicsResult(
+            "OK",
+            {"state": updated, "changed": changed},
+        )
+
+    def update_queue(self, state: State, incoming: Record) -> GraphicsResult:
+        updated = copy.deepcopy(state)
+        action = str((incoming or {}).get("action", "")).strip().lower()
+        queue = [
+            copy.deepcopy(item)
+            for item in list(updated.get("graphics_queue") or [])
+            if isinstance(item, dict)
+        ]
+        if action == "cancel":
+            item_id = str((incoming or {}).get("id", "")).strip()
+            queue = [item for item in queue if str(item.get("id", "")) != item_id]
+        elif action == "clear":
+            queue = []
+        elif action == "advance":
+            for key in self.PRIMARY_CHANNELS.values():
+                graphic = dict(updated.get(key) or {})
+                graphic["visible"] = False
+                graphic["expires_at"] = 0
+                updated[key] = graphic
+        else:
+            return GraphicsResult("INVALID_QUEUE_ACTION")
+        updated["graphics_queue"] = queue
+        return self.reconcile_queue(updated)
 
     def update_lower_third(self, state: State, incoming: Record) -> GraphicsResult:
         updated = copy.deepcopy(state)
@@ -289,11 +374,115 @@ class GraphicsService:
             graphic["updated_at"] = int(self._clock())
 
         updated["player_graphic"] = graphic
+        if action in {"hide", "clear"}:
+            updated = self.reconcile_queue(updated).data["state"]
+            graphic = copy.deepcopy(updated.get("player_graphic") or graphic)
         return GraphicsResult(
             "OK",
             {
                 "state": updated,
                 "graphic": copy.deepcopy(graphic),
+                "sponsor_warning": sponsor_warning,
+            },
+        )
+
+    def update_sponsor_spotlight(
+        self,
+        state: State,
+        incoming: Record,
+    ) -> GraphicsResult:
+        updated = copy.deepcopy(state)
+        data = copy.deepcopy(incoming or {})
+        action = str(data.get("action", "update")).lower()
+        spotlight = self._graphic_default("sponsor_spotlight")
+        spotlight.update(updated.get("sponsor_spotlight") or {})
+        sponsor_warning = ""
+
+        if action == "clear":
+            spotlight = self._graphic_default("sponsor_spotlight")
+        else:
+            sponsor_warning = self._apply_sponsor(spotlight, data)
+            if action in {"show", "update"} and not spotlight.get("sponsor_id"):
+                return GraphicsResult(
+                    "SPONSOR_REQUIRED",
+                    {"sponsor_warning": sponsor_warning},
+                )
+
+            asset_id = str(
+                data.get("media_asset_id", spotlight.get("media_asset_id", ""))
+                or ""
+            ).strip()
+            asset = self._find(self._load_assets(), asset_id)
+            if asset_id:
+                if (
+                    not asset
+                    or asset.get("active", True) is False
+                    or str(asset.get("category", "")).casefold() != "sponsor"
+                    or str(asset.get("rights_status", "")) not in self.APPROVED_RIGHTS
+                    or str(asset.get("asset_type", "")).casefold()
+                    not in {"logo", "background", "overlay", "video"}
+                    or not str(asset.get("file_url", "")).strip()
+                ):
+                    return GraphicsResult("SPONSOR_MEDIA_NOT_APPROVED")
+                media_url = str(asset.get("file_url", ""))[:500]
+                asset_type = str(asset.get("asset_type", ""))
+                spotlight.update(
+                    {
+                        "media_asset_id": asset_id,
+                        "media_name": str(asset.get("name", ""))[:240],
+                        "media_url": media_url,
+                        "media_type": (
+                            "video"
+                            if asset_type.casefold() == "video"
+                            or media_url.lower().split("?", 1)[0].endswith(
+                                (".mp4", ".webm")
+                            )
+                            else "image"
+                        ),
+                    }
+                )
+            elif spotlight.get("sponsor_logo"):
+                spotlight.update(
+                    {
+                        "media_asset_id": "",
+                        "media_name": str(spotlight.get("sponsor_name", "")),
+                        "media_url": str(spotlight.get("sponsor_logo", "")),
+                        "media_type": "image",
+                    }
+                )
+
+            if action in {"show", "update"} and not spotlight.get("media_url"):
+                return GraphicsResult("SPONSOR_MEDIA_REQUIRED")
+            if "caption" in data:
+                spotlight["caption"] = str(data.get("caption", ""))[:180]
+            if "lead_in" in data:
+                spotlight["lead_in"] = str(data.get("lead_in", ""))[:120]
+            spotlight["duration"] = self._duration(
+                data.get("duration"),
+                spotlight.get("duration", 0),
+            )
+            if action == "hide":
+                spotlight["visible"] = False
+                spotlight["expires_at"] = 0
+            elif action in {"show", "update"}:
+                updated = self.activate_primary(updated, "sponsor")
+                spotlight["visible"] = True
+                spotlight["expires_at"] = (
+                    int(self._clock()) + spotlight["duration"]
+                    if spotlight["duration"]
+                    else 0
+                )
+            spotlight["updated_at"] = int(self._clock())
+
+        updated["sponsor_spotlight"] = spotlight
+        if action in {"hide", "clear"}:
+            updated = self.reconcile_queue(updated).data["state"]
+            spotlight = copy.deepcopy(updated.get("sponsor_spotlight") or spotlight)
+        return GraphicsResult(
+            "OK",
+            {
+                "state": updated,
+                "graphic": copy.deepcopy(spotlight),
                 "sponsor_warning": sponsor_warning,
             },
         )
@@ -458,6 +647,40 @@ class GraphicsService:
                 "updated_at": now,
             }
         )
+        active_player = dict(updated.get("player_graphic") or {})
+        if (
+            self._active(active_player, now)
+            and str(active_player.get("graphic_type", ""))
+            in {"player_spotlight", "player_highlight"}
+        ):
+            queue = [
+                copy.deepcopy(item)
+                for item in list(updated.get("graphics_queue") or [])
+                if isinstance(item, dict)
+            ][-19:]
+            queue.append(
+                {
+                    "id": (
+                        f"GQ-{now}-{str(player.get('id', 'player'))}-"
+                        f"{len(queue) + 1}"
+                    ),
+                    "channel": "player",
+                    "label": str(graphic.get("eyebrow", "PLAYER EVENT")),
+                    "player_name": str(graphic.get("display_name", "")),
+                    "queued_at": now,
+                    "graphic": copy.deepcopy(graphic),
+                }
+            )
+            updated["graphics_queue"] = queue
+            return GraphicsResult(
+                "OK",
+                {
+                    "state": updated,
+                    "graphic": copy.deepcopy(graphic),
+                    "applied": False,
+                    "queued": True,
+                },
+            )
         updated = self.activate_primary(updated, "player")
         updated["player_graphic"] = graphic
         return GraphicsResult(
