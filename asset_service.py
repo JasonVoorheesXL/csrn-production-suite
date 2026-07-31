@@ -43,6 +43,21 @@ class AssetResult:
 class AssetService:
     """Asset-domain behavior independent of Flask and physical upload storage."""
 
+    PLACEMENTS = {
+        "flexible",
+        "sponsor_feature_still",
+        "sponsor_feature_video",
+        "lower_third_sponsor",
+        "scorebug_sponsor",
+        "player_highlight_video",
+        "full_screen_master",
+    }
+
+    @classmethod
+    def normalize_placement(cls, value: Any) -> str:
+        placement = str(value or "flexible").strip().lower()
+        return placement if placement in cls.PLACEMENTS else "flexible"
+
     def __init__(
         self,
         *,
@@ -90,6 +105,11 @@ class AssetService:
             "name": str(source.get("name", "")).strip(),
             "category": str(source.get("category", "Other")).strip() or "Other",
             "asset_type": str(source.get("asset_type", "Other")).strip() or "Other",
+            "placement": cls.normalize_placement(source.get("placement")),
+            "sponsor_id": str(source.get("sponsor_id", "")).strip(),
+            "roster_id": str(source.get("roster_id", "")).strip(),
+            "player_id": str(source.get("player_id", "")).strip(),
+            "season": str(source.get("season", "")).strip(),
             "file_url": str(source.get("file_url", "")).strip(),
             "source_url": str(source.get("source_url", "")).strip(),
             "rights_status": str(source.get("rights_status", "Unverified")).strip() or "Unverified",
@@ -133,6 +153,11 @@ class AssetService:
             "name": str(source.get("name", "")).strip(),
             "category": str(source.get("category", "Other")).strip() or "Other",
             "asset_type": str(source.get("asset_type", "Other")).strip() or "Other",
+            "placement": self.normalize_placement(source.get("placement")),
+            "sponsor_id": str(source.get("sponsor_id", "")).strip(),
+            "roster_id": str(source.get("roster_id", "")).strip(),
+            "player_id": str(source.get("player_id", "")).strip(),
+            "season": str(source.get("season", "")).strip(),
             "file_url": str(source.get("file_url", "")).strip(),
             "source_url": str(source.get("source_url", "")).strip(),
             "rights_status": str(source.get("rights_status", "Unverified")).strip() or "Unverified",
@@ -152,10 +177,12 @@ class AssetService:
         category: str = "",
         asset_type: str = "",
         rights_status: str = "",
+        placement: str = "",
     ) -> AssetResult:
         category_key = str(category or "").strip().casefold()
         type_key = str(asset_type or "").strip().casefold()
         rights_key = str(rights_status or "").strip().casefold()
+        placement_key = str(placement or "").strip().casefold()
         rows: list[Asset] = []
         for record in self._records():
             if not include_inactive and not record.get("active", True):
@@ -165,6 +192,8 @@ class AssetService:
             if type_key and str(record.get("asset_type", "")).casefold() != type_key:
                 continue
             if rights_key and str(record.get("rights_status", "")).casefold() != rights_key:
+                continue
+            if placement_key and str(record.get("placement", "")).casefold() != placement_key:
                 continue
             rows.append(copy.deepcopy(record))
         rows.sort(

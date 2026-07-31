@@ -200,7 +200,7 @@ PRODUCT_PATHS = resolve_product_paths(
     BASE_DIR,
     frozen=bool(getattr(sys, "frozen", False) or "--installed" in sys.argv),
 )
-OVERLAY_SCHEMA_REVISION = "gate5-program-visual-v6"
+OVERLAY_SCHEMA_REVISION = "gate5-program-visual-v9"
 PRODUCT_PATHS.ensure()
 STATE_FILE = PRODUCT_PATHS.state_file
 SECURITY_FILE = PRODUCT_PATHS.security_file
@@ -365,6 +365,29 @@ DEFAULT_STATE: dict[str, Any] = {
         "sponsor_lead_in": "",
         "sponsor_name": "",
         "sponsor_logo": "",
+        "duration": 0,
+        "expires_at": 0,
+        "updated_at": 0
+    },
+    "player_highlight": {
+        "visible": False,
+        "roster_id": "",
+        "player_id": "",
+        "school_id": "",
+        "full_name": "",
+        "display_name": "",
+        "number": "",
+        "position": "",
+        "grade": "",
+        "team_logo": "",
+        "team_name": "",
+        "team_color": "#C9203B",
+        "eyebrow": "PLAYER HIGHLIGHT",
+        "detail": "",
+        "media_asset_id": "",
+        "media_name": "",
+        "media_url": "",
+        "media_type": "video",
         "duration": 0,
         "expires_at": 0,
         "updated_at": 0

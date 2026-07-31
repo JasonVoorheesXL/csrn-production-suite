@@ -24,6 +24,7 @@ def defaults() -> dict:
         "visitor_identity": {},
         "personnel_graphic": {},
         "player_graphic": {},
+        "player_highlight": {},
         "sponsor_spotlight": {},
         "graphics_queue": [],
     }
@@ -164,6 +165,10 @@ def test_public_state_removes_local_media_paths() -> None:
         "visitor_identity": {"logo": "/school-logos/v/logo.png"},
         "personnel_graphic": {"headshot": "Data/Personnel/a.png"},
         "player_graphic": {"team_logo": "https://example.com/logo.png"},
+        "player_highlight": {
+            "team_logo": "/school-logos/team.png",
+            "media_url": "C:/private/highlight.mp4",
+        },
         "sponsor_spotlight": {
             "media_url": "C:/private/sponsor.mp4",
             "sponsor_logo": "/asset-files/sponsor.png",
@@ -182,6 +187,8 @@ def test_public_state_removes_local_media_paths() -> None:
     assert public["visitor_identity"]["logo"].startswith("/")
     assert public["personnel_graphic"]["headshot"] == ""
     assert public["player_graphic"]["team_logo"].startswith("https://")
+    assert public["player_highlight"]["team_logo"].startswith("/")
+    assert public["player_highlight"]["media_url"] == ""
     assert public["sponsor_spotlight"]["media_url"] == ""
     assert public["sponsor_spotlight"]["sponsor_logo"].startswith("/")
     assert public["graphics_queue"][0]["graphic"]["headshot"] == ""

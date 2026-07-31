@@ -153,7 +153,7 @@ def test_list_assets_preserves_object_contract_and_filters(asset_client) -> None
     client, service, _ = asset_client
     response = client.get(
         "/api/assets?include_inactive=false&category=Organization"
-        "&asset_type=Logo&rights_status=Verified"
+        "&asset_type=Logo&rights_status=Verified&placement=flexible"
     )
     assert response.status_code == 200
     assert response.get_json() == {"assets": [service.asset]}
@@ -165,6 +165,7 @@ def test_list_assets_preserves_object_contract_and_filters(asset_client) -> None
                 "category": "Organization",
                 "asset_type": "Logo",
                 "rights_status": "Verified",
+                "placement": "flexible",
             },
         )
     ]
@@ -196,7 +197,7 @@ def test_update_and_delete_preserve_missing_contracts(asset_client) -> None:
 
     deleted = client.delete(f"/api/assets/{ASSET_ID}")
     assert deleted.status_code == 200
-    assert deleted.get_json() == {"ok": True}
+    assert deleted.get_json() == {"media_deleted": False, "ok": True}
 
     service.delete_result = AssetResult("ASSET_NOT_FOUND")
     missing_delete = client.delete("/api/assets/missing")

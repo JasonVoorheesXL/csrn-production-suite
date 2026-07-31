@@ -172,6 +172,13 @@ class StateService:
             for field in ("headshot", "team_logo", "sponsor_logo"):
                 graphic[field] = self._safe_media_value(graphic.get(field, ""))
 
+        highlight = result.get("player_highlight")
+        if isinstance(highlight, dict):
+            for field in ("team_logo", "media_url"):
+                highlight[field] = self._safe_media_value(
+                    highlight.get(field, "")
+                )
+
         spotlight = result.get("sponsor_spotlight")
         if isinstance(spotlight, dict):
             for field in ("sponsor_logo", "media_url"):

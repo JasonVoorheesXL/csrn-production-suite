@@ -48,6 +48,11 @@ def test_program_visual_controls_expose_highlight_spotlight_and_queue() -> None:
         in command_center
     )
     assert "showProgramPlayerHighlight()" in command_center
+    assert 'id="phvRoster"' in command_center
+    assert 'id="phvPlayer"' in command_center
+    assert 'id="phvMedia"' in command_center
+    assert 'id="phvDuration"' in command_center
+    assert "showProgramPlayerHighlightVideo()" in command_center
     assert 'id="spsSponsor"' in command_center
     assert 'id="spsMedia"' in command_center
     assert 'id="spsDuration"' in command_center
@@ -61,18 +66,23 @@ def test_sponsor_spotlight_stays_below_the_scorebug() -> None:
     assert 'id="sponsorSpotlight"' in overlay
     assert 'id="sponsorSpotlightImage"' in overlay
     assert 'id="sponsorSpotlightVideo"' in overlay
-    assert "#sponsorSpotlight{" in overlay
+    assert "#sponsorSpotlight,#playerHighlight{" in overlay
     assert "#scorebug,#eventTicker{z-index:100}" in overlay
     assert "sponsorSpotlight.media_type==='video'" in overlay
     assert '<link rel="stylesheet" href="/themes/current.css">' in overlay
-    assert "const OVERLAY_SCHEMA_REVISION='gate5-program-visual-v6';" in overlay
+    assert "const OVERLAY_SCHEMA_REVISION='gate5-program-visual-v9';" in overlay
     assert (
         "s.overlay_revision&&s.overlay_revision!==OVERLAY_SCHEMA_REVISION"
         in overlay
     )
-    assert "#sponsorSpotlight.scorebug-active{bottom:176px}" in overlay
     assert (
-        "#sponsorSpotlight.scorebug-active.graphic-mode{bottom:310px}"
+        "#sponsorSpotlight.scorebug-active,"
+        "#playerHighlight.scorebug-active{bottom:176px}"
+        in overlay
+    )
+    assert (
+        "#sponsorSpotlight.scorebug-active.graphic-mode,"
+        "#playerHighlight.scorebug-active.graphic-mode{bottom:310px}"
         in overlay
     )
     assert (
@@ -96,9 +106,57 @@ def test_graphics_routes_expose_spotlight_and_queue_coordinator() -> None:
         encoding="utf-8"
     )
     assert '@routes.post("/api/graphics/sponsor-spotlight")' in routes
+    assert '@routes.post("/api/graphics/player-highlight")' in routes
     assert '@routes.post("/api/graphics/queue")' in routes
     assert "update_sponsor_spotlight(" in routes
+    assert "update_player_highlight(" in routes
     assert "update_queue(" in routes
+
+
+def test_asset_manager_exposes_placement_and_identity_associations() -> None:
+    command_center = (ROOT / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert 'id="assetPlacement"' in command_center
+    assert 'value="sponsor_feature_still"' in command_center
+    assert 'value="sponsor_feature_video"' in command_center
+    assert 'value="player_highlight_video"' in command_center
+    assert 'id="assetSponsorId"' in command_center
+    assert 'id="assetRosterId"' in command_center
+    assert 'id="assetPlayerId"' in command_center
+    assert 'id="assetSeason"' in command_center
+
+
+def test_player_highlight_video_uses_protected_feature_stage() -> None:
+    overlay = (ROOT / "templates" / "overlay.html").read_text(encoding="utf-8")
+    assert 'id="playerHighlight"' in overlay
+    assert 'id="playerHighlightVideo" muted playsinline' in overlay
+    assert "const playerHighlight=s.player_highlight||{}" in overlay
+    assert "playerHighlightEl.classList.toggle('scorebug-active'" in overlay
+    assert "playerHighlightVideo.play().catch(()=>{})" in overlay
+    assert 'class="sponsor-spotlight-media player-highlight-media"' in overlay
+    assert ".player-highlight-media video{" in overlay
+    assert "function fitPlayerHighlightVideo()" in overlay
+    assert "video.videoWidth/video.videoHeight" in overlay
+    assert "Math.min(availableWidth,availableHeight*ratio)" in overlay
+    assert "requestAnimationFrame(fitPlayerHighlightVideo)" in overlay
+    assert "addEventListener('loadedmetadata',fitPlayerHighlightVideo)" in overlay
+    assert "object-fit:contain!important" in overlay
+
+
+def test_roster_player_owns_highlight_preparation_workflow() -> None:
+    command_center = (ROOT / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert 'id="playerHighlightsPanel"' in command_center
+    assert 'id="playerHighlightUpload"' in command_center
+    assert "uploadRosterPlayerHighlight(this.files[0])" in command_center
+    assert "placement:'player_highlight_video'" in command_center
+    assert "roster_id:rosterId" in command_center
+    assert "player_id:playerId" in command_center
+    assert "unlinkRosterPlayerHighlight" in command_center
+    assert "deleteRosterPlayerHighlight" in command_center
+    assert "/api/assets/storage" in command_center
 
 
 def test_broadcaster_penalty_buttons_use_context_free_labels() -> None:

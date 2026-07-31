@@ -70,6 +70,11 @@ def test_migrate_legacy_record_adds_canonical_defaults() -> None:
     assert migrated["id"] == "legacy"
     assert migrated["category"] == "Other"
     assert migrated["asset_type"] == "Other"
+    assert migrated["placement"] == "flexible"
+    assert migrated["sponsor_id"] == ""
+    assert migrated["roster_id"] == ""
+    assert migrated["player_id"] == ""
+    assert migrated["season"] == ""
     assert migrated["rights_status"] == "Unverified"
     assert migrated["active"] is False
 
@@ -98,6 +103,13 @@ def test_list_records_filters_and_sorts() -> None:
     )
     assert [row["id"] for row in filtered.data["assets"]] == ["z"]
 
+    active["placement"] = "player_highlight_video"
+    store = Store([inactive, active])
+    placement = service(store).list_records(
+        placement="player_highlight_video",
+    )
+    assert [row["id"] for row in placement.data["assets"]] == ["a"]
+
 
 def test_create_requires_name_and_generates_unique_id() -> None:
     store = Store([asset("asset-1000000")])
@@ -115,6 +127,25 @@ def test_create_requires_name_and_generates_unique_id() -> None:
     assert created.data["asset"]["id"] == "asset-1000000-2"
     assert created.data["asset"]["created_at"] == 1000
     assert len(store.rows) == 2
+
+
+def test_create_preserves_placement_and_associations() -> None:
+    created = service(Store()).create(
+        {
+            "name": "Week 4 Highlight",
+            "category": "Player",
+            "asset_type": "Video",
+            "placement": "player_highlight_video",
+            "roster_id": "caledonia-football",
+            "player_id": "12-jason",
+            "season": "2026",
+        }
+    )
+    record = created.data["asset"]
+    assert record["placement"] == "player_highlight_video"
+    assert record["roster_id"] == "caledonia-football"
+    assert record["player_id"] == "12-jason"
+    assert record["season"] == "2026"
 
 
 def test_create_preserves_explicit_id_when_available() -> None:

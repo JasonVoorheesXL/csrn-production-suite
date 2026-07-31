@@ -101,6 +101,7 @@ def test_graphics_blueprint_registers_preserved_urls(graphics_client) -> None:
     assert ("/api/graphics/player", ("POST",)) in rules
     assert ("/api/graphics/personnel", ("POST",)) in rules
     assert ("/api/graphics/sponsor-spotlight", ("POST",)) in rules
+    assert ("/api/graphics/player-highlight", ("POST",)) in rules
     assert ("/api/graphics/queue", ("POST",)) in rules
 
 

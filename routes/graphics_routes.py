@@ -84,6 +84,26 @@ def create_graphics_blueprint(
             response["sponsor_warning"] = warning
         return jsonify(response)
 
+    @routes.post("/api/graphics/player-highlight")
+    @dependencies.require_auth
+    def update_player_highlight():
+        incoming = request.get_json(force=True) or {}
+        with dependencies.transaction_lock:
+            result = dependencies.get_graphics_service().update_player_highlight(
+                dependencies.load_state(),
+                incoming,
+            )
+            if result.code in {
+                "PLAYER_REQUIRED",
+                "PLAYER_HIGHLIGHT_MEDIA_REQUIRED",
+                "PLAYER_HIGHLIGHT_MEDIA_NOT_APPROVED",
+                "PLAYER_HIGHLIGHT_DURATION_REQUIRED",
+            }:
+                return jsonify({"error": result.code}), 400
+            state = result.data["state"]
+            dependencies.save_state(state)
+        return jsonify(dependencies.public_state(state))
+
     @routes.post("/api/graphics/queue")
     @dependencies.require_auth
     def update_graphics_queue():

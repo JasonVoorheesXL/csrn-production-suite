@@ -145,6 +145,9 @@ class EventService:
                 "player_graphic": copy.deepcopy(
                     state.get("player_graphic") or {}
                 ),
+                "player_highlight": copy.deepcopy(
+                    state.get("player_highlight") or {}
+                ),
                 "sponsor_spotlight": copy.deepcopy(
                     state.get("sponsor_spotlight") or {}
                 ),
@@ -640,6 +643,10 @@ class EventService:
                     state["player_graphic"] = copy.deepcopy(
                         before.get("player_graphic")
                         or dict(self._default_player_graphic())
+                    )
+                if "player_highlight" in before:
+                    state["player_highlight"] = copy.deepcopy(
+                        before.get("player_highlight") or {}
                     )
                 if "sponsor_spotlight" in before:
                     state["sponsor_spotlight"] = copy.deepcopy(
