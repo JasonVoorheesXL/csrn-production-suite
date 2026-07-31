@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 
 Broadcast = dict[str, Any]
@@ -59,6 +59,19 @@ class BroadcastService:
         "venue_id",
         "visual_mode",
         "crew",
+        "contest_type",
+        "record_policy",
+        "region_game",
+        "special_designations",
+        "home_classification",
+        "home_region",
+        "visitor_classification",
+        "visitor_region",
+        "home_pregame_record",
+        "home_pregame_region_record",
+        "visitor_pregame_record",
+        "visitor_pregame_region_record",
+        "record_tracking",
     )
     _STATE_SYNC_KEYS = _EDITABLE_KEYS + (
         "home_school_id",
@@ -69,6 +82,14 @@ class BroadcastService:
         "visitor_identity",
     )
     _VALID_STATUSES = {"planned", "live", "completed"}
+    _VALID_CONTEST_TYPES = {"official", "scrimmage", "exhibition"}
+    _VALID_SPECIAL_DESIGNATIONS = {
+        "homecoming",
+        "senior_night",
+        "rivalry",
+        "playoff",
+        "championship",
+    }
 
     def __init__(
         self,
@@ -226,6 +247,39 @@ class BroadcastService:
         )
         home_identity = self._build_identity(home_school, sport)
         visitor_identity = self._build_identity(visitor_school, sport)
+        contest_type = self._contest_type(data.get("contest_type"))
+        region_game = (
+            bool(data.get("region_game", False))
+            if contest_type == "official"
+            else False
+        )
+        primary_school_id = str(defaults.get("home_school_id", "") or "").strip()
+        primary_side = self._primary_side(
+            primary_school_id,
+            home_school_id,
+            visitor_school_id,
+        )
+        latest_primary = self._latest_primary_records(
+            primary_school_id,
+            sport,
+            season,
+        )
+        home_pregame = self.normalize_record(data.get("home_pregame_record"))
+        home_region_pregame = self.normalize_record(
+            data.get("home_pregame_region_record")
+        )
+        visitor_pregame = self.normalize_record(
+            data.get("visitor_pregame_record")
+        )
+        visitor_region_pregame = self.normalize_record(
+            data.get("visitor_pregame_region_record")
+        )
+        if primary_side == "home" and latest_primary:
+            home_pregame = copy.deepcopy(latest_primary["overall"])
+            home_region_pregame = copy.deepcopy(latest_primary["region"])
+        elif primary_side == "visitor" and latest_primary:
+            visitor_pregame = copy.deepcopy(latest_primary["overall"])
+            visitor_region_pregame = copy.deepcopy(latest_primary["region"])
 
         record: Broadcast = {
             "broadcast_id": broadcast_id,
@@ -258,6 +312,34 @@ class BroadcastService:
             "visual_mode": visual_mode,
             "crew": crew,
             "production_type": str(data.get("production_type", "game") or "game"),
+            "contest_type": contest_type,
+            "record_policy": "official" if contest_type == "official" else "non_record",
+            "region_game": region_game,
+            "special_designations": self.normalize_designations(
+                data.get("special_designations")
+            ),
+            "home_classification": self._snapshot_value(
+                data.get("home_classification"), home_school, "classification"
+            ),
+            "home_region": self._snapshot_value(
+                data.get("home_region"), home_school, "region"
+            ),
+            "visitor_classification": self._snapshot_value(
+                data.get("visitor_classification"), visitor_school, "classification"
+            ),
+            "visitor_region": self._snapshot_value(
+                data.get("visitor_region"), visitor_school, "region"
+            ),
+            "home_pregame_record": home_pregame,
+            "home_pregame_region_record": home_region_pregame,
+            "visitor_pregame_record": visitor_pregame,
+            "visitor_pregame_region_record": visitor_region_pregame,
+            "record_tracking": {
+                "primary_school_id": primary_school_id,
+                "primary_side": primary_side,
+                "home_source": "automatic" if primary_side == "home" and latest_primary else "manual",
+                "visitor_source": "automatic" if primary_side == "visitor" and latest_primary else "manual",
+            },
         }
 
         items = self._load_broadcasts()
@@ -287,6 +369,8 @@ class BroadcastService:
         )
         home = self._get_school(home_id) if home_id else None
         visitor = self._get_school(visitor_id) if visitor_id else None
+        home_changed = home_id != str(item.get("home_school_id", "") or "")
+        visitor_changed = visitor_id != str(item.get("visitor_school_id", "") or "")
 
         for key in self._EDITABLE_KEYS:
             if key in data:
@@ -320,6 +404,77 @@ class BroadcastService:
                 "updated_at": int(self._clock()),
             }
         )
+        for side, school, changed in (
+            ("home", home, home_changed),
+            ("visitor", visitor, visitor_changed),
+        ):
+            for suffix, school_key in (
+                ("classification", "classification"),
+                ("region", "region"),
+            ):
+                key = f"{side}_{suffix}"
+                if key in data:
+                    item[key] = str(data.get(key, "") or "").strip()
+                elif changed:
+                    item[key] = self._snapshot_value(None, school, school_key)
+            for key in (
+                f"{side}_pregame_record",
+                f"{side}_pregame_region_record",
+            ):
+                if key in data:
+                    item[key] = self.normalize_record(data.get(key))
+                else:
+                    item[key] = self.normalize_record(item.get(key))
+        if "contest_type" in data:
+            item["contest_type"] = self._contest_type(data.get("contest_type"))
+        else:
+            item["contest_type"] = self._contest_type(item.get("contest_type"))
+        item["record_policy"] = (
+            "official" if item["contest_type"] == "official" else "non_record"
+        )
+        item["region_game"] = (
+            bool(data.get("region_game", item.get("region_game", False)))
+            if item["contest_type"] == "official"
+            else False
+        )
+        if "special_designations" in data:
+            item["special_designations"] = self.normalize_designations(
+                data.get("special_designations")
+            )
+        else:
+            item["special_designations"] = self.normalize_designations(
+                item.get("special_designations")
+            )
+        config = self._load_config()
+        defaults = config.get("broadcast_defaults", {}) if isinstance(config, Mapping) else {}
+        if not isinstance(defaults, Mapping):
+            defaults = {}
+        primary_school_id = str(defaults.get("home_school_id", "") or "").strip()
+        primary_side = self._primary_side(primary_school_id, home_id, visitor_id)
+        tracking = item.get("record_tracking", {})
+        if not isinstance(tracking, Mapping):
+            tracking = {}
+        latest_primary = self._latest_primary_records(
+            primary_school_id,
+            str(item.get("sport", "Football") or "Football"),
+            str(item.get("season", "") or ""),
+        )
+        primary_changed = (primary_side == "home" and home_changed) or (
+            primary_side == "visitor" and visitor_changed
+        )
+        if primary_side and primary_changed and latest_primary:
+            item[f"{primary_side}_pregame_record"] = copy.deepcopy(
+                latest_primary["overall"]
+            )
+            item[f"{primary_side}_pregame_region_record"] = copy.deepcopy(
+                latest_primary["region"]
+            )
+        item["record_tracking"] = {
+            "primary_school_id": primary_school_id,
+            "primary_side": primary_side,
+            "home_source": "automatic" if primary_side == "home" and primary_changed and latest_primary else str(tracking.get("home_source", "manual")),
+            "visitor_source": "automatic" if primary_side == "visitor" and primary_changed and latest_primary else str(tracking.get("visitor_source", "manual")),
+        }
         self._save_broadcasts(items)
         self._write_detail(copy.deepcopy(item), False)
         self._sync_active_state(item)
@@ -371,6 +526,11 @@ class BroadcastService:
             item["completed_at"] = now
         if extra:
             item.update(copy.deepcopy(extra))
+        if status == "completed" and extra and {
+            "final_home_score",
+            "final_visitor_score",
+        }.issubset(extra):
+            self._apply_completion_records(item)
         self._save_broadcasts(items)
         self._write_detail(copy.deepcopy(item), False)
         return BroadcastResult("OK", {"broadcast": copy.deepcopy(item)})
@@ -388,6 +548,11 @@ class BroadcastService:
         item.pop("completed_at", None)
         item.pop("final_home_score", None)
         item.pop("final_visitor_score", None)
+        item.pop("home_postgame_record", None)
+        item.pop("home_postgame_region_record", None)
+        item.pop("visitor_postgame_record", None)
+        item.pop("visitor_postgame_region_record", None)
+        item.pop("record_tracking_applied", None)
         self._save_broadcasts(items)
         self._write_detail(copy.deepcopy(item), False)
         return BroadcastResult("OK", {"broadcast": copy.deepcopy(item)})
@@ -420,6 +585,122 @@ class BroadcastService:
             if key in broadcast:
                 state[key] = copy.deepcopy(broadcast[key])
         self._save_state(state)
+
+    @staticmethod
+    def normalize_record(value: Any) -> dict[str, int]:
+        incoming = value if isinstance(value, Mapping) else {}
+        normalized: dict[str, int] = {}
+        for key in ("wins", "losses", "ties"):
+            try:
+                normalized[key] = max(0, int(incoming.get(key, 0) or 0))
+            except (TypeError, ValueError):
+                normalized[key] = 0
+        return normalized
+
+    @classmethod
+    def normalize_designations(cls, value: Any) -> list[str]:
+        incoming = value if isinstance(value, (list, tuple, set)) else []
+        result: list[str] = []
+        for item in incoming:
+            normalized = str(item or "").strip().lower().replace(" ", "_")
+            if normalized in cls._VALID_SPECIAL_DESIGNATIONS and normalized not in result:
+                result.append(normalized)
+        return result
+
+    @classmethod
+    def _contest_type(cls, value: Any) -> str:
+        normalized = str(value or "official").strip().lower()
+        return normalized if normalized in cls._VALID_CONTEST_TYPES else "official"
+
+    @staticmethod
+    def _snapshot_value(incoming: Any, school: School | None, key: str) -> str:
+        return str(incoming or (school or {}).get(key, "") or "").strip()
+
+    @staticmethod
+    def _primary_side(primary_school_id: str, home_id: str, visitor_id: str) -> str:
+        if primary_school_id and primary_school_id == home_id:
+            return "home"
+        if primary_school_id and primary_school_id == visitor_id:
+            return "visitor"
+        return ""
+
+    def _latest_primary_records(
+        self,
+        primary_school_id: str,
+        sport: str,
+        season: str,
+    ) -> dict[str, dict[str, int]] | None:
+        if not primary_school_id:
+            return None
+        candidates: list[tuple[int, dict[str, int], dict[str, int]]] = []
+        for row in self._load_broadcasts():
+            if str(row.get("status", "")) != "completed":
+                continue
+            if str(row.get("sport", "")).casefold() != str(sport).casefold():
+                continue
+            if str(row.get("season", "")) != str(season):
+                continue
+            side = self._primary_side(
+                primary_school_id,
+                str(row.get("home_school_id", "") or ""),
+                str(row.get("visitor_school_id", "") or ""),
+            )
+            if not side:
+                continue
+            overall_key = f"{side}_postgame_record"
+            region_key = f"{side}_postgame_region_record"
+            if not isinstance(row.get(overall_key), Mapping):
+                continue
+            candidates.append(
+                (
+                    int(row.get("completed_at", row.get("updated_at", 0)) or 0),
+                    self.normalize_record(row.get(overall_key)),
+                    self.normalize_record(row.get(region_key)),
+                )
+            )
+        if not candidates:
+            return None
+        _, overall, region = max(candidates, key=lambda item: item[0])
+        return {"overall": overall, "region": region}
+
+    @staticmethod
+    def _advance_record(record: dict[str, int], outcome: str) -> dict[str, int]:
+        result = copy.deepcopy(record)
+        key = {"win": "wins", "loss": "losses", "tie": "ties"}[outcome]
+        result[key] += 1
+        return result
+
+    def _apply_completion_records(self, item: Broadcast) -> None:
+        tracking = item.get("record_tracking", {})
+        if not isinstance(tracking, Mapping):
+            tracking = {}
+        primary_side = str(tracking.get("primary_side", "") or "")
+        if primary_side not in {"home", "visitor"}:
+            item["record_tracking_applied"] = False
+            return
+        overall = self.normalize_record(item.get(f"{primary_side}_pregame_record"))
+        region = self.normalize_record(
+            item.get(f"{primary_side}_pregame_region_record")
+        )
+        if item.get("record_policy") == "official":
+            home_score = int(item.get("final_home_score", 0) or 0)
+            visitor_score = int(item.get("final_visitor_score", 0) or 0)
+            if home_score == visitor_score:
+                outcome = "tie"
+            elif (primary_side == "home" and home_score > visitor_score) or (
+                primary_side == "visitor" and visitor_score > home_score
+            ):
+                outcome = "win"
+            else:
+                outcome = "loss"
+            overall = self._advance_record(overall, outcome)
+            if item.get("region_game"):
+                region = self._advance_record(region, outcome)
+            item["record_tracking_applied"] = True
+        else:
+            item["record_tracking_applied"] = False
+        item[f"{primary_side}_postgame_record"] = overall
+        item[f"{primary_side}_postgame_region_record"] = region
 
     def _branding_warnings(
         self,

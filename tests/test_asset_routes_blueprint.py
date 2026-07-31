@@ -28,6 +28,7 @@ class StubAssetService:
         self.read_result = StubResult("OK", {"asset": self.asset})
         self.duplicate: dict[str, Any] | None = None
         self.calls: list[tuple[str, Any]] = []
+        self.preserve_list_on_delete = False
 
     def list_records(self, **kwargs: Any) -> StubResult:
         self.calls.append(("list", kwargs))
@@ -43,6 +44,8 @@ class StubAssetService:
 
     def delete(self, asset_id: str) -> StubResult:
         self.calls.append(("delete", asset_id))
+        if self.delete_result.code == "OK" and not self.preserve_list_on_delete:
+            self.list_result = StubResult("OK", {"assets": []})
         return self.delete_result
 
     def read(self, asset_id: str) -> StubResult:
@@ -112,6 +115,7 @@ def test_asset_blueprint_registers_preserved_urls(asset_client) -> None:
     paths = {rule.rule for rule in app.url_map.iter_rules()}
     assert {
         "/api/assets",
+        "/api/assets/storage",
         "/api/assets/<asset_id>",
         "/api/assets/<asset_id>/upload",
         "/asset-files/<filename>",
@@ -134,20 +138,24 @@ def test_asset_list_maps_filters(asset_client) -> None:
     assert response.status_code == 200
     assert service.calls[-1] == (
         "list",
-        {
-            "include_inactive": False,
-            "category": "Sponsor",
-            "asset_type": "Logo",
-            "rights_status": "Verified",
-        },
-    )
+            {
+                "include_inactive": False,
+                "category": "Sponsor",
+                "asset_type": "Logo",
+                "rights_status": "Verified",
+                "placement": "",
+            },
+        )
 
 
 def test_asset_crud_preserves_payloads_and_error_mappings(asset_client) -> None:
     client, _, service, _ = asset_client
     assert client.post("/api/assets", json={"name": "Logo"}, headers=auth_headers()).status_code == 200
     assert client.put("/api/assets/asset-one", json={"name": "New"}, headers=auth_headers()).status_code == 200
-    assert client.delete("/api/assets/asset-one", headers=auth_headers()).get_json() == {"ok": True}
+    assert client.delete("/api/assets/asset-one", headers=auth_headers()).get_json() == {
+        "media_deleted": False,
+        "ok": True,
+    }
     service.create_result = StubResult("ASSET_NAME_REQUIRED", {})
     assert client.post("/api/assets", json={}, headers=auth_headers()).status_code == 400
     service.update_result = StubResult("ASSET_NOT_FOUND", {})
@@ -163,6 +171,82 @@ def test_asset_file_route_remains_public(asset_client) -> None:
     response = client.get("/asset-files/logo.txt")
     assert response.status_code == 200
     assert response.data == b"asset"
+
+
+def test_asset_storage_reports_managed_and_orphan_files(asset_client) -> None:
+    client, _, service, upload_dir = asset_client
+    upload_dir.mkdir(parents=True)
+    (upload_dir / "used.mp4").write_bytes(b"used")
+    (upload_dir / "orphan.mp4").write_bytes(b"orphan")
+    service.list_result = StubResult(
+        "OK",
+        {"assets": [{"id": "asset-one", "file_url": "/asset-files/used.mp4"}]},
+    )
+    payload = client.get("/api/assets/storage", headers=auth_headers()).get_json()
+    assert payload == {
+        "managed_bytes": 10,
+        "managed_file_count": 2,
+        "orphan_bytes": 6,
+        "orphan_count": 1,
+    }
+
+
+def test_asset_delete_removes_only_unshared_managed_media(asset_client) -> None:
+    client, _, service, upload_dir = asset_client
+    upload_dir.mkdir(parents=True)
+    managed = upload_dir / "clip.mp4"
+    managed.write_bytes(b"clip")
+    service.asset = {
+        "id": "asset-one",
+        "name": "Clip",
+        "file_url": "/asset-files/clip.mp4",
+    }
+    service.read_result = StubResult("OK", {"asset": service.asset})
+    response = client.delete("/api/assets/asset-one", headers=auth_headers())
+    assert response.get_json() == {"media_deleted": True, "ok": True}
+    assert not managed.exists()
+
+
+def test_asset_delete_retains_external_media(asset_client) -> None:
+    client, _, service, _ = asset_client
+    service.asset = {
+        "id": "asset-one",
+        "name": "External",
+        "file_url": "https://example.test/clip.mp4",
+    }
+    service.read_result = StubResult("OK", {"asset": service.asset})
+    response = client.delete("/api/assets/asset-one", headers=auth_headers())
+    assert response.get_json() == {"media_deleted": False, "ok": True}
+
+
+def test_asset_delete_retains_managed_media_referenced_by_another_asset(asset_client) -> None:
+    client, _, service, upload_dir = asset_client
+    upload_dir.mkdir(parents=True)
+    managed = upload_dir / "shared.mp4"
+    managed.write_bytes(b"shared")
+    service.asset = {
+        "id": "asset-one",
+        "name": "Shared Clip One",
+        "file_url": "/asset-files/shared.mp4",
+    }
+    service.read_result = StubResult("OK", {"asset": service.asset})
+    service.list_result = StubResult(
+        "OK",
+        {
+            "assets": [
+                service.asset,
+                {
+                    "id": "asset-two",
+                    "name": "Shared Clip Two",
+                    "file_url": "/asset-files/shared.mp4",
+                },
+            ]
+        },
+    )
+    service.preserve_list_on_delete = True
+    response = client.delete("/api/assets/asset-one", headers=auth_headers())
+    assert response.get_json() == {"media_deleted": False, "ok": True}
+    assert managed.exists()
 
 
 def test_asset_upload_validates_file_and_record(asset_client) -> None:

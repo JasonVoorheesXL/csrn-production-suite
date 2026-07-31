@@ -15,6 +15,19 @@ def record(status: str = "planned") -> dict[str, Any]:
         "season": "2026",
         "week": "1",
         "classification": "5A",
+        "home_classification": "5A",
+        "home_region": "Region 1",
+        "visitor_classification": "5A",
+        "visitor_region": "Region 2",
+        "home_pregame_record": {"wins": 3, "losses": 1, "ties": 1},
+        "home_pregame_region_record": {"wins": 2, "losses": 0, "ties": 0},
+        "visitor_pregame_record": {"wins": 4, "losses": 0, "ties": 0},
+        "visitor_pregame_region_record": {"wins": 1, "losses": 0, "ties": 0},
+        "contest_type": "official",
+        "record_policy": "official",
+        "region_game": True,
+        "special_designations": ["homecoming", "rivalry"],
+        "record_tracking": {"primary_side": "home"},
         "level": "Varsity",
         "division": "Boys",
         "home_school_id": "caledonia",
@@ -176,6 +189,9 @@ def test_load_builds_new_state_and_team_identities() -> None:
     assert state["visitor_identity"]["school_id"] == "new-hope"
     assert state["home_score"] == 0
     assert state["review_mode"] is False
+    assert state["home_pregame_record"]["ties"] == 1
+    assert state["region_game"] is True
+    assert state["special_designations"] == ["homecoming", "rivalry"]
 
 
 def test_load_completed_record_restores_final_score_and_review_mode() -> None:

@@ -61,6 +61,64 @@ def create_graphics_blueprint(
             response["sponsor_warning"] = warning
         return jsonify(response)
 
+    @routes.post("/api/graphics/sponsor-spotlight")
+    @dependencies.require_auth
+    def update_sponsor_spotlight():
+        incoming = request.get_json(force=True) or {}
+        with dependencies.transaction_lock:
+            result = dependencies.get_graphics_service().update_sponsor_spotlight(
+                dependencies.load_state(),
+                incoming,
+            )
+            if result.code in {
+                "SPONSOR_REQUIRED",
+                "SPONSOR_MEDIA_REQUIRED",
+                "SPONSOR_MEDIA_NOT_APPROVED",
+            }:
+                return jsonify({"error": result.code}), 400
+            state = result.data["state"]
+            dependencies.save_state(state)
+        response = dependencies.public_state(state)
+        warning = str(result.data.get("sponsor_warning", ""))
+        if warning:
+            response["sponsor_warning"] = warning
+        return jsonify(response)
+
+    @routes.post("/api/graphics/player-highlight")
+    @dependencies.require_auth
+    def update_player_highlight():
+        incoming = request.get_json(force=True) or {}
+        with dependencies.transaction_lock:
+            result = dependencies.get_graphics_service().update_player_highlight(
+                dependencies.load_state(),
+                incoming,
+            )
+            if result.code in {
+                "PLAYER_REQUIRED",
+                "PLAYER_HIGHLIGHT_MEDIA_REQUIRED",
+                "PLAYER_HIGHLIGHT_MEDIA_NOT_APPROVED",
+                "PLAYER_HIGHLIGHT_DURATION_REQUIRED",
+            }:
+                return jsonify({"error": result.code}), 400
+            state = result.data["state"]
+            dependencies.save_state(state)
+        return jsonify(dependencies.public_state(state))
+
+    @routes.post("/api/graphics/queue")
+    @dependencies.require_auth
+    def update_graphics_queue():
+        incoming = request.get_json(force=True) or {}
+        with dependencies.transaction_lock:
+            result = dependencies.get_graphics_service().update_queue(
+                dependencies.load_state(),
+                incoming,
+            )
+            if result.code == "INVALID_QUEUE_ACTION":
+                return jsonify({"error": result.code}), 400
+            state = result.data["state"]
+            dependencies.save_state(state)
+        return jsonify(dependencies.public_state(state))
+
     @routes.post("/api/graphics/personnel")
     @dependencies.require_auth
     def update_personnel_graphic():

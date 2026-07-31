@@ -207,6 +207,23 @@ class BroadcastLifecycleService:
             "season": item.get("season", ""),
             "week": item.get("week", "1"),
             "classification": item.get("classification", ""),
+            "home_classification": item.get("home_classification", ""),
+            "home_region": item.get("home_region", ""),
+            "visitor_classification": item.get("visitor_classification", ""),
+            "visitor_region": item.get("visitor_region", ""),
+            "home_pregame_record": copy.deepcopy(item.get("home_pregame_record", {"wins": 0, "losses": 0, "ties": 0})),
+            "home_pregame_region_record": copy.deepcopy(item.get("home_pregame_region_record", {"wins": 0, "losses": 0, "ties": 0})),
+            "visitor_pregame_record": copy.deepcopy(item.get("visitor_pregame_record", {"wins": 0, "losses": 0, "ties": 0})),
+            "visitor_pregame_region_record": copy.deepcopy(item.get("visitor_pregame_region_record", {"wins": 0, "losses": 0, "ties": 0})),
+            "contest_type": item.get("contest_type", "official"),
+            "record_policy": item.get("record_policy", "official"),
+            "region_game": (
+                bool(item.get("region_game", False))
+                if str(item.get("contest_type", "official")).strip().lower() == "official"
+                else False
+            ),
+            "special_designations": copy.deepcopy(item.get("special_designations", [])),
+            "record_tracking": copy.deepcopy(item.get("record_tracking", {})),
             "level": item.get("level", "Varsity"),
             "division": item.get("division", "Boys"),
             "home_school_id": home_school_id,

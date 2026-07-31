@@ -306,6 +306,26 @@ def test_reset_data_preserves_selected_broadcast_identity() -> None:
     assert current["broadcast_created"] is True
 
 
+def test_reset_preserves_broadcast_record_policy_context() -> None:
+    state = base_state()
+    state.update(
+        {
+            "contest_type": "official",
+            "record_policy": "official",
+            "region_game": True,
+            "special_designations": ["senior_night"],
+            "home_pregame_record": {"wins": 4, "losses": 1, "ties": 1},
+            "record_tracking": {"primary_side": "home"},
+        }
+    )
+    service, current, _, _, _, _ = build_service(state)
+    service.reset_data()
+    assert current["region_game"] is True
+    assert current["special_designations"] == ["senior_night"]
+    assert current["home_pregame_record"]["ties"] == 1
+    assert current["record_tracking"]["primary_side"] == "home"
+
+
 def test_reset_completed_game_preserves_review_mode() -> None:
     state = base_state()
     state["status"] = "completed"

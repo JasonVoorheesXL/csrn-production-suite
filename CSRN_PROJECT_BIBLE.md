@@ -5,7 +5,7 @@ Product: CSRN Production Suite
 Primary release target: Finished Windows-hosted football broadcasting product  
 Owner: Jason Chrest  
 Last audited: 2026-07-30  
-Current status: **GATE 4 ACTIVE — repair blocking identity and Command Center interface defects**
+Current status: **GATE 5 IMPLEMENTATION COMPLETE — branch validation and merge pending**
 
 ---
 
@@ -401,8 +401,8 @@ These may be implemented only after source recovery and baseline repair:
 3. Overall and regional record tracking.
 4. Scrimmage/exhibition rules that do not alter official records.
 5. Special-game designations such as Homecoming, Senior Night, rivalry, playoff, and championship.
-6. Player Highlight using the existing Player Identification Card.
-7. Team-filtered player selection for Player Highlight.
+6. Player Spotlight using the existing Player Identification Card.
+7. Team-filtered player selection for Player Spotlight.
 8. Manual show, hide, and clear controls.
 9. Verified statistics only.
 
@@ -474,19 +474,362 @@ and merged into `develop-1.13` at
 
 Exit condition: no open blocking identity or interface defect.
 
-**Status: local exit audit complete; pull request and CI pending.** The final
-audit passed 54 focused tests and all 1,227 authoritative tests on Python
-3.13.14. Gate 4 is not complete until the branch is pushed, reviewed through
-GitHub Actions on Windows and Ubuntu, and merged into `develop-1.13`.
+**Status: complete.** PR #90 passed Windows and Ubuntu on Python 3.13.14 in
+GitHub Actions run `30579098825` and merged into `develop-1.13` at
+`10afa40c99877dca9b4362a1ad4ef4c950db362d`.
 
 ### Gate 5 — Complete frozen football scope
 
 - regional data and record rules;
 - special-game designations;
-- Player Highlight;
+- Player Spotlight card and Player Highlight video;
 - tests and documentation.
 
 Exit condition: approved football scope is complete.
+
+**Status: implementation complete; commit, push, CI, and merge pending.** Branch `gate5/frozen-football-scope` was created and pushed
+from the exact Gate 4 merge
+`10afa40c99877dca9b4362a1ad4ef4c950db362d`.
+
+Initial audit:
+
+- schools persist classification and region, but broadcasts do not yet persist
+  home/visitor overall and region records or a rule controlling which result
+  affects which record;
+- no structured special-game designation exists in the broadcast record or
+  Create/Edit Broadcast interface;
+- the player graphic already renders `play_detail`, but the manual operator
+  path did not expose or persist the frozen-scope `Player Spotlight` type.
+- Player Spotlight is the first independent Gate 5 repair; the record and
+  designation model must be fixed before implementation so archived broadcasts
+  retain their original pregame context.
+
+#### Player Spotlight operator workflow
+
+The production destination is a dedicated **Player Spotlight** menu within
+Program Visual Controls. Player Identification Master remains the roster and
+identity source; it must not be Jordan's primary live highlight workflow.
+
+The Program Visual Controls menu must let the operator:
+
+- select the applicable roster and player;
+- select which prepared player information or saved highlight note to feature,
+  with a controlled custom-text option for an unplanned live achievement;
+- preview the complete graphic before air;
+- select its display duration; and
+- show, update, hide, or clear the spotlight without editing the underlying
+  player identity.
+
+Prepared spotlight information belongs with the player's reusable roster data
+so it can be entered before the broadcast and selected quickly during the
+event. The live custom-text field remains available for a new achievement that
+was not known during preparation.
+
+Player-event sequencing is deterministic. If a touchdown is recorded while a
+Player Spotlight is on air, the touchdown graphic is queued rather than
+discarded or allowed to overwrite the active spotlight. When the spotlight
+ends—by duration expiry or operator hide—the queued touchdown graphic appears
+next. The queue must preserve the scoring player and event detail, prevent
+duplicate delivery, and expose a way to cancel an erroneous queued event before
+it reaches air. `Clear` behavior and queue advancement must be explicit in the
+operator interface and covered by tests.
+
+#### Sponsor Spotlight operator workflow
+
+Program Visual Controls must also provide a dedicated **Sponsor Spotlight**
+activity for filling a natural broadcast lull. It is separate from Player
+Highlight while following the same preview-first operator pattern.
+
+The Sponsor Spotlight menu must let the operator:
+
+- select an approved sponsor profile from the sponsor library;
+- select one of that sponsor's approved still graphics or video assets;
+- optionally select a prepared lead-in or caption;
+- preview the exact composition without putting it on air;
+- choose a display duration for still media and use either the approved clip
+  duration or a controlled cutoff for video; and
+- show, update, hide, clear, or cancel the activity.
+
+The on-air composition covers most of the program canvas but remains below the
+scorebug. The scorebug is a protected top layer and stays visible for the full
+Sponsor Spotlight. Sponsor media must preserve its aspect ratio, must not expose
+browser playback controls, and must end cleanly without leaving a black frame,
+stale audio, or a hidden scorebug.
+
+Sponsor Spotlight is a low-priority, lull-only activity. Live game-event
+graphics take precedence when play resumes. The graphics coordinator must
+define and test whether each event interrupts the spotlight immediately or is
+queued behind it; no event may be lost or silently overwrite another activity.
+Video audio policy, transition timing, replay behavior, and cancellation must
+be visible and deterministic in the operator interface.
+
+Gate 5 implementation checkpoint:
+
+- Program Visual Controls now owns dedicated Player Spotlight and Sponsor
+  Spotlight operator panels with preview-first selection and duration controls.
+- A persisted graphics queue holds a touchdown recorded while Player Spotlight
+  is active. Expiry or operator hide advances the queued event exactly once;
+  each pending item can be cancelled before air.
+- Sponsor Spotlight accepts active sponsors and their associated
+  Sponsor-category image/video assets. Attaching media to a paid, active sponsor
+  is the operator's assertion that the sponsor supplied or authorized it;
+  `rights_status` remains useful documentation but does not block sponsor media
+  from air.
+- Sponsor Spotlight is interrupted by a live automated scoring-player graphic.
+  The scorebug and event ticker are protected above the spotlight layer.
+- Sponsor video begins muted in this checkpoint. Enabling program audio requires
+  a separate explicit operator control and OBS audio-path validation.
+- Player Spotlight duration choices are consistent between Program Visual
+  Controls and Player Identification Master through the 30-second option.
+- The live overlay publishes and checks an overlay schema revision. After one
+  manual OBS browser-source refresh for this checkpoint, later incompatible
+  overlay updates automatically reload instead of retaining stale HTML.
+- Sponsor Spotlight uses a shared feature-stage layout: a theme-driven lead-in,
+  sponsor name, and caption band overlays the top of the media; the still image
+  or video fits at the largest aspect-preserving size beneath that band; and the
+  stage ends at the top of the protected scorebug in compact and graphic modes.
+  The band consumes the operator-selected theme's surface, accent, text, border,
+  radius, shadow, and font tokens.
+- Broadcaster penalty buttons use the context-free label `Penalty`; the home or
+  visitor column supplies team context, preventing stale fixture or generic
+  team names from leaking into the live controls.
+- The existing Asset Manager now owns explicit placement roles:
+  `flexible`, `sponsor_feature_still`, `sponsor_feature_video`,
+  `lower_third_sponsor`, `scorebug_sponsor`, `player_highlight_video`, and
+  `full_screen_master`. Existing records migrate to `flexible` so previously
+  approved sponsor media remains usable.
+- Asset records may be associated with a sponsor, roster, player, and season.
+  Sponsor Spotlight accepts only flexible or feature-stage sponsor media and
+  rejects an explicitly associated asset belonging to another sponsor.
+
+#### Frozen follow-on — Player Highlight video
+
+Player Highlight means actual season highlight video. It is separate from the
+roster-driven Player Spotlight card and is not a general-purpose video player.
+
+- Operators select a roster and player first, then choose an approved
+  player/season-linked highlight clip.
+- The clip uses the same feature-stage geometry as Sponsor Spotlight: a
+  theme-driven player identity/information band at the top, aspect-preserving
+  video below it, and the protected scorebug beneath the stage.
+- Player name, number, position, grade, and the operator-entered recognition
+  note remain visible in the top band without being burned into the source
+  video.
+- A touchdown recorded during the clip follows the existing Player Spotlight
+  rule: it enters the graphics queue and plays exactly once after the clip ends
+  or the operator hides it.
+- Clip approval, season/player association, playback cutoff, replay behavior,
+  cancellation, muted/default audio, and OBS program-audio routing require
+  focused tests before this presentation can be marked available.
+
+Implementation status:
+
+- Program Visual Controls now exposes Player Highlight separately from Player
+  Spotlight, with roster, player, approved clip, detail, and 15/30/60/90-second
+  cutoff controls.
+- Only active, rights-approved `Player` + `Video` assets tagged
+  `player_highlight_video` and compatible with the selected roster/player may
+  reach air.
+- The overlay uses the shared feature-stage geometry, places player information
+  in the theme-aware top band, preserves video aspect ratio below it, and keeps
+  the scorebug/ticker above the feature.
+- Touchdowns generated during Player Highlight enter the existing queue and
+  advance after hide, clear, or timed expiry. Player Highlight video remains
+  muted until a separately validated OBS program-audio workflow is approved.
+- Overlay schema revision `gate5-program-visual-v9` forces stale browser sources
+  to reload this contract. Focused and authoritative validation remain required
+  before this slice is committed or pushed.
+- Player Highlight preparation is roster-owned: open a saved player and use the
+  `Player Highlights` panel to name, describe, classify rights, and upload a
+  clip. CSRN automatically creates the `Player` + `Video` asset, assigns
+  `player_highlight_video`, and links the roster, player, and season. Asset
+  Manager remains the advanced library rather than a required operator step.
+- Roster and Asset Manager operate on the same asset record. `Remove from
+  Player` clears the roster/player association while retaining the asset and
+  file. `Delete Media` or Asset Manager deletion removes an unshared file only
+  when it is inside CSRN-managed `/asset-files/` storage; external paths and
+  media still referenced by another asset are retained.
+- Asset Manager reports managed-media file count, total size, and orphan count.
+  Replacing a managed upload also removes its superseded unshared file.
+- Player Highlight preview and overlay video use an explicit 16:9 `contain`
+  contract on a theme-backed stage. The complete source frame remains visible;
+  it is never stretched or cropped to imitate sponsor banner artwork.
+- The on-air `<video>` element itself is constrained to a 16:9 box rather than
+  filling the wider feature-stage media region. This avoids OBS browser-engine
+  differences in `object-fit` behavior and uses theme-backed side space when
+  the protected-scorebug geometry is wider than the source clip.
+- Overlay revision v9 derives explicit pixel width and height from the live
+  feature-stage viewport and the clip's intrinsic dimensions. This prevents
+  percentage-height/replaced-element layout differences from making the video
+  taller than its clipped stage in OBS browser sources.
+
+Validation evidence:
+
+- Windows development runtime: Python 3.13.14.
+- Focused roster-owned highlight and managed-media suite: 42 passed.
+- Full authoritative suite: 1,250 passed with the four unchanged Pillow
+  `Image.getdata()` deprecation warnings.
+- Git diff and runtime identity checks passed.
+- Player Highlight workflow checkpoint `8ad488164df65c488c93f08233e0f81199923517`
+  is committed and pushed on `gate5/frozen-football-scope`. Operator review in
+  OBS approved the complete 16:9 source frame, scorebug protection, and roster-
+  owned preparation workflow. The Gate 5 branch remains intentionally unmerged.
+
+#### Next Gate 5 implementation slice — game classification and record policy
+
+The next frozen-football slice is broadcast planning metadata, not another
+graphics feature. The current audit confirms that schools persist
+`classification` and `region`, while a broadcast currently persists only one
+general `classification`; it does not snapshot each team's classification,
+region, overall record, or region record. It also has no structured region-game
+flag, scrimmage/exhibition record rule, or special-game designation.
+
+Preparation contract for the next slice:
+
+- snapshot home and visitor classification and region when the broadcast is
+  created so later school-database edits cannot rewrite archived game context;
+- capture each team's pregame overall and region records as structured
+  wins/losses/ties values;
+- persist an explicit `region_game` flag rather than guessing solely from the
+  two school records;
+- persist a contest/record policy that distinguishes an official game from a
+  scrimmage or exhibition and prevents non-official results from changing
+  official records;
+- allow multiple structured special-game designations, including Homecoming,
+  Senior Night, rivalry, playoff, and championship;
+- expose the fields in both Create Broadcast and Edit Broadcast, synchronize
+  them into the active state, retain them in detail/archive records, and cover
+  create/edit/load and legacy-record behavior with focused tests.
+
+Authoritative record decision:
+
+- wins, losses, and ties are supported across every sport;
+- the broadcaster's configured primary team is tracked automatically from
+  completed official CSRN broadcasts whether it appears as home or visitor;
+- the operator enters each opponent's record entering the game because CSRN
+  will not possess that opponent's complete schedule;
+- the opponent record is a broadcast snapshot and is not retroactively changed;
+- the primary team needs an operator-entered starting baseline when CSRN is
+  adopted after its season has begun; and
+- scrimmages and exhibitions never alter official overall or region records.
+
+Implementation status:
+
+- Create/Edit Broadcast now stores per-team classification and region snapshots,
+  overall and region pregame records with wins/losses/ties, an explicit region-
+  game flag, contest type, derived record policy, and multiple structured
+  special-game designations.
+- `broadcast_defaults.home_school_id` is the primary-team authority. The first
+  official broadcast accepts an operator baseline; later broadcasts inherit the
+  latest calculated postgame overall and region records whether the primary team
+  appears as home or visitor. Opponent records remain manual snapshots.
+- Completing an official broadcast advances only the primary team's record and
+  supports wins, losses, and ties. Region records advance only for an explicitly
+  marked region game. Scrimmages and exhibitions preserve the baseline.
+- Broadcast load, active-state synchronization, reset, detail records, and
+  archived records retain this planning context. Legacy records receive safe
+  defaults without rewriting their stored school-era snapshots.
+
+#### Approved refinement — scorebug record context and nonofficial clarity
+
+- Scrimmage and exhibition planning now states explicitly that official overall
+  and region win/loss/tie records will not be updated at completion.
+- Nonofficial contests force `region_game` false in the interface, service, and
+  active-state lifecycle; returning to Official Game re-enables the control but
+  does not restore a stale checked value.
+- The scorebug displays each team's persisted pregame overall record beneath
+  the team name. For an official region game it appends the persisted region
+  record in compact form; non-region and nonofficial contests omit the region
+  segment. Legacy broadcasts without structured snapshots hide the record line,
+  while an explicit 0-0 snapshot remains visible.
+- This refinement is implemented but remains uncommitted pending focused/full
+  validation and operator visual approval of compact and graphic scorebug modes.
+
+#### Gate 5 final implementation acceptance
+
+Gate 5 frozen-football implementation is accepted for branch closeout.
+
+Final accepted behavior:
+
+- broadcasts snapshot each team's classification, region, overall record, and
+  region record so later School Database changes do not rewrite archived game
+  context;
+- wins, losses, and ties are represented structurally;
+- official region games may advance the configured primary team's overall and
+  region records;
+- official non-region games may advance only the overall record;
+- scrimmages and exhibitions force `region_game` to false and never advance
+  official overall or region records;
+- the operator warning states: "Official overall and region win/loss/tie
+  records will not be updated when this game is completed.";
+- multiple structured special-game designations persist through create, edit,
+  load, active-state, detail, and archive workflows;
+- the scorebug renders each team's persisted pregame overall record and adds
+  the region record only for an official region game;
+- zero ties are omitted from the compact scorebug string, explicit `0-0`
+  records remain visible, and legacy broadcasts without structured record data
+  do not display a fabricated record;
+- overlay schema revision `gate5-program-visual-v10` refreshes stale OBS browser
+  sources for the scorebug record contract.
+
+Validation and operator evidence:
+
+- Windows development runtime: Python 3.13.14;
+- focused Gate 5 and state-route suite: 64 passed;
+- full authoritative repository suite: 1,260 passed with the four unchanged
+  Pillow `Image.getdata()` deprecation warnings;
+- Create Broadcast, Edit Broadcast, active-state reload, and snapshot retention
+  were manually accepted;
+- official/nonofficial record messaging and Region Game disabling were accepted;
+- compact scorebug record rendering was visually accepted without score or
+  module alignment failure.
+
+Gate 6 visual-regression item:
+
+- move the scorebug record line below the mascot rather than between the team
+  name and mascot, while preserving current score alignment, fixed scorebug
+  height, long-name fitting, compact mode, and graphic mode.
+
+Nonblocking follow-up risk:
+
+- `tests/test_venue_repository.py::test_cache_invalidates_when_file_changes`
+  can fail when run alone on the current Windows filesystem but passed in the
+  final authoritative suite. Investigate file-change cache invalidation and
+  timestamp-resolution assumptions before release freeze; this is not caused by
+  the Gate 5 classification/record-policy changes.
+
+Production-tree cleanup performed for this checkpoint:
+
+- temporary `CSRN_GATE5_WORKTREE.zip` removed;
+- repository-local pytest and Python cache directories removed outside `.venv`;
+- no temporary patch archive is included in the commit;
+- final untracked-file and diff-integrity checks are required before commit.
+#### Sponsor broadcast creative package
+
+One sponsor logo must not be stretched, cropped, or repurposed across every
+broadcast placement. Each commercial sponsor should provide or approve a
+placement-tagged creative package. Until an exact rendition exists, the system
+must letterbox the closest approved asset without cropping it.
+
+Required package renditions:
+
+- **Primary transparent logo:** square 1200 × 1200 PNG, with at least 8 percent
+  transparent safe space on every edge;
+- **Feature-stage still:** 1600 × 500 PNG or high-quality JPEG, designed for the
+  Sponsor Spotlight media region below its top information band;
+- **Feature-stage video:** 1600 × 500 H.264 MP4 or WebM, with critical content
+  inside a 5 percent safe area and a separately declared audio policy;
+- **Lower-third sponsor mark:** 1200 × 300 transparent PNG;
+- **Scorebug sponsor bug:** 600 × 180 transparent PNG; and
+- **Full 16:9 master:** 1920 × 1080 still/video retained as the archival master
+  and for future true full-screen uses.
+
+Asset records must gain an explicit placement/rendition role rather than
+inferring suitability from filename or generic `Logo`, `Background`, `Overlay`,
+or `Video` type alone. Sponsor Spotlight should prefer the feature-stage still
+or video, while other graphics expose only renditions compatible with their
+placement. Rights approval remains per asset or may be inherited from a
+documented sponsor-package approval covering the submitted package.
 
 #### Deferred commercial presentation concept — starting lineups
 
@@ -530,7 +873,8 @@ Render and approve:
 - headshot present/missing;
 - school logo present/missing;
 - short and long names;
-- touchdown, turnover, field goal, player highlight, and Player of the Game;
+- touchdown, turnover, field goal, Player Spotlight card, Player Highlight
+  video, and Player of the Game;
 - scorebug, ticker, lower third, sponsor, caption, weather, and social states;
 - desktop, phone, and production-resolution views.
 
@@ -885,17 +1229,21 @@ C:\Users\Darth\My Drive\CSRN\Development\CSRN-Production-Suite\CSRN_PROJECT_BIBL
 
 Read the entire Bible before recommending or changing anything. Treat it as the authoritative continuity and release-control document unless I explicitly change a decision.
 
-Gate 1 source recovery and Gate 2 governance repair are complete. PR #88
-passed final GitHub Actions run `30566281259` on Windows and Ubuntu and merged
-into `develop-1.13` at
-`ef9d4a5d11b7c0aa6535e501d0a6503907120f76`.
+Gates 1 through 4 are complete. Gate 4 merged through PR #90 at
+`10afa40c99877dca9b4362a1ad4ef4c950db362d`. The active branch is
+`gate5/frozen-football-scope`, based on committed head
+`442f9e4438630f612d821729e5f6c0c897fc49b5`.
 
-The active objective is Gate 3 on `gate3/reproducible-environment`: establish a
-clean declared local development/test environment, separate setup/update from
-normal startup, keep the full CI suite green, and add a deterministic build
-command. Maintain canonical identity `1.13.0-alpha.8f` /
-`V1.13A8F-SOURCE-ALIGNMENT`. Do not add product features, apply installer ZIPs,
-or modify live runtime data.
+Gate 5 Program Visual Coordinator work is intentionally uncommitted pending
+operator acceptance. The current slice adds Player Spotlight, Sponsor
+Spotlight, queued touchdown handling, player-linked highlight video, explicit
+asset placement roles, and a roster-owned Player Highlights workflow. The
+roster workflow creates and links the Asset Manager record automatically;
+unshared CSRN-managed media is deleted with its asset, while shared or external
+media is retained. Highlight video must preserve the complete 16:9 frame above
+the protected scorebug. Maintain canonical identity `1.13.0-alpha.8f` /
+`V1.13A8F-SOURCE-ALIGNMENT`. Do not commit, push, or merge until the operator
+visual check and validation checkpoint are accepted.
 
 Before acting, report:
 1. the development folder you inspected;
@@ -914,11 +1262,14 @@ Then proceed only within the next incomplete gate documented in the Bible.
 The next action is:
 
 ```text
-Install Python 3.13.14 with `py install 3.13.14`. Then close CSRN and Python
-processes, pause Google Drive sync, run
-`SETUP_CSRN_DEVELOPMENT_ENVIRONMENT.bat`, and run the focused and full
-validation suite before committing or pushing the Gate 3 repair.
+Launch CSRN, open Roster Engine, select a saved player, and exercise the new
+Player Highlights panel with a test MP4 or WebM. Confirm that the clip appears
+automatically in Program Visual Controls, preserves the full 16:9 source frame
+above the scorebug, and that Remove from Player retains the Asset Manager record.
+Then run `VALIDATE_CSRN_GATE_5_PLAYER_HIGHLIGHT_WORKFLOW.ps1` and return its
+complete output before any commit or push.
 ```
 
-Do not begin Gate 4 visual fixes or new features until Gate 3 passes Windows
-and Ubuntu CI and merges into `develop-1.13`.
+After this slice is checkpointed, continue the frozen Gate 5 game-classification
+and record-policy work documented above. Do not begin Gate 6 visual regression
+until every Gate 5 frozen-football slice is complete.

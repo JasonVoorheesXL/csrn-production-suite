@@ -200,6 +200,7 @@ PRODUCT_PATHS = resolve_product_paths(
     BASE_DIR,
     frozen=bool(getattr(sys, "frozen", False) or "--installed" in sys.argv),
 )
+OVERLAY_SCHEMA_REVISION = "gate5-program-visual-v10"
 PRODUCT_PATHS.ensure()
 STATE_FILE = PRODUCT_PATHS.state_file
 SECURITY_FILE = PRODUCT_PATHS.security_file
@@ -306,6 +307,19 @@ DEFAULT_STATE: dict[str, Any] = {
     "season": "",
     "week": "1",
     "classification": "",
+    "home_classification": "",
+    "home_region": "",
+    "visitor_classification": "",
+    "visitor_region": "",
+    "home_pregame_record": {"wins": 0, "losses": 0, "ties": 0},
+    "home_pregame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+    "visitor_pregame_record": {"wins": 0, "losses": 0, "ties": 0},
+    "visitor_pregame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+    "contest_type": "official",
+    "record_policy": "official",
+    "region_game": False,
+    "special_designations": [],
+    "record_tracking": {},
     "venue_id": "",
     "status": "planned",
     "history": [],
@@ -368,6 +382,45 @@ DEFAULT_STATE: dict[str, Any] = {
         "expires_at": 0,
         "updated_at": 0
     },
+    "player_highlight": {
+        "visible": False,
+        "roster_id": "",
+        "player_id": "",
+        "school_id": "",
+        "full_name": "",
+        "display_name": "",
+        "number": "",
+        "position": "",
+        "grade": "",
+        "team_logo": "",
+        "team_name": "",
+        "team_color": "#C9203B",
+        "eyebrow": "PLAYER HIGHLIGHT",
+        "detail": "",
+        "media_asset_id": "",
+        "media_name": "",
+        "media_url": "",
+        "media_type": "video",
+        "duration": 0,
+        "expires_at": 0,
+        "updated_at": 0
+    },
+    "sponsor_spotlight": {
+        "visible": False,
+        "sponsor_id": "",
+        "sponsor_name": "",
+        "sponsor_logo": "",
+        "lead_in": "SPONSOR SPOTLIGHT",
+        "caption": "",
+        "media_asset_id": "",
+        "media_name": "",
+        "media_url": "",
+        "media_type": "image",
+        "duration": 0,
+        "expires_at": 0,
+        "updated_at": 0
+    },
+    "graphics_queue": [],
 }
 
 DEFAULT_SECURITY: dict[str, Any] = {
@@ -1509,6 +1562,7 @@ def get_graphics_service() -> GraphicsService:
             load_personnel=load_broadcasters,
             build_identity=broadcast_identity,
             apply_sponsor=apply_sponsor_to_graphic,
+            load_assets=load_assets,
         )
 
     return GRAPHICS_SERVICE
@@ -1580,8 +1634,20 @@ def save_state(state: dict[str, Any]) -> None:
     get_state_service().save(state)
 
 
+def load_reconciled_state() -> dict[str, Any]:
+    with lock:
+        state = load_state()
+        result = get_graphics_service().reconcile_queue(state)
+        reconciled = result.data["state"]
+        if result.data.get("changed"):
+            save_state(reconciled)
+        return reconciled
+
+
 def public_state(state: dict[str, Any]) -> dict[str, Any]:
-    return get_state_service().public(state).data["state"]
+    result = get_state_service().public(state).data["state"]
+    result["overlay_revision"] = OVERLAY_SCHEMA_REVISION
+    return result
 
 def load_security() -> dict[str, Any]:
     return SECURITY_SERVICE.ensure_secret_key(
@@ -1877,7 +1943,7 @@ SYSTEM_ROUTES_BLUEPRINT = create_system_blueprint(
         require_auth=require_auth,
         get_configuration_service=get_configuration_service,
         diagnostic_status=diagnostic_status,
-        load_state=load_state,
+        load_state=load_reconciled_state,
         public_state=public_state,
         readiness_payload=readiness_payload,
         load_build_journal=load_build_journal,
