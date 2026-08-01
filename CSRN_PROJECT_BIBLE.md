@@ -1047,6 +1047,71 @@ This checkpoint does not claim that `/api/state` has reached its long-term
 performance target. Further optimization may reduce loaded latency, but the
 worker-exhaustion failure mode is corrected and the supported production path is
 stable enough for continued Gate 6 visual-regression work.
+#### Gate 6 logo fallback integrity slice
+
+A visual-regression review found that some synthetic/test teams left the
+scorebug logo column blank even though teams without any logo reference correctly
+displayed a monogram. Caledonia's valid logo continued to render.
+
+The confirmed presentation defect is the distinction between a missing logo
+reference and a non-empty reference whose image cannot be loaded:
+
+- a valid logo must render unchanged;
+- a missing logo must render the existing team monogram;
+- a stale, deleted, corrupt, unreadable, or otherwise broken logo reference must
+  also render the team monogram rather than leaving a blank identity column;
+- once a logo URL fails, the overlay must retain the fallback for that URL rather
+  than retrying the broken file on every state poll;
+- if the URL or team name later changes, the overlay may attempt the new logo or
+  rebuild the correct monogram;
+- this defensive overlay behavior does not replace the later data-integrity audit
+  of why synthetic team records retained stale asset paths.
+
+Overlay revision `gate6-logo-fallback-v1` refreshes OBS browser sources for this
+contract. Acceptance requires automated coverage for valid, missing, and broken
+logo states plus Graphic-mode operator verification that a broken test-team logo
+degrades to a monogram while Caledonia's valid logo remains intact.
+#### Gate 6 logo fallback integrity acceptance
+
+The scorebug logo-fallback integrity slice is accepted for the supported Graphic
+mode.
+
+Operator verification confirmed:
+
+- Caledonia's valid approved logo still renders normally;
+- no duplicate monogram appears behind or over a valid logo;
+- Northwood and Pine Valley no longer leave blank logo columns when their approved
+  logo references fail to load;
+- broken-logo states now render team monograms;
+- teams with no logo reference continue to render monograms;
+- no repeated broken-image flicker or repeated image-load failures were observed;
+- the overlay retains fallback state for the same failed URL rather than retrying
+  it on every state poll.
+
+Automated validation:
+
+- focused logo-fallback and identity-contract suite: 29 passed;
+- full authoritative suite: 1,271 passed;
+- the four existing Pillow `Image.getdata()` deprecation warnings remain
+  unchanged.
+
+A separate fixture asset-integrity defect remains documented and does not block
+this slice:
+
+- the Northwood and Pine Valley fixture records reference
+  `assets/school-logos/<school-id>/logo.png`;
+- both PNG files physically exist inside the fixture package and have normal file
+  sizes;
+- therefore the remaining defect is not missing or corrupt source files;
+- the fixture import/runtime path translation is failing to convert fixture-relative
+  logo paths into browser-served application asset URLs;
+- a later asset-integrity slice must inspect fixture asset copy/remapping for
+  school logos and confirm approved fixture logos render instead of requiring the
+  defensive monogram fallback.
+
+The fallback remains required for commercial resilience even after fixture path
+remapping is corrected because deleted, moved, corrupt, or unreadable customer
+assets must never leave blank broadcast identity columns.
 ### Gate 6 — Visual regression
 
 Render and approve:
