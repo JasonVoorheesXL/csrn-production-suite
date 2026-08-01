@@ -1112,6 +1112,78 @@ this slice:
 The fallback remains required for commercial resilience even after fixture path
 remapping is corrected because deleted, moved, corrupt, or unreadable customer
 assets must never leave blank broadcast identity columns.
+#### Gate 6 legacy managed-logo URL normalization slice
+
+Investigation of the Northwood and Pine Valley approved fixture logos disproved
+the initial fixture-copy and Flask-route hypotheses:
+
+- each runtime PNG exactly matches its fixture source by SHA-256;
+- Pillow validates both runtime PNG files;
+- each `/school-logos/<school-id>/logo.png` route returns HTTP 200,
+  `image/png`, and the exact expected byte count;
+- the School Database records contain browser-served absolute logo URLs;
+- the persisted broadcast and embedded live-state snapshots contain the correct
+  frozen logo identity, but legacy entries omit the leading slash:
+  `school-logos/<school-id>/logo.png`;
+- `StateService` correctly rejected those relative values as unsafe, causing
+  `/api/state` to expose an empty `logo` while retaining
+  `logo_certified: true`.
+
+The approved repair is a compatibility normalization at the public-state media
+boundary:
+
+- known CSRN-managed legacy relative prefixes are converted to root-relative
+  browser URLs;
+- `school-logos/...`, `asset-files/...`, `roster-headshots/...`, and
+  `personnel-headshots/...` become `/school-logos/...`, `/asset-files/...`,
+  `/roster-headshots/...`, and `/personnel-headshots/...`;
+- Windows separators in those known managed paths are normalized to `/`;
+- arbitrary relative paths, traversal paths, and local filesystem paths remain
+  blocked;
+- current absolute URLs, data-image URLs, and HTTP(S) URLs remain unchanged;
+- the persisted frozen broadcast snapshot is not rewritten and the current
+  School Database is not consulted.
+
+Acceptance requires automated proof that legacy managed logo URLs render through
+public state, unsafe paths remain suppressed, certification metadata is
+preserved, and public normalization does not mutate the frozen raw state.
+#### Gate 6 legacy managed-logo URL normalization acceptance
+
+The legacy managed-media URL normalization slice is accepted.
+
+Operator verification confirmed:
+
+- Northwood's approved logo renders from the frozen broadcast identity;
+- Pine Valley's approved logo renders from the frozen broadcast identity;
+- neither team displays the monogram fallback when its approved logo is
+  available;
+- no logo flicker or repeated image-load failures were observed.
+
+The investigation established the final root cause:
+
+- fixture source PNG files were present and valid;
+- runtime PNG copies exactly matched their fixture sources by SHA-256;
+- `/school-logos/<school-id>/logo.png` returned HTTP 200 with `image/png` and
+  the correct byte count;
+- School Database records contained valid root-relative URLs;
+- older persisted broadcast snapshots stored otherwise-correct managed logo
+  paths without the leading slash;
+- `StateService` therefore suppressed them at the public-state safety boundary.
+
+The accepted compatibility repair normalizes only known CSRN-managed legacy
+relative prefixes at public-state publication. It does not rewrite the frozen
+broadcast record, consult current School Database branding, or permit arbitrary
+relative filesystem paths.
+
+Automated validation completed with:
+
+- focused state and Gate 6 suite: 39 passed;
+- full authoritative suite: 1,274 passed;
+- four unchanged Pillow `Image.getdata()` deprecation warnings.
+
+Although the branch retains its original investigative name
+`gate6/fixture-logo-remapping`, no fixture importer or asset-copy defect was
+found and no fixture remapping code was added.
 ### Gate 6 — Visual regression
 
 Render and approve:

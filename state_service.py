@@ -28,6 +28,12 @@ class StateService:
         "http://",
         "https://",
     )
+    LEGACY_MANAGED_URL_PREFIXES = (
+        "asset-files/",
+        "school-logos/",
+        "roster-headshots/",
+        "personnel-headshots/",
+    )
 
     def __init__(
         self,
@@ -270,9 +276,12 @@ class StateService:
 
     @classmethod
     def _safe_media_value(cls, value: Any) -> str:
-        text = str(value or "")
+        text = str(value or "").strip()
         if not text or text.startswith(cls.SAFE_URL_PREFIXES):
             return text
+        normalized = text.replace("\\", "/")
+        if normalized.startswith(cls.LEGACY_MANAGED_URL_PREFIXES):
+            return f"/{normalized}"
         return ""
 
     def _enrich_play(

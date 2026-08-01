@@ -240,3 +240,91 @@ def test_public_state_enriches_player_name_and_result() -> None:
     play = service.public(state).data["state"]["plays"][0]
     assert play["player_name"] == "Runner"
     assert play["result"] == "#7 Runner run for 8 yards, first down"
+
+def test_public_state_normalizes_legacy_managed_relative_logo_urls() -> None:
+    service, _ = build()
+    state = defaults() | {
+        "home_identity": {
+            "logo": "school-logos/test-northwood-knights/logo.png",
+            "logo_certified": True,
+            "branding_status": "certified_logo",
+        },
+        "visitor_identity": {
+            "logo": r"school-logos\test-pine-valley-panthers\logo.png",
+            "logo_certified": True,
+            "branding_status": "certified_logo",
+        },
+    }
+
+    public = service.public(state).data["state"]
+
+    assert (
+        public["home_identity"]["logo"]
+        == "/school-logos/test-northwood-knights/logo.png"
+    )
+    assert (
+        public["visitor_identity"]["logo"]
+        == "/school-logos/test-pine-valley-panthers/logo.png"
+    )
+    assert public["home_identity"]["logo_certified"] is True
+    assert public["visitor_identity"]["logo_certified"] is True
+    assert public["home_identity"]["branding_status"] == "certified_logo"
+    assert public["visitor_identity"]["branding_status"] == "certified_logo"
+
+
+def test_public_state_normalizes_only_known_managed_relative_media_paths() -> None:
+    service, _ = build()
+    state = defaults() | {
+        "home_identity": {"logo": "assets/private/logo.png"},
+        "visitor_identity": {"logo": "../outside/logo.png"},
+        "personnel_graphic": {
+            "headshot": "personnel-headshots/coach.png",
+        },
+        "player_graphic": {
+            "headshot": "roster-headshots/test-fixtures/player.png",
+            "team_logo": "asset-files/team.png",
+        },
+    }
+
+    public = service.public(state).data["state"]
+
+    assert public["home_identity"]["logo"] == ""
+    assert public["visitor_identity"]["logo"] == ""
+    assert (
+        public["personnel_graphic"]["headshot"]
+        == "/personnel-headshots/coach.png"
+    )
+    assert (
+        public["player_graphic"]["headshot"]
+        == "/roster-headshots/test-fixtures/player.png"
+    )
+    assert public["player_graphic"]["team_logo"] == "/asset-files/team.png"
+
+
+def test_legacy_logo_url_normalization_does_not_mutate_frozen_state() -> None:
+    service, store = build(
+        defaults()
+        | {
+            "broadcast_id": "B1",
+            "home_identity": {
+                "logo": "school-logos/test-northwood-knights/logo.png",
+                "logo_certified": True,
+            },
+        }
+    )
+
+    loaded = service.load().data["state"]
+    public = service.public(loaded).data["state"]
+
+    assert (
+        loaded["home_identity"]["logo"]
+        == "school-logos/test-northwood-knights/logo.png"
+    )
+    assert (
+        store["home_identity"]["logo"]
+        == "school-logos/test-northwood-knights/logo.png"
+    )
+    assert (
+        public["home_identity"]["logo"]
+        == "/school-logos/test-northwood-knights/logo.png"
+    )
