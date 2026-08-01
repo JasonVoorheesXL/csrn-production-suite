@@ -54,8 +54,8 @@ def test_gate6_overlay_revision_is_published_consistently() -> None:
     overlay = (ROOT / "templates" / "overlay.html").read_text(encoding="utf-8")
     app = (ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert "const OVERLAY_SCHEMA_REVISION='gate6-runtime-resilience-v2';" in overlay
-    assert 'OVERLAY_SCHEMA_REVISION = "gate6-runtime-resilience-v2"' in app
+    assert "const OVERLAY_SCHEMA_REVISION='gate6-logo-fallback-v1';" in overlay
+    assert 'OVERLAY_SCHEMA_REVISION = "gate6-logo-fallback-v1"' in app
 
 
 def test_gate5_record_rendering_rules_remain_unchanged() -> None:
@@ -98,3 +98,23 @@ def test_fast_ticker_speed_is_one_and_a_half_times_the_prior_preset() -> None:
 
     assert "{very_slow:24,slow:36,normal:84,fast:189}" in overlay
     assert "{very_slow:24,slow:36,normal:84,fast:126}" not in overlay
+
+def test_scorebug_logo_fallback_handles_valid_missing_and_broken_media() -> None:
+    overlay = (ROOT / "templates" / "overlay.html").read_text(encoding="utf-8")
+
+    assert "function setScorebugLogo(id,url,teamName)" in overlay
+    assert "const fallback=identityMonogramData(normalizedName)" in overlay
+    assert "if(!requested)" in overlay
+    assert "logo.dataset.mediaState='fallback'" in overlay
+    assert "logo.onerror=()=>{if(logo.dataset.requestedLogo===requested)useFallback()}" in overlay
+    assert "setScorebugLogo('homeLogo',hi.logo,s.home_team||'HOME')" in overlay
+    assert "setScorebugLogo('visitorLogo',vi.logo,s.visitor_team||'VISITOR')" in overlay
+
+
+def test_broken_scorebug_logo_is_not_retried_on_every_state_poll() -> None:
+    overlay = (ROOT / "templates" / "overlay.html").read_text(encoding="utf-8")
+
+    assert "logo.dataset.requestedLogo===requested" in overlay
+    assert "logo.dataset.mediaState==='fallback'&&logo.dataset.fallbackName===normalizedName" in overlay
+    assert "for(const [id,url] of [['homeLogo',hi.logo],['visitorLogo',vi.logo]])" not in overlay
+    assert "logo.style.display='none'" not in overlay

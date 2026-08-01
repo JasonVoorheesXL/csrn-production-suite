@@ -200,7 +200,7 @@ PRODUCT_PATHS = resolve_product_paths(
     BASE_DIR,
     frozen=bool(getattr(sys, "frozen", False) or "--installed" in sys.argv),
 )
-OVERLAY_SCHEMA_REVISION = "gate6-runtime-resilience-v2"
+OVERLAY_SCHEMA_REVISION = "gate6-logo-fallback-v1"
 PRODUCT_PATHS.ensure()
 STATE_FILE = PRODUCT_PATHS.state_file
 SECURITY_FILE = PRODUCT_PATHS.security_file

@@ -100,6 +100,8 @@ def test_player_event_visual_contract_is_independent_and_contained() -> None:
     assert "#playerGraphic .pg-onair-play-detail" in overlay
     assert "function fitPlayerGraphicName()" in overlay
     assert "minimum=large?36:27" in overlay
-    assert "['homeLogo','visitorLogo']" in overlay
-    assert "logo.dataset.mediaState='invalid'" in overlay
+    assert "function setScorebugLogo(id,url,teamName)" in overlay
+    assert "setScorebugLogo('homeLogo',hi.logo,s.home_team||'HOME')" in overlay
+    assert "setScorebugLogo('visitorLogo',vi.logo,s.visitor_team||'VISITOR')" in overlay
+    assert "logo.dataset.mediaState='fallback'" in overlay
     assert '.team-logo[data-media-state="invalid"]' in overlay
