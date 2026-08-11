@@ -1,0 +1,74 @@
+{
+  "package": 1,
+  "r18_r3": true,
+  "colors": [
+    "scarlet",
+    "maroon",
+    "orange",
+    "gold",
+    "yellow"
+  ],
+  "assets": [
+    {
+      "file": "visitor-28-scarlet.png",
+      "role": "visitor",
+      "color": "scarlet",
+      "sha256": "6e7ed95fb3ed37ed23f990bb9afd425e3f1f5760497af848cdf6df9afd91393b"
+    },
+    {
+      "file": "home-31-scarlet.png",
+      "role": "home",
+      "color": "scarlet",
+      "sha256": "0f45aebe16ec9f1b35dec43b54a76905cd6473f099e5d5756072c357f33406a3"
+    },
+    {
+      "file": "visitor-28-maroon.png",
+      "role": "visitor",
+      "color": "maroon",
+      "sha256": "a8cd33cf14e5e559147a9a8efad698b1a1a80d36fe2706fc9044edf11ad2fe70"
+    },
+    {
+      "file": "home-31-maroon.png",
+      "role": "home",
+      "color": "maroon",
+      "sha256": "f76d1b7670594a1e72a534e21d779da47e638db70e61ba7ad4d77e3e237a07cf"
+    },
+    {
+      "file": "visitor-28-orange.png",
+      "role": "visitor",
+      "color": "orange",
+      "sha256": "c4832356c57b928cd3629809beffb243828ca6c5e4396f6359377074a233e322"
+    },
+    {
+      "file": "home-31-orange.png",
+      "role": "home",
+      "color": "orange",
+      "sha256": "f9045f78388443f12929f57da9733a0feaeba5d933d62f26c6da0eb0276e4b26"
+    },
+    {
+      "file": "visitor-28-gold.png",
+      "role": "visitor",
+      "color": "gold",
+      "sha256": "6d5ea992890e81eda29184497bafb39749ab836b745c8244b9507244bbb6b171"
+    },
+    {
+      "file": "home-31-gold.png",
+      "role": "home",
+      "color": "gold",
+      "sha256": "ecaec75646f0c74b380eaab905c78daad365875e54ede5aa7b961588611b3fdc"
+    },
+    {
+      "file": "visitor-28-yellow.png",
+      "role": "visitor",
+      "color": "yellow",
+      "sha256": "7060f1ab823c44ace97a2b5bfdea761ccb0a1579c4342b75a14a87d575305054"
+    },
+    {
+      "file": "home-31-yellow.png",
+      "role": "home",
+      "color": "yellow",
+      "sha256": "1373f3b42d1d0b4d516b73c8a5fdb3fa90fb35a7c6112622e02fb7c91d51a5ba"
+    }
+  ],
+  "runtime_behavior": "select-finished-png-no-runtime-recolor"
+}

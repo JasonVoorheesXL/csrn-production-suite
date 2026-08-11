@@ -1,0 +1,74 @@
+{
+  "package": 3,
+  "r18_r3": true,
+  "colors": [
+    "purple",
+    "black",
+    "charcoal",
+    "white",
+    "black-gold"
+  ],
+  "assets": [
+    {
+      "file": "visitor-28-purple.png",
+      "role": "visitor",
+      "color": "purple",
+      "sha256": "d1217207f3349bca2fa51bd01f3e1435a18e55fa4beeb75d6e896dea44b13518"
+    },
+    {
+      "file": "home-31-purple.png",
+      "role": "home",
+      "color": "purple",
+      "sha256": "e3e7b4cc6e31dea4a6aa051eb6900644dae643211a072e237c7043df181281a8"
+    },
+    {
+      "file": "visitor-28-black.png",
+      "role": "visitor",
+      "color": "black",
+      "sha256": "f29e212983851dd47afa1881afcc17678455037af4c2a843bd78a56ffa0402e1"
+    },
+    {
+      "file": "home-31-black.png",
+      "role": "home",
+      "color": "black",
+      "sha256": "1537c5cf8ac86bf7d4ea4d46caac52d9edca35682db803f34781abaf2e089f97"
+    },
+    {
+      "file": "visitor-28-charcoal.png",
+      "role": "visitor",
+      "color": "charcoal",
+      "sha256": "9c4508c539abce78bb70e6569f2f45d426900a6d7e2de8700870f3f8fcb4c32b"
+    },
+    {
+      "file": "home-31-charcoal.png",
+      "role": "home",
+      "color": "charcoal",
+      "sha256": "9ff5cd78971ae18a5fba66cd2f22e489191640c67083cc8f9317b6dea5f02074"
+    },
+    {
+      "file": "visitor-28-white.png",
+      "role": "visitor",
+      "color": "white",
+      "sha256": "d583bab734af222ba8b9970d2dcea1fc8511890c975bb14457f88b304ba91dda"
+    },
+    {
+      "file": "home-31-white.png",
+      "role": "home",
+      "color": "white",
+      "sha256": "46a112ee13d5c954931b6fa638463a356d6f491e0de6bff7864141fbb2388ae6"
+    },
+    {
+      "file": "visitor-28-black-gold.png",
+      "role": "visitor",
+      "color": "black-gold",
+      "sha256": "65486df73cd7f5f99c250096b8b6f90d9cdb131947d0cf14d9e54fb83a74cbac"
+    },
+    {
+      "file": "home-31-black-gold.png",
+      "role": "home",
+      "color": "black-gold",
+      "sha256": "0fe35174435551c0dd5af508bc35d77a67abfaa941d3d874cebbe768f63bf31c"
+    }
+  ],
+  "runtime_behavior": "select-finished-png-no-runtime-recolor"
+}
