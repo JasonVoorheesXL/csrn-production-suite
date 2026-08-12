@@ -599,6 +599,15 @@ function productionDownDistance(runtime) {
   };
 }
 
+function productionBallOn(runtime) {
+  if (runtime.ball_spot_visible === false) return "-";
+  const raw = textValue(runtime.ball_spot, runtime.ball_on, runtime.ballOn).trim();
+  if (!raw) return "-";
+  if (/goal/i.test(raw)) return "GL";
+  const numbers = raw.match(/\d+/g);
+  return numbers?.length ? numbers[numbers.length - 1] : raw.toUpperCase();
+}
+
 const STADIUM_LED_GLYPHS = Object.freeze({
   " ":["00000","00000","00000","00000","00000","00000","00000"],
   "0":["01110","10001","10011","10101","11001","10001","01110"],
@@ -611,6 +620,8 @@ const STADIUM_LED_GLYPHS = Object.freeze({
   "7":["11111","00001","00010","00100","01000","01000","01000"],
   "8":["01110","10001","10001","01110","10001","10001","01110"],
   "9":["01110","10001","10001","01111","00001","00001","01110"],
+  "G":["01110","10001","10000","10111","10001","10001","01110"],
+  "L":["10000","10000","10000","10000","10000","10000","11111"],
   "O":["01110","10001","10001","10001","10001","10001","01110"],
   "T":["11111","00100","00100","00100","00100","00100","00100"],
   "-":["00000","00000","00000","11111","00000","00000","00000"]
@@ -676,6 +687,7 @@ function applyFootballBoardOverrides(root, alias, runtime) {
 
   const period = productionFootballPeriod(runtime);
   const downDistance = productionDownDistance(runtime);
+  const ballOn = productionBallOn(runtime);
   const clock = productionClock(runtime);
 
   if (alias === "eight_bit_gameday") {
@@ -701,6 +713,7 @@ function applyFootballBoardOverrides(root, alias, runtime) {
     setStadiumLedSvg(labeledCell(root, "QUARTER"), period, "bl-fns-small-led");
     setStadiumLedSvg(labeledCell(root, "DOWN"), downDistance.down, "bl-fns-small-led");
     setStadiumLedSvg(labeledCell(root, "TO GO"), downDistance.distance, "bl-fns-small-led");
+    setStadiumLedSvg(labeledCell(root, "BALL ON"), ballOn, "bl-fns-small-led");
     return;
   }
 
@@ -764,7 +777,7 @@ function imageCandidate(value) {
   return text;
 }
 
-function imageLoads(url, timeoutMs = 1200) {
+function imageLoads(url, timeoutMs = 350) {
   const candidate = imageCandidate(url);
   if (!candidate) return Promise.resolve(false);
   if (candidate.startsWith("data:image/") || candidate.startsWith("blob:")) {
@@ -1857,6 +1870,11 @@ async function renderSelected() {
     if (alias === "legacy" || !PACKAGE_ALIASES[alias]) {
       deactivate(alias === "legacy" ? "legacy" : "invalid-selection");
       return "inactive";
+    }
+
+    if (themedIntegratedPlayerSupported(alias)) {
+      cancelLegacyPlayerMotion();
+      document.documentElement.classList.add(PLAYER_PENDING_CLASS);
     }
 
     const runtime = await fetchJson(RUNTIME_STATE_URL);

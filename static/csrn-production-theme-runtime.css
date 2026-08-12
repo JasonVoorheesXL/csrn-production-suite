@@ -27,6 +27,15 @@ html.csrn-production-theme-scorebug-active #scorebug{
   display:none!important;
   visibility:hidden!important;
 }
+html.csrn-production-theme-scorebug-active #playerGraphic{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+}
 html.csrn-production-theme-ticker-active #eventTicker{
   display:none!important;
   visibility:hidden!important;
@@ -297,6 +306,12 @@ html.csrn-production-theme-player-active #playerGraphic{
 #csrnProductionThemeLayout [data-video-mode="player"] .bl-fns-player-portrait b,
 #csrnProductionThemeLayout [data-video-mode="player"] .bl-8bit-player-portrait b{
   font-size:82px!important;
+}
+
+#csrnProductionThemeLayout .package-stadium-approved [data-video-mode="player"],
+#csrnProductionThemeLayout .package-stadium-approved [data-video-mode="player"] *{
+  transition:none!important;
+  animation:none!important;
 }
 
 
