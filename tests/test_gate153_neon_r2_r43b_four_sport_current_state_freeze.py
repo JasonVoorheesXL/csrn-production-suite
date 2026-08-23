@@ -1,0 +1,120 @@
+from pathlib import Path
+import hashlib
+
+ROOT = Path(__file__).resolve().parents[1]
+EXPECTED = {
+    'static/csrn-layout-lab.html': 'F6F1C74509E254659A95B009A195FB466BDD0EE1E1479149DD8B697D45E01BCD',
+    'static/csrn-neon-baseball-r43-driver.css': 'C403FF7B1098D3F9CB31B05200DF20E8EFC17A0378DC6066AA17233B593FF5CE',
+    'static/csrn-neon-baseball-r43-driver.js': 'CB3A14B86D543FF58E44C0B01A6701442A72000F4F261C53C8005BCAB66CB1F0',
+    'static/csrn-neon-r2-engine.css': 'C9F1F9316EA1F16E86099F90DDD417075FF7111DA341867A8BFE2D7378EF043F',
+    'static/csrn-neon-r2-engine.js': '6AFEE5D838FB183F975E10E2F29AA75526C675167D7AABE21B2D99075F3DCA5C',
+    'static/csrn-neon-softball-r42-driver.css': '9B5A83A59DBA7CD6ABC5B3FDFCCC63E08BE12F45A52D2F81010F9F397842B556',
+    'static/csrn-neon-softball-r42-driver.js': '3221E0FF67B6D27D11B479132BB2925CC41AA6BDB19C6833924D5F53346C25A2',
+    'static/neon-r2/baseball-r43-home-jersey-alpha.png': '62F3FB3DE5112D46AEB9FC6DD72093D73CA40FAADA9FD16D3EA43E653C102B80',
+    'static/neon-r2/baseball-r43-home-jersey-color-slot.png': '62F3FB3DE5112D46AEB9FC6DD72093D73CA40FAADA9FD16D3EA43E653C102B80',
+    'static/neon-r2/baseball-r43-home-jersey-texture-luminosity.png': '90BD83552CC6080D6EE5842C91813D6D75813E5885C1BEEE1575003C99C2491F',
+    'static/neon-r2/baseball-r43-scene-with-jersey-holes.png': '762C801594B4921E1468AA03DF2C9F2B91048E874962B3B68B2C8333019443D6',
+    'static/neon-r2/baseball-r43-template-driver-contract.json': '19B69BDD7279330FE940D76A3B89A674BF277A2E92E9E0EFD4EE4CB7B00656A4',
+    'static/neon-r2/baseball-r43-visitor-jersey-alpha.png': '7AA9B2470288CB55B6A0EAB79F436E97B0A14124498FCFBB01C58091C759094D',
+    'static/neon-r2/baseball-r43-visitor-jersey-color-slot.png': '7AA9B2470288CB55B6A0EAB79F436E97B0A14124498FCFBB01C58091C759094D',
+    'static/neon-r2/baseball-r43-visitor-jersey-texture-luminosity.png': '3D46DE3C3C785A5F21F959195960FCD3D3F477905D0B1495C80837F826A754FB',
+    'static/neon-r2/basketball-r41-ball-channel-home-glow-mask.png': '53C4863677C2766D93C9D246FC956800B1513D1B3DD8B03E620BC6562B520602',
+    'static/neon-r2/basketball-r41-cutout-master.png': '0EF3E255CC075E539E59B01966D92258BF945CB5829FAE8F39BDEF87664A5649',
+    'static/neon-r2/basketball-r41-environment-neutral.png': '04F4994D78D608E67D33A079C4A7DB26DBBD5A82519D12993786D7D173CB0013',
+    'static/neon-r2/basketball-r41-highlights.png': 'F9B03B9D3919D937FB6741F6AC05800CEBA25F2EF1938238E15E96F0D9D64038',
+    'static/neon-r2/basketball-r41-home-court-glow-mask.png': '1703293575C218BDD95D0FC2C6F5C8D811791C0FD81AFC808B07F0AAB8E808F2',
+    'static/neon-r2/basketball-r41-home-primary-cutout.png': 'F6B639C9D0CC3852C6F58EE8CE0AAE371EC1C77F19F357705A71EBF4DB85EA5E',
+    'static/neon-r2/basketball-r41-home-rim-net-glow-mask.png': '3AA262BF1596C94A8503DCD9F9BFDEAE625424EB1AE65D5A4515CBFE36128EF6',
+    'static/neon-r2/basketball-r41-home-secondary-cutout.png': 'C2808B9FF1CF7271F972EBA4B32961C030750E3DDC9E3C9800C612D1491A4C6A',
+    'static/neon-r2/basketball-r41-luminance.png': '326BCEC3A1F3292773217421631E7581FCAEDFCD24D51614A8ADB7B22B16DF91',
+    'static/neon-r2/basketball-r41-player-occlusion-underlay.png': '5D841C6229C5683300B445AAF074E3CA1EB3C53B86D1E10759F2A84EB071797B',
+    'static/neon-r2/basketball-r41-shadows.png': '661384833F6EA4FF9549C194443C2A9273957EAFD7868330763AE30494E95145',
+    'static/neon-r2/basketball-r41-visitor-court-glow-mask.png': 'E13424AED31A5B4F3FD05C11F3B43831D51DBFD35834EBDDE9EAAEC4DFD0B6D8',
+    'static/neon-r2/basketball-r41-visitor-primary-cutout.png': '1F12634AA18EF2238392E60FB2493AEFB75C5EE8E5220197B2E23C53DB12A29C',
+    'static/neon-r2/basketball-r41-visitor-rim-net-glow-mask.png': 'E93CB5D49B3A54992B45C913E0244E74ABBBC6E43C0AE59455F1B47123FEC48B',
+    'static/neon-r2/basketball-r41-visitor-secondary-cutout.png': 'C2808B9FF1CF7271F972EBA4B32961C030750E3DDC9E3C9800C612D1491A4C6A',
+    'static/neon-r2/football-cutout-highlights.png': '406527DE1DB9D23610A07367CBBAD4C64E5DA75DFF7609E849D30AE8F612E197',
+    'static/neon-r2/football-cutout-luminance.png': '917C4107F221B3B2D115A6AF5B4AE50E6445EAE6BC07F3C0B40DB081E4C31CB8',
+    'static/neon-r2/football-cutout-master.png': '220B3D2823CB3649AF295B55467B975FE0F8BBB4265E61DD92CAFA9CC5FB4B1B',
+    'static/neon-r2/football-cutout-midtones.png': 'A3465288E1187CDC323754713C77B97B3BDE5C89175E7B6737427BDA0554152C',
+    'static/neon-r2/football-cutout-shadows.png': '5C67C590CA5B17BB292A6F9D97BBEA97AB37C3BC71F67C28B78C02C8D2948A08',
+    'static/neon-r2/football-field-base.png': '72A468291825AE9AD4DAE66AFCD4E2580AEE2CEDAE1711B32DB9A03CEA863EEA',
+    'static/neon-r2/football-home-halo-cutout.png': 'ED8A62163EEB5CA6B182A32340F90521457EF724973C946D130CA9116CB23F06',
+    'static/neon-r2/football-home-primary-cutout.png': '927ED4E2B3F95C98F4656D4140A8D34F3EC99E6C5F0BF99271D2AEF059B52FF6',
+    'static/neon-r2/football-home-primary-mask.png': '0DD34ACA0B1AC1DFC0638D93CAAF839D2E03CD3F6F993ABFBB5691B3DBCD0CBC',
+    'static/neon-r2/football-home-secondary-cutout.png': '417CCE0FDA5C4C76D04C35A64991385CC7B55838423BA7386BA953B99E7246C7',
+    'static/neon-r2/football-home-secondary-mask.png': '2D96CF3C4BDFD658CBE14EB06A594D44D4408F212C8AC2DDE330C364A5C79334',
+    'static/neon-r2/football-layered-neutral.png': '56E9A6FFC8607D980ACFE230CF7EA7EA21B77C4AB75FD12ACD70CECE85159772',
+    'static/neon-r2/football-neutral-home-smoke-mask.png': '0563452733B749145D5437C5D6303FC4AE912E7C38B002ED34916329CE3220A0',
+    'static/neon-r2/football-neutral-smoke-highlights.png': '533E9BE5FDAC551CAEA822AC7B9ED27047DD297A07B17F396A3D3CD870EC9148',
+    'static/neon-r2/football-neutral-smoke-luminance.png': '489F79C64C0B774DDBA07708126183213CE9E6B2F49211D05545E5A0CC1BE42B',
+    'static/neon-r2/football-neutral-smoke-master.png': '9428B4046D5BDCDFB2F8DD14DB82C957515BB3237CF924878788B9B1E30BBF5D',
+    'static/neon-r2/football-neutral-smoke-shadows.png': '684C9FDA34F7AF201F50FB22877C7C3F4CC1161E67CFB801D2AD6D14A2385891',
+    'static/neon-r2/football-neutral-smoke-texture.png': '43650EA50C1F99872C03FE1AF8FF0D89F8F7F5AF52BAFD9C23EBD4699C7AAF15',
+    'static/neon-r2/football-neutral-visitor-smoke-mask.png': '0F9FCB912488411FD7D5C4068D16D1DFEFD141D08B961169A5BF4AD49F9A809E',
+    'static/neon-r2/football-new-cutout-master.png': 'D10323EFAC60D051441F61887B5661715F58B50EB12072CC7A0D59E9EFD65206',
+    'static/neon-r2/football-new-home-primary-cutout.png': 'C9E5AA195D94164342B7F4692EC868234E40835105A30EE99E26963442CF294E',
+    'static/neon-r2/football-new-home-secondary-cutout.png': 'CE8B082A16768C2D3C6FE273310B60C9CC2494E4B0569FDDFDD92100312E310C',
+    'static/neon-r2/football-new-home-smoke-cutout.png': 'CD04DFBA483ADD252CA29C1E2A430256ED33A1162D6BBA111F38D2015FB0AD91',
+    'static/neon-r2/football-new-luminance-cap.png': 'B9B7B5A1623AC82ADAB0BB5028CDE0629AFE8174BB982FBC0FCA7DA2E94708AE',
+    'static/neon-r2/football-new-visitor-primary-cutout.png': 'A195E17A4DA5BB4F3C5F79421B8AC7E2F0B24000D4B2C6849E02E235D38A0FCC',
+    'static/neon-r2/football-new-visitor-secondary-cutout.png': 'A46B63D627C30FA8BAB59F04BBCFA94545DDAD9B942A92F3A729391CDAD86C9E',
+    'static/neon-r2/football-new-visitor-smoke-cutout.png': '63BA8714B656E77DE5C5F8B31B4A2B2F84B9F1E6EA1B97621994FDF35F582F72',
+    'static/neon-r2/football-r40-ballcarrier-primary-cutout.png': '7B327C23C36093F54FAC212B4F9506082B838A4A7D3EE8BBC1493FA28DB3EFC7',
+    'static/neon-r2/football-r40-ballcarrier-secondary-cutout.png': '936CAD24DEF53ED8F49FC6DCB32CA606837C93E2BAB85E6E8812E74D11BDE449',
+    'static/neon-r2/football-r40-cutout-master.png': '006CA0B134BA472F8FB1D98A41D9E6D1338AB18F8A031EE8990822B7AFEF16AC',
+    'static/neon-r2/football-r40-defender-primary-cutout.png': '3A86A201755BED50DDE6E96D2142F97FE8FDD5CB9E6939CA8D686FFE7E1986E6',
+    'static/neon-r2/football-r40-defender-secondary-cutout.png': '936CAD24DEF53ED8F49FC6DCB32CA606837C93E2BAB85E6E8812E74D11BDE449',
+    'static/neon-r2/football-r40-field-home-primary-mask.png': '36221A88F2EBC87076D48F52B2666E997C7CE2F6F862C2B6FA729F922ECE8201',
+    'static/neon-r2/football-r40-field-home-secondary-mask.png': 'E8991B11B1A92E4BF0F3B2396225C587A8E6628A0B4355A2EDD3A5AF7E9B5A67',
+    'static/neon-r2/football-r40-field-neutral.png': '13460B323E62492FF6D6D4B2B65B9C1844903CB356CBD04F75CEC8EABE8ECF06',
+    'static/neon-r2/football-r40-field-visitor-primary-mask.png': '3186C63268A1B6C3D83EAEED14F131A9E28E02A5AFE56B399680053A891C9B33',
+    'static/neon-r2/football-r40-field-visitor-secondary-mask.png': 'D3A5027C9D790A41078ABB84CF93E164529888A88D3732A4D296F5C83585968A',
+    'static/neon-r2/football-r40-ground-shadows.png': '96DC0F8DDBB131B353E52C7D56C7A2FF0417F75B0835C992C8F9054437077442',
+    'static/neon-r2/football-r40-highlights.png': '8A248AB327768920822514713FC018771807395723C42F31CBC5768018606A20',
+    'static/neon-r2/football-r40-luminance.png': '539516A5D490ECB2126110A52F12811CEC1F30E364B1AF127C7E98AFAD5FC816',
+    'static/neon-r2/football-r40-shadows.png': 'E1AD7EDDBFD5640973677ECA8BE4E6E468239A81F0570599F427C48782561FD0',
+    'static/neon-r2/football-uniform-shadows.png': '9354978CBA1935AB29B001FDBC5594742998FF0A662C7C87C3475959032799F7',
+    'static/neon-r2/football-visitor-halo-cutout.png': '718E8C0A0FEADF83C0C4EBF4F7041A489C51CE654D27BC4DFF6FD6ACE5878AE1',
+    'static/neon-r2/football-visitor-primary-cutout.png': 'D313944BD7B21AF133E7F570E6ECB9011A3C1D73B49A6035978CD5AD6E0EE60C',
+    'static/neon-r2/football-visitor-primary-mask.png': 'C82C8E797C9BA96BEFE397D08E6E1E45FE3B62B204E8C3F7B35F21F2AC2CBF6B',
+    'static/neon-r2/football-visitor-secondary-cutout.png': 'BA28B73AD5F720B386E8F46604149B8A0A55FDE70D0F73BE7AD292B067BB3EA5',
+    'static/neon-r2/football-visitor-secondary-mask.png': 'D9FA0D58882F8D31B40C996316E3824680674EB5BC7CA82004186CCA5427A253',
+    'static/neon-r2/neon-frame-left-bloom-mask.png': '44CE8D715254A3D73A2D167CEDA74DC9EF7BB4DAB95C6944097C4BE834C9522A',
+    'static/neon-r2/neon-frame-left-core-mask.png': '459716FB148610083B107133D38724182C0D43D35DF70A556514AF4AC37C671A',
+    'static/neon-r2/neon-frame-neutral-chassis.png': '658D2261F8E0963573DA210DDF362C235E0C687A4932720CA99CBE4ED294901C',
+    'static/neon-r2/neon-frame-neutral-highlights.png': '51AAD4F85FE92BBF43142FB973635014E589B4C7D6661718DFF3BEB5169447A1',
+    'static/neon-r2/neon-frame-right-bloom-mask.png': '22B93C511DF06C559EEECCCCD7F8AEC694522F71A8A7524EA8F14A85BD1C016B',
+    'static/neon-r2/neon-frame-right-core-mask.png': '71228E4629933747FDA62E7EAE194CB1AA01FD58288021FCF06CE8F71F948AEC',
+    'static/neon-r2/softball-r42-home-jersey-alpha.png': '6931571EFF3DC21334779F385651BBC63B2169DDB2253EDAA90C44937C3A5ACD',
+    'static/neon-r2/softball-r42-home-jersey-color-slot.png': '6931571EFF3DC21334779F385651BBC63B2169DDB2253EDAA90C44937C3A5ACD',
+    'static/neon-r2/softball-r42-home-jersey-texture-luminosity.png': '1233120EF67C6DA8AF451D5F9E514F8649036FFEB34CCBD101EA9669B372251C',
+    'static/neon-r2/softball-r42-scene-with-jersey-holes.png': '3D93B6EE6A865CD9FFD68CA21410CB827A02D183A3EBEC6BF0DA3D6CF6D86C8C',
+    'static/neon-r2/softball-r42-template-driver-contract.json': '8FFDB0EB66283CBD32F94B84BF64290296584B17F9E0FE02C6157D88891B3FBF',
+    'static/neon-r2/softball-r42-visitor-jersey-alpha.png': '54D12DE2AE59347C21B4209DCC0650C362CAD32D2AB590FAE5E1DE423DFB57A6',
+    'static/neon-r2/softball-r42-visitor-jersey-color-slot.png': '54D12DE2AE59347C21B4209DCC0650C362CAD32D2AB590FAE5E1DE423DFB57A6',
+    'static/neon-r2/softball-r42-visitor-jersey-texture-luminosity.png': '331ADCBCCC2D690C2C2F6F49F5C6DFFD79A6CD1C592C7EC76D84C6F26013C213',
+    'tests/test_gate151_neon_r2_approved_build.py': '53F2A206651BB3C202988F6E6AF591B35E6FBDEB318A69DEA7797D6C9867BFB3',
+    'tests/test_gate151_neon_r2_r34_adaptive_clash_color_pipeline.py': '35909A0A498122A0D427174BED78AE991CF258318C2254CD010AB088E497E68D',
+    'tests/test_gate151_neon_r2_r40_blacklight_field_deployment.py': 'B6A9E8FD422BCD345D70F01FFA41DA1448060756D5F67DE7CBD9C51530385EA2',
+    'tests/test_gate152_neon_r2_r41f_basketball_asset_variables.py': '1C66D87F3DEB0B1DCA7199A31581A4E79D068AC87419CC6C5D0BE71793374DF7',
+    'tests/test_gate153_neon_r2_r42a_softball_template_driver.py': '81FAEBD30CBDF122685105EF1281014650F7BFF3B7E1A0E73FB9E28CFF93BE3A',
+    'tests/test_gate153_neon_r2_r43a_baseball_template_driver.py': '69C6CFFFA799BBD996907508161C4A6CC24B351C41553AF7E7B4E43EBF45D172',
+}
+
+def digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest().upper()
+
+def test_r43b_neon_four_sport_current_state_hash_freeze() -> None:
+    for relative, expected in EXPECTED.items():
+        path = ROOT / relative
+        assert path.is_file(), relative
+        assert digest(path) == expected, relative
+
+def test_r43b_freeze_scope_is_complete() -> None:
+    assert len(EXPECTED) >= 80
+    assert 'static/csrn-neon-r2-engine.js' in EXPECTED
+    assert 'static/csrn-neon-softball-r42-driver.js' in EXPECTED
+    assert 'static/csrn-neon-baseball-r43-driver.js' in EXPECTED
+
+

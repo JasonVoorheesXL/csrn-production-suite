@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CSRN Captions</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --caption-bg: rgba(10, 10, 12, 0.88);
+      --caption-border: rgba(255, 255, 255, 0.28);
+      --caption-text: #ffffff;
+      --caption-speaker: #ff3658;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    body {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 0 5vw 6vh;
+    }
+    #captions {
+      width: min(1400px, 92vw);
+      display: grid;
+      gap: 10px;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 140ms ease, transform 140ms ease;
+    }
+    #captions.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .caption-line {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      padding: 13px 20px 15px;
+      border: 2px solid var(--caption-border);
+      border-radius: 12px;
+      background: var(--caption-bg);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
+      color: var(--caption-text);
+      font-size: clamp(26px, 2.4vw, 46px);
+      line-height: 1.18;
+      text-shadow: 0 2px 3px rgba(0, 0, 0, 0.9);
+    }
+    .speaker {
+      flex: 0 0 auto;
+      color: var(--caption-speaker);
+      font-size: 0.62em;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .text {
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+    .theme-minimal .caption-line {
+      border: 0;
+      border-radius: 4px;
+      box-shadow: none;
+      background: rgba(0, 0, 0, 0.76);
+    }
+    .theme-heritage .caption-line {
+      border-color: rgba(238, 221, 178, 0.68);
+      background: rgba(47, 37, 26, 0.91);
+      color: #fff5d8;
+      font-family: Georgia, 'Times New Roman', serif;
+    }
+    .theme-heritage .speaker { color: #f0c86a; }
+  </style>
+  <link rel="stylesheet" href="/themes/current.css">
+</head>
+<body>
+  <main id="captions" aria-live="polite" aria-atomic="true"></main>
+  <script>
+    const root = document.getElementById('captions');
+    const CAPTION_STICKY_MS = 2800;
+    let lastRendered = '';
+    let lastCaptionSnapshot = null;
+
+    function activeSegments(payload) {
+      if (!payload || payload.visible !== true) {
+        lastCaptionSnapshot = null;
+        return [];
+      }
+      const segments = Array.isArray(payload.segments) ? payload.segments : [];
+      const updatedAt = Number(payload.updated_at || 0);
+      if (segments.length) {
+        lastCaptionSnapshot = {
+          segments,
+          updatedAt,
+          capturedAt: Date.now()
+        };
+        return segments;
+      }
+      if (
+        lastCaptionSnapshot &&
+        lastCaptionSnapshot.updatedAt === updatedAt &&
+        Date.now() - lastCaptionSnapshot.capturedAt <= CAPTION_STICKY_MS
+      ) {
+        return lastCaptionSnapshot.segments;
+      }
+      lastCaptionSnapshot = null;
+      return [];
+    }
+
+    function render(payload) {
+      const segments = activeSegments(payload);
+      const signature = JSON.stringify({
+        visible: Boolean(payload.visible),
+        theme: payload.theme || 'standard',
+        segments: segments.map(segment => [segment.id, segment.speaker, segment.text])
+      });
+      if (signature === lastRendered) return;
+      lastRendered = signature;
+      root.className = payload.visible && segments.length ? `visible theme-${payload.theme || 'standard'}` : '';
+      root.replaceChildren();
+      for (const segment of segments) {
+        const line = document.createElement('div');
+        line.className = 'caption-line';
+        const speaker = document.createElement('span');
+        speaker.className = 'speaker';
+        speaker.textContent = segment.speaker || `Channel ${segment.channel || ''}`;
+        const text = document.createElement('span');
+        text.className = 'text';
+        text.textContent = segment.text || '';
+        line.append(speaker, text);
+        root.append(line);
+      }
+    }
+
+    async function refresh() {
+      try {
+        const response = await fetch('/api/captions/overlay-state', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        render(await response.json());
+      } catch (error) {
+        render({ visible: false, segments: [] });
+      }
+    }
+
+    refresh();
+    setInterval(refresh, 250);
+  </script>
+</body>
+</html>

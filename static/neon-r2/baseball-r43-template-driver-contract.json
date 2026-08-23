@@ -1,0 +1,91 @@
+{
+  "schema": "csrn.template-driver.asset-stack/v2",
+  "asset_id": "neon-baseball-jersey-cutout-v2-mask-correction",
+  "display_name": "Neon Baseball Jersey Cutout \u2014 Corrected",
+  "canvas": {
+    "width": 1163,
+    "height": 665,
+    "origin": "top-left"
+  },
+  "color_space": "sRGB",
+  "alpha": "straight",
+  "runtime_color_slots": {
+    "home_primary": {
+      "subject": "male batter visible jersey fabric",
+      "mask": "runtime/baseball-neon-home-batter-jersey-alpha.png",
+      "color_slot": "runtime/baseball-neon-home-batter-jersey-color-slot.png",
+      "texture": "runtime/baseball-neon-home-batter-jersey-texture-luminosity.png"
+    },
+    "visitor_primary": {
+      "subject": "male catcher visible jersey sleeves",
+      "mask": "runtime/baseball-neon-visitor-catcher-jersey-alpha.png",
+      "color_slot": "runtime/baseball-neon-visitor-catcher-jersey-color-slot.png",
+      "texture": "runtime/baseball-neon-visitor-catcher-jersey-texture-luminosity.png"
+    }
+  },
+  "stack_bottom_to_top": [
+    {
+      "order": 1,
+      "id": "home_primary_color",
+      "asset": "runtime/baseball-neon-home-batter-jersey-color-slot.png",
+      "operation": "tint_to_runtime_color",
+      "color_slot": "home_primary",
+      "blend_mode": "normal"
+    },
+    {
+      "order": 2,
+      "id": "visitor_primary_color",
+      "asset": "runtime/baseball-neon-visitor-catcher-jersey-color-slot.png",
+      "operation": "tint_to_runtime_color",
+      "color_slot": "visitor_primary",
+      "blend_mode": "normal"
+    },
+    {
+      "order": 3,
+      "id": "scene_with_jersey_holes",
+      "asset": "runtime/baseball-neon-scene-with-jersey-holes.png",
+      "operation": "draw",
+      "blend_mode": "normal"
+    },
+    {
+      "order": 4,
+      "id": "home_primary_texture",
+      "asset": "runtime/baseball-neon-home-batter-jersey-texture-luminosity.png",
+      "operation": "draw",
+      "blend_mode": "luminosity",
+      "clip_mask": "runtime/baseball-neon-home-batter-jersey-alpha.png"
+    },
+    {
+      "order": 5,
+      "id": "visitor_primary_texture",
+      "asset": "runtime/baseball-neon-visitor-catcher-jersey-texture-luminosity.png",
+      "operation": "draw",
+      "blend_mode": "luminosity",
+      "clip_mask": "runtime/baseball-neon-visitor-catcher-jersey-alpha.png"
+    }
+  ],
+  "protected_elements": [
+    "face",
+    "skin",
+    "exposed arms",
+    "compression sleeves",
+    "batting gloves",
+    "belt",
+    "pants",
+    "bat",
+    "mitt",
+    "catcher equipment",
+    "umpire",
+    "baseball",
+    "field",
+    "backstop",
+    "lighting",
+    "signage"
+  ],
+  "corrections_from_v1": [
+    "Removed batter color coverage from face, exposed arms, compression sleeves, gloves, and belt.",
+    "Expanded the batter mask across the previously unchanged jersey body, shoulder, collar, and side-panel fabric.",
+    "Extended the visitor catcher mask through the lower visible portion of the image-right sleeve.",
+    "Removed the V1 home-secondary split; all batter jersey fabric is driven by home_primary."
+  ]
+}

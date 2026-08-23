@@ -1,0 +1,232 @@
+.package-8bit-approved{
+  --pixel-home:#2787ff;--pixel-visitor:#16ff83;--pixel-home-secondary:#d7e8ff;--pixel-visitor-secondary:#f2f5f7;
+  --pixel-home-display:#54a6ff;--pixel-visitor-display:#42ff9d;--pixel-amber:#ffc928;--pixel-metal:#77818a;
+  color:#f5f7f8;font-family:"Courier New",Consolas,monospace;image-rendering:pixelated
+}
+.package-8bit-approved .bl-component{position:absolute;box-sizing:border-box}
+.package-8bit-approved .bl-component>*{width:100%;height:100%;box-sizing:border-box}
+.package-8bit-approved *{box-sizing:border-box}
+.package-8bit-approved .bl-8bit-top-ticker{display:grid;grid-template-columns:120px minmax(0,1fr) 100px;align-items:center;gap:14px;padding:8px 14px;border:5px solid #090b0e;background:#020305;box-shadow:0 0 0 3px #66717a,inset 0 0 0 3px #171d22;color:#fff}
+.package-8bit-approved .bl-8bit-top-ticker:after{content:"";position:absolute;left:16px;right:16px;bottom:4px;height:3px;background:linear-gradient(90deg,var(--pixel-visitor-display),#f2e21b,var(--pixel-home-display))}
+.package-8bit-approved .bl-8bit-live,.package-8bit-approved .bl-8bit-ticker-bug{display:grid;place-items:center;height:34px;border:3px solid #c8d0d6;background:#07090d;font:900 17px/1 "Courier New",monospace;letter-spacing:1px}
+.package-8bit-approved .bl-8bit-live{color:#ff4668}.package-8bit-approved .bl-8bit-ticker-bug{color:#e6ebef}
+.package-8bit-approved .bl-8bit-ticker-led{width:100%;height:33px;color:#68adff;filter:drop-shadow(0 0 2px #2168d8)}
+.package-8bit-approved .bl-8bit-board{position:relative;display:grid;grid-template-rows:96px minmax(0,1fr) 156px;gap:10px;overflow:hidden;padding:18px;border:12px solid #11161b;background:linear-gradient(135deg,#78818a 0 2%,#242b31 2% 4%,#050709 4% 96%,#66717b 96% 98%,#14191e 98%);box-shadow:0 0 0 4px #818a91,inset 0 0 0 5px #080a0d,0 14px 30px #000c}
+.package-8bit-approved .bl-8bit-board:before{content:"";position:absolute;inset:8px;pointer-events:none;background:repeating-linear-gradient(90deg,#0000 0 7px,#ffffff0b 8px 9px),repeating-linear-gradient(0deg,#0000 0 7px,#0000004a 8px 9px);opacity:.5}
+.package-8bit-approved .bl-8bit-cabinet{position:absolute;inset:6px;pointer-events:none;border:4px solid #9ba3aa;box-shadow:inset 0 0 0 4px #1a2025,inset 0 0 30px #000,0 0 0 3px #020304}
+.package-8bit-approved .bl-8bit-venue{position:relative;z-index:3;display:grid;grid-template-columns:1fr 650px 1fr;align-items:center;gap:26px;padding:8px 20px;border:5px solid #07090b;background:linear-gradient(#59616a,#181d22 35%,#0b0e11 65%,#333a41);box-shadow:inset 0 0 0 3px #7b848c}
+.package-8bit-approved .bl-8bit-venue strong{grid-column:2;align-self:stretch;display:grid;grid-template-rows:1fr auto;place-items:center;padding:6px 12px 7px;border:4px solid #11161b;background:#030405;text-align:center;text-transform:uppercase;white-space:nowrap;overflow:hidden}
+.package-8bit-approved .bl-8bit-venue strong b{color:#317fff;font:900 36px/.9 "Courier New",monospace;letter-spacing:6px;text-shadow:8px 0 #2fd970}
+.package-8bit-approved .bl-8bit-venue strong span{color:var(--pixel-amber);font:900 22px/1 "Courier New",monospace;letter-spacing:3px}
+.package-8bit-approved .bl-8bit-venue i{height:38px;border:4px solid #0b0e11;background:repeating-linear-gradient(90deg,#e8f2ff 0 9px,#87b5ff 10px 14px,#10141a 15px 26px);box-shadow:inset 0 0 8px #fff8,0 0 0 3px #59636c}
+.package-8bit-approved .bl-8bit-main-display{position:relative;z-index:2;display:grid;grid-template-columns:330px minmax(0,1fr) 330px;gap:12px;min-height:0;padding:10px;border:6px solid #06080a;background:#030405;box-shadow:inset 0 0 0 4px #59636b}
+.package-8bit-approved .bl-8bit-team-tower{--team:var(--pixel-home);--display:var(--pixel-home-display);position:relative;display:grid;grid-template-rows:50px minmax(0,1fr) 74px 170px;gap:8px;min-height:0;padding:10px;border:5px solid #171d22;background:linear-gradient(160deg,color-mix(in srgb,var(--team) 24%,#080b0e),#030405 48%);box-shadow:inset 0 0 0 3px color-mix(in srgb,var(--team) 48%,#252a2e)}
+.package-8bit-approved .bl-8bit-visitor{--team:var(--pixel-visitor);--display:var(--pixel-visitor-display)}
+.package-8bit-approved .bl-8bit-home{--team:var(--pixel-home);--display:var(--pixel-home-display)}
+.package-8bit-approved .bl-8bit-side-label{display:grid;place-items:center;border-bottom:4px solid #30383f;color:#fff;font:900 30px/1 "Courier New",monospace;text-shadow:3px 3px #000}
+.package-8bit-approved .bl-8bit-score{position:relative;display:grid;place-items:center;min-height:0;border:4px solid #222a30;background:#010203;box-shadow:inset 0 0 26px color-mix(in srgb,var(--display) 28%,transparent)}
+.package-8bit-approved .bl-8bit-score-led{width:80%;height:76%;color:var(--display);filter:drop-shadow(0 0 4px color-mix(in srgb,var(--display) 80%,transparent))}
+.package-8bit-approved .bl-8bit-identity-plate{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;border:4px solid #151a1e;background:#020305;text-transform:uppercase}
+.package-8bit-approved .bl-8bit-identity-plate strong{max-width:100%;color:var(--display);font:900 21px/.95 "Courier New",monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.package-8bit-approved .bl-8bit-identity-plate span{margin-top:5px;color:#fff;font:900 17px/.95 "Courier New",monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.package-8bit-approved .bl-8bit-sport-icon{align-self:center;justify-self:center;width:88%;height:88%;padding:8px;border:4px solid #252c31;background:#010203;color:var(--display);filter:drop-shadow(0 0 3px color-mix(in srgb,var(--display) 65%,transparent))}
+.package-8bit-approved .bl-8bit-sport-icon path,.package-8bit-approved .bl-8bit-sport-icon circle{fill:none;stroke:currentColor;stroke-width:5}
+.package-8bit-approved .bl-8bit-sport-icon .primary{fill:color-mix(in srgb,var(--team) 76%,#111);stroke:var(--display)}
+.package-8bit-approved .bl-8bit-sport-icon .secondary{fill:color-mix(in srgb,var(--team) 38%,#0b1015);stroke:var(--display)}
+.package-8bit-approved .bl-8bit-sport-icon .stitch{stroke:#fff;stroke-width:3}
+.package-8bit-approved .bl-8bit-football-possession{position:absolute;left:50%;bottom:7px;transform:translateX(-50%);width:64px;height:38px;color:var(--display)}
+.package-8bit-approved .bl-8bit-football-possession svg{width:100%;height:100%}.package-8bit-approved .bl-8bit-football-possession path{fill:#07111b;stroke:currentColor;stroke-width:4}
+.package-8bit-approved .bl-8bit-diamond-role{position:absolute;left:6px;right:6px;bottom:6px;display:flex;align-items:center;justify-content:center;gap:7px;color:#fff;font:700 12px/1 "Courier New",monospace;white-space:nowrap}
+.package-8bit-approved .bl-8bit-diamond-role small{color:var(--display);font-weight:900}.package-8bit-approved .bl-8bit-diamond-role b{overflow:hidden;text-overflow:ellipsis}
+.package-8bit-approved .bl-8bit-video-board{position:relative;overflow:hidden;border:8px solid #151a1e;background:#000;box-shadow:0 0 0 3px #7c858c,inset 0 0 0 3px #050607}
+.package-8bit-approved .bl-8bit-video-board:after{content:"";position:absolute;z-index:8;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,#ffffff06 0 1px,#0000 1px 4px)}
+.package-8bit-approved .bl-8bit-clash{position:absolute;inset:0;overflow:hidden;background:#07100a}
+.package-8bit-approved .bl-8bit-field-art{position:absolute;z-index:0;inset:0}
+.package-8bit-approved .bl-8bit-field-art{background-position:center;background-repeat:no-repeat;background-size:cover;image-rendering:pixelated}
+.package-8bit-approved .bl-8bit-clash-football .bl-8bit-field-art{background-image:url("8bit-gameday/environments/football-stadium.png")}
+.package-8bit-approved .bl-8bit-clash-basketball .bl-8bit-field-art{background-image:url("8bit-gameday/environments/basketball-gym.png")}
+.package-8bit-approved .bl-8bit-clash-baseball .bl-8bit-field-art{background-image:url("8bit-gameday/environments/baseball-ballpark.png")}
+.package-8bit-approved .bl-8bit-clash-softball .bl-8bit-field-art{background-image:url("8bit-gameday/environments/softball-park.png")}
+.package-8bit-approved .bl-8bit-clash-art{position:absolute;z-index:2;inset:3% 1.5% 8%;width:97%;height:89%;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(8px 10px 0 #0008)}
+.package-8bit-approved .bl-8bit-clash-art .ink{fill:#10151a;stroke:#dde5e9;stroke-width:5}.package-8bit-approved .bl-8bit-clash-art .skin{fill:#a85d39;stroke:#111820;stroke-width:4}.package-8bit-approved .bl-8bit-clash-art .shoe{fill:#101215;stroke:#d9e1e5;stroke-width:4}.package-8bit-approved .bl-8bit-clash-art .ball{fill:#7d421e;stroke:#f1d5b2;stroke-width:4}.package-8bit-approved .bl-8bit-clash-art .basketball{fill:#d87522;stroke:#17120d;stroke-width:5}.package-8bit-approved .bl-8bit-clash-art .ball-white{fill:#fff;stroke:#b52b2b;stroke-width:3}.package-8bit-approved .bl-8bit-clash-art .bat{fill:#d9aa62;stroke:#21170d;stroke-width:4}.package-8bit-approved .bl-8bit-clash-art .hair{fill:#3a2418;stroke:#12100e;stroke-width:4}
+.package-8bit-approved .bl-8bit-clash-art .visitor .primary{fill:var(--pixel-visitor);stroke:var(--pixel-visitor-display);stroke-width:4}.package-8bit-approved .bl-8bit-clash-art .visitor .secondary{fill:var(--pixel-visitor-secondary);stroke:#0b1117;stroke-width:4}.package-8bit-approved .bl-8bit-clash-art .home .primary{fill:var(--pixel-home);stroke:var(--pixel-home-display);stroke-width:4}.package-8bit-approved .bl-8bit-clash-art .home .secondary{fill:var(--pixel-home-secondary);stroke:#0b1117;stroke-width:4}
+.package-8bit-approved .bl-8bit-clash-art .jersey-number{fill:#fff;font:900 55px/1 "Courier New",monospace;text-anchor:middle;paint-order:stroke;stroke:#0a0c10;stroke-width:7px}
+.package-8bit-approved .bl-8bit-versus{position:absolute;z-index:4;left:50%;top:47%;width:160px;height:190px;transform:translate(-50%,-50%)}
+.package-8bit-approved .bl-8bit-vs-art{width:100%;height:100%;overflow:visible;filter:drop-shadow(7px 8px 0 #000) drop-shadow(0 0 5px #fff9)}
+.package-8bit-approved .bl-8bit-vs-art path{fill:#f0f2f3;stroke:#636d75;stroke-width:8}.package-8bit-approved .bl-8bit-vs-art text{fill:#fff;stroke:#111820;stroke-width:7;paint-order:stroke;font:900 84px/1 Impact,"Courier New",monospace;text-anchor:middle}
+.package-8bit-approved .bl-8bit-clash-side{position:absolute;z-index:5;bottom:8px;width:42%;display:flex;flex-direction:column;align-items:center;text-align:center;text-transform:uppercase;text-shadow:4px 4px #000}
+.package-8bit-approved .bl-8bit-clash-visitor{left:2%;color:var(--pixel-visitor-display)}.package-8bit-approved .bl-8bit-clash-home{right:2%;color:var(--pixel-home-display)}
+.package-8bit-approved .bl-8bit-clash-side strong{max-width:100%;font:900 28px/.9 "Courier New",monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.package-8bit-approved .bl-8bit-clash-side span{margin-top:3px;color:#fff;font:900 18px/.9 "Courier New",monospace}
+.package-8bit-approved .bl-8bit-video-replacement{position:absolute;z-index:2;inset:0;display:grid;grid-template-columns:58% 1fr;grid-template-rows:1fr auto auto 1fr;gap:10px 24px;align-items:end;padding:26px;background:linear-gradient(110deg,#020305 0 58%,color-mix(in srgb,var(--pixel-home) 28%,#030405) 58%)}
+.package-8bit-approved .bl-8bit-video-feed{grid-row:1/-1;align-self:stretch;display:grid;place-items:center;border:6px solid #39434b;background:#000;color:#fff;font:900 46px/1 "Courier New",monospace}
+.package-8bit-approved .bl-8bit-video-replacement small{color:var(--pixel-amber);font:900 16px/1 "Courier New",monospace}.package-8bit-approved .bl-8bit-video-replacement strong{font:900 31px/.95 "Courier New",monospace;text-transform:uppercase}.package-8bit-approved .bl-8bit-video-replacement span{align-self:start;color:#d0d8df;font:700 17px/1.25 "Courier New",monospace}
+.package-8bit-approved .bl-8bit-sponsor-replacement{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:#020305}.package-8bit-approved .bl-8bit-sponsor-replacement img{max-width:60%;max-height:38%;object-fit:contain}.package-8bit-approved .bl-8bit-player-replacement{grid-template-columns:42% 1fr}.package-8bit-approved .bl-8bit-player-portrait{grid-row:1/-1;align-self:stretch;display:grid;place-items:center;border:5px solid #465159;background:#010203}.package-8bit-approved .bl-8bit-player-portrait img{width:100%;height:100%;object-fit:contain}.package-8bit-approved .bl-8bit-player-portrait b{font:900 66px/1 "Courier New",monospace;color:var(--pixel-home-display)}
+.package-8bit-approved .bl-8bit-caption{position:absolute;z-index:7;left:24px;right:24px;bottom:18px;display:grid;grid-template-columns:190px 1fr;align-items:center;min-height:52px;padding:9px 18px;border:3px solid #aab4bc;background:#020407d9;box-shadow:6px 6px 0 #000b;color:#fff}.package-8bit-approved .bl-8bit-caption strong{color:var(--pixel-amber);font:900 16px/1 "Courier New",monospace}.package-8bit-approved .bl-8bit-caption span{font:900 17px/1.1 "Courier New",monospace}
+.package-8bit-approved .bl-8bit-football-control-bank,.package-8bit-approved .bl-8bit-basketball-control-bank,.package-8bit-approved .bl-8bit-diamond-control-bank{position:relative;z-index:3;display:grid;grid-template-rows:78px 1fr;border:5px solid #161c21;background:#020305;box-shadow:inset 0 0 0 3px #69727a}
+.package-8bit-approved .bl-8bit-primary-clock,.package-8bit-approved .bl-8bit-basketball-clock{justify-self:center;display:grid;grid-template-columns:1fr auto;place-items:center;width:470px;border:4px solid #151a1f;background:#000;color:#fff}.package-8bit-approved .bl-8bit-clock-led{width:330px;height:62px;color:#fff7d4;filter:drop-shadow(0 0 4px #f6d364)}.package-8bit-approved .bl-8bit-basketball-clock strong{padding-right:18px;color:#5c9cff;font:900 23px/1 "Courier New",monospace}
+.package-8bit-approved .bl-8bit-football-bottom,.package-8bit-approved .bl-8bit-basketball-bottom,.package-8bit-approved .bl-8bit-diamond-bottom{display:grid;align-items:stretch;border-top:4px solid #161d22}
+.package-8bit-approved .bl-8bit-football-bottom{grid-template-columns:repeat(4,1fr)}.package-8bit-approved .bl-8bit-basketball-bottom{grid-template-columns:repeat(6,1fr)}.package-8bit-approved .bl-8bit-diamond-bottom{grid-template-columns:repeat(3,1fr)}
+.package-8bit-approved .bl-8bit-football-bottom>span,.package-8bit-approved .bl-8bit-basketball-bottom>span,.package-8bit-approved .bl-8bit-diamond-bottom>span{display:grid;grid-template-columns:1fr 92px;align-items:center;padding:6px 18px;border-right:4px solid #1c2329}.package-8bit-approved small{color:#fff;font:900 18px/1 "Courier New",monospace}.package-8bit-approved .bl-8bit-small-led{width:78px;height:47px;color:#ffc928;filter:drop-shadow(0 0 3px #d69500)}
+.package-8bit-approved .bl-8bit-basketball-bottom>span{grid-template-columns:1fr auto;padding:6px 12px}.package-8bit-approved .bl-8bit-basketball-bottom b{color:#67a8ff;font:900 18px/1 "Courier New",monospace}.package-8bit-approved .bl-8bit-timeouts{display:flex;gap:7px}.package-8bit-approved .bl-8bit-timeouts i{width:15px;height:15px;border:3px solid #66717a;background:#111}.package-8bit-approved .bl-8bit-timeout-visitor i.on{background:var(--pixel-visitor-display)}.package-8bit-approved .bl-8bit-timeout-home i.on{background:var(--pixel-home-display)}
+.package-8bit-approved .bl-8bit-diamond-control-bank{grid-template-rows:80px 1fr}.package-8bit-approved .bl-8bit-diamond-center{display:grid;grid-template-columns:1fr 340px 180px 1fr;align-items:stretch}.package-8bit-approved .bl-8bit-diamond-center>strong{display:grid;place-items:center;border-left:4px solid #222a30;border-right:4px solid #222a30;background:#000}.package-8bit-approved .bl-8bit-inning-led{width:300px;height:58px;color:#e6f6ff}.package-8bit-approved .bl-8bit-role-bases{display:grid;place-items:center;border-right:4px solid #222a30}.package-8bit-approved .bl-8bit-bases{position:relative;width:80px;height:56px}.package-8bit-approved .bl-8bit-bases i{position:absolute;width:24px;height:24px;transform:rotate(45deg);border:4px solid #5ca2ff;background:#09111b}.package-8bit-approved .bl-8bit-bases i:nth-child(1){left:28px;top:1px}.package-8bit-approved .bl-8bit-bases i:nth-child(2){left:4px;top:27px}.package-8bit-approved .bl-8bit-bases i:nth-child(3){right:4px;top:27px}.package-8bit-approved .bl-8bit-bases i.on{background:#58a0ff;box-shadow:0 0 8px #4c9cff}
+.package-8bit-approved .bl-8bit-rhe{--team:#fff;display:grid;grid-template-columns:repeat(3,1fr);align-items:center;padding:5px 15px}.package-8bit-approved .bl-8bit-rhe-visitor{--team:var(--pixel-visitor-display)}.package-8bit-approved .bl-8bit-rhe-home{--team:var(--pixel-home-display)}.package-8bit-approved .bl-8bit-rhe span{display:grid;grid-template-rows:18px 1fr;place-items:center;color:#fff;font:900 13px/1 "Courier New",monospace}.package-8bit-approved .bl-8bit-rhe b{display:grid;place-items:center}.package-8bit-approved .bl-8bit-rhe-led{width:58px;height:38px;color:var(--team)}
+.package-8bit-approved .bl-8bit-diamond-tower{grid-template-rows:50px minmax(0,1fr) 74px 170px}
+.package-8bit-approved .diagnostics .bl-component{outline:2px dashed #f1d72d}.package-8bit-approved .diagnostics [data-module]{outline:1px dotted #e2cf27}
+.package-8bit-approved .composer-active [data-module]{transform:translate(var(--composer-x,0),var(--composer-y,0));width:var(--composer-w,auto)!important;height:var(--composer-h,auto)!important}.package-8bit-approved .composer-selected{outline:5px solid #ff3bce!important}
+
+/* Gate 13.2 approved baseball-family pixel cabinet rebuild. */
+.package-8bit-approved .bl-8bit-board{grid-template-rows:132px minmax(0,1fr) 176px;gap:8px;padding:16px;border:10px solid #d7dde1;background:#020304;box-shadow:0 0 0 7px #171c20,0 0 0 11px #7c858b,inset 0 0 0 5px #050709,0 14px 30px #000c}
+.package-8bit-approved .bl-8bit-cabinet{inset:5px;border:5px solid #151a1e;box-shadow:inset 0 0 0 4px #7e878d,inset 0 0 0 9px #050709,inset 0 0 30px #000,0 0 0 3px #020304}
+.package-8bit-approved .bl-8bit-venue{grid-template-columns:300px 1fr 300px;align-items:end;gap:24px;padding:8px 24px 10px;border:5px solid #0a0d10;border-top-color:#d7dde1;background:linear-gradient(#020304 0 38%,#2a3035 39% 48%,#717980 49% 53%,#15191d 54% 100%);box-shadow:inset 0 0 0 3px #858d93,0 0 0 3px #07090b}
+.package-8bit-approved .bl-8bit-venue:before,.package-8bit-approved .bl-8bit-venue:after{content:"";position:absolute;top:9px;width:84px;height:52px;border:5px solid #737b81;background:radial-gradient(circle,#fff6d5 0 34%,#786f54 36% 48%,#080a0c 50%) 0 0/21px 17px;box-shadow:0 5px 0 #171b1f,0 10px 0 #92999e,0 15px 0 #0b0d0f}
+.package-8bit-approved .bl-8bit-venue:before{left:66px}.package-8bit-approved .bl-8bit-venue:after{right:66px}
+.package-8bit-approved .bl-8bit-venue strong{margin:0 120px;border:6px solid #d4d9dd;box-shadow:0 0 0 5px #171b1f,0 0 0 9px #747d83}
+.package-8bit-approved .bl-8bit-venue i{height:26px;background:repeating-linear-gradient(90deg,#29323a 0 10px,#11161a 11px 18px)}
+.package-8bit-approved .bl-8bit-main-display{grid-template-columns:370px minmax(0,1fr) 370px;gap:10px;padding:8px;border:7px solid #d4d9dd;box-shadow:0 0 0 5px #171c20,inset 0 0 0 4px #656e74}
+.package-8bit-approved .bl-8bit-team-tower{grid-template-rows:62px minmax(0,1fr) 78px 188px;gap:6px;padding:9px;border:7px solid #d5dade;background:linear-gradient(160deg,color-mix(in srgb,var(--team) 32%,#070a0d),#020304 48%);box-shadow:0 0 0 5px #151a1e,inset 0 0 0 4px color-mix(in srgb,var(--team) 72%,#252a2e)}
+.package-8bit-approved .bl-8bit-side-label{border:5px solid color-mix(in srgb,var(--team) 64%,#111);background:color-mix(in srgb,var(--team) 22%,#020304);font-size:34px}
+.package-8bit-approved .bl-8bit-score{border:5px solid color-mix(in srgb,var(--team) 54%,#171d22);box-shadow:inset 0 0 34px color-mix(in srgb,var(--display) 34%,transparent)}
+.package-8bit-approved .bl-8bit-score-led{width:94%;height:88%;filter:drop-shadow(0 0 3px currentColor) drop-shadow(0 0 8px currentColor)}
+.package-8bit-approved .bl-8bit-sport-icon{width:92%;height:92%;border:5px solid color-mix(in srgb,var(--team) 58%,#252c31);filter:drop-shadow(0 0 4px color-mix(in srgb,var(--display) 82%,transparent))}
+.package-8bit-approved .bl-8bit-video-board{border:9px solid #d4dade;box-shadow:0 0 0 5px #151a1e,0 0 0 8px #747d83,inset 0 0 0 3px #050607}
+.package-8bit-approved .bl-8bit-football-control-bank,.package-8bit-approved .bl-8bit-basketball-control-bank,.package-8bit-approved .bl-8bit-diamond-control-bank{grid-template-rows:86px 1fr;border:7px solid #d4dade;box-shadow:0 0 0 5px #151a1e,inset 0 0 0 3px #69727a}
+.package-8bit-approved .bl-8bit-primary-clock,.package-8bit-approved .bl-8bit-basketball-clock{width:540px;border:5px solid #59636a}.package-8bit-approved .bl-8bit-clock-led{width:390px;height:72px;color:#ffd21a;filter:drop-shadow(0 0 3px #ffd21a) drop-shadow(0 0 8px #b67d00)}
+.package-8bit-approved .bl-8bit-football-bottom>span,.package-8bit-approved .bl-8bit-basketball-bottom>span,.package-8bit-approved .bl-8bit-diamond-bottom>span{grid-template-columns:1fr 110px;padding:6px 18px;border-right:4px solid #4e585f;background:#010203}.package-8bit-approved small{font-size:21px}.package-8bit-approved .bl-8bit-small-led{width:100px;height:55px;color:#ffd21a;filter:drop-shadow(0 0 3px #ffd21a) drop-shadow(0 0 7px #b67d00)}
+.package-8bit-approved .bl-8bit-rhe-led{width:76px;height:48px;filter:drop-shadow(0 0 3px currentColor) drop-shadow(0 0 7px currentColor)}
+
+/* Gate 13.3 generated approved-concept cabinet plate and live-layer fit. */
+.package-8bit-approved .bl-8bit-board{
+  grid-template-rows:190px minmax(0,1fr) 180px;gap:0;padding:14px;
+  border:0;background:#010203;box-shadow:none;isolation:isolate
+}
+.package-8bit-approved .bl-8bit-board:before{display:none}
+.package-8bit-approved .bl-8bit-cabinet{
+  z-index:20;inset:0;border:0;background:url("8bit-gameday/frame/cabinet-frame.png") center/100% 100% no-repeat;
+  box-shadow:none;image-rendering:pixelated;pointer-events:none
+}
+.package-8bit-approved .bl-8bit-venue{
+  z-index:3;grid-template-columns:1fr 570px 1fr;align-items:center;gap:0;padding:42px 0 16px;
+  border:0;background:transparent;box-shadow:none
+}
+.package-8bit-approved .bl-8bit-venue:before,.package-8bit-approved .bl-8bit-venue:after{display:none}
+.package-8bit-approved .bl-8bit-venue strong{
+  grid-column:2;margin:0;height:105px;padding:12px;border:0;background:#010203;box-shadow:none
+}
+.package-8bit-approved .bl-8bit-venue strong b{font-size:38px}.package-8bit-approved .bl-8bit-venue strong span{font-size:23px}
+.package-8bit-approved .bl-8bit-venue i{display:none}
+.package-8bit-approved .bl-8bit-main-display{
+  z-index:3;grid-template-columns:398px minmax(0,1fr) 398px;gap:16px;padding:0 16px;
+  border:0;background:transparent;box-shadow:none
+}
+.package-8bit-approved .bl-8bit-team-tower{
+  grid-template-rows:52px minmax(0,1fr) 62px 178px;gap:0;padding:8px 10px;
+  border:0;background:transparent;box-shadow:none
+}
+.package-8bit-approved .bl-8bit-side-label{border:0;background:#010304e8;font-size:32px}
+.package-8bit-approved .bl-8bit-score{border:0;background:#010203e8;box-shadow:inset 0 0 28px color-mix(in srgb,var(--display) 25%,transparent)}
+.package-8bit-approved .bl-8bit-score-led{width:90%;height:86%;color:var(--display);filter:drop-shadow(0 0 2px currentColor) drop-shadow(0 0 6px currentColor)}
+.package-8bit-approved .bl-8bit-led circle{fill:currentColor}
+.package-8bit-approved .bl-8bit-identity-plate{z-index:2;border:0;background:#010203e8}
+.package-8bit-approved .bl-8bit-identity-plate strong{font-size:19px}.package-8bit-approved .bl-8bit-identity-plate span{font-size:15px}
+.package-8bit-approved .bl-8bit-mini-player{
+  align-self:center;justify-self:center;width:94%;height:94%;padding:4px;background:#010203;
+  object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 0 5px color-mix(in srgb,var(--display) 70%,transparent))
+}
+.package-8bit-approved .bl-8bit-video-board{border:0;background:#000;box-shadow:none}
+.package-8bit-approved .bl-8bit-football-control-bank,.package-8bit-approved .bl-8bit-basketball-control-bank,.package-8bit-approved .bl-8bit-diamond-control-bank{
+  z-index:3;grid-template-rows:82px 1fr;margin:7px 76px 13px;border:0;background:#010203;box-shadow:none
+}
+.package-8bit-approved .bl-8bit-primary-clock,.package-8bit-approved .bl-8bit-basketball-clock{width:500px;border:0;background:#010203}
+.package-8bit-approved .bl-8bit-clock-led{width:360px;height:66px;color:#ffd21a;filter:drop-shadow(0 0 3px #ffd21a)}
+.package-8bit-approved .bl-8bit-football-bottom,.package-8bit-approved .bl-8bit-basketball-bottom,.package-8bit-approved .bl-8bit-diamond-bottom{border-top:0;gap:14px}
+.package-8bit-approved .bl-8bit-football-bottom>span,.package-8bit-approved .bl-8bit-basketball-bottom>span,.package-8bit-approved .bl-8bit-diamond-bottom>span{
+  min-width:0;padding:5px 12px;border:0;background:#010203;overflow:hidden
+}
+.package-8bit-approved .bl-8bit-small-led{width:82px;height:48px;color:#ffd21a;filter:drop-shadow(0 0 3px #ffd21a)}
+.package-8bit-approved .bl-8bit-basketball-bottom{grid-template-columns:.8fr .9fr 1.15fr 1.15fr 1.3fr .8fr;gap:8px}
+.package-8bit-approved .bl-8bit-basketball-bottom>span{grid-template-columns:minmax(0,1fr) auto;padding:4px 7px;gap:5px}
+.package-8bit-approved .bl-8bit-basketball-bottom small{font-size:14px;line-height:1.05;white-space:normal;text-align:center}
+.package-8bit-approved .bl-8bit-basketball-bottom b{font-size:14px;white-space:nowrap}
+.package-8bit-approved .bl-8bit-timeout-cell{display:flex!important;justify-content:center;gap:6px}.package-8bit-approved .bl-8bit-timeouts{gap:4px}.package-8bit-approved .bl-8bit-timeouts i{width:11px;height:11px;border-width:2px}
+.package-8bit-approved .bl-8bit-diamond-control-bank{grid-template-rows:76px 1fr}.package-8bit-approved .bl-8bit-diamond-center{grid-template-columns:1fr 310px 150px 1fr}
+.package-8bit-approved .bl-8bit-rhe{padding:3px 8px}.package-8bit-approved .bl-8bit-rhe-led{width:58px;height:38px}
+.package-8bit-approved .bl-8bit-inning-led{width:270px;height:52px}.package-8bit-approved .bl-8bit-role-bases{border:0}
+.package-8bit-approved .bl-8bit-top-ticker{overflow:hidden;border-color:#adb6bd;background:#010203;box-shadow:0 0 0 3px #10151a,inset 0 0 0 2px #66717a}
+.package-8bit-approved .bl-8bit-ticker-led{min-width:0;width:100%;height:37px;color:#8fc5ff;filter:drop-shadow(0 0 2px #5b9eff)}
+.package-8bit-approved .bl-8bit-live,.package-8bit-approved .bl-8bit-ticker-bug{position:relative;z-index:2;background:#05070a;color:#f4f7f9}
+.package-8bit-approved .bl-8bit-live{color:#ff5574}
+.package-8bit-approved .bl-8bit-caption{overflow:hidden}.package-8bit-approved .bl-8bit-caption span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff}
+
+/* Gate 13.4 exact generated-frame opening coordinates. */
+.package-8bit-approved .bl-8bit-venue{
+  position:absolute;left:720px;top:64px;width:445px;height:108px;display:block;padding:0
+}
+.package-8bit-approved .bl-8bit-venue strong{
+  display:grid;grid-template-rows:1fr auto;place-items:center;width:100%;height:100%;margin:0;padding:13px 10px 15px;
+  background:#010203;color:#fff;overflow:hidden
+}
+.package-8bit-approved .bl-8bit-venue strong b{
+  color:#f4f7f8;font:900 29px/.95 "Courier New",monospace;letter-spacing:2px;text-shadow:3px 3px #182028
+}
+.package-8bit-approved .bl-8bit-venue strong span{font-size:20px;letter-spacing:2px}
+.package-8bit-approved .bl-8bit-main-display{position:absolute;inset:0;display:block;padding:0}
+.package-8bit-approved .bl-8bit-team-tower{position:absolute;top:193px;width:365px;height:520px;grid-template-rows:52px 174px 58px 214px;padding:0;background:#010203}
+.package-8bit-approved .bl-8bit-visitor{left:32px}.package-8bit-approved .bl-8bit-home{left:1490px}
+.package-8bit-approved .bl-8bit-video-board{position:absolute;left:424px;top:193px;width:1035px;height:520px;overflow:hidden}
+.package-8bit-approved .bl-8bit-clash{inset:0;overflow:hidden}.package-8bit-approved .bl-8bit-field-art{inset:0}
+.package-8bit-approved .bl-8bit-clash-art{inset:1.5% 1.5% 7%;width:97%;height:91.5%}
+.package-8bit-approved .bl-8bit-clash-side{bottom:7px}.package-8bit-approved .bl-8bit-caption{bottom:10px}
+.package-8bit-approved .bl-8bit-mini-player{width:100%;height:100%;padding:8px 14px;object-fit:contain}
+.package-8bit-approved .bl-8bit-football-control-bank,.package-8bit-approved .bl-8bit-basketball-control-bank,.package-8bit-approved .bl-8bit-diamond-control-bank{
+  position:absolute;left:114px;top:738px;width:1658px;height:142px;margin:0;display:grid;
+  grid-template-columns:355fr 125fr 229fr 223fr 257fr 150fr;grid-template-rows:1fr;gap:0;background:transparent
+}
+.package-8bit-approved .bl-8bit-football-control-bank>span,.package-8bit-approved .bl-8bit-basketball-control-bank>span,.package-8bit-approved .bl-8bit-diamond-control-bank>span{
+  min-width:0;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  padding:9px 10px;background:#010203;overflow:hidden
+}
+.package-8bit-approved .bl-8bit-football-control-bank>span:first-child,.package-8bit-approved .bl-8bit-basketball-control-bank>span:first-child,.package-8bit-approved .bl-8bit-diamond-control-bank>span:first-child{padding-left:18px}
+.package-8bit-approved .bl-8bit-football-control-bank>span:last-child,.package-8bit-approved .bl-8bit-basketball-control-bank>span:last-child,.package-8bit-approved .bl-8bit-diamond-control-bank>span:last-child{padding-right:15px}
+.package-8bit-approved .bl-8bit-football-control-bank small,.package-8bit-approved .bl-8bit-basketball-control-bank small,.package-8bit-approved .bl-8bit-diamond-control-bank small{
+  max-width:100%;color:#f5f7f8;font:900 16px/1 "Courier New",monospace;text-align:center;white-space:nowrap
+}
+.package-8bit-approved .bl-8bit-clock-led{width:300px;height:73px;color:#ffd21a}
+.package-8bit-approved .bl-8bit-small-led{width:78px;height:66px}.package-8bit-approved .bl-8bit-inning-led{width:140px;height:70px;color:#ffd21a}
+.package-8bit-approved .bl-8bit-football-possession{bottom:1px;width:50px;height:28px}
+.package-8bit-approved .bl-8bit-basketball-control-bank>span:nth-child(3) .bl-8bit-clock-led{width:190px;height:65px}
+.package-8bit-approved .bl-8bit-basketball-control-bank>span:nth-child(2) b,.package-8bit-approved .bl-8bit-basketball-control-bank>span:nth-child(5) b{color:#81b9ff;font:900 14px/1 "Courier New",monospace;text-align:center}
+.package-8bit-approved .bl-8bit-combined-timeouts{gap:7px!important}.package-8bit-approved .bl-8bit-combined-timeouts>i{display:flex;align-items:center;gap:6px;color:#fff;font:900 13px/1 "Courier New",monospace;font-style:normal}
+.package-8bit-approved .bl-8bit-timeouts{gap:3px}.package-8bit-approved .bl-8bit-timeouts i{width:10px;height:10px;border-width:2px}
+.package-8bit-approved .bl-8bit-diamond-control-bank>span:first-child,.package-8bit-approved .bl-8bit-diamond-control-bank>span:nth-child(5){display:grid;padding:8px 14px}
+.package-8bit-approved .bl-8bit-rhe{width:100%;height:100%;padding:0;grid-template-columns:repeat(3,minmax(0,1fr))}
+.package-8bit-approved .bl-8bit-rhe span{grid-template-rows:18px 1fr}.package-8bit-approved .bl-8bit-rhe-led{width:66px;height:70px}
+.package-8bit-approved .bl-8bit-count-pair{display:grid!important;grid-template-columns:1fr 52px;grid-template-rows:1fr 1fr;gap:1px!important;padding:8px!important}
+.package-8bit-approved .bl-8bit-count-pair small{font-size:11px!important}.package-8bit-approved .bl-8bit-count-pair .bl-8bit-small-led{width:46px;height:42px}
+.package-8bit-approved .bl-8bit-bases{width:76px;height:55px}
+
+/* Gate 13.5 metadata marquee, identity possession, and legibility closeout. */
+.package-8bit-approved .bl-8bit-venue strong b{font-size:25px;letter-spacing:1px}
+.package-8bit-approved .bl-8bit-venue strong span{color:#ffd21a;font-size:22px;letter-spacing:2px}
+.package-8bit-approved .bl-8bit-identity-plate{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:12px;padding:4px 12px}
+.package-8bit-approved .bl-8bit-identity-copy{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0!important}
+.package-8bit-approved .bl-8bit-identity-copy strong{font-size:19px}.package-8bit-approved .bl-8bit-identity-copy>span{margin-top:3px;color:#fff;font-size:15px}
+.package-8bit-approved .bl-8bit-football-possession{position:static;flex:0 0 44px;width:44px;height:30px;transform:none}
+.package-8bit-approved .bl-8bit-possession-ball.is-empty{display:none}
+.package-8bit-approved .bl-8bit-possession-led{width:280px;height:66px;color:#ffd21a;filter:drop-shadow(0 0 3px #ffd21a) drop-shadow(0 0 7px #b67d00)}
+.package-8bit-approved .bl-8bit-diamond-player-role{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:18px;background:#010203;text-align:center;overflow:hidden}
+.package-8bit-approved .bl-8bit-diamond-player-role strong{color:var(--display);font:900 29px/1 "Courier New",monospace;letter-spacing:1px}
+.package-8bit-approved .bl-8bit-diamond-player-role b{max-width:100%;color:#fff;font:900 24px/1.05 "Courier New",monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.package-8bit-approved .bl-8bit-diamond-tower .bl-8bit-mini-player{display:none}
+.package-8bit-approved .bl-8bit-basketball-control-bank small{font-size:24px;line-height:1.05;white-space:normal}
+.package-8bit-approved .bl-8bit-basketball-control-bank>span:first-child small,.package-8bit-approved .bl-8bit-basketball-control-bank>span:last-child small{font-size:21px}
+.package-8bit-approved .bl-8bit-basketball-control-bank>span:nth-child(2) b,.package-8bit-approved .bl-8bit-basketball-control-bank>span:nth-child(5) b{font-size:23px;line-height:1.05}
+.package-8bit-approved .bl-8bit-combined-timeouts>i{gap:8px;font-size:22px}.package-8bit-approved .bl-8bit-timeouts{gap:5px}.package-8bit-approved .bl-8bit-timeouts i{width:18px;height:18px;border-width:3px}
+.package-8bit-approved .bl-8bit-diamond-control-bank small{font-size:24px}
+.package-8bit-approved .bl-8bit-rhe{column-gap:12px}.package-8bit-approved .bl-8bit-rhe span{grid-template-rows:27px 1fr;font-size:23px}.package-8bit-approved .bl-8bit-rhe-led{width:52px;height:62px}
+.package-8bit-approved .bl-8bit-count-pair{grid-template-columns:84px 46px!important;justify-content:start;transform:translateX(-8px)}
+.package-8bit-approved .bl-8bit-count-pair small{font-size:19px!important;text-align:left!important}.package-8bit-approved .bl-8bit-count-pair .bl-8bit-small-led{width:42px;height:40px}
+.package-8bit-approved .bl-8bit-diamond-control-bank>span:nth-child(3) small,.package-8bit-approved .bl-8bit-diamond-control-bank>span:nth-child(4) small,.package-8bit-approved .bl-8bit-diamond-control-bank>span:nth-child(6) small{font-size:25px}
+
+/* Gate 13.6 explicit lower-bank football possession. */
+
+/* Gate 13.7 LED football possession closeout candidate. */

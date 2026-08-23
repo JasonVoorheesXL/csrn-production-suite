@@ -1,0 +1,362 @@
+{
+  "classification": "7A",
+  "cycle": "2025-27",
+  "sport": "Football",
+  "source": {
+    "provider": "MHSAA",
+    "title": "2025-27 Football Regions",
+    "url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/"
+  },
+  "schools": [
+    {
+      "official_name": "DESOTO CENTRAL HIGH SCHOOL",
+      "broadcast_name": "DESOTO CENTRAL HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "1",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "HERNANDO HIGH SCHOOL",
+      "broadcast_name": "HERNANDO HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "1",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "HORN LAKE HIGH",
+      "broadcast_name": "HORN LAKE HIGH",
+      "state": "MS",
+      "classification": "7A",
+      "region": "1",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "LEWISBURG HIGH SCHOOL",
+      "broadcast_name": "LEWISBURG HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "1",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "SOUTHAVEN HIGH SCHOOL",
+      "broadcast_name": "SOUTHAVEN HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "1",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "TUPELO HIGH SCHOOL",
+      "broadcast_name": "TUPELO HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "1",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "CLINTON HIGH SCHOOL",
+      "broadcast_name": "CLINTON HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "2",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "GERMANTOWN HIGH SCHOOL",
+      "broadcast_name": "GERMANTOWN HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "2",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "MADISON CENTRAL HIGH SCHOOL",
+      "broadcast_name": "MADISON CENTRAL HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "2",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "MURRAH HIGH SCHOOL",
+      "broadcast_name": "MURRAH HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "2",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "OXFORD HIGH SCHOOL",
+      "broadcast_name": "OXFORD HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "2",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "STARKVILLE HIGH SCHOOL",
+      "broadcast_name": "STARKVILLE HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "2",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "BRANDON HIGH SCHOOL",
+      "broadcast_name": "BRANDON HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "3",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "Meridian High School",
+      "broadcast_name": "Meridian High School",
+      "state": "MS",
+      "classification": "7A",
+      "region": "3",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "NORTHWEST RANKIN HIGH SCHOOL",
+      "broadcast_name": "NORTHWEST RANKIN HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "3",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "OAK GROVE HIGH SCHOOL",
+      "broadcast_name": "OAK GROVE HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "3",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "PEARL HIGH SCHOOL",
+      "broadcast_name": "PEARL HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "3",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "PETAL HIGH SCHOOL",
+      "broadcast_name": "PETAL HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "3",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "BILOXI HIGH SCHOOL",
+      "broadcast_name": "BILOXI HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "4",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "DIBERVILLE SENIOR HIGH SCH",
+      "broadcast_name": "DIBERVILLE SENIOR HIGH SCH",
+      "state": "MS",
+      "classification": "7A",
+      "region": "4",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "GULFPORT HIGH SCHOOL",
+      "broadcast_name": "GULFPORT HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "4",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "HARRISON CENTRAL HIGH SCHOOL",
+      "broadcast_name": "HARRISON CENTRAL HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "4",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "OCEAN SPRINGS HIGH SCHOOL",
+      "broadcast_name": "OCEAN SPRINGS HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "4",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "ST MARTIN HIGH SCHOOL",
+      "broadcast_name": "ST MARTIN HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "4",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    },
+    {
+      "official_name": "WEST HARRISON HIGH SCHOOL",
+      "broadcast_name": "WEST HARRISON HIGH SCHOOL",
+      "state": "MS",
+      "classification": "7A",
+      "region": "4",
+      "source_data": {
+        "association": "MHSAA",
+        "provider": "MHSAA",
+        "source_url": "https://www.misshsaa.com/2024/11/19/2025-27-football-regions/",
+        "cycle": "2025-27",
+        "sport": "Football"
+      }
+    }
+  ]
+}

@@ -1,0 +1,912 @@
+/* Gate 15.1 Neon Sports Network R2 approved visual candidate */
+.package-neon-r2{position:relative;width:1920px;height:1080px;overflow:hidden;background:#020407;color:#fff;font-family:"Arial Narrow",Arial,sans-serif}
+.n2-page{position:absolute;inset:0;background:radial-gradient(circle at 50% 42%,#20242b,#030509 65%);overflow:hidden}
+.n2-frame{position:absolute;inset:0;z-index:18;background:url('/static/neon-r2/neon-frame-neutral-chassis.png') 0 0/100% 100% no-repeat;filter:brightness(.78) contrast(1.2)}
+.n2-frame:after{content:"";position:absolute;inset:0;background:url('/static/neon-r2/neon-frame-neutral-highlights.png') 0 0/100% 100% no-repeat}
+.n2-bloom{position:absolute;inset:0;z-index:12;pointer-events:none;background:var(--n2-left);-webkit-mask-image:url('/static/neon-r2/neon-frame-left-bloom-mask.png');mask-image:url('/static/neon-r2/neon-frame-left-bloom-mask.png');-webkit-mask-position:center;mask-position:center;-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;mask-mode:alpha;filter:blur(10px) drop-shadow(0 0 18px var(--n2-left)) drop-shadow(0 0 36px var(--n2-left));opacity:.96;mix-blend-mode:screen}
+.n2-bloom.right{background:var(--n2-right);-webkit-mask-image:url('/static/neon-r2/neon-frame-right-bloom-mask.png');mask-image:url('/static/neon-r2/neon-frame-right-bloom-mask.png')}
+.n2-page:before,.n2-page:after{content:"";position:absolute;inset:0;z-index:19;pointer-events:none;background:color-mix(in srgb,var(--n2-left) 72%,white);-webkit-mask-image:url('/static/neon-r2/neon-frame-left-core-mask.png');mask-image:url('/static/neon-r2/neon-frame-left-core-mask.png');-webkit-mask-position:center;mask-position:center;-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;mask-mode:alpha;filter:drop-shadow(0 0 3px white) drop-shadow(0 0 10px var(--n2-left)) drop-shadow(0 0 24px var(--n2-left));opacity:1;mix-blend-mode:screen}
+.n2-page:after{background:color-mix(in srgb,var(--n2-right) 72%,white);-webkit-mask-image:url('/static/neon-r2/neon-frame-right-core-mask.png');mask-image:url('/static/neon-r2/neon-frame-right-core-mask.png');filter:drop-shadow(0 0 3px white) drop-shadow(0 0 10px var(--n2-right)) drop-shadow(0 0 24px var(--n2-right))}
+.n2-ticker{position:absolute;z-index:30;left:35px;top:30px;width:1850px;height:68px;display:grid;grid-template-columns:330px 1fr;align-items:center;padding:0 28px;box-sizing:border-box;background:#05080ddd;border:1px solid #707782}.n2-ticker strong{font-size:24px;letter-spacing:3px;color:#fff;text-shadow:0 0 10px var(--n2-left)}.n2-ticker span{font-size:25px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.n2-team{position:absolute;z-index:25;top:130px;width:285px;height:620px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}.n2-team.left{left:42px}.n2-team.right{right:42px}.n2-team>div{font-size:165px;font-weight:1000;line-height:.9;color:#fff}.n2-team.left>div{text-shadow:0 0 3px #fff,0 0 12px #fff,0 0 24px var(--n2-left),0 0 52px var(--n2-left);-webkit-text-stroke:4px var(--n2-left)}.n2-team.right>div{text-shadow:0 0 3px #fff,0 0 12px #fff,0 0 24px var(--n2-right),0 0 52px var(--n2-right);-webkit-text-stroke:4px var(--n2-right)}.n2-team h2{font-size:31px;margin:30px 0 0;text-transform:uppercase}.n2-team h3{font-size:27px;margin:7px 0;text-transform:uppercase}.n2-team.left h3{color:var(--n2-left)}.n2-team.right h3{color:var(--n2-right)}.n2-team p{font-size:24px}
+.n2-opening{position:absolute;z-index:5;left:330px;top:120px;width:1260px;height:620px;overflow:hidden;background:#090b10}.n2-action{position:absolute;z-index:1;inset:0;background-position:center;background-size:cover;background-repeat:no-repeat}.n2-action.neutral{z-index:5;background-image:var(--n2-neutral);filter:contrast(1.16) brightness(1.02)}.n2-action.lcolor{z-index:6;background-color:color-mix(in srgb,var(--n2-left) 88%,white);-webkit-mask-image:var(--n2-lmask);mask-image:var(--n2-lmask);-webkit-mask-position:center;mask-position:center;-webkit-mask-size:cover;mask-size:cover;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;mask-mode:alpha;mix-blend-mode:screen;opacity:.82;filter:saturate(1.55) brightness(1.18) drop-shadow(0 0 12px var(--n2-left))}.n2-action.rcolor{z-index:7;background-color:color-mix(in srgb,var(--n2-right) 88%,white);-webkit-mask-image:var(--n2-rmask);mask-image:var(--n2-rmask);-webkit-mask-position:center;mask-position:center;-webkit-mask-size:cover;mask-size:cover;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;mask-mode:alpha;mix-blend-mode:screen;opacity:.82;filter:saturate(1.55) brightness(1.18) drop-shadow(0 0 12px var(--n2-right))}.n2-opening:after{content:"";position:absolute;z-index:8;inset:0;background:linear-gradient(90deg,color-mix(in srgb,var(--n2-left) 58%,transparent),transparent 34% 66%,color-mix(in srgb,var(--n2-right) 58%,transparent));mix-blend-mode:screen;opacity:.52}
+.n2-feature{position:absolute;z-index:8;left:50%;top:50%;transform:translate(-50%,-50%);padding:25px 40px;background:#02060bd9;border:1px solid #88909a;text-align:center}.n2-feature>*{display:block}.n2-feature strong{font-size:38px}.n2-captions{position:absolute;z-index:9;left:50px;right:50px;bottom:22px;padding:16px 22px;background:#020408e8;border-left:5px solid var(--n2-left);border-right:5px solid var(--n2-right);display:grid;grid-template-columns:180px 1fr;font-size:23px}
+
+.n2-lower-assembly{position:absolute;z-index:30;left:42px;right:42px;top:738px;height:292px;display:grid;grid-template-rows:146px 136px;gap:8px;box-sizing:border-box}
+.n2-score{position:relative;width:100%;height:146px;display:grid;grid-template-columns:minmax(0,1fr) 500px minmax(0,1fr);background:#03070c;border:1px solid #84909a;box-shadow:0 0 6px #fff,0 0 15px color-mix(in srgb,var(--n2-left) 30%,transparent),0 0 15px color-mix(in srgb,var(--n2-right) 30%,transparent);overflow:hidden}
+.n2-score-team{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) 150px;align-items:center;padding:0 30px;background:#02060b}
+.n2-score-team.visitor{grid-template-columns:150px minmax(0,1fr)}
+.n2-score-name{min-width:0;display:grid;gap:5px}
+.n2-score-team.visitor .n2-score-name{order:2;text-align:left}
+.n2-score-name b{font-size:31px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.n2-score-name span{font-size:15px;letter-spacing:1px;color:#d9eef8}
+.n2-score-team strong{font-size:84px;text-align:center;text-shadow:0 0 4px #fff,0 0 18px currentColor,0 0 38px currentColor}
+.n2-score-team.home strong{color:var(--n2-left)}
+.n2-score-team.visitor strong{color:var(--n2-right)}
+.n2-clock,.n2-diamond{position:relative;display:grid;place-items:center;align-content:center;gap:4px;background:#070b12}
+.n2-clock strong{font-size:52px}
+.n2-clock b{font-size:22px}
+.n2-clock em{font-style:normal;font-size:18px}
+.n2-clock span{position:absolute;right:54px;font-size:38px}
+.n2-basket-clock i{font-style:normal;font-size:13px;letter-spacing:1px;color:#dffaff;text-shadow:0 0 8px currentColor}
+.n2-diamond b{font-size:31px}
+.n2-diamond em{font-style:normal;font-size:17px}
+
+.n2-sport-deck{position:relative;width:100%;height:136px;box-sizing:border-box;overflow:hidden}
+.n2-foot-field{display:grid;grid-template-columns:10% 80% 10%;background:#071b12;border:2px solid color-mix(in srgb,var(--n2-ball-neon) 65%,white);box-shadow:inset 0 0 26px color-mix(in srgb,var(--n2-left) 25%,transparent),inset 0 0 32px color-mix(in srgb,var(--n2-right) 25%,transparent),0 0 8px #fff,0 0 24px color-mix(in srgb,var(--n2-ball-neon) 65%,transparent)}
+.n2-endzone{display:grid;place-items:center;font-size:28px;font-weight:1000;letter-spacing:3px;background:linear-gradient(180deg,#07111b,#02070b);color:#fff}
+.n2-endzone.home{border-right:4px solid var(--n2-left);text-shadow:0 0 4px #fff,0 0 16px var(--n2-left),0 0 30px var(--n2-left)}
+.n2-endzone.visitor{border-left:4px solid var(--n2-right);text-shadow:0 0 4px #fff,0 0 16px var(--n2-right),0 0 30px var(--n2-right)}
+.n2-field-grid{position:relative;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 2px),#d9fff078 calc(10% - 2px) 10%),repeating-linear-gradient(0deg,#0d402b 0 47%,#17633f 47% 53%,#0d402b 53% 100%);box-shadow:inset 0 0 22px #000}
+.n2-field-grid:before{content:"";position:absolute;left:50%;top:0;bottom:0;width:4px;background:#f4fff9;box-shadow:0 0 10px #fff,0 0 22px color-mix(in srgb,var(--n2-ball-neon) 72%,transparent)}
+.n2-yard-numbers{position:absolute;left:0;right:0;display:grid;grid-template-columns:repeat(9,1fr);padding:0 4.5%;pointer-events:none}
+.n2-yard-numbers.top{top:8px}
+.n2-yard-numbers.bottom{bottom:8px}
+.n2-yard-numbers span{text-align:center;font-size:31px;font-weight:1000;line-height:1;color:#f3fff8;text-shadow:0 0 5px #fff,0 0 13px #70ffb5}
+.n2-ball-line{position:absolute;z-index:4;left:var(--n2-ball-x);top:0;bottom:0;width:6px;transform:translateX(-50%);background:#fff;box-shadow:0 0 5px #fff,0 0 14px var(--n2-ball-neon),0 0 34px var(--n2-ball-neon),0 0 56px var(--n2-ball-neon)}
+.n2-ball-line i{position:absolute;left:50%;top:50%;width:24px;height:14px;transform:translate(-50%,-50%) rotate(-18deg);border-radius:50%;background:#9b542b;border:2px solid #fff;box-shadow:0 0 4px #fff,0 0 16px var(--n2-ball-neon)}
+.n2-ball-line i:before{content:"";position:absolute;left:5px;right:5px;top:5px;border-top:2px solid #fff}
+.n2-ball-line b{position:absolute;top:50%;width:0;height:0;filter:drop-shadow(0 0 4px #fff) drop-shadow(0 0 12px var(--n2-ball-neon))}
+.n2-ball-line b.right{left:26px;transform:translateY(-50%);border-top:15px solid transparent;border-bottom:15px solid transparent;border-left:28px solid var(--n2-ball-neon)}
+.n2-ball-line b.left{right:26px;transform:translateY(-50%);border-top:15px solid transparent;border-bottom:15px solid transparent;border-right:28px solid var(--n2-ball-neon)}
+.n2-ball-line strong{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);padding:3px 11px;white-space:nowrap;background:#020407f2;border:1px solid #fff;font-size:14px;letter-spacing:1px;color:#fff;text-shadow:0 0 8px var(--n2-ball-neon);box-shadow:0 0 12px var(--n2-ball-neon)}
+
+.n2-basket-court{background:linear-gradient(90deg,color-mix(in srgb,var(--n2-left) 18%,#04080c),#06090d 48% 52%,color-mix(in srgb,var(--n2-right) 18%,#04080c));border:2px solid #dffaff;box-shadow:0 0 8px #fff,0 0 20px color-mix(in srgb,var(--n2-left) 48%,transparent),0 0 28px color-mix(in srgb,var(--n2-right) 48%,transparent)}
+.n2-basket-court:before{content:"";position:absolute;inset:9px;border:2px solid #dffaffaa}
+.n2-court-half{position:absolute;left:50%;top:0;bottom:0;width:3px;background:#fff;box-shadow:0 0 10px #fff}
+.n2-court-circle{position:absolute;left:50%;top:50%;width:72px;height:72px;transform:translate(-50%,-50%);border:3px solid #fff;border-radius:50%;box-shadow:0 0 12px #fff}
+.n2-court-key{position:absolute;top:23px;width:130px;height:86px;border:3px solid currentColor;box-shadow:0 0 13px currentColor}
+.n2-court-key.left{left:9px;color:var(--n2-left)}
+.n2-court-key.right{right:9px;color:var(--n2-right)}
+.n2-court-key i{position:absolute;top:50%;width:20px;height:20px;border:2px solid #fff;border-radius:50%;transform:translateY(-50%)}
+.n2-court-key.left i{right:-12px}.n2-court-key.right i{left:-12px}
+.n2-court-three{position:absolute;top:11px;width:190px;height:110px;border:3px solid currentColor;border-radius:50%;opacity:.8}
+.n2-court-three.left{left:-92px;color:var(--n2-left)}.n2-court-three.right{right:-92px;color:var(--n2-right)}
+
+.n2-diamond-deck{display:grid;grid-template-columns:250px minmax(0,1fr) 250px;gap:6px}
+.n2-deck-player{min-width:0;padding:12px 16px;background:#03070c;border:1px solid color-mix(in srgb,var(--n2-left) 66%,white);box-shadow:inset 0 0 18px color-mix(in srgb,var(--n2-left) 18%,transparent),0 0 10px color-mix(in srgb,var(--n2-left) 40%,transparent);display:grid;align-content:center}
+.n2-deck-player.pitching{border-color:color-mix(in srgb,var(--n2-right) 66%,white);box-shadow:inset 0 0 18px color-mix(in srgb,var(--n2-right) 18%,transparent),0 0 10px color-mix(in srgb,var(--n2-right) 40%,transparent)}
+.n2-deck-player small{font-size:14px;color:var(--n2-left)}
+.n2-deck-player.pitching small{color:var(--n2-right)}
+.n2-deck-player b{font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.n2-deck-player span{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.n2-linescore{width:100%;height:136px;table-layout:fixed;border-collapse:collapse;background:#02060a;border:1px solid #dffaff;box-shadow:0 0 7px #fff,0 0 18px color-mix(in srgb,var(--n2-left) 32%,transparent),0 0 18px color-mix(in srgb,var(--n2-right) 32%,transparent)}
+.n2-linescore .team-col{width:128px}.n2-linescore .rhe{width:38px}
+.n2-linescore th,.n2-linescore td{border:1px solid #263640;text-align:center;padding:0 4px;font-size:15px;line-height:1}
+.n2-linescore thead{height:34px;background:linear-gradient(90deg,color-mix(in srgb,var(--n2-left) 28%,#05090d),#05090d 50%,color-mix(in srgb,var(--n2-right) 28%,#05090d))}
+.n2-linescore tbody tr{height:50px}
+.n2-linescore th:first-child{text-align:left;padding-left:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.n2-linescore thead th{font-size:14px;color:#fff}
+.n2-linescore tbody th{font-size:14px}
+.n2-linescore .visitor{color:#e9fbff;text-shadow:0 0 7px var(--n2-right)}
+.n2-linescore .home{color:#e9fbff;text-shadow:0 0 7px var(--n2-left)}
+
+.package-neon-r2[data-sport="basketball"] .n2-action.lcolor,.package-neon-r2[data-sport="basketball"] .n2-action.rcolor,.package-neon-r2[data-sport="baseball"] .n2-action.lcolor,.package-neon-r2[data-sport="baseball"] .n2-action.rcolor,.package-neon-r2[data-sport="softball"] .n2-action.lcolor,.package-neon-r2[data-sport="softball"] .n2-action.rcolor{opacity:.96;mix-blend-mode:color;filter:saturate(1.65) brightness(1.22) drop-shadow(0 0 14px currentColor)}
+.package-neon-r2[data-sport="basketball"] .n2-opening:after,.package-neon-r2[data-sport="baseball"] .n2-opening:after,.package-neon-r2[data-sport="softball"] .n2-opening:after{opacity:.38;background:linear-gradient(90deg,color-mix(in srgb,var(--n2-left) 58%,transparent),transparent 40% 60%,color-mix(in srgb,var(--n2-right) 58%,transparent))}
+
+/* Gate 15.1 R26 commercial visual convergence */
+.n2-page{box-shadow:inset 0 0 0 2px #53606b}
+.n2-frame{opacity:.72;filter:brightness(.68) contrast(1.12)}
+.n2-ticker{
+  height:70px;
+  background:linear-gradient(180deg,#0b1118ee,#03070cee);
+  border:1px solid #85919c;
+  border-left:4px solid var(--n2-left);
+  border-right:4px solid var(--n2-right);
+  box-shadow:inset 0 1px 0 #ffffff35,inset 0 -10px 24px #000,0 0 10px #000;
+}
+.n2-ticker:after{content:"";position:absolute;left:330px;right:24px;bottom:7px;height:2px;background:linear-gradient(90deg,var(--n2-left),transparent 42% 58%,var(--n2-right));opacity:.55}
+.n2-ticker strong{font-size:25px}
+.n2-ticker span{font-size:24px}
+
+.n2-opening{top:120px;height:610px}
+.n2-team{top:120px;height:610px}
+.n2-lower-assembly{top:730px;height:304px;grid-template-rows:150px 146px;gap:8px}
+.n2-score{height:150px;grid-template-columns:minmax(0,1fr) 470px minmax(0,1fr);border:2px solid #7d8994}
+.n2-score-team{padding:0 28px}
+.n2-score-team strong{font-size:82px}
+.n2-score-name b{font-size:29px}
+.n2-score-name span{font-size:16px;color:#fff;text-shadow:0 0 8px currentColor}
+.n2-clock strong{font-size:50px}
+.n2-clock span{right:42px}
+.n2-sport-deck{height:146px}
+
+/* Football field */
+.n2-foot-field{grid-template-columns:9% 82% 9%;border-width:2px}
+.n2-field-grid{overflow:hidden}
+.n2-field-grid:after{content:"";position:absolute;inset:10px 0;border-top:2px solid #e9fff4aa;border-bottom:2px solid #e9fff4aa}
+.n2-yard-numbers{position:absolute;left:3.5%;right:3.5%;display:grid;grid-template-columns:repeat(9,minmax(0,1fr));padding:0;z-index:2}
+.n2-yard-numbers.top{top:10px}
+.n2-yard-numbers.bottom{bottom:10px}
+.n2-yard-numbers span{display:block;min-width:0;text-align:center;font-size:29px;line-height:1;font-weight:1000;color:#f6fff9;text-shadow:0 0 4px #fff,0 0 13px #66ffad}
+.n2-hashmarks{position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(2.5% - 1px),#eafff044 calc(2.5% - 1px) 2.5%);opacity:.5}
+.n2-ball-line strong{bottom:12px;font-size:15px}
+.n2-ball-line i,.n2-ball-line b{top:50%}
+
+/* Basketball score and court */
+.package-neon-r2[data-sport="basketball"] .n2-score-team{grid-template-columns:minmax(0,1fr) 145px}
+.package-neon-r2[data-sport="basketball"] .n2-score-team.visitor{grid-template-columns:145px minmax(0,1fr)}
+.package-neon-r2[data-sport="basketball"] .n2-score-name span{color:#e8f9ff}
+.n2-basket-court{
+  background:
+    radial-gradient(circle at 50% 50%,#ffffff08 0 18%,transparent 45%),
+    linear-gradient(90deg,color-mix(in srgb,var(--n2-left) 25%,#06101a),#071015 46% 54%,color-mix(in srgb,var(--n2-right) 25%,#06101a));
+  border-color:#eaffff;
+  box-shadow:inset 0 0 28px #000,0 0 7px #fff,0 0 22px color-mix(in srgb,var(--n2-left) 45%,transparent),0 0 22px color-mix(in srgb,var(--n2-right) 45%,transparent);
+}
+.n2-basket-court:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,color-mix(in srgb,var(--n2-left) 12%,transparent),transparent 42% 58%,color-mix(in srgb,var(--n2-right) 12%,transparent));pointer-events:none}
+.n2-court-half,.n2-court-circle{filter:drop-shadow(0 0 8px #fff)}
+.n2-court-key,.n2-court-three{filter:drop-shadow(0 0 9px currentColor)}
+
+/* Diamond center cockpit: inning, bases, count */
+.n2-diamond{grid-template-columns:1fr 150px;padding:0 34px;gap:18px}
+.n2-inning{display:grid;place-items:center;align-content:center;gap:6px}
+.n2-inning b{font-size:31px}
+.n2-inning span{font-size:17px}
+.n2-bases{position:relative;width:112px;height:78px;justify-self:center}
+.n2-bases i{position:absolute;width:31px;height:31px;transform:rotate(45deg);background:#071019;border:2px solid #e9ffff;box-shadow:0 0 8px #fff}
+.n2-bases i:nth-child(1){left:5px;top:37px}
+.n2-bases i:nth-child(2){left:40px;top:3px}
+.n2-bases i:nth-child(3){right:1px;top:37px}
+.n2-bases i.on{background:color-mix(in srgb,var(--n2-right) 78%,white);border-color:#fff;box-shadow:0 0 6px #fff,0 0 20px var(--n2-right),0 0 34px var(--n2-right)}
+
+/* Commercial line score */
+.n2-diamond-deck{grid-template-columns:265px minmax(0,1fr) 265px;gap:8px}
+.n2-deck-player{padding:14px 18px;border-width:2px}
+.n2-deck-player small{font-size:15px;letter-spacing:1px}
+.n2-deck-player b{font-size:22px;margin-top:3px}
+.n2-deck-player span{font-size:15px;margin-top:2px}
+.n2-linescore{height:146px;border-width:2px}
+.n2-linescore .team-col{width:146px}
+.n2-linescore .rhe{width:42px}
+.n2-linescore th,.n2-linescore td{font-size:16px;border-color:#314550}
+.n2-linescore thead{height:38px}
+.n2-linescore tbody tr{height:52px}
+.n2-linescore thead th{font-size:15px}
+.n2-linescore tbody th{font-size:15px}
+.n2-linescore .current{background:#ffffff12;color:#fff;box-shadow:inset 0 0 14px color-mix(in srgb,var(--n2-right) 40%,transparent)}
+.n2-linescore th:first-child{text-overflow:clip}
+
+/* Stronger authored-mask color; restrained environmental wash */
+.package-neon-r2[data-sport="basketball"] .n2-action.lcolor,
+.package-neon-r2[data-sport="basketball"] .n2-action.rcolor,
+.package-neon-r2[data-sport="baseball"] .n2-action.lcolor,
+.package-neon-r2[data-sport="baseball"] .n2-action.rcolor,
+.package-neon-r2[data-sport="softball"] .n2-action.lcolor,
+.package-neon-r2[data-sport="softball"] .n2-action.rcolor{
+  opacity:1;
+  mix-blend-mode:screen;
+  filter:saturate(1.8) brightness(1.3) contrast(1.1) drop-shadow(0 0 15px currentColor);
+}
+.package-neon-r2[data-sport="basketball"] .n2-opening:after,
+.package-neon-r2[data-sport="baseball"] .n2-opening:after,
+.package-neon-r2[data-sport="softball"] .n2-opening:after{
+  opacity:.22;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--n2-left) 48%,transparent),transparent 42% 58%,color-mix(in srgb,var(--n2-right) 48%,transparent));
+}
+
+
+
+/* Gate 15.1 R27 approved-clash integration */
+.n2-action.neutral{
+  filter:contrast(1.06) brightness(1.02) saturate(1.08);
+  background-size:cover;
+  background-position:center;
+}
+.n2-action.lcolor,
+.n2-action.rcolor{
+  display:none !important;
+}
+.package-neon-r2[data-sport="football"] .n2-opening:after,
+.package-neon-r2[data-sport="basketball"] .n2-opening:after,
+.package-neon-r2[data-sport="baseball"] .n2-opening:after,
+.package-neon-r2[data-sport="softball"] .n2-opening:after{
+  opacity:.12;
+  background:linear-gradient(
+    90deg,
+    color-mix(in srgb,var(--n2-left) 24%,transparent),
+    transparent 38% 62%,
+    color-mix(in srgb,var(--n2-right) 24%,transparent)
+  );
+}
+
+/* Gate 15.1 R28 release-layout correction */
+
+/* Side identity details for baseball and softball */
+.n2-team{justify-content:center}
+.n2-team p{margin:12px 0 0}
+.n2-team-extra{width:82%;margin-top:20px;padding-top:14px;border-top:1px solid #56636e;display:grid;gap:4px;text-align:center}
+.n2-team-extra small{font-size:16px;letter-spacing:1px}
+.n2-team-extra b{font-size:23px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.n2-team-extra span{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.n2-team.left .n2-team-extra small{color:var(--n2-left)}
+.n2-team.right .n2-team-extra small{color:var(--n2-right)}
+
+/* Score-row alignment */
+.n2-score-team{display:flex;align-items:center;justify-content:space-between;gap:24px}
+.n2-score-team.home{text-align:left}
+.n2-score-team.visitor{flex-direction:row-reverse;text-align:right}
+.n2-score-team.visitor .n2-score-name{order:initial;text-align:right}
+.n2-score-name{align-content:center}
+.n2-score-team strong{flex:0 0 150px}
+.n2-score-team.home strong{text-align:right}
+.n2-score-team.visitor strong{text-align:left}
+
+/* Basketball: larger team/foul text; no shot clock or possession */
+.package-neon-r2[data-sport="basketball"] .n2-score-name b{font-size:58px;line-height:1}
+.package-neon-r2[data-sport="basketball"] .n2-score-name span{font-size:32px;line-height:1.05;letter-spacing:0}
+.package-neon-r2[data-sport="basketball"] .n2-score-team{padding:0 30px}
+.package-neon-r2[data-sport="basketball"] .n2-score-team strong{font-size:86px;flex-basis:145px}
+.n2-basket-clock{gap:8px}
+.n2-basket-clock strong{font-size:58px}
+.n2-basket-clock b{font-size:28px}
+
+/* Full-width readable baseball/softball inning table */
+.n2-diamond-deck{display:block}
+.n2-linescore{width:100%;height:146px}
+.n2-linescore .team-col{width:220px}
+.n2-linescore .rhe{width:60px}
+.n2-linescore th,.n2-linescore td{font-size:25px;padding:0 8px}
+.n2-linescore thead{height:42px}
+.n2-linescore thead th{font-size:22px}
+.n2-linescore tbody tr{height:52px}
+.n2-linescore tbody th{font-size:24px;padding-left:18px}
+.n2-linescore .current{box-shadow:inset 0 0 12px color-mix(in srgb,var(--n2-right) 28%,transparent)}
+
+/* Graphic-layer football field */
+.n2-foot-field{grid-template-columns:9% 82% 9%}
+.n2-field-grid{
+  background-image:url('/static/neon-r2/football-field-base.png');
+  background-size:100% 100%;
+  background-position:center;
+  background-repeat:no-repeat;
+}
+.n2-field-grid:before,.n2-field-grid:after,.n2-yard-numbers,.n2-hashmarks{display:none!important}
+.n2-endzone{background:#030a0e}
+.n2-endzone img{display:block;max-width:76%;max-height:76%;object-fit:contain;filter:none}
+.n2-endzone span{font-size:32px;font-weight:1000;color:#fff;text-shadow:none}
+.n2-endzone.home,.n2-endzone.visitor{box-shadow:none;text-shadow:none}
+.n2-ball-line{width:8px}
+.n2-ball-line i{
+  width:72px;
+  height:42px;
+  border-width:4px;
+  box-shadow:0 0 4px #fff,0 0 10px var(--n2-ball-neon);
+}
+.n2-ball-line i:before{left:15px;right:15px;top:17px;border-top-width:4px}
+.n2-ball-line b.right{left:52px;border-top-width:22px;border-bottom-width:22px;border-left-width:40px}
+.n2-ball-line b.left{right:52px;border-top-width:22px;border-bottom-width:22px;border-right-width:40px}
+.n2-ball-line strong{
+  bottom:8px;
+  font-size:25px;
+  padding:6px 17px;
+  border-width:2px;
+  text-shadow:none;
+  box-shadow:0 0 8px var(--n2-ball-neon);
+}
+
+/* Gate 15.1 R29 final sport corrections */
+
+/* Football: 50% larger quarter and down/distance. */
+.package-neon-r2[data-sport="football"] .n2-clock b{
+  font-size:42px;
+  line-height:1;
+}
+.package-neon-r2[data-sport="football"] .n2-clock em{
+  font-size:28px;
+  line-height:1;
+  margin-top:4px;
+}
+
+/* Football field graphic retains texture and numbers with restrained lighting. */
+.n2-field-grid{
+  background-image:url('/static/neon-r2/football-field-base.png');
+  background-size:100% 100%;
+  background-position:center;
+  background-repeat:no-repeat;
+  box-shadow:inset 0 0 18px #000000a8;
+}
+.n2-ball-line{
+  box-shadow:0 0 4px #fff,0 0 10px var(--n2-ball-neon);
+}
+
+/* Highlight/broadcast video owns the complete clash opening. */
+.n2-highlight-video{
+  position:absolute;
+  z-index:20;
+  inset:0;
+  overflow:hidden;
+  background:#020408;
+}
+.n2-highlight-video video,
+.n2-highlight-video iframe,
+.n2-highlight-video canvas,
+.n2-highlight-video img{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  border:0;
+}
+.n2-highlight-fallback{
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:8px;
+  background:#02060bd9;
+  text-align:center;
+}
+.n2-highlight-fallback small{font-size:16px}
+.n2-highlight-fallback strong{font-size:38px}
+
+/* Gate 15.1 R30 baseball-only and football-field cleanup */
+
+/* Diamond team-panel text: readable, restrained, no blown-out highlight. */
+.package-neon-r2[data-sport="baseball"] .n2-team-extra,
+.package-neon-r2[data-sport="softball"] .n2-team-extra{
+  background:#02070bcf;
+  border:1px solid #56636e;
+  box-shadow:inset 0 0 12px #000;
+  padding:12px 8px;
+}
+.package-neon-r2[data-sport="baseball"] .n2-team-extra small,
+.package-neon-r2[data-sport="softball"] .n2-team-extra small{
+  color:#dce8ef;
+  text-shadow:none;
+  filter:none;
+  opacity:.92;
+}
+.package-neon-r2[data-sport="baseball"] .n2-team-extra b,
+.package-neon-r2[data-sport="baseball"] .n2-team-extra span,
+.package-neon-r2[data-sport="softball"] .n2-team-extra b,
+.package-neon-r2[data-sport="softball"] .n2-team-extra span{
+  color:#fff;
+  text-shadow:none;
+  filter:none;
+  opacity:1;
+}
+
+/* Football graphic: upper-half field texture only, one number row, one hash zone. */
+.n2-field-grid{
+  background-image:url('/static/neon-r2/football-field-base.png');
+  background-size:100% 100%;
+  background-position:center;
+  background-repeat:no-repeat;
+}
+.n2-field-grid:before{
+  content:"10     20     30     40     50     40     30     20     10";
+  display:block!important;
+  position:absolute;
+  left:3%;
+  right:3%;
+  top:8px;
+  color:#f2f3e9;
+  font-size:28px;
+  font-weight:900;
+  letter-spacing:18px;
+  text-align:center;
+  white-space:pre;
+  text-shadow:0 1px 2px #000;
+  opacity:.94;
+}
+.n2-field-grid:after{
+  content:"";
+  display:block!important;
+  position:absolute;
+  left:2%;
+  right:2%;
+  top:74px;
+  height:22px;
+  background:repeating-linear-gradient(90deg,transparent 0 20px,#e9f4e455 20px 21px,transparent 21px 40px);
+  border-top:1px solid #e9f4e466;
+  border-bottom:1px solid #e9f4e466;
+  opacity:.55;
+}
+
+/* Gate 15.1 R31 baseball rerender and field alignment */
+
+/* Field graphic owns its numbers. Remove every HTML number/hash overlay. */
+.n2-field-grid:before,
+.n2-field-grid:after,
+.n2-yard-numbers,
+.n2-hashmarks{
+  display:none !important;
+  content:none !important;
+}
+.package-neon-r2[data-sport="football"] .n2-clock em{
+  font-size:25px;
+  white-space:nowrap;
+  letter-spacing:.4px;
+}
+
+/* Ball placement uses the same linear 0–100 yard coordinate as the baked field. */
+.n2-ball-line{
+  left:var(--n2-ball-x);
+  transform:translateX(-50%);
+}
+
+/* Diamond identity details: no glow anywhere on the info block or its text. */
+.package-neon-r2[data-sport="baseball"] .n2-team-extra,
+.package-neon-r2[data-sport="softball"] .n2-team-extra{
+  box-shadow:none !important;
+  filter:none !important;
+  background:#02070bf0;
+}
+.package-neon-r2[data-sport="baseball"] .n2-team-extra *,
+.package-neon-r2[data-sport="softball"] .n2-team-extra *{
+  text-shadow:none !important;
+  box-shadow:none !important;
+  filter:none !important;
+}
+
+/* Gate 15.1 R32 swap and visual cleanup */
+.n2-field-grid:before,
+.n2-field-grid:after,
+.n2-yard-numbers,
+.n2-hashmarks{
+  display:none !important;
+  content:none !important;
+  opacity:0 !important;
+  visibility:hidden !important;
+}
+.package-neon-r2[data-sport="football"] .n2-clock{
+  grid-template-columns:1fr;
+  justify-items:center;
+}
+.package-neon-r2[data-sport="football"] .n2-clock span{
+  display:none !important;
+}
+
+.package-neon-r2[data-sport="baseball"] .n2-team-extra,
+.package-neon-r2[data-sport="softball"] .n2-team-extra{
+  background:#03080df2 !important;
+  border:1px solid #56636e !important;
+  box-shadow:none !important;
+  filter:none !important;
+  mix-blend-mode:normal !important;
+  opacity:1 !important;
+}
+.package-neon-r2[data-sport="baseball"] .n2-team-extra *,
+.package-neon-r2[data-sport="softball"] .n2-team-extra *{
+  text-shadow:none !important;
+  box-shadow:none !important;
+  filter:none !important;
+  -webkit-text-stroke:0 !important;
+  opacity:1 !important;
+  mix-blend-mode:normal !important;
+}
+.package-neon-r2[data-sport="baseball"] .n2-team.left .n2-team-extra small,
+.package-neon-r2[data-sport="softball"] .n2-team.left .n2-team-extra small{
+  color:#66b8ff !important;
+}
+.package-neon-r2[data-sport="baseball"] .n2-team.right .n2-team-extra small,
+.package-neon-r2[data-sport="softball"] .n2-team.right .n2-team-extra small{
+  color:#58e9a0 !important;
+}
+.package-neon-r2[data-sport="baseball"] .n2-team-extra b,
+.package-neon-r2[data-sport="softball"] .n2-team-extra b{
+  color:#ffffff !important;
+  font-weight:900;
+}
+.package-neon-r2[data-sport="baseball"] .n2-team-extra span,
+.package-neon-r2[data-sport="softball"] .n2-team-extra span{
+  color:#d7e2e9 !important;
+  font-weight:700;
+}
+
+/* Gate 15.1 R33 commercial-art and color-validation cleanup */
+
+/* Team swapping changes fixture data only. Clash artwork is never mirrored. */
+.n2-page .n2-action{
+  transform:none !important;
+}
+
+/* Crisp neon labels: colored cores without bloom, blur or translucent stacking. */
+.package-neon-r2[data-sport="baseball"] .n2-team-extra small,
+.package-neon-r2[data-sport="softball"] .n2-team-extra small{
+  font-weight:900 !important;
+  letter-spacing:1.2px;
+  text-shadow:none !important;
+  box-shadow:none !important;
+  filter:none !important;
+  opacity:1 !important;
+}
+.package-neon-r2[data-sport="baseball"] .n2-team-extra b,
+.package-neon-r2[data-sport="softball"] .n2-team-extra b,
+.package-neon-r2[data-sport="baseball"] .n2-team-extra span,
+.package-neon-r2[data-sport="softball"] .n2-team-extra span{
+  text-shadow:none !important;
+  box-shadow:none !important;
+  filter:none !important;
+  opacity:1 !important;
+}
+
+/* Gate 15.1 R34 adaptive clash-color pipeline */
+.n2-action.neutral{
+  filter:contrast(1.07) brightness(1.02) saturate(.36) !important;
+}
+.n2-action.lcolor,
+.n2-action.rcolor{
+  display:block !important;
+  mix-blend-mode:normal !important;
+  opacity:1 !important;
+  filter:none !important;
+  background-image:none !important;
+  background-repeat:no-repeat;
+}
+.n2-action.lcolor{
+  background-color:var(--n2-left-raw) !important;
+}
+.n2-action.rcolor{
+  background-color:var(--n2-right-raw) !important;
+}
+.package-neon-r2 .n2-opening:after{
+  opacity:.08 !important;
+}
+
+/* Gate 15.1 R35 football layered-color proof */
+.package-neon-r2[data-sport="football"] .n2-action{
+  display:none !important;
+}
+.n2-foot-art{
+  position:absolute;
+  inset:0;
+  background-position:center;
+  background-size:cover;
+  background-repeat:no-repeat;
+  pointer-events:none;
+}
+.n2-foot-art.neutral{
+  z-index:5;
+  background-image:var(--n2-foot-neutral);
+  filter:contrast(1.06) brightness(1.02);
+}
+.n2-foot-art.home-primary,
+.n2-foot-art.home-secondary,
+.n2-foot-art.visitor-primary,
+.n2-foot-art.visitor-secondary{
+  z-index:6;
+  background-repeat:no-repeat;
+  background-position:center;
+  background-size:cover;
+  mix-blend-mode:normal;
+}
+.n2-foot-art.home-primary{
+  background-color:var(--n2-left-raw);
+  -webkit-mask:var(--n2-foot-home-primary) center/cover no-repeat;
+  mask:var(--n2-foot-home-primary) center/cover no-repeat;
+}
+.n2-foot-art.home-secondary{
+  z-index:7;
+  background-color:var(--n2-left2);
+  -webkit-mask:var(--n2-foot-home-secondary) center/cover no-repeat;
+  mask:var(--n2-foot-home-secondary) center/cover no-repeat;
+}
+.n2-foot-art.visitor-primary{
+  background-color:var(--n2-right-raw);
+  -webkit-mask:var(--n2-foot-visitor-primary) center/cover no-repeat;
+  mask:var(--n2-foot-visitor-primary) center/cover no-repeat;
+}
+.n2-foot-art.visitor-secondary{
+  z-index:7;
+  background-color:var(--n2-right2);
+  -webkit-mask:var(--n2-foot-visitor-secondary) center/cover no-repeat;
+  mask:var(--n2-foot-visitor-secondary) center/cover no-repeat;
+}
+.n2-foot-art.uniform-shadows{
+  z-index:8;
+  background-image:var(--n2-foot-shadows);
+  mix-blend-mode:multiply;
+}
+.n2-foot-art.uniform-highlights{
+  z-index:9;
+  background-image:var(--n2-foot-highlights);
+  mix-blend-mode:screen;
+}
+.package-neon-r2[data-sport="football"] .n2-opening:after{
+  z-index:10;
+  opacity:.12 !important;
+}
+
+/* Gate 15.1 R36 football alpha-cutout proof */
+.package-neon-r2[data-sport="football"] .n2-foot-art{
+  display:none !important;
+}
+.n2-cutout{
+  position:absolute;
+  inset:0;
+  background-position:center;
+  background-size:cover;
+  background-repeat:no-repeat;
+  pointer-events:none;
+}
+.n2-cutout.home-primary{
+  z-index:3;
+  background-color:var(--n2-left-raw);
+  -webkit-mask:var(--n2-foot-home-primary-cutout) center/cover no-repeat;
+  mask:var(--n2-foot-home-primary-cutout) center/cover no-repeat;
+}
+.n2-cutout.home-secondary{
+  z-index:4;
+  background-color:var(--n2-left2);
+  -webkit-mask:var(--n2-foot-home-secondary-cutout) center/cover no-repeat;
+  mask:var(--n2-foot-home-secondary-cutout) center/cover no-repeat;
+}
+.n2-cutout.visitor-primary{
+  z-index:3;
+  background-color:var(--n2-right-raw);
+  -webkit-mask:var(--n2-foot-visitor-primary-cutout) center/cover no-repeat;
+  mask:var(--n2-foot-visitor-primary-cutout) center/cover no-repeat;
+}
+.n2-cutout.visitor-secondary{
+  z-index:4;
+  background-color:var(--n2-right2);
+  -webkit-mask:var(--n2-foot-visitor-secondary-cutout) center/cover no-repeat;
+  mask:var(--n2-foot-visitor-secondary-cutout) center/cover no-repeat;
+}
+.n2-cutout.home-halo{
+  z-index:2;
+  background-color:var(--n2-left-raw);
+  opacity:.52;
+  -webkit-mask:var(--n2-foot-home-halo-cutout) center/cover no-repeat;
+  mask:var(--n2-foot-home-halo-cutout) center/cover no-repeat;
+}
+.n2-cutout.visitor-halo{
+  z-index:2;
+  background-color:var(--n2-right-raw);
+  opacity:.52;
+  -webkit-mask:var(--n2-foot-visitor-halo-cutout) center/cover no-repeat;
+  mask:var(--n2-foot-visitor-halo-cutout) center/cover no-repeat;
+}
+.n2-cutout.master{
+  z-index:5;
+  background-image:var(--n2-foot-cutout-master);
+}
+.n2-cutout.midtones{
+  z-index:6;
+  background-image:var(--n2-foot-cutout-midtones);
+  mix-blend-mode:soft-light;
+}
+.n2-cutout.shadows{
+  z-index:7;
+  background-image:var(--n2-foot-cutout-shadows);
+  mix-blend-mode:multiply;
+}
+.n2-cutout.highlights{
+  z-index:8;
+  background-image:var(--n2-foot-cutout-highlights);
+  mix-blend-mode:screen;
+}
+.n2-cutout.details{
+  z-index:9;
+  background-image:var(--n2-foot-cutout-details);
+}
+.package-neon-r2[data-sport="football"] .n2-opening:after{
+  z-index:10;
+  opacity:.10 !important;
+}
+
+/* Gate 15.1 R37 football luminance cap */
+.n2-cutout.luminance{
+  z-index:6;
+  background-image:var(--n2-foot-cutout-luminance);
+  mix-blend-mode:luminosity;
+  opacity:1;
+}
+.n2-cutout.midtones{
+  z-index:7;
+  opacity:.34;
+}
+.n2-cutout.shadows{
+  z-index:8;
+}
+.n2-cutout.highlights{
+  z-index:9;
+}
+.n2-cutout.details{
+  z-index:10;
+}
+.package-neon-r2[data-sport="football"] .n2-opening:after{
+  z-index:11;
+}
+
+/* Gate 15.1 R38 new-render exact-pixel football cutout */
+.package-neon-r2[data-sport="football"] .n2-cutout{
+  display:none !important;
+}
+.n2-newcut{
+  position:absolute;
+  inset:0;
+  background-position:center;
+  background-size:cover;
+  background-repeat:no-repeat;
+  pointer-events:none;
+}
+.n2-newcut.home-smoke{
+  z-index:2;
+  background-color:var(--n2-left-raw);
+  -webkit-mask:var(--n2-foot-new-home-smoke) center/cover no-repeat;
+  mask:var(--n2-foot-new-home-smoke) center/cover no-repeat;
+}
+.n2-newcut.visitor-smoke{
+  z-index:2;
+  background-color:var(--n2-right-raw);
+  -webkit-mask:var(--n2-foot-new-visitor-smoke) center/cover no-repeat;
+  mask:var(--n2-foot-new-visitor-smoke) center/cover no-repeat;
+}
+.n2-newcut.home-primary{
+  z-index:3;
+  background-color:var(--n2-left-raw);
+  -webkit-mask:var(--n2-foot-new-home-primary) center/cover no-repeat;
+  mask:var(--n2-foot-new-home-primary) center/cover no-repeat;
+}
+.n2-newcut.home-secondary{
+  z-index:4;
+  background-color:var(--n2-left2);
+  -webkit-mask:var(--n2-foot-new-home-secondary) center/cover no-repeat;
+  mask:var(--n2-foot-new-home-secondary) center/cover no-repeat;
+}
+.n2-newcut.visitor-primary{
+  z-index:3;
+  background-color:var(--n2-right-raw);
+  -webkit-mask:var(--n2-foot-new-visitor-primary) center/cover no-repeat;
+  mask:var(--n2-foot-new-visitor-primary) center/cover no-repeat;
+}
+.n2-newcut.visitor-secondary{
+  z-index:4;
+  background-color:var(--n2-right2);
+  -webkit-mask:var(--n2-foot-new-visitor-secondary) center/cover no-repeat;
+  mask:var(--n2-foot-new-visitor-secondary) center/cover no-repeat;
+}
+.n2-newcut.master{
+  z-index:5;
+  background-image:var(--n2-foot-new-master);
+}
+.n2-newcut.luminance{
+  z-index:6;
+  background-image:var(--n2-foot-new-luminance);
+  mix-blend-mode:luminosity;
+}
+.n2-newcut.texture{
+  z-index:7;
+  background-image:var(--n2-foot-new-texture);
+  mix-blend-mode:soft-light;
+}
+.package-neon-r2[data-sport="football"] .n2-opening:after{
+  z-index:8;
+  opacity:.08 !important;
+}
+
+/* Gate 15.1 R39 neutral smoke texture cutout */
+.package-neon-r2[data-sport="football"] .n2-newcut{
+  display:none !important;
+}
+.n2-r39{
+  position:absolute;
+  inset:0;
+  background-position:center;
+  background-size:cover;
+  background-repeat:no-repeat;
+  pointer-events:none;
+}
+.n2-r39.home-smoke-color{
+  z-index:2;
+  background-color:var(--n2-left-raw);
+  -webkit-mask:var(--n2-foot-neutral-home-smoke) center/cover no-repeat;
+  mask:var(--n2-foot-neutral-home-smoke) center/cover no-repeat;
+}
+.n2-r39.visitor-smoke-color{
+  z-index:2;
+  background-color:var(--n2-right-raw);
+  -webkit-mask:var(--n2-foot-neutral-visitor-smoke) center/cover no-repeat;
+  mask:var(--n2-foot-neutral-visitor-smoke) center/cover no-repeat;
+}
+.n2-r39.home-primary{
+  z-index:3;
+  background-color:var(--n2-left-raw);
+  -webkit-mask:var(--n2-foot-new-home-primary) center/cover no-repeat;
+  mask:var(--n2-foot-new-home-primary) center/cover no-repeat;
+}
+.n2-r39.home-secondary{
+  z-index:4;
+  background-color:var(--n2-left2);
+  -webkit-mask:var(--n2-foot-new-home-secondary) center/cover no-repeat;
+  mask:var(--n2-foot-new-home-secondary) center/cover no-repeat;
+}
+.n2-r39.visitor-primary{
+  z-index:3;
+  background-color:var(--n2-right-raw);
+  -webkit-mask:var(--n2-foot-new-visitor-primary) center/cover no-repeat;
+  mask:var(--n2-foot-new-visitor-primary) center/cover no-repeat;
+}
+.n2-r39.visitor-secondary{
+  z-index:4;
+  background-color:var(--n2-right2);
+  -webkit-mask:var(--n2-foot-new-visitor-secondary) center/cover no-repeat;
+  mask:var(--n2-foot-new-visitor-secondary) center/cover no-repeat;
+}
+.n2-r39.master{
+  z-index:5;
+  background-image:var(--n2-foot-neutral-master);
+}
+.n2-r39.uniform-luminance{
+  z-index:6;
+  background-image:var(--n2-foot-new-luminance);
+  mix-blend-mode:luminosity;
+}
+.n2-r39.uniform-texture{
+  z-index:7;
+  background-image:var(--n2-foot-new-texture);
+  mix-blend-mode:soft-light;
+}
+.n2-r39.smoke-luminance{
+  z-index:8;
+  background-image:var(--n2-foot-neutral-smoke-luminance);
+  mix-blend-mode:luminosity;
+}
+.n2-r39.smoke-texture{
+  z-index:9;
+  background-image:var(--n2-foot-neutral-smoke-texture);
+  mix-blend-mode:soft-light;
+}
+.n2-r39.smoke-shadows{
+  z-index:10;
+  background-image:var(--n2-foot-neutral-smoke-shadows);
+  mix-blend-mode:multiply;
+}
+.n2-r39.smoke-highlights{
+  z-index:11;
+  background-image:var(--n2-foot-neutral-smoke-highlights);
+  mix-blend-mode:screen;
+}
+.package-neon-r2[data-sport="football"] .n2-opening:after{
+  z-index:12;
+  opacity:.08 !important;
+}
+
+
+
+/* Gate 15.1 R40 adaptive blacklight football field deployment */
+.package-neon-r2[data-sport="football"] .n2-r39{display:none !important}
+.n2-r40{position:absolute;inset:0;pointer-events:none;background-position:center;background-size:100% 100%;background-repeat:no-repeat}
+.n2-r40.field-base{z-index:1;background-image:var(--n2-r40-field)}
+.n2-r40.field-home-primary,.n2-r40.field-home-secondary,.n2-r40.field-visitor-primary,.n2-r40.field-visitor-secondary{mix-blend-mode:screen}
+.n2-r40.field-home-primary{z-index:2;background-color:var(--n2-left);-webkit-mask:var(--n2-r40-field-home-primary) center/100% 100% no-repeat;mask:var(--n2-r40-field-home-primary) center/100% 100% no-repeat;filter:drop-shadow(0 0 5px var(--n2-left)) drop-shadow(0 0 14px var(--n2-left)) drop-shadow(0 0 28px var(--n2-left));opacity:.92}
+.n2-r40.field-home-secondary{z-index:3;background-color:var(--n2-left2);-webkit-mask:var(--n2-r40-field-home-secondary) center/100% 100% no-repeat;mask:var(--n2-r40-field-home-secondary) center/100% 100% no-repeat;filter:drop-shadow(0 0 4px var(--n2-left2)) drop-shadow(0 0 12px var(--n2-left));opacity:.82}
+.n2-r40.field-visitor-primary{z-index:2;background-color:var(--n2-right);-webkit-mask:var(--n2-r40-field-visitor-primary) center/100% 100% no-repeat;mask:var(--n2-r40-field-visitor-primary) center/100% 100% no-repeat;filter:drop-shadow(0 0 5px var(--n2-right)) drop-shadow(0 0 14px var(--n2-right)) drop-shadow(0 0 28px var(--n2-right));opacity:.92}
+.n2-r40.field-visitor-secondary{z-index:3;background-color:var(--n2-right2);-webkit-mask:var(--n2-r40-field-visitor-secondary) center/100% 100% no-repeat;mask:var(--n2-r40-field-visitor-secondary) center/100% 100% no-repeat;filter:drop-shadow(0 0 4px var(--n2-right2)) drop-shadow(0 0 12px var(--n2-right));opacity:.82}
+.n2-r40.ground-shadows{z-index:4;background-image:var(--n2-r40-ground-shadows);mix-blend-mode:multiply;opacity:.9}
+.n2-r40.player-occlusion{z-index:4;background-image:var(--n2-r40-player-occlusion);background-position:center;background-size:100% 100%;background-repeat:no-repeat;opacity:1}
+.n2-r40.ballcarrier-primary{z-index:5;background-color:var(--n2-left-raw);filter:saturate(1.16) contrast(1.04) brightness(.96);-webkit-mask:var(--n2-r40-ballcarrier-primary) center/100% 100% no-repeat;mask:var(--n2-r40-ballcarrier-primary) center/100% 100% no-repeat}
+.n2-r40.ballcarrier-secondary{z-index:6;background-color:var(--n2-left2);-webkit-mask:var(--n2-r40-ballcarrier-secondary) center/100% 100% no-repeat;mask:var(--n2-r40-ballcarrier-secondary) center/100% 100% no-repeat}
+.n2-r40.defender-primary{z-index:5;background-color:var(--n2-right-raw);filter:saturate(1.16) contrast(1.04) brightness(.96);-webkit-mask:var(--n2-r40-defender-primary) center/100% 100% no-repeat;mask:var(--n2-r40-defender-primary) center/100% 100% no-repeat}
+.n2-r40.defender-secondary{z-index:6;background-color:var(--n2-right2);-webkit-mask:var(--n2-r40-defender-secondary) center/100% 100% no-repeat;mask:var(--n2-r40-defender-secondary) center/100% 100% no-repeat}
+.n2-r40.master{z-index:7;background-image:var(--n2-r40-master)}
+.n2-r40.luminance{z-index:8;background-image:var(--n2-r40-luminance);mix-blend-mode:luminosity;opacity:.40}
+.n2-r40.shadows{z-index:9;background-image:var(--n2-r40-shadows);mix-blend-mode:multiply;opacity:.88}
+.n2-r40.highlights{z-index:10;background-image:var(--n2-r40-highlights);mix-blend-mode:screen;opacity:.62}
+.package-neon-r2[data-sport="football"] .n2-opening:after{z-index:11;opacity:.035 !important}
+
+/* Opaque player correction validation marker */
+
+
+/* Gate 15.2 R41E compatible adaptive basketball clash deployment. */
+.n2-r41{position:absolute;inset:0;pointer-events:none;background-position:center;background-size:100% 100%;background-repeat:no-repeat}
+.package-neon-r2[data-sport="basketball"] .n2-r41.environment{z-index:1;background-image:var(--n2-basketball-r41-environment)}
+.package-neon-r2[data-sport="basketball"] .n2-r41.env-home{z-index:2;background-color:var(--n2-left);-webkit-mask:var(--n2-basketball-r41-home-court) center/100% 100% no-repeat;mask:var(--n2-basketball-r41-home-court) center/100% 100% no-repeat;filter:drop-shadow(0 0 5px var(--n2-left)) drop-shadow(0 0 14px var(--n2-left));opacity:.96;mix-blend-mode:screen}
+.package-neon-r2[data-sport="basketball"] .n2-r41.env-visitor{z-index:2;background-color:var(--n2-right);-webkit-mask:var(--n2-basketball-r41-visitor-court) center/100% 100% no-repeat;mask:var(--n2-basketball-r41-visitor-court) center/100% 100% no-repeat;filter:drop-shadow(0 0 5px var(--n2-right)) drop-shadow(0 0 14px var(--n2-right));opacity:.96;mix-blend-mode:screen}
+.package-neon-r2[data-sport="basketball"] .n2-r41.home-rim{z-index:3;background-color:var(--n2-left);-webkit-mask:var(--n2-basketball-r41-home-rim) center/100% 100% no-repeat;mask:var(--n2-basketball-r41-home-rim) center/100% 100% no-repeat;filter:drop-shadow(0 0 8px var(--n2-left));opacity:.94;mix-blend-mode:screen}
+.package-neon-r2[data-sport="basketball"] .n2-r41.visitor-rim{z-index:3;background-color:var(--n2-right);-webkit-mask:var(--n2-basketball-r41-visitor-rim) center/100% 100% no-repeat;mask:var(--n2-basketball-r41-visitor-rim) center/100% 100% no-repeat;filter:drop-shadow(0 0 8px var(--n2-right));opacity:.94;mix-blend-mode:screen}
+.package-neon-r2[data-sport="basketball"] .n2-r41.underlay{z-index:4;background-image:var(--n2-basketball-r41-underlay)}
+.package-neon-r2[data-sport="basketball"] .n2-r41.home-primary{z-index:5;background-color:var(--n2-left-raw);-webkit-mask:var(--n2-basketball-r41-home) center/100% 100% no-repeat;mask:var(--n2-basketball-r41-home) center/100% 100% no-repeat}
+.package-neon-r2[data-sport="basketball"] .n2-r41.home-secondary{z-index:5;background-color:var(--n2-left2);-webkit-mask:var(--n2-basketball-r41-home-secondary) center/100% 100% no-repeat;mask:var(--n2-basketball-r41-home-secondary) center/100% 100% no-repeat}
+.package-neon-r2[data-sport="basketball"] .n2-r41.visitor-primary{z-index:5;background-color:var(--n2-right-raw);-webkit-mask:var(--n2-basketball-r41-visitor) center/100% 100% no-repeat;mask:var(--n2-basketball-r41-visitor) center/100% 100% no-repeat}
+.package-neon-r2[data-sport="basketball"] .n2-r41.visitor-secondary{z-index:5;background-color:var(--n2-right2);-webkit-mask:var(--n2-basketball-r41-visitor-secondary) center/100% 100% no-repeat;mask:var(--n2-basketball-r41-visitor-secondary) center/100% 100% no-repeat}
+.package-neon-r2[data-sport="basketball"] .n2-r41.ball-home{z-index:6;background-color:var(--n2-left);-webkit-mask:var(--n2-basketball-r41-ball-home) center/100% 100% no-repeat;mask:var(--n2-basketball-r41-ball-home) center/100% 100% no-repeat;filter:drop-shadow(0 0 8px var(--n2-left));opacity:.9;mix-blend-mode:screen}
+.package-neon-r2[data-sport="basketball"] .n2-r41.master{z-index:7;background-image:var(--n2-basketball-r41-master)}
+.package-neon-r2[data-sport="basketball"] .n2-r41.luminance{z-index:8;background-image:var(--n2-basketball-r41-luminance);mix-blend-mode:luminosity;opacity:.38}
+.package-neon-r2[data-sport="basketball"] .n2-r41.shadows{z-index:9;background-image:var(--n2-basketball-r41-shadows);mix-blend-mode:multiply;opacity:.86}
+.package-neon-r2[data-sport="basketball"] .n2-r41.highlights{z-index:10;background-image:var(--n2-basketball-r41-highlights);mix-blend-mode:screen;opacity:.58}
+.package-neon-r2[data-sport="basketball"] .n2-opening:after{opacity:.38;background:linear-gradient(90deg,color-mix(in srgb,var(--n2-left) 58%,transparent),transparent 40% 60%,color-mix(in srgb,var(--n2-right) 58%,transparent))}

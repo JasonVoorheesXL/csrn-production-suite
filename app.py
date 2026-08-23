@@ -1,20 +1,25 @@
 from __future__ import annotations
 
 import copy
-import io
 import json
+import hashlib
 import os
+import sys
 import re
 import secrets
-import socket
+import signal
 import time
+import shutil
+import tempfile
 from functools import wraps
 from pathlib import Path
+from datetime import date
 from threading import Lock
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 from urllib.parse import urlparse, quote
 
-from flask import Flask, jsonify, render_template, request, session, send_from_directory
+from flask import Flask, current_app, jsonify, session
+from application_factory import create_application
 from werkzeug.security import check_password_hash, generate_password_hash
 from PIL import Image, ImageChops
 from obs_client import (
@@ -24,30 +29,249 @@ from obs_client import (
     validate_obs_read_only,
 )
 from upgrade_manager import inspect_candidate, migrate
+from persistence_engine import JsonPersistenceEngine
+from core_repositories import (
+    ConfigurationRepository,
+    LocalMirroredStateRepository,
+    StateRepository,
+    SecurityRepository,
+)
+from security_service import SecurityService
+from broadcast_package_service import BroadcastPackageService
+from school_service import SchoolService
+from roster_service import RosterService
+from sponsor_service import SponsorService
+from venue_service import VenueService
+from broadcast_service import BroadcastService
+from broadcaster_print_service import BroadcasterPrintService
+from personnel_service import PersonnelService
+from asset_service import AssetService
+from graphics_service import GraphicsService
+from logo_service import LogoService
+from obs_service import OBSService
+from configuration_service import ConfigurationService
+from state_service import StateService
+from diagnostics_service import DiagnosticsService
+from upgrade_service import UpgradeService
+from event_service import EventService
+from penalty_service import PenaltyService
+from rules_service import RulesService
+from statistics_service import StatisticsService
+from game_operations_service import GameOperationsService
+from support_media_service import SupportMediaService
+from game_day_safety_service import GameDaySafetyService
+from recovery_service import RecoveryService
+from commissioning_service import HardwareOBSCommissioningService
+from caption_service import CaptionService
+from caption_worker import CaptionRuntime
+from weather_service import VenueWeatherService
+from operational_rehearsal_service import OperationalRehearsalService
+from product_paths import resolve_product_paths
+from entitlement_service import EntitlementService
+from deployment_service import DeploymentService
+from theme_service import GraphicsThemeService
+from social_service import SocialPublishingService
+from social_card_renderer import SocialCardRenderer
+from social_asset_resolver import SocialAssetResolver
+from social_platforms import default_adapter_registry
+from facebook_connection_service import (
+    FacebookConnectionService,
+    FacebookCredentialVault,
+)
+from recap_service import GroundedGameRecapService
+from broadcast_lifecycle_service import BroadcastLifecycleService
+from routes.system_routes import (
+    SystemRoutesDependencies,
+    create_system_blueprint,
+)
+from routes.coin_toss_routes import create_coin_toss_blueprint
+from routes.security_upgrade_routes import (
+    SecurityUpgradeRoutesDependencies,
+    create_security_upgrade_blueprint,
+)
+from routes.school_routes import (
+    SchoolRoutesDependencies,
+    create_school_blueprint,
+)
+from routes.association_routes import (
+    AssociationRoutesDependencies,
+    create_association_blueprint,
+)
+from routes.mhsaa_division_routes import create_mhsaa_division_blueprint
+from routes.personnel_routes import (
+    PersonnelRoutesDependencies,
+    create_personnel_blueprint,
+)
+from routes.roster_routes import (
+    RosterRoutesDependencies,
+    create_roster_blueprint,
+)
+from routes.venue_routes import (
+    VenueRoutesDependencies,
+    create_venue_blueprint,
+)
+from routes.asset_routes import (
+    AssetRoutesDependencies,
+    create_asset_blueprint,
+    start_isolated_media_server,
+)
+from routes.logo_routes import (
+    LogoRoutesDependencies,
+    create_logo_blueprint,
+)
+from routes.sponsor_routes import (
+    SponsorRoutesDependencies,
+    create_sponsor_blueprint,
+)
+from routes.broadcast_lifecycle_routes import (
+    BroadcastLifecycleRoutesDependencies,
+    create_broadcast_lifecycle_blueprint,
+)
+from routes.broadcast_package_routes import (
+    BroadcastPackageRoutesDependencies,
+    create_broadcast_package_blueprint,
+)
+from routes.broadcast_routes import (
+    BroadcastRoutesDependencies,
+    create_broadcast_blueprint,
+)
+from routes.graphics_routes import (
+    GraphicsRoutesDependencies,
+    create_graphics_blueprint,
+)
+from routes.obs_routes import (
+    OBSRoutesDependencies,
+    create_obs_blueprint,
+)
+from routes.live_game_routes import (
+    LiveGameRoutesDependencies,
+    create_live_game_blueprint,
+)
+from routes.page_routes import (
+    PageRoutesDependencies,
+    create_page_blueprint,
+)
+from routes.support_routes import (
+    SupportRoutesDependencies,
+    create_support_blueprint,
+)
+from routes.game_day_safety_routes import (
+    GameDaySafetyRoutesDependencies,
+    create_game_day_safety_blueprint,
+)
+from routes.recovery_routes import (
+    RecoveryRoutesDependencies,
+    create_recovery_blueprint,
+)
+from routes.commissioning_routes import (
+    CommissioningRoutesDependencies,
+    create_commissioning_blueprint,
+)
+from routes.caption_routes import (
+    CaptionRoutesDependencies,
+    create_caption_blueprint,
+)
+from routes.weather_routes import (
+    WeatherRoutesDependencies,
+    create_weather_blueprint,
+)
+from routes.rehearsal_routes import (
+    RehearsalRoutesDependencies,
+    create_rehearsal_blueprint,
+)
+from routes.deployment_routes import (
+    DeploymentRoutesDependencies,
+    create_deployment_blueprint,
+)
+from routes.theme_routes import (
+    ThemeRoutesDependencies,
+    create_theme_blueprint,
+)
+from routes.social_routes import (
+    SocialRoutesDependencies,
+    create_social_blueprint,
+)
+from routes.recap_routes import (
+    RecapRoutesDependencies,
+    create_recap_blueprint,
+)
+from association_import_service import AssociationImportService
+from association_supplement_service import AssociationSupplementService
+from association_profile_service import AssociationProfileService
+from association_source_service import AssociationSourceService
+from dragonfly_service import DragonFlyService
+from dragonfly_sync_service import DragonFlySyncService
+from association_workflow_service import AssociationWorkflowService
+from school_repository import SchoolRepository
+from roster_repository import RosterRepository
+from sponsor_repository import SponsorRepository
+from venue_repository import VenueRepository
+from broadcast_repository import BroadcastRepository
+
+# Phase 3 repository boundaries remain integrated below.
 
 BASE_DIR = Path(__file__).resolve().parent
-STATE_FILE = BASE_DIR / "state.json"
-SECURITY_FILE = BASE_DIR / "security.json"
-DATA_DIR = BASE_DIR / "Data"
+PRODUCT_PATHS = resolve_product_paths(
+    BASE_DIR,
+    frozen=bool(getattr(sys, "frozen", False) or "--installed" in sys.argv),
+)
+OVERLAY_SCHEMA_REVISION = "gate6-logo-fallback-v1"
+PRODUCT_PATHS.ensure()
+STATE_FILE = PRODUCT_PATHS.state_file
+SECURITY_FILE = PRODUCT_PATHS.security_file
+DATA_DIR = PRODUCT_PATHS.data_dir
 CONFIG_FILE = DATA_DIR / "Settings" / "config.json"
 SCHOOLS_FILE = DATA_DIR / "Schools" / "schools.json"
 BROADCASTERS_FILE = DATA_DIR / "Settings" / "broadcasters.json"
 ROSTERS_FILE = DATA_DIR / "Rosters" / "rosters.json"
 HEADSHOTS_DIR = DATA_DIR / "Rosters" / "Headshots"
 PERSONNEL_HEADSHOTS_DIR = DATA_DIR / "Personnel" / "Headshots"
+ASSETS_FILE = DATA_DIR / "Assets" / "assets.json"
+ASSET_UPLOAD_DIR = DATA_DIR / "Assets" / "Files"
+SPONSORS_FILE = DATA_DIR / "Sponsors" / "sponsors.json"
+SPONSOR_UPLOAD_DIR = DATA_DIR / "Sponsors" / "Logos"
 VENUES_FILE = DATA_DIR / "Venues" / "venues.json"
 LOGOS_FILE = DATA_DIR / "Logos" / "logos.json"
 IMPORTS_DIR = DATA_DIR / "Imports"
+ASSOCIATION_PROFILES_DIR = IMPORTS_DIR / "Profiles"
 MHSAA_5A_FILE = IMPORTS_DIR / "mhsaa_2025_27_football_5a.json"
 MHSAA_5A_ENRICHMENT_FILE = IMPORTS_DIR / "mhsaa_5a_enrichment.json"
 MHSAA_5A_BRANDING_FILE = IMPORTS_DIR / "mhsaa_5a_branding.json"
+MHSAA_5A_PROFILE_FILE = (
+    IMPORTS_DIR
+    / "Profiles"
+    / "mhsaa_football_5a_2025_27.json"
+)
 BROADCAST_INDEX_FILE = DATA_DIR / "Broadcasts" / "broadcasts.json"
+PACKAGES_FILE = DATA_DIR / "Packages" / "broadcast_packages.json"
 BUILD_JOURNAL_FILE = DATA_DIR / "Logs" / "build_journal.json"
+VERSION_FILE = BASE_DIR / "VERSION.txt"
+GAME_DAY_BACKUP_DIR = DATA_DIR / "Backups" / "GameDay"
+GAME_DAY_RECOVERY_DIR = DATA_DIR / "Backups" / "Recovery"
+COMMISSIONING_FILE = DATA_DIR / "Settings" / "hardware_commissioning.json"
+CAPTION_PROFILE_FILE = DATA_DIR / "Settings" / "caption_profile.json"
+CAPTION_STATE_FILE = DATA_DIR / "Captions" / "caption_state.json"
+CAPTION_TRANSCRIPTS_DIR = DATA_DIR / "Captions" / "Transcripts"
+WEATHER_STATE_FILE = DATA_DIR / "Weather" / "weather_state.json"
+REHEARSAL_STATE_FILE = DATA_DIR / "Rehearsals" / "rehearsals.json"
+RELEASE_MANIFEST_FILE = DATA_DIR / "Releases" / "game_day_release_manifest.json"
+THEME_STATE_FILE = DATA_DIR / "Themes" / "theme_state.json"
+SOCIAL_STATE_FILE = DATA_DIR / "Social" / "social_state.json"
+SOCIAL_CARDS_DIR = DATA_DIR / "Social" / "Cards"
+FACEBOOK_CONNECTION_FILE = DATA_DIR / "Social" / "facebook_connection.json"
+FACEBOOK_CREDENTIAL_FILE = DATA_DIR / "Social" / "facebook_credentials.dat"
+RECAP_STATE_FILE = DATA_DIR / "Recaps" / "recaps.json"
 
-app = Flask(__name__)
+APPLICATION_BLUEPRINTS: list[Any] = []
 lock = Lock()
 obs_status_lock = Lock()
 upgrade_lock = Lock()
+roster_io_lock = Lock()
+_roster_recovery_checked = False
+_roster_cache: list[dict[str, Any]] | None = None
+_roster_cache_mtime_ns: int | None = None
+for _path in (SPONSORS_FILE.parent, SPONSOR_UPLOAD_DIR, PACKAGES_FILE.parent):
+    _path.mkdir(parents=True, exist_ok=True)
 last_upgrade_report: dict[str, Any] = {
     "status": "NOT_RUN",
     "source_build": "",
@@ -84,7 +308,14 @@ DEFAULT_STATE: dict[str, Any] = {
     "down": "1st",
     "distance": "Off",
     "clock_visible": False,
+    "clock_seconds": 720,
+    "clock_running": False,
+    "clock_started_at": 0,
+    "home_direction": "right",
+    "visitor_direction": "left",
     "possession": "home",
+    "coin_toss": {"recorded": False},
+    "second_half_receiving_team": "",
     "scorebug_visible": False,
     "visual_mode": "graphic",
     "broadcast_phase": "pregame",
@@ -93,13 +324,34 @@ DEFAULT_STATE: dict[str, Any] = {
     "season": "",
     "week": "1",
     "classification": "",
+    "home_classification": "",
+    "home_region": "",
+    "visitor_classification": "",
+    "visitor_region": "",
+    "home_pregame_record": {"wins": 0, "losses": 0, "ties": 0},
+    "home_pregame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+    "visitor_pregame_record": {"wins": 0, "losses": 0, "ties": 0},
+    "visitor_pregame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+    "contest_type": "official",
+    "record_policy": "official",
+    "region_game": False,
+    "special_designations": [],
+    "record_tracking": {},
     "venue_id": "",
     "status": "planned",
     "history": [],
     "events": [],
+    "plays": [],
     "last_event": {},
+    "next_play_number": 1,
+    "ball_spot": "",
+    "ball_spot_visible": True,
+    "correction_log": [],
+    "game_data_authority": "broadcaster",
+    "statistician_enabled": False,
     "ticker_visible": True,
-    "ticker_speed": "normal",
+    "ticker_speed": "slow",
+    "ticker_pause": 2,
     "production_type": "game",
     "lower_third": {
         "visible": False,
@@ -117,7 +369,7 @@ DEFAULT_STATE: dict[str, Any] = {
     "personnel_graphic": {
         "visible": False, "personnel_id": "", "graphic_type": "coach_id", "full_name": "", "display_name": "",
         "title": "", "role": "", "organization": "", "headshot": "", "logo": "", "accent": "#C9203B",
-        "eyebrow": "COACH", "sponsor_lead_in": "", "sponsor_name": "", "sponsor_logo": "", "duration": 0,
+        "eyebrow": "COACH", "sponsor_id": "", "sponsor_lead_in": "", "sponsor_name": "", "sponsor_logo": "", "duration": 0,
         "expires_at": 0, "updated_at": 0
     },
     "player_graphic": {
@@ -138,7 +390,9 @@ DEFAULT_STATE: dict[str, Any] = {
         "team_logo": "",
         "team_name": "",
         "team_color": "#C9203B",
+        "play_detail": "",
         "eyebrow": "PLAYER PROFILE",
+        "sponsor_id": "",
         "sponsor_lead_in": "",
         "sponsor_name": "",
         "sponsor_logo": "",
@@ -146,6 +400,45 @@ DEFAULT_STATE: dict[str, Any] = {
         "expires_at": 0,
         "updated_at": 0
     },
+    "player_highlight": {
+        "visible": False,
+        "roster_id": "",
+        "player_id": "",
+        "school_id": "",
+        "full_name": "",
+        "display_name": "",
+        "number": "",
+        "position": "",
+        "grade": "",
+        "team_logo": "",
+        "team_name": "",
+        "team_color": "#C9203B",
+        "eyebrow": "PLAYER HIGHLIGHT",
+        "detail": "",
+        "media_asset_id": "",
+        "media_name": "",
+        "media_url": "",
+        "media_type": "video",
+        "duration": 0,
+        "expires_at": 0,
+        "updated_at": 0
+    },
+    "sponsor_spotlight": {
+        "visible": False,
+        "sponsor_id": "",
+        "sponsor_name": "",
+        "sponsor_logo": "",
+        "lead_in": "SPONSOR SPOTLIGHT",
+        "caption": "",
+        "media_asset_id": "",
+        "media_name": "",
+        "media_url": "",
+        "media_type": "image",
+        "duration": 0,
+        "expires_at": 0,
+        "updated_at": 0
+    },
+    "graphics_queue": [],
 }
 
 DEFAULT_SECURITY: dict[str, Any] = {
@@ -156,7 +449,97 @@ DEFAULT_SECURITY: dict[str, Any] = {
 }
 
 
-DEFAULT_CONFIG: dict[str, Any] = {'organization': {'name': 'Caledonia Sports Radio Network', 'short_name': 'CSRN', 'logo_path': 'static/csrn-logo.png', 'primary_color': '#C9203B', 'secondary_color': '#000000', 'accent_color': '#FFFFFF'}, 'broadcast_defaults': {'venue': 'Caledonia High School', 'sport': 'Football', 'timezone': 'America/Chicago', 'theme': 'CSRN Dark', 'home_school_id': 'caledonia', 'visual_mode': 'graphic'}, 'folders': {'graphics': 'Graphics', 'assets': 'Assets', 'obs': 'OBS', 'broadcast_archive': 'Data/Broadcasts', 'exports': 'Exports', 'backups': 'Data/Backups'}, 'obs': {'websocket_enabled': False, 'controlled_commands': False, 'host': '127.0.0.1', 'port': 4455, 'password': '', 'scene_collection': 'CSRN Master', 'profile': 'CSRN Production', 'required_scene': '10.01 - FOOTBALL SCOREBUG', 'browser_source': 'BRWSR - Football Scorebug', 'program_visual_scene': '10.02 - PROGRAM VISUAL', 'graphic_source': 'IMG - Broadcast Background', 'camera_source': 'CAM - Primary Camera'}, 'weather': {'use_home_venue_address': True, 'default_alert_radius_miles': 25}, 'social': {'facebook': '', 'youtube': '', 'x': '', 'website': ''}, 'application': {'version': 'Version 1.4 Alpha — Player Graphics Engine v1', 'build': 'V1.4A-PLAYERGRAPHICS1', 'automatic_backup': True, 'auto_save': True, 'operator_timeout_hours': 12, 'upgrade_manager_enabled': True, 'last_migration_status': ''}}
+RUNTIME_VERSION = (
+    "Version 1.13.0-alpha.8f — Player Identity Repair and Source Alignment"
+)
+RUNTIME_BUILD = "V1.13A8F-SOURCE-ALIGNMENT"
+
+
+DEFAULT_CONFIG: dict[str, Any] = {
+    "organization": {
+        "name": "Caledonia Sports Radio Network",
+        "short_name": "CSRN",
+        "logo_path": "static/csrn-logo.png",
+        "primary_color": "#C9203B",
+        "secondary_color": "#000000",
+        "accent_color": "#FFFFFF",
+    },
+    "broadcast_defaults": {
+        "venue": "Caledonia High School",
+        "sport": "Football",
+        "timezone": "America/Chicago",
+        "theme": "CSRN Dark",
+        "home_school_id": "caledonia",
+        "visual_mode": "graphic",
+    },
+    "folders": {
+        "graphics": "Graphics",
+        "assets": "Assets",
+        "obs": "OBS",
+        "broadcast_archive": "Data/Broadcasts",
+        "exports": "Exports",
+        "backups": "Data/Backups",
+    },
+    "obs": {
+        "websocket_enabled": False,
+        "controlled_commands": False,
+        "host": "127.0.0.1",
+        "port": 4455,
+        "password": "",
+        "scene_collection": "CSRN Master",
+        "profile": "CSRN Production",
+        "required_scene": "10.01 - FOOTBALL SCOREBUG",
+        "browser_source": "BRWSR - Football Scorebug",
+        "program_visual_scene": "10.02 - PROGRAM VISUAL",
+        "graphic_source": "IMG - Broadcast Background",
+        "camera_source": "CAM - Primary Camera",
+    },
+    "weather": {
+        "use_home_venue_address": True,
+        "default_alert_radius_miles": 25,
+        "refresh_seconds": 60,
+        "stale_after_seconds": 180,
+        "user_agent": "CSRN-Production-Suite/1.13 (operator-configurable)",
+    },
+    "licensing": {
+        "provider": "",
+        "enforcement_mode": "installed_only",
+        "activation_endpoint": "",
+    },
+    "graphics_theme": {
+        "active_preset": "modern_network",
+        "school_color_adaptation": True,
+        "season_lock": False,
+    },
+    "social": {
+        "facebook": "",
+        "youtube": "",
+        "x": "",
+        "website": "",
+        "publishing": {
+            "preview_first": True,
+            "auto_create_drafts": False,
+            "allow_auto_publish": False,
+            "facebook_credential_ref": "CSRN_FACEBOOK_SECURE_PAGE_TOKEN",
+            "facebook_api_version": "v25.0",
+            "facebook_connection": "local_oauth_test",
+            "x_mode": "assisted_manual",
+            "x_oauth": False,
+            "x_api": False,
+            "x_auto_queue": False,
+        },
+    },
+    "application": {
+        "version": RUNTIME_VERSION,
+        "build": RUNTIME_BUILD,
+        "rules_edition": "NFHS",
+        "automatic_backup": True,
+        "auto_save": True,
+        "operator_timeout_hours": 12,
+        "upgrade_manager_enabled": True,
+        "last_migration_status": "",
+    },
+}
 
 SESSION_SECONDS = 12 * 60 * 60
 MAX_ATTEMPTS = 3
@@ -164,64 +547,205 @@ LOCKOUT_SECONDS = 60
 
 
 def ensure_data_architecture() -> None:
-    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Statistics", "Logs", "Backups", "Settings"):
+    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings", "Rehearsals", "Releases", "Themes", "Social", "Recaps"):
         (DATA_DIR / name).mkdir(parents=True, exist_ok=True)
+    ASSOCIATION_PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     PERSONNEL_HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+    ASSET_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    SPONSOR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    SOCIAL_CARDS_DIR.mkdir(parents=True, exist_ok=True)
+
+CORE_BACKUP_DIR = DATA_DIR / "Backups" / "Core"
+CORE_QUARANTINE_DIR = DATA_DIR / "Backups" / "Quarantine"
+CORE_PERSISTENCE = JsonPersistenceEngine(CORE_BACKUP_DIR, CORE_QUARANTINE_DIR)
+CONFIG_REPOSITORY = ConfigurationRepository(
+    CORE_PERSISTENCE,
+    CONFIG_FILE,
+    DEFAULT_CONFIG,
+    runtime_identity={
+    "version": RUNTIME_VERSION,
+    "build": RUNTIME_BUILD,
+},
+)
+
+def _local_state_authority_path() -> Path:
+    explicit = os.environ.get("CSRN_STATE_AUTHORITY_FILE", "").strip()
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    root = os.environ.get("LOCALAPPDATA", "").strip()
+    base = Path(root).expanduser() if root else Path.home() / ".possumfrog"
+    candidate = base / "PossumFrog" / "CSRN Production Suite" / "GameDay" / "state.json"
+    try:
+        candidate.parent.mkdir(parents=True, exist_ok=True)
+        return candidate
+    except OSError:
+        return Path(tempfile.gettempdir()) / "CSRN" / "GameDay" / "state.json"
+
+
+def _drive_backed_game_day_state() -> bool:
+    explicit = os.environ.get("CSRN_GAME_DAY_LOCAL_STATE", "").strip().lower()
+    if explicit in {"0", "false", "no", "off"}:
+        return False
+    if explicit in {"1", "true", "yes", "on"}:
+        return True
+    return any(part.lower() in {"my drive", "google drive"} for part in STATE_FILE.parts)
+
+STATE_AUTHORITY_PATH = _local_state_authority_path()
+DRIVE_BACKED_GAME_DAY_STATE = _drive_backed_game_day_state()
+STATE_REPOSITORY = (
+    LocalMirroredStateRepository(
+        CORE_PERSISTENCE,
+        authority_path=STATE_AUTHORITY_PATH,
+        mirror_path=STATE_FILE,
+        defaults=DEFAULT_STATE,
+    )
+    if DRIVE_BACKED_GAME_DAY_STATE
+    else StateRepository(CORE_PERSISTENCE, STATE_FILE, DEFAULT_STATE)
+)
+SECURITY_REPOSITORY = SecurityRepository(CORE_PERSISTENCE, SECURITY_FILE, DEFAULT_SECURITY)
+SECURITY_SERVICE = SecurityService(
+    SECURITY_REPOSITORY,
+    max_attempts=MAX_ATTEMPTS,
+    lockout_seconds=LOCKOUT_SECONDS,
+)
+
 
 def load_config() -> dict[str, Any]:
     ensure_data_architecture()
-    if not CONFIG_FILE.exists():
-        save_json(CONFIG_FILE, DEFAULT_CONFIG)
-        return copy.deepcopy(DEFAULT_CONFIG)
-    try:
-        loaded = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        loaded = copy.deepcopy(DEFAULT_CONFIG)
-        save_json(CONFIG_FILE, loaded)
-    merged = copy.deepcopy(DEFAULT_CONFIG)
-    for section, values in loaded.items():
-        if isinstance(values, dict) and isinstance(merged.get(section), dict):
-            merged[section].update(values)
-        else:
-            merged[section] = values
-    # Application identity always follows the running package, including after migration.
-    merged.setdefault("application", {})["version"] = "Version 1.5 Alpha — Personnel Engine v1"
-    merged["application"]["build"] = "V1.5A-PERSONNEL1-R2"
-    return merged
+    return CONFIG_REPOSITORY.load()
+
 
 def save_config(config: dict[str, Any]) -> None:
     ensure_data_architecture()
-    save_json(CONFIG_FILE, config)
+    CONFIG_REPOSITORY.save(config)
+
+
+def update_config_values(
+    patch: dict[str, Any],
+) -> dict[str, Any]:
+    ensure_data_architecture()
+    return CONFIG_REPOSITORY.update(patch)
+
+
+CONFIGURATION_SERVICE: ConfigurationService | None = None
+
+
+def get_configuration_service() -> ConfigurationService:
+    global CONFIGURATION_SERVICE
+    if CONFIGURATION_SERVICE is None:
+        CONFIGURATION_SERVICE = ConfigurationService(
+            load_config=load_config,
+            save_config=save_config,
+            runtime_version=RUNTIME_VERSION,
+            runtime_build=RUNTIME_BUILD,
+        )
+    return CONFIGURATION_SERVICE
+
+
+def application_identity() -> dict[str, str]:
+    """Return package identity from VERSION.txt with safe config fallbacks."""
+    cfg = load_config()
+    application = cfg.get("application", {})
+    version = str(
+        application.get("version") or RUNTIME_VERSION
+    )
+    build = str(
+        application.get("build") or RUNTIME_BUILD
+    )
+    product = "CSRN Production Suite"
+    if VERSION_FILE.exists():
+        try:
+            lines = [line.strip() for line in VERSION_FILE.read_text(encoding="utf-8").splitlines() if line.strip()]
+            if lines:
+                product = lines[0]
+            version_line = next((line for line in lines if line.lower().startswith("version ")), "")
+            feature_line = next((line for line in lines if line.lower().endswith("v1") or "library" in line.lower()), "")
+            build_line = next((line for line in lines if line.lower().startswith("build ")), "")
+            if version_line:
+                version = version_line
+                if feature_line and feature_line != version_line:
+                    version = f"{version_line} — {feature_line}"
+            if build_line:
+                build = build_line.removeprefix("Build ").strip()
+        except OSError:
+            pass
+    return {"product": product, "version": version, "build": build}
+
+
+def load_packages() -> list[dict[str, Any]]:
+    data = load_json(PACKAGES_FILE, {"packages": []})
+    items = data if isinstance(data, list) else data.get("packages", [])
+    return [x for x in items if isinstance(x, dict)]
+
+def save_packages(items: list[dict[str, Any]]) -> None:
+    PACKAGES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    PACKAGES_FILE.write_text(json.dumps({"packages": items}, indent=2), encoding="utf-8")
+
+BROADCAST_PACKAGE_SERVICE: BroadcastPackageService | None = None
+
+
+def get_broadcast_package_service() -> BroadcastPackageService:
+    global BROADCAST_PACKAGE_SERVICE
+
+    if BROADCAST_PACKAGE_SERVICE is None:
+        BROADCAST_PACKAGE_SERVICE = BroadcastPackageService(
+            load_packages=load_packages,
+            save_packages=save_packages,
+            load_broadcasts=load_broadcasts,
+            load_rosters=load_rosters,
+            load_personnel=load_broadcasters,
+            load_sponsors=load_sponsors,
+            load_config=load_config,
+            sponsor_contract_state=sponsor_contract_state,
+            load_state=load_state,
+            save_state=save_state,
+        )
+
+    return BROADCAST_PACKAGE_SERVICE
+
+
+def package_health(package: dict[str, Any]) -> dict[str, Any]:
+    return get_broadcast_package_service().health(package)
+
+
+def package_record(
+    data: dict[str, Any],
+    existing: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return get_broadcast_package_service().record(data, existing)
+
+
+DIAGNOSTICS_SERVICE: DiagnosticsService | None = None
+
+
+def get_diagnostics_service() -> DiagnosticsService:
+    global DIAGNOSTICS_SERVICE
+    if DIAGNOSTICS_SERVICE is None:
+        DIAGNOSTICS_SERVICE = DiagnosticsService(
+            base_dir=BASE_DIR,
+            data_dir=DATA_DIR,
+            config_file=CONFIG_FILE,
+            schools_file=SCHOOLS_FILE,
+            broadcasters_file=BROADCASTERS_FILE,
+            rosters_file=ROSTERS_FILE,
+            venues_file=VENUES_FILE,
+            logos_file=LOGOS_FILE,
+            packages_file=PACKAGES_FILE,
+            assets_file=ASSETS_FILE,
+            sponsors_file=SPONSORS_FILE,
+            load_config=load_config,
+            load_state=load_state,
+            public_state=public_state,
+            load_obs_status=load_obs_status,
+            authenticated=authenticated,
+            migrate_venues=migrate_venue_names,
+        )
+    return DIAGNOSTICS_SERVICE
+
 
 def diagnostic_status() -> dict[str, Any]:
-    cfg = load_config()
-    required = {
-        "Configuration": CONFIG_FILE,
-        "Data folder": DATA_DIR,
-        "Schools folder": DATA_DIR / "Schools",
-        "Broadcasts folder": DATA_DIR / "Broadcasts",
-        "Backups folder": DATA_DIR / "Backups",
-        "Logo file": BASE_DIR / cfg["organization"].get("logo_path", "static/csrn-logo.png"),
-        "School database": SCHOOLS_FILE,
-        "Broadcaster profiles": BROADCASTERS_FILE,
-        "Roster database": ROSTERS_FILE,
-        "Venue database": VENUES_FILE,
-        "Logo database": LOGOS_FILE,
-    }
-    return {
-        "checks": [
-            {"name": name, "ok": path.exists(), "path": str(path)}
-            for name, path in required.items()
-        ],
-        "version": cfg["application"].get("version", "1.0 Alpha"),
-        "build": cfg["application"].get("build", "0007"),
-        "authenticated": authenticated(),
-        "config_file": str(CONFIG_FILE),
-        "data_folder": str(DATA_DIR),
-        "obs": copy.deepcopy(last_obs_status),
-    }
-
+    return get_diagnostics_service().diagnostics().data["diagnostics"]
 
 
 def normalize_school_id(value: str) -> str:
@@ -296,40 +820,286 @@ def ensure_school_schema(school: dict[str, Any], schools: list[dict[str, Any]]) 
     metadata["scorebug_derivative"] = "256x256-round"
     return school
 
+SCHOOL_REPOSITORY = SchoolRepository(
+    CORE_PERSISTENCE,
+    SCHOOLS_FILE,
+    school_normalizer=ensure_school_schema,
+    collection_normalizer=reconcile_5a_csrn_ids,
+)
+
 def load_schools() -> list[dict[str, Any]]:
     ensure_data_architecture()
-    if not SCHOOLS_FILE.exists():
-        save_json(SCHOOLS_FILE, {"schools": []})
-    raw = load_json(SCHOOLS_FILE, {"schools": []})
-    if isinstance(raw, list):
-        schools = raw
-    else:
-        schools = raw.get("schools", [])
-    if not isinstance(schools, list):
-        return []
-    changed = reconcile_5a_csrn_ids(schools)
-    for school in schools:
-        before = json.dumps(school, sort_keys=True)
-        ensure_school_schema(school, schools)
-        changed = changed or before != json.dumps(school, sort_keys=True)
-    if changed:
-        save_schools(schools)
-    return schools
+    return SCHOOL_REPOSITORY.load()
 
 def save_schools(schools: list[dict[str, Any]]) -> None:
     ensure_data_architecture()
-    SCHOOLS_FILE.write_text(json.dumps(schools, indent=2), encoding="utf-8")
+    SCHOOL_REPOSITORY.save(schools)
+
+
+SCHOOL_SERVICE: SchoolService | None = None
+
+
+def get_school_service() -> SchoolService:
+    global SCHOOL_SERVICE
+
+    if SCHOOL_SERVICE is None:
+        SCHOOL_SERVICE = SchoolService(
+            load_schools=load_schools,
+            save_schools=save_schools,
+            load_logos=load_logos,
+            save_logos=save_logos,
+        )
+
+    return SCHOOL_SERVICE
+
+
+VENUE_REPOSITORY = VenueRepository(
+    CORE_PERSISTENCE,
+    VENUES_FILE,
+)
 
 
 def load_venues() -> list[dict[str, Any]]:
     ensure_data_architecture()
-    if not VENUES_FILE.exists():
-        save_json(VENUES_FILE, [])
-    data = load_json(VENUES_FILE, [])
-    return data if isinstance(data, list) else data.get("venues", [])
+    return VENUE_REPOSITORY.load()
+
 
 def save_venues(items: list[dict[str, Any]]) -> None:
-    save_json(VENUES_FILE, items)
+    ensure_data_architecture()
+    VENUE_REPOSITORY.save(items)
+
+
+VENUE_SERVICE: VenueService | None = None
+
+
+def get_venue_service() -> VenueService:
+    global VENUE_SERVICE
+
+    if VENUE_SERVICE is None:
+        VENUE_SERVICE = VenueService(
+            load_venues=load_venues,
+            save_venues=save_venues,
+            load_schools=load_schools,
+            load_broadcasts=load_broadcasts,
+        )
+
+    return VENUE_SERVICE
+
+
+ASSOCIATION_IMPORT_SERVICE: AssociationImportService | None = None
+
+
+def get_association_import_service() -> AssociationImportService:
+    global ASSOCIATION_IMPORT_SERVICE
+
+    if ASSOCIATION_IMPORT_SERVICE is None:
+        ASSOCIATION_IMPORT_SERVICE = AssociationImportService(
+            school_service=get_school_service(),
+            load_schools=load_schools,
+            load_venues=load_venues,
+            save_venues=save_venues,
+        )
+
+    return ASSOCIATION_IMPORT_SERVICE
+
+
+ASSOCIATION_SUPPLEMENT_SERVICE: AssociationSupplementService | None = None
+
+
+def get_association_supplement_service() -> AssociationSupplementService:
+    global ASSOCIATION_SUPPLEMENT_SERVICE
+
+    if ASSOCIATION_SUPPLEMENT_SERVICE is None:
+        ASSOCIATION_SUPPLEMENT_SERVICE = AssociationSupplementService(
+            load_schools=load_schools,
+            save_schools=save_schools,
+            load_venues=load_venues,
+            save_venues=save_venues,
+        )
+
+    return ASSOCIATION_SUPPLEMENT_SERVICE
+
+
+ASSOCIATION_PROFILE_SERVICE: AssociationProfileService | None = None
+
+
+def get_association_profile_service() -> AssociationProfileService:
+    global ASSOCIATION_PROFILE_SERVICE
+
+    if ASSOCIATION_PROFILE_SERVICE is None:
+        ASSOCIATION_PROFILE_SERVICE = AssociationProfileService(
+            ASSOCIATION_PROFILES_DIR,
+            protected_ids={"mhsaa-football-5a-2025-27"},
+        )
+
+    return ASSOCIATION_PROFILE_SERVICE
+
+
+ASSOCIATION_SOURCE_SERVICE: AssociationSourceService | None = None
+
+
+def get_association_source_service() -> AssociationSourceService:
+    global ASSOCIATION_SOURCE_SERVICE
+
+    if ASSOCIATION_SOURCE_SERVICE is None:
+        ASSOCIATION_SOURCE_SERVICE = AssociationSourceService()
+
+    return ASSOCIATION_SOURCE_SERVICE
+
+
+DRAGONFLY_SERVICE: DragonFlyService | None = None
+
+
+def get_dragonfly_service() -> DragonFlyService:
+    global DRAGONFLY_SERVICE
+
+    if DRAGONFLY_SERVICE is None:
+        DRAGONFLY_SERVICE = DragonFlyService()
+
+    return DRAGONFLY_SERVICE
+
+
+DRAGONFLY_SYNC_SERVICE: DragonFlySyncService | None = None
+
+
+def get_dragonfly_sync_service() -> DragonFlySyncService:
+    global DRAGONFLY_SYNC_SERVICE
+
+    if DRAGONFLY_SYNC_SERVICE is None:
+        DRAGONFLY_SYNC_SERVICE = DragonFlySyncService(
+            dragonfly_service=get_dragonfly_service(),
+            load_schools=load_schools,
+            load_rosters=load_rosters,
+            save_rosters=save_rosters,
+        )
+
+    return DRAGONFLY_SYNC_SERVICE
+
+
+ASSOCIATION_WORKFLOW_SERVICE: AssociationWorkflowService | None = None
+
+
+def get_association_workflow_service() -> AssociationWorkflowService:
+    global ASSOCIATION_WORKFLOW_SERVICE
+
+    if ASSOCIATION_WORKFLOW_SERVICE is None:
+        ASSOCIATION_WORKFLOW_SERVICE = AssociationWorkflowService(
+            source_service=get_association_source_service(),
+            import_service=get_association_import_service(),
+        )
+
+    return ASSOCIATION_WORKFLOW_SERVICE
+
+def load_assets() -> list[dict[str, Any]]:
+    ensure_data_architecture()
+    if not ASSETS_FILE.exists():
+        save_json(ASSETS_FILE, [])
+        return []
+    try:
+        data = json.loads(ASSETS_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    return data if isinstance(data, list) else data.get("assets", [])
+
+
+def save_assets(items: list[dict[str, Any]]) -> None:
+    save_json(ASSETS_FILE, items)
+
+
+ASSET_SERVICE: AssetService | None = None
+
+
+def get_asset_service() -> AssetService:
+    global ASSET_SERVICE
+    if ASSET_SERVICE is None:
+        ASSET_SERVICE = AssetService(
+            load_assets=load_assets,
+            save_assets=save_assets,
+        )
+    return ASSET_SERVICE
+
+
+def asset_by_id(asset_id: str) -> dict[str, Any] | None:
+    result = get_asset_service().read(asset_id)
+    return result.data.get("asset") if result.ok else None
+
+
+def asset_file_hash(path: Path) -> str:
+    return AssetService.file_hash(path)
+
+
+SPONSOR_REPOSITORY = SponsorRepository(
+    CORE_PERSISTENCE,
+    SPONSORS_FILE,
+)
+
+
+def load_sponsors() -> list[dict[str, Any]]:
+    ensure_data_architecture()
+    return SPONSOR_REPOSITORY.load()
+
+
+def save_sponsors(items: list[dict[str, Any]]) -> None:
+    ensure_data_architecture()
+    SPONSOR_REPOSITORY.save(items)
+
+
+SPONSOR_SERVICE: SponsorService | None = None
+
+
+def get_sponsor_service() -> SponsorService:
+    global SPONSOR_SERVICE
+
+    if SPONSOR_SERVICE is None:
+        SPONSOR_SERVICE = SponsorService(
+            load_sponsors=load_sponsors,
+            save_sponsors=save_sponsors,
+            load_assets=load_assets,
+        )
+
+    return SPONSOR_SERVICE
+
+
+def sponsor_logo_assets() -> list[dict[str, Any]]:
+    return get_sponsor_service().logo_assets()
+
+
+def sponsor_contract_state(record: dict[str, Any]) -> str:
+    return get_sponsor_service().contract_state(record)
+
+
+def clean_sponsor_record(
+    data: dict[str, Any],
+    sponsor_id: str | None = None,
+) -> dict[str, Any]:
+    return get_sponsor_service().clean_record(data, sponsor_id)
+
+
+def active_sponsor_by_id(sponsor_id: str) -> dict[str, Any] | None:
+    return get_sponsor_service().active_sponsor_by_id(sponsor_id)
+
+
+def apply_sponsor_to_graphic(
+    graphic: dict[str, Any],
+    incoming: dict[str, Any],
+) -> str:
+    result = get_sponsor_service().apply_to_graphic(graphic, incoming)
+    graphic.clear()
+    graphic.update(result.data["graphic"])
+    return str(result.data.get("warning", ""))
+
+
+def clean_asset_record(
+    incoming: dict[str, Any],
+    existing_id: str = "",
+) -> dict[str, Any]:
+    existing = asset_by_id(existing_id) if existing_id else None
+    return get_asset_service().clean_record(
+        incoming,
+        existing_id,
+        existing=existing,
+    )
+
 
 def load_logos() -> list[dict[str, Any]]:
     ensure_data_architecture()
@@ -341,31 +1111,130 @@ def load_logos() -> list[dict[str, Any]]:
 def save_logos(items: list[dict[str, Any]]) -> None:
     save_json(LOGOS_FILE, items)
 
-def load_broadcasts() -> list[dict[str, Any]]:
-    ensure_data_architecture()
-    if not BROADCAST_INDEX_FILE.exists():
-        save_json(BROADCAST_INDEX_FILE, [])
-    data = load_json(BROADCAST_INDEX_FILE, [])
-    items = data if isinstance(data, list) else data.get("broadcasts", [])
-    if not isinstance(items, list):
-        return []
+
+LOGO_SERVICE: LogoService | None = None
+
+
+def get_logo_service() -> LogoService:
+    global LOGO_SERVICE
+    if LOGO_SERVICE is None:
+        LOGO_SERVICE = LogoService(
+            load_schools=load_schools,
+            save_schools=save_schools,
+            load_logos=load_logos,
+            save_logos=save_logos,
+            normalize_school_id=normalize_school_id,
+        )
+    return LOGO_SERVICE
+
+def _normalize_broadcast_lifecycle(
+    items: list[dict[str, Any]],
+) -> bool:
+    """Migrate obsolete broadcast lifecycle values."""
+
     changed = False
+
     for item in items:
-        # Prepared was removed from the operator lifecycle in Version 1.0 Alpha Hotfix 2.
+        # Prepared was removed from the operator lifecycle
+        # in Version 1.0 Alpha Hotfix 2.
         if str(item.get("status", "")).lower() == "prepared":
             item["status"] = "planned"
             changed = True
+
         live_state = item.get("live_state")
-        if isinstance(live_state, dict) and str(live_state.get("status", "")).lower() == "prepared":
+
+        if (
+            isinstance(live_state, dict)
+            and str(live_state.get("status", "")).lower()
+            == "prepared"
+        ):
             live_state["status"] = "planned"
             changed = True
-    if changed:
-        save_json(BROADCAST_INDEX_FILE, items)
-    return items
 
-def save_broadcasts(items: list[dict[str, Any]]) -> None:
-    save_json(BROADCAST_INDEX_FILE, items)
+    return changed
 
+
+BROADCAST_REPOSITORY = BroadcastRepository(
+    CORE_PERSISTENCE,
+    BROADCAST_INDEX_FILE,
+    normalizer=_normalize_broadcast_lifecycle,
+)
+
+
+def load_broadcasts() -> list[dict[str, Any]]:
+    ensure_data_architecture()
+    return BROADCAST_REPOSITORY.load()
+
+
+def save_broadcasts(
+    items: list[dict[str, Any]],
+) -> None:
+    ensure_data_architecture()
+    BROADCAST_REPOSITORY.save(items)
+
+
+def write_broadcast_detail(
+    record: dict[str, Any],
+    existing_only: bool = False,
+) -> None:
+    broadcast_id = str(record.get("broadcast_id", "")).strip()
+    if not broadcast_id:
+        return
+    path = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
+    if existing_only and not path.exists():
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+
+
+def delete_broadcast_detail(broadcast_id: str) -> None:
+    path = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
+    if path.exists():
+        path.unlink()
+
+
+BROADCAST_SERVICE: BroadcastService | None = None
+
+
+def get_broadcast_service() -> BroadcastService:
+    global BROADCAST_SERVICE
+
+    if BROADCAST_SERVICE is None:
+        BROADCAST_SERVICE = BroadcastService(
+            load_broadcasts=load_broadcasts,
+            save_broadcasts=save_broadcasts,
+            get_school=get_school,
+            resolve_venue=venue_for_school,
+            build_identity=broadcast_identity,
+            logo_certification=logo_certification,
+            school_monogram=school_monogram,
+            load_config=load_config,
+            load_state=load_state,
+            save_state=save_state,
+            default_state=lambda: copy.deepcopy(DEFAULT_STATE),
+            write_detail=write_broadcast_detail,
+            delete_detail=delete_broadcast_detail,
+        )
+
+    return BROADCAST_SERVICE
+
+
+
+BROADCASTER_PRINT_SERVICE: BroadcasterPrintService | None = None
+
+
+def get_broadcaster_print_service() -> BroadcasterPrintService:
+    global BROADCASTER_PRINT_SERVICE
+
+    if BROADCASTER_PRINT_SERVICE is None:
+        BROADCASTER_PRINT_SERVICE = BroadcasterPrintService(
+            load_broadcasts=load_broadcasts,
+            load_rosters=load_rosters,
+            load_packages=load_packages,
+            get_school_logo_file=lambda school_id, filename: DATA_DIR / "Logos" / normalize_school_id(school_id) / filename,
+        )
+
+    return BROADCASTER_PRINT_SERVICE
 
 def normalize_roster_id(value: str) -> str:
     return normalize_school_id(value)
@@ -373,47 +1242,154 @@ def normalize_roster_id(value: str) -> str:
 def normalize_player_id(value: str) -> str:
     return normalize_school_id(value)
 
-def load_rosters() -> list[dict[str, Any]]:
-    ensure_data_architecture()
-    if not ROSTERS_FILE.exists():
-        save_json(ROSTERS_FILE, [])
-    data = load_json(ROSTERS_FILE, [])
-    items = data if isinstance(data, list) else data.get("rosters", [])
-    if not isinstance(items, list):
+def _parse_roster_payload(path: Path) -> list[dict[str, Any]]:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
         return []
+    items = raw if isinstance(raw, list) else raw.get("rosters", []) if isinstance(raw, dict) else []
+    return items if isinstance(items, list) else []
+
+def _roster_payload_score(items: list[dict[str, Any]]) -> tuple[int, int]:
+    roster_count = len(items)
+    player_count = sum(len(r.get("players", [])) for r in items if isinstance(r, dict) and isinstance(r.get("players"), list))
+    return player_count, roster_count
+
+def _roster_recovery_candidates() -> list[Path]:
+    candidates: list[Path] = []
+    # Keep recovery bounded. Searching BASE_DIR.parent recursively on every roster
+    # request caused severe latency on OneDrive and large installation folders.
+    roots = [DATA_DIR / "Backups", BASE_DIR / "Backups"]
+    seen: set[str] = set()
+    for root in roots:
+        if not root.exists():
+            continue
+        try:
+            for candidate in root.rglob("rosters.json"):
+                try:
+                    resolved = str(candidate.resolve())
+                except OSError:
+                    resolved = str(candidate)
+                if resolved == str(ROSTERS_FILE.resolve()) or resolved in seen:
+                    continue
+                seen.add(resolved)
+                candidates.append(candidate)
+        except OSError:
+            continue
+    return candidates
+
+def recover_rosters_if_needed(force: bool = False) -> dict[str, Any]:
+    global _roster_recovery_checked
+    ensure_data_architecture()
+    if _roster_recovery_checked and not force:
+        current = _parse_roster_payload(ROSTERS_FILE) if ROSTERS_FILE.exists() else []
+        score = _roster_payload_score(current)
+        return {"recovered": False, "source": "", "rosters": score[1], "players": score[0], "checked": True}
+
+    current = _parse_roster_payload(ROSTERS_FILE) if ROSTERS_FILE.exists() else []
+    current_score = _roster_payload_score(current)
+    if current_score[0] > 0:
+        _roster_recovery_checked = True
+        return {"recovered": False, "source": "", "rosters": current_score[1], "players": current_score[0]}
+
+    best_path: Path | None = None
+    best_items: list[dict[str, Any]] = []
+    best_score = current_score
+    for candidate in _roster_recovery_candidates():
+        items = _parse_roster_payload(candidate)
+        score = _roster_payload_score(items)
+        if score > best_score:
+            best_path, best_items, best_score = candidate, items, score
+
+    _roster_recovery_checked = True
+    if not best_path or best_score[0] == 0:
+        return {"recovered": False, "source": "", "rosters": current_score[1], "players": current_score[0]}
+
+    timestamp = int(time.time())
+    if ROSTERS_FILE.exists():
+        quarantine = DATA_DIR / "Backups" / "RosterRecovery" / f"rosters-empty-or-invalid-{timestamp}.json"
+        quarantine.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.copy2(ROSTERS_FILE, quarantine)
+        except OSError:
+            pass
+    _write_rosters_file(best_items, snapshot=False)
+    report = {"recovered": True, "source": str(best_path), "rosters": best_score[1], "players": best_score[0], "recovered_at": timestamp}
+    save_json(DATA_DIR / "Logs" / "roster_recovery.json", report)
+    return report
+
+def _normalize_rosters(items: list[dict[str, Any]]) -> bool:
     changed = False
     for roster in items:
-        roster.setdefault("id", normalize_roster_id(f"{roster.get('school_id','school')}-{roster.get('sport','football')}-{roster.get('season','season')}-{roster.get('level','varsity')}-{roster.get('division','boys')}"))
-        roster.setdefault("school_id", "")
-        roster.setdefault("sport", "Football")
-        roster.setdefault("season", "")
-        roster.setdefault("level", "Varsity")
-        roster.setdefault("division", "Boys")
-        roster.setdefault("players", [])
+        if not isinstance(roster, dict):
+            continue
+        defaults = {
+            "id": normalize_roster_id(f"{roster.get('school_id','school')}-{roster.get('sport','football')}-{roster.get('season','season')}-{roster.get('level','varsity')}-{roster.get('division','boys')}"),
+            "school_id": "", "sport": "Football", "season": "",
+            "level": "Varsity", "division": "Boys", "players": [],
+        }
+        for key, value in defaults.items():
+            if key not in roster:
+                roster[key] = value
+                changed = True
+        if not isinstance(roster.get("players"), list):
+            roster["players"] = []
+            changed = True
         for player in roster["players"]:
-            player.setdefault("id", normalize_player_id(f"{player.get('number','')}-{player.get('first_name','')}-{player.get('last_name','')}"))
-            player.setdefault("preferred_name", "")
-            player.setdefault("position", "")
-            player.setdefault("secondary_position", "")
-            player.setdefault("grade", "")
-            player.setdefault("height", "")
-            player.setdefault("weight", "")
-            player.setdefault("captain", False)
-            player.setdefault("starter", False)
-            player.setdefault("status", "active")
-            player.setdefault("headshot", "")
-            player.setdefault("pronunciation", "")
-            player.setdefault("pronunciation_verified", False)
-        changed = True
-    if changed:
-        save_rosters(items)
-    return items
+            if not isinstance(player, dict):
+                continue
+            player_defaults = {
+                "id": normalize_player_id(f"{player.get('number','')}-{player.get('first_name','')}-{player.get('last_name','')}"),
+                "preferred_name": "", "position": "", "secondary_position": "",
+                "grade": "", "height": "", "weight": "", "captain": False,
+                "starter": False, "status": "active", "headshot": "",
+                "pronunciation": "", "pronunciation_verified": False,
+            }
+            for key, value in player_defaults.items():
+                if key not in player:
+                    player[key] = value
+                    changed = True
+    return changed
+
+ROSTER_REPOSITORY = RosterRepository(
+    CORE_PERSISTENCE,
+    ROSTERS_FILE,
+    normalizer=_normalize_rosters,
+)
+
+def _write_rosters_file(items: list[dict[str, Any]], snapshot: bool = True) -> None:
+    ensure_data_architecture()
+    ROSTER_REPOSITORY.save(items)
+
+def load_rosters() -> list[dict[str, Any]]:
+    ensure_data_architecture()
+    recover_rosters_if_needed()
+    return ROSTER_REPOSITORY.load()
 
 def save_rosters(items: list[dict[str, Any]]) -> None:
-    save_json(ROSTERS_FILE, items)
+    ensure_data_architecture()
+    ROSTER_REPOSITORY.save(items)
 
-def roster_summary(roster: dict[str, Any]) -> dict[str, Any]:
-    school = next((s for s in load_schools() if str(s.get("id")) == str(roster.get("school_id"))), {})
+
+ROSTER_SERVICE: RosterService | None = None
+
+
+def get_roster_service() -> RosterService:
+    global ROSTER_SERVICE
+
+    if ROSTER_SERVICE is None:
+        ROSTER_SERVICE = RosterService(
+            load_rosters=load_rosters,
+            save_rosters=save_rosters,
+            load_schools=load_schools,
+            pronunciation_dictionary_path=DATA_DIR / "Rosters" / "pronunciation_dictionary.json",
+        )
+
+    return ROSTER_SERVICE
+
+def roster_summary(roster: dict[str, Any], schools: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    school_list = schools if schools is not None else load_schools()
+    school = next((s for s in school_list if str(s.get("id")) == str(roster.get("school_id"))), {})
     players = roster.get("players", []) if isinstance(roster.get("players"), list) else []
     return {
         **roster,
@@ -449,37 +1425,29 @@ def ensure_build_0018_journal() -> None:
     save_build_journal(items)
 
 def football_week_code(value: Any) -> str:
-    text = str(value or "1").strip().upper().replace("WEEK", "").strip()
-    try:
-        return f"W{int(text):02d}"
-    except ValueError:
-        cleaned = ''.join(ch for ch in text if ch.isalnum())[:3] or '01'
-        return f"W{cleaned}"
+    return BroadcastService.football_week_code(value)
 
-def next_broadcast_id(sport: str, season: str, classification: str, week: Any) -> str:
-    sport_code = {"football": "FB", "basketball": "BB", "baseball": "BSB", "softball": "SB"}.get(str(sport).lower(), str(sport)[:3].upper() or "EVT")
-    season_code = ''.join(ch for ch in str(season) if ch.isdigit())[:4] or time.strftime("%Y")
-    class_code = str(classification or "OPEN").upper().replace("CLASS", "").replace(" ", "")
-    prefix = f"{sport_code}-{season_code}-{class_code}-{football_week_code(week)}-"
-    used=[]
-    for item in load_broadcasts():
-        value=str(item.get("broadcast_id", ""))
-        if value.startswith(prefix):
-            try: used.append(int(value.rsplit("-",1)[1]))
-            except (ValueError, IndexError): pass
-    number=max(used, default=0)+1
-    return f"{prefix}{number:03d}"
 
-def venue_for_school(school: dict[str, Any] | None) -> dict[str, Any] | None:
-    if not school:
-        return None
-    venue_id = str(school.get("venue_id", ""))
-    venues=load_venues()
-    if venue_id:
-        found=next((v for v in venues if str(v.get("id")) == venue_id), None)
-        if found: return found
-    school_id=str(school.get("id", ""))
-    return next((v for v in venues if str(v.get("school_id", "")) == school_id), None)
+def next_broadcast_id(
+    sport: str,
+    season: str,
+    classification: str,
+    week: Any,
+) -> str:
+    return get_broadcast_service().next_id(
+        sport,
+        season,
+        classification,
+        week,
+    )
+
+
+def venue_for_school(
+    school: dict[str, Any] | None,
+    sport: str = "",
+) -> dict[str, Any] | None:
+    return get_venue_service().for_school(school, sport)
+
 
 def school_duplicate_candidates(incoming: dict[str, Any], exclude_id: str = "") -> list[dict[str, Any]]:
     official = str(incoming.get("official_name", "")).strip().casefold()
@@ -651,62 +1619,56 @@ def save_broadcasters(items: list[dict[str, Any]]) -> None:
     ensure_data_architecture()
     BROADCASTERS_FILE.write_text(json.dumps(items, indent=2), encoding="utf-8")
 
-def normalize_social_url(platform: str, value: str) -> tuple[str, bool, str]:
-    value = (value or "").strip()
-    if not value:
-        return "", True, ""
-    if value.startswith("@"):
-        value = value[1:]
-    if "://" not in value and "/" not in value:
-        domains = {
-            "facebook": "https://facebook.com/",
-            "x": "https://x.com/",
-            "instagram": "https://instagram.com/",
-            "youtube": "https://youtube.com/@",
-        }
-        if platform in domains:
-            value = domains[platform] + value
-        elif platform == "website":
-            value = "https://" + value
-    elif "://" not in value:
-        value = "https://" + value
+def normalize_social_url(
+    platform: str,
+    value: str,
+) -> tuple[str, bool, str]:
+    return ConfigurationService.normalize_social_url(platform, value)
 
-    try:
-        hostname = (urlparse(value).hostname or "").lower()
-    except ValueError:
-        hostname = ""
-    valid_domains = {
-        "facebook": ("facebook.com", "www.facebook.com"),
-        "x": ("x.com", "twitter.com", "www.x.com", "www.twitter.com"),
-        "instagram": ("instagram.com", "www.instagram.com"),
-        "youtube": ("youtube.com", "www.youtube.com", "youtu.be"),
-    }
-    if platform == "website":
-        valid = bool(hostname) and value.lower().startswith(("http://", "https://"))
-    else:
-        valid = any(hostname == domain or hostname.endswith(f".{domain}") for domain in valid_domains.get(platform, ()))
-    return value, valid, "" if valid else f"Expected a valid {platform} URL"
 
-def normalize_social_block(block: dict[str, Any]) -> tuple[dict[str, str], dict[str, str]]:
-    normalized: dict[str, str] = {}
-    errors: dict[str, str] = {}
-    for platform in ("facebook", "x", "instagram", "youtube", "website"):
-        value, valid, message = normalize_social_url(platform, str(block.get(platform, "")))
-        normalized[platform] = value
-        if not valid:
-            errors[platform] = message
-    return normalized, errors
+def normalize_social_block(
+    block: dict[str, Any],
+) -> tuple[dict[str, str], dict[str, str]]:
+    return ConfigurationService.normalize_social_block(block)
+
+
+PERSONNEL_SERVICE: PersonnelService | None = None
+
+
+def get_personnel_service() -> PersonnelService:
+    global PERSONNEL_SERVICE
+
+    if PERSONNEL_SERVICE is None:
+        PERSONNEL_SERVICE = PersonnelService(
+            load_personnel=load_broadcasters,
+            save_personnel=save_broadcasters,
+        )
+
+    return PERSONNEL_SERVICE
+
+
+GRAPHICS_SERVICE: GraphicsService | None = None
+
+
+def get_graphics_service() -> GraphicsService:
+    global GRAPHICS_SERVICE
+
+    if GRAPHICS_SERVICE is None:
+        GRAPHICS_SERVICE = GraphicsService(
+            default_state=lambda: copy.deepcopy(DEFAULT_STATE),
+            load_rosters=load_rosters,
+            load_schools=load_schools,
+            load_personnel=load_broadcasters,
+            build_identity=broadcast_identity,
+            apply_sponsor=apply_sponsor_to_graphic,
+            load_assets=load_assets,
+        )
+
+    return GRAPHICS_SERVICE
 
 
 def normalize_state(state: dict[str, Any]) -> dict[str, Any]:
-    merged = copy.deepcopy(DEFAULT_STATE)
-    merged.update(state or {})
-    if merged.get("broadcast_phase") not in {"pregame", "live", "halftime", "postgame", "final"}:
-        merged["broadcast_phase"] = "pregame"
-    if merged.get("possession") not in {"home", "visitor"}:
-        merged["possession"] = "home"
-    merged.setdefault("history", [])
-    return merged
+    return get_state_service().normalize(state)
 
 def load_json(path: Path, default: dict[str, Any]) -> dict[str, Any]:
     if not path.exists():
@@ -721,77 +1683,228 @@ def load_json(path: Path, default: dict[str, Any]) -> dict[str, Any]:
 def save_json(path: Path, data: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-def load_state() -> dict[str, Any]:
-    return normalize_state(load_json(STATE_FILE, DEFAULT_STATE))
+STATE_SERVICE: StateService | None = None
 
-def save_state(state: dict[str, Any]) -> None:
-    normalized = normalize_state(state)
-    save_json(STATE_FILE, normalized)
+
+def persist_linked_state_snapshot(normalized: dict[str, Any]) -> None:
     broadcast_id = str(normalized.get("broadcast_id", "")).strip()
     if not broadcast_id:
         return
-    items = load_broadcasts()
-    item = next((row for row in items if row.get("broadcast_id") == broadcast_id), None)
-    if not item:
-        return
     snapshot = copy.deepcopy(normalized)
-    snapshot["history"] = []
-    item["live_state"] = snapshot
-    item["status"] = normalized.get("status", item.get("status", "planned"))
-    item["updated_at"] = int(time.time())
-    save_broadcasts(items)
-    detail = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
-    detail.write_text(json.dumps(item, indent=2), encoding="utf-8")
+    # Runs on a dedicated background thread (StateService's async linked-
+    # snapshot writer) whenever async_linked_snapshot=True, as it is for the
+    # production STATE_SERVICE — never inline on a request thread that might
+    # already hold `lock`. Taking `lock` here serializes this read-modify-
+    # write of Data/Broadcasts/*.json against write_broadcast_final_archive()
+    # below, which runs synchronously inside GameOperationsService's
+    # already-held transaction lock (the same `lock` object).
+    with lock:
+        items = load_broadcasts()
+        item = next(
+            (row for row in items if row.get("broadcast_id") == broadcast_id),
+            None,
+        )
+        if not item:
+            return
+        item["live_state"] = snapshot
+        item["status"] = normalized.get(
+            "status",
+            item.get("status", "planned"),
+        )
+        item["updated_at"] = int(time.time())
+        save_broadcasts(items)
+        write_broadcast_detail(item)
+
+
+def write_broadcast_final_archive(state: Mapping[str, Any]) -> bool:
+    """Archive a completed broadcast's full state — including its play-by-play
+    history — into Data/Broadcasts/<id>.json, and confirm the write by
+    reading it back from disk before reporting success.
+
+    Must be called while `lock` is already held (GameOperationsService runs
+    this synchronously inside its transaction lock), so it can't race the
+    background linked-snapshot writer above.
+
+    Returns True only once the archive has been verified on disk to contain
+    the expected history/events/plays. The caller (GameOperationsService)
+    must not clear the live state unless this returns True.
+    """
+    broadcast_id = str(state.get("broadcast_id", "")).strip()
+    if not broadcast_id:
+        return False
+
+    snapshot = copy.deepcopy(dict(state))
+    expected_history = list(snapshot.get("history") or [])
+    expected_events = list(snapshot.get("events") or [])
+    expected_plays = list(snapshot.get("plays") or [])
+
+    try:
+        items = load_broadcasts()
+        item = next(
+            (row for row in items if row.get("broadcast_id") == broadcast_id),
+            None,
+        )
+        if item is None:
+            return False
+        item["final_state_archive"] = snapshot
+        item["final_state_archived_at"] = int(time.time())
+        # Also bring the ongoing live-mirror up to the same, uncleared
+        # snapshot right now — the regular async mirror will overwrite it
+        # again shortly after with the (soon to be cleared) live state, which
+        # is fine: final_state_archive above is the durable record, live_state
+        # is only ever a reflection of whatever state.json currently holds.
+        item["live_state"] = copy.deepcopy(snapshot)
+        item["status"] = snapshot.get("status", item.get("status", "planned"))
+        item["updated_at"] = int(time.time())
+        save_broadcasts(items)
+        write_broadcast_detail(item)
+    except Exception:
+        return False
+
+    detail_path = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
+    try:
+        written = json.loads(detail_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(written, dict):
+        return False
+    archive = written.get("final_state_archive")
+    if not isinstance(archive, dict):
+        return False
+    if str(archive.get("broadcast_id", "")).strip() != broadcast_id:
+        return False
+    if (
+        list(archive.get("history") or []) != expected_history
+        or list(archive.get("events") or []) != expected_events
+        or list(archive.get("plays") or []) != expected_plays
+    ):
+        return False
+    return True
+
+
+def load_final_state_archive(broadcast_id: str) -> dict[str, Any] | None:
+    key = str(broadcast_id or "").strip()
+    if not key:
+        return None
+    detail_path = DATA_DIR / "Broadcasts" / f"{key}.json"
+    try:
+        item = json.loads(detail_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(item, dict):
+        return None
+    archive = item.get("final_state_archive")
+    return archive if isinstance(archive, dict) else None
+
+
+def load_state_for_reporting() -> dict[str, Any]:
+    """Read-only variant of load_state() for reporting consumers (recap
+    generation, social drafting, the statistics and play-register endpoints)
+    that may run after a broadcast has been finalized.
+
+    GameOperationsService.end_game() clears history/events/plays from the
+    live state.json once it has confirmed a full archive was written (see
+    write_broadcast_final_archive above). A reporting request made after
+    that point would otherwise see an empty game, so once state.json shows
+    a completed broadcast with those fields empty, this transparently backs
+    them from the archived snapshot in Data/Broadcasts/<id>.json.
+
+    Never use this for state mutation — only load_state()/save_state() are
+    the write path, and mutating a copy built from the archived fallback
+    would write archived history back into "live" state.
+    """
+    state = load_state()
+    if str(state.get("status", "")).strip().lower() != "completed":
+        return state
+    if state.get("history") or state.get("events") or state.get("plays"):
+        return state
+    broadcast_id = str(state.get("broadcast_id", "") or "").strip()
+    if not broadcast_id:
+        return state
+    archive = load_final_state_archive(broadcast_id)
+    if not archive:
+        return state
+    result = dict(state)
+    for key in ("history", "events", "plays"):
+        if archive.get(key):
+            result[key] = copy.deepcopy(archive[key])
+    return result
+
+
+def get_state_service() -> StateService:
+    global STATE_SERVICE
+    if STATE_SERVICE is None:
+        STATE_SERVICE = StateService(
+            load_raw=STATE_REPOSITORY.load,
+            replace_raw=STATE_REPOSITORY.replace,
+            default_state=lambda: copy.deepcopy(DEFAULT_STATE),
+            persist_linked_snapshot=persist_linked_state_snapshot,
+            async_linked_snapshot=True,
+            cache_committed_state=True,
+            resolve_player=resolve_game_roster_player,
+            canonical_team_key=canonical_team_key,
+            canonical_team_name=canonical_team_name,
+        )
+    return STATE_SERVICE
+
+
+def load_state() -> dict[str, Any]:
+    return get_state_service().load().data["state"]
+
+
+def save_state(state: dict[str, Any]) -> None:
+    get_state_service().save(state)
+    try:
+        from state_read_cache import invalidate_state_read_cache
+        from runtime_state_cache import invalidate_runtime_state_cache
+
+        invalidate_state_read_cache()
+        invalidate_runtime_state_cache()
+    except Exception:
+        pass
+
+
+def load_reconciled_state() -> dict[str, Any]:
+    with lock:
+        state = load_state()
+        result = get_graphics_service().reconcile_queue(state)
+        reconciled = result.data["state"]
+        if result.data.get("changed"):
+            save_state(reconciled)
+        return reconciled
+
+
+def _merge_opening_setup_state(result: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
+    for key in ("coin_toss", "second_half_receiving_team", "special_game_phase", "kicking_team", "receiving_team"):
+        if key in state:
+            result[key] = copy.deepcopy(state.get(key))
+    return result
+
 
 def public_state(state: dict[str, Any]) -> dict[str, Any]:
-    """Return overlay-safe state. Logo values are application-relative HTTP paths."""
-    result = copy.deepcopy(state)
-    for key in ("home_identity", "visitor_identity"):
-        identity = result.get(key)
-        if isinstance(identity, dict):
-            logo = str(identity.get("logo", "") or "")
-            # Never expose local filesystem paths; retain only application URLs.
-            if logo and not (logo.startswith("/") or logo.startswith("data:image/svg+xml") or logo.startswith("http://") or logo.startswith("https://")):
-                identity["logo"] = ""
-    personnel = result.get("personnel_graphic")
-    if isinstance(personnel, dict):
-        for field in ("headshot", "logo", "sponsor_logo"):
-            value = str(personnel.get(field, "") or "")
-            if value and not (value.startswith("/") or value.startswith("data:image/svg+xml") or value.startswith("http://") or value.startswith("https://")):
-                personnel[field] = ""
-    graphic = result.get("player_graphic")
-    if isinstance(graphic, dict):
-        for field in ("headshot", "team_logo", "sponsor_logo"):
-            value = str(graphic.get(field, "") or "")
-            if value and not (value.startswith("/") or value.startswith("data:image/svg+xml") or value.startswith("http://") or value.startswith("https://")):
-                graphic[field] = ""
+    result = get_state_service().public(state).data["state"]
+    _merge_opening_setup_state(result, state)
+    result["overlay_revision"] = OVERLAY_SCHEMA_REVISION
+    return result
+
+
+def runtime_state(state: dict[str, Any]) -> dict[str, Any]:
+    result = get_state_service().runtime_view(state).data["state"]
+    _merge_opening_setup_state(result, state)
+    result["overlay_revision"] = OVERLAY_SCHEMA_REVISION
     return result
 
 def load_security() -> dict[str, Any]:
-    sec = load_json(SECURITY_FILE, DEFAULT_SECURITY)
-    changed = False
-    for key, value in DEFAULT_SECURITY.items():
-        if key not in sec:
-            sec[key] = value
-            changed = True
-    if not sec.get("secret_key"):
-        sec["secret_key"] = secrets.token_hex(32)
-        changed = True
-    if changed:
-        save_json(SECURITY_FILE, sec)
-    return sec
+    return SECURITY_SERVICE.ensure_secret_key(
+        lambda: secrets.token_hex(32)
+    )
 
-security = load_security()
-app.secret_key = security["secret_key"]
-app.config.update(
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Strict",
-    SESSION_COOKIE_SECURE=False,
-    PERMANENT_SESSION_LIFETIME=SESSION_SECONDS,
-)
+
+def save_security(sec: dict[str, Any]) -> None:
+    SECURITY_REPOSITORY.save(sec)
 
 def pin_is_configured() -> bool:
-    return bool(load_security().get("pin_hash"))
+    return SECURITY_SERVICE.pin_is_configured()
 
 def authenticated() -> bool:
     return bool(session.get("authenticated"))
@@ -804,1607 +1917,1369 @@ def require_auth(func: Callable):
         if not authenticated():
             return jsonify({"error": "AUTH_REQUIRED"}), 401
         return func(*args, **kwargs)
+    setattr(wrapper, "_csrn_requires_auth", True)
     return wrapper
 
 def push_history(state: dict[str, Any]) -> None:
-    snapshot = {k: copy.deepcopy(v) for k, v in state.items() if k != "history"}
-    state.setdefault("history", []).append(snapshot)
-    state["history"] = state["history"][-50:]
+    StateService.push_history(state)
 
-def apply_change(changes: dict[str, Any], save_undo: bool = True) -> dict[str, Any]:
+
+def apply_change(
+    changes: dict[str, Any],
+    save_undo: bool = True,
+) -> dict[str, Any]:
     with lock:
-        state = load_state()
-        if save_undo:
-            push_history(state)
-        state.update(changes)
-        save_state(state)
-        return state
-
-@app.get("/")
-def control_panel():
-    return render_template("index.html")
-
-@app.get("/overlay")
-def overlay():
-    return render_template("overlay.html")
-
-@app.get("/api/security-status")
-def security_status():
-    sec = load_security()
-    remaining = max(0, int(sec.get("locked_until", 0) - time.time()))
-    return jsonify({
-        "pin_configured": bool(sec.get("pin_hash")),
-        "authenticated": authenticated(),
-        "locked_seconds": remaining,
-    })
-
-@app.post("/api/setup-pin")
-def setup_pin():
-    if pin_is_configured():
-        return jsonify({"error": "PIN_ALREADY_CONFIGURED"}), 409
-    data = request.get_json(force=True)
-    pin = str(data.get("pin", ""))
-    confirm = str(data.get("confirm", ""))
-    if not (pin.isdigit() and len(pin) == 6):
-        return jsonify({"error": "PIN_MUST_BE_6_DIGITS"}), 400
-    if pin != confirm:
-        return jsonify({"error": "PIN_MISMATCH"}), 400
-
-    sec = load_security()
-    sec["pin_hash"] = generate_password_hash(pin, method="scrypt")
-    sec["failed_attempts"] = 0
-    sec["locked_until"] = 0
-    save_json(SECURITY_FILE, sec)
-
-    session.clear()
-    session.permanent = True
-    session["authenticated"] = True
-    return jsonify({"ok": True})
-
-@app.post("/api/login")
-def login():
-    sec = load_security()
-    now = time.time()
-    locked_until = float(sec.get("locked_until", 0))
-    if now < locked_until:
-        return jsonify({"error": "LOCKED", "locked_seconds": int(locked_until - now)}), 429
-
-    data = request.get_json(force=True)
-    pin = str(data.get("pin", ""))
-    if check_password_hash(sec.get("pin_hash", ""), pin):
-        sec["failed_attempts"] = 0
-        sec["locked_until"] = 0
-        save_json(SECURITY_FILE, sec)
-        session.clear()
-        session.permanent = True
-        session["authenticated"] = True
-        return jsonify({"ok": True})
-
-    sec["failed_attempts"] = int(sec.get("failed_attempts", 0)) + 1
-    if sec["failed_attempts"] >= MAX_ATTEMPTS:
-        sec["failed_attempts"] = 0
-        sec["locked_until"] = int(now + LOCKOUT_SECONDS)
-        save_json(SECURITY_FILE, sec)
-        return jsonify({"error": "LOCKED", "locked_seconds": LOCKOUT_SECONDS}), 429
-
-    remaining = MAX_ATTEMPTS - sec["failed_attempts"]
-    save_json(SECURITY_FILE, sec)
-    return jsonify({"error": "INVALID_PIN", "attempts_remaining": remaining}), 401
-
-@app.post("/api/logout")
-def logout():
-    session.clear()
-    return jsonify({"ok": True})
-
-
-
-
-@app.get("/api/broadcasters")
-@require_auth
-def list_broadcasters():
-    return jsonify(load_broadcasters())
-
-@app.post("/api/broadcasters")
-@require_auth
-def create_broadcaster():
-    incoming = request.get_json(force=True)
-    name = str(incoming.get("full_name") or incoming.get("name", "")).strip()
-    role = str(incoming.get("role") or incoming.get("primary_role", "Other"))
-    if not name:
-        return jsonify({"error": "STAFF_NAME_REQUIRED"}), 400
-    if role not in STAFF_ROLES:
-        return jsonify({"error": "INVALID_STAFF_ROLE"}), 400
-
-    social, errors = normalize_social_block(incoming.get("social") or {})
-    if errors:
-        return jsonify({"error": "INVALID_SOCIAL_URL", "fields": errors}), 400
-
-    items = load_broadcasters()
-    staff_id = normalize_staff_id(incoming.get("id") or name)
-    base_id = staff_id
-    suffix = 2
-    while any(item.get("id") == staff_id for item in items):
-        staff_id = f"{base_id}-{suffix}"
-        suffix += 1
-
-    record = {
-        "id": staff_id,
-        "full_name": name, "name": name, "preferred_name": str(incoming.get("preferred_name", "")).strip(),
-        "pronunciation": str(incoming.get("pronunciation", "")).strip(), "pronunciation_verified": bool(incoming.get("pronunciation_verified", False)),
-        "category": str(incoming.get("category", "Other")), "role": role, "primary_role": role,
-        "title": role, "organization": str(incoming.get("organization", "")).strip(),
-        "school_id": str(incoming.get("school_id", "")).strip(), "bio": str(incoming.get("bio", "")).strip(),
-        "headshot": normalize_personnel_headshot_url(incoming.get("headshot", "")), "status": "inactive" if str(incoming.get("status", "active")).lower()=="inactive" else "active",
-        "producer": bool(incoming.get("producer", False)), "social": social,
-    }
-    items.append(record)
-    save_broadcasters(items)
-    return jsonify(record), 201
-
-@app.put("/api/broadcasters/<broadcaster_id>")
-@require_auth
-def update_broadcaster(broadcaster_id: str):
-    incoming = request.get_json(force=True)
-    items = load_broadcasters()
-    index = next((i for i, item in enumerate(items) if item.get("id") == broadcaster_id), None)
-    if index is None:
-        return jsonify({"error": "BROADCASTER_NOT_FOUND"}), 404
-
-    name = str(incoming.get("full_name") or incoming.get("name", items[index].get("full_name") or items[index].get("name", ""))).strip()
-    role = str(incoming.get("role") or incoming.get("primary_role", items[index].get("role") or items[index].get("primary_role", "Other")))
-    if not name:
-        return jsonify({"error": "STAFF_NAME_REQUIRED"}), 400
-    if role not in STAFF_ROLES:
-        return jsonify({"error": "INVALID_STAFF_ROLE"}), 400
-
-    social, errors = normalize_social_block(incoming.get("social") or {})
-    if errors:
-        return jsonify({"error": "INVALID_SOCIAL_URL", "fields": errors}), 400
-
-    items[index].update({
-        "full_name": name, "name": name, "preferred_name": str(incoming.get("preferred_name", "")).strip(),
-        "pronunciation": str(incoming.get("pronunciation", "")).strip(), "pronunciation_verified": bool(incoming.get("pronunciation_verified", False)),
-        "category": str(incoming.get("category", "Other")), "role": role, "primary_role": role,
-        "title": role, "organization": str(incoming.get("organization", "")).strip(),
-        "school_id": str(incoming.get("school_id", "")).strip(), "bio": str(incoming.get("bio", "")).strip(),
-        "headshot": normalize_personnel_headshot_url(incoming.get("headshot", "")), "status": "inactive" if str(incoming.get("status", "active")).lower()=="inactive" else "active",
-        "producer": bool(incoming.get("producer", False)), "social": social,
-    })
-    save_broadcasters(items)
-    return jsonify(items[index])
-
-@app.delete("/api/broadcasters/<broadcaster_id>")
-@require_auth
-def delete_broadcaster(broadcaster_id: str):
-    items = load_broadcasters()
-    if not any(item.get("id") == broadcaster_id for item in items):
-        return jsonify({"error": "BROADCASTER_NOT_FOUND"}), 404
-    save_broadcasters([item for item in items if item.get("id") != broadcaster_id])
-    return jsonify({"ok": True})
-
-@app.get("/personnel-headshots/<filename>")
-def personnel_headshot_file(filename: str):
-    return send_from_directory(PERSONNEL_HEADSHOTS_DIR, filename)
-
-@app.post("/api/personnel/<personnel_id>/headshot")
-@require_auth
-def upload_personnel_headshot(personnel_id: str):
-    file = request.files.get("file")
-    if not file or not file.filename:
-        return jsonify({"error":"FILE_REQUIRED"}), 400
-    ext = Path(file.filename).suffix.lower()
-    if ext not in {".png",".jpg",".jpeg",".webp"}:
-        return jsonify({"error":"UNSUPPORTED_IMAGE"}), 400
-    PERSONNEL_HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
-    target = PERSONNEL_HEADSHOTS_DIR / f"{normalize_staff_id(personnel_id)}{ext}"
-    file.save(target)
-    rel = "/personnel-headshots/" + target.name
-    items = load_broadcasters()
-    for item in items:
-        if str(item.get("id")) == personnel_id:
-            item["headshot"] = rel
-            save_broadcasters(items)
-            return jsonify({"path":rel})
-    return jsonify({"error":"PERSONNEL_NOT_FOUND"}), 404
-
-@app.post("/api/validate-social")
-@require_auth
-def validate_social():
-    incoming = request.get_json(force=True)
-    platform = str(incoming.get("platform", ""))
-    value, valid, message = normalize_social_url(platform, str(incoming.get("value", "")))
-    return jsonify({"normalized": value, "valid": valid, "message": message})
-
-
-
-@app.get("/api/rosters")
-@require_auth
-def list_rosters():
-    return jsonify([roster_summary(r) for r in load_rosters()])
-
-@app.post("/api/rosters")
-@require_auth
-def create_roster():
-    incoming = request.get_json(force=True) or {}
-    school_id = str(incoming.get("school_id", "")).strip()
-    sport = str(incoming.get("sport", "Football")).strip() or "Football"
-    season = str(incoming.get("season", "")).strip()
-    level = str(incoming.get("level", "Varsity")).strip() or "Varsity"
-    division = str(incoming.get("division", "Boys")).strip() or "Boys"
-    if not school_id or not season:
-        return jsonify({"error":"SCHOOL_AND_SEASON_REQUIRED"}), 400
-    items = load_rosters()
-    duplicate = next((r for r in items if str(r.get("school_id"))==school_id and str(r.get("sport")).lower()==sport.lower() and str(r.get("season"))==season and str(r.get("level")).lower()==level.lower() and str(r.get("division")).lower()==division.lower()), None)
-    if duplicate:
-        return jsonify({"error":"ROSTER_ALREADY_EXISTS", "roster":roster_summary(duplicate)}), 409
-    roster_id = normalize_roster_id(f"{school_id}-{sport}-{season}-{level}-{division}")
-    base=roster_id; n=2
-    while any(r.get("id")==roster_id for r in items):
-        roster_id=f"{base}-{n}"; n+=1
-    record={"id":roster_id,"school_id":school_id,"sport":sport,"season":season,"level":level,"division":division,"players":[],"created_at":int(time.time()),"updated_at":int(time.time())}
-    items.append(record); save_rosters(items)
-    return jsonify(roster_summary(record)), 201
-
-@app.put("/api/rosters/<roster_id>")
-@require_auth
-def update_roster(roster_id: str):
-    incoming=request.get_json(force=True) or {}; items=load_rosters()
-    roster=next((r for r in items if r.get("id")==roster_id),None)
-    if not roster: return jsonify({"error":"ROSTER_NOT_FOUND"}),404
-    for field in ("school_id","sport","season","level","division"):
-        if field in incoming: roster[field]=str(incoming[field]).strip()
-    roster["updated_at"]=int(time.time()); save_rosters(items)
-    return jsonify(roster_summary(roster))
-
-@app.delete("/api/rosters/<roster_id>")
-@require_auth
-def delete_roster(roster_id: str):
-    items=load_rosters()
-    if not any(r.get("id")==roster_id for r in items): return jsonify({"error":"ROSTER_NOT_FOUND"}),404
-    save_rosters([r for r in items if r.get("id")!=roster_id])
-    return jsonify({"ok":True})
-
-@app.post("/api/rosters/<roster_id>/players")
-@require_auth
-def create_roster_player(roster_id: str):
-    incoming=request.get_json(force=True) or {}; items=load_rosters(); roster=next((r for r in items if r.get("id")==roster_id),None)
-    if not roster: return jsonify({"error":"ROSTER_NOT_FOUND"}),404
-    first=str(incoming.get("first_name","")).strip(); last=str(incoming.get("last_name","")).strip(); number=str(incoming.get("number","")).strip()
-    if not first and not last: return jsonify({"error":"PLAYER_NAME_REQUIRED"}),400
-    player_id=normalize_player_id(incoming.get("id") or f"{number}-{first}-{last}"); base=player_id; n=2
-    while any(p.get("id")==player_id for p in roster.get("players",[])): player_id=f"{base}-{n}"; n+=1
-    duplicate_number=bool(number and any(str(p.get("number","")).strip()==number for p in roster.get("players",[])))
-    player={"id":player_id,"number":number,"first_name":first,"last_name":last,"preferred_name":str(incoming.get("preferred_name","")).strip(),"position":str(incoming.get("position","")).strip(),"secondary_position":str(incoming.get("secondary_position","")).strip(),"grade":str(incoming.get("grade","")).strip(),"height":str(incoming.get("height","")).strip(),"weight":str(incoming.get("weight","")).strip(),"captain":bool(incoming.get("captain",False)),"starter":bool(incoming.get("starter",False)),"status":"inactive" if str(incoming.get("status", "active")).lower()=="inactive" else "active","pronunciation":str(incoming.get("pronunciation","")).strip(),"pronunciation_verified":bool(incoming.get("pronunciation_verified",False)),"headshot":str(incoming.get("headshot","")).strip()}
-    roster.setdefault("players",[]).append(player); roster["updated_at"]=int(time.time()); save_rosters(items)
-    return jsonify({"player":player,"warning":"DUPLICATE_JERSEY_NUMBER" if duplicate_number else ""}),201
-
-@app.put("/api/rosters/<roster_id>/players/<player_id>")
-@require_auth
-def update_roster_player(roster_id: str, player_id: str):
-    incoming=request.get_json(force=True) or {}; items=load_rosters(); roster=next((r for r in items if r.get("id")==roster_id),None)
-    if not roster: return jsonify({"error":"ROSTER_NOT_FOUND"}),404
-    player=next((p for p in roster.get("players",[]) if p.get("id")==player_id),None)
-    if not player: return jsonify({"error":"PLAYER_NOT_FOUND"}),404
-    number=str(incoming.get("number",player.get("number",''))).strip(); duplicate_number=bool(number and any(p.get("id")!=player_id and str(p.get("number","")).strip()==number for p in roster.get("players",[])))
-    for field in ("number","first_name","last_name","preferred_name","position","secondary_position","grade","height","weight","pronunciation","headshot"):
-        if field in incoming: player[field]=str(incoming[field]).strip()
-    for field in ("captain","starter","pronunciation_verified"):
-        if field in incoming: player[field]=bool(incoming[field])
-    if "status" in incoming: player["status"]="inactive" if str(incoming["status"]).lower()=="inactive" else "active"
-    roster["updated_at"]=int(time.time()); save_rosters(items)
-    return jsonify({"player":player,"warning":"DUPLICATE_JERSEY_NUMBER" if duplicate_number else ""})
-
-@app.delete("/api/rosters/<roster_id>/players/<player_id>")
-@require_auth
-def delete_roster_player(roster_id: str, player_id: str):
-    items=load_rosters(); roster=next((r for r in items if r.get("id")==roster_id),None)
-    if not roster: return jsonify({"error":"ROSTER_NOT_FOUND"}),404
-    before=len(roster.get("players",[])); roster["players"]=[p for p in roster.get("players",[]) if p.get("id")!=player_id]
-    if len(roster["players"])==before: return jsonify({"error":"PLAYER_NOT_FOUND"}),404
-    roster["updated_at"]=int(time.time()); save_rosters(items); return jsonify({"ok":True})
-
-@app.post("/api/rosters/<roster_id>/players/import")
-@require_auth
-def import_roster_players(roster_id: str):
-    incoming=request.get_json(force=True) or {}; rows=incoming.get("players",[])
-    if not isinstance(rows,list): return jsonify({"error":"INVALID_PLAYER_LIST"}),400
-    items=load_rosters(); roster=next((r for r in items if r.get("id")==roster_id),None)
-    if not roster: return jsonify({"error":"ROSTER_NOT_FOUND"}),404
-    added=0; warnings=[]
-    for row in rows:
-        if not isinstance(row,dict): continue
-        first=str(row.get("first_name","")).strip(); last=str(row.get("last_name","")).strip()
-        if not first and not last: continue
-        number=str(row.get("number","")).strip()
-        if number and any(str(p.get("number","")).strip()==number for p in roster.get("players",[])): warnings.append(f"Duplicate jersey number {number}")
-        pid=normalize_player_id(f"{number}-{first}-{last}"); base=pid; n=2
-        while any(p.get("id")==pid for p in roster.get("players",[])): pid=f"{base}-{n}"; n+=1
-        roster.setdefault("players",[]).append({"id":pid,"number":number,"first_name":first,"last_name":last,"preferred_name":str(row.get("preferred_name","")).strip(),"position":str(row.get("position","")).strip(),"secondary_position":str(row.get("secondary_position","")).strip(),"grade":str(row.get("grade","")).strip(),"height":str(row.get("height","")).strip(),"weight":str(row.get("weight","")).strip(),"captain":str(row.get("captain","")).lower() in ("1","true","yes","y"),"starter":str(row.get("starter","")).lower() in ("1","true","yes","y"),"status":"inactive" if str(row.get("status","")).lower()=="inactive" else "active","pronunciation":str(row.get("pronunciation","")).strip(),"pronunciation_verified":str(row.get("pronunciation_verified","")).lower() in ("1","true","yes","y"),"headshot":str(row.get("headshot","")).strip()}); added+=1
-    roster["updated_at"]=int(time.time()); save_rosters(items)
-    return jsonify({"added":added,"warnings":warnings,"roster":roster_summary(roster)})
-
-
-@app.get("/api/schools")
-@require_auth
-def list_schools():
-    return jsonify([school_display_payload(s) for s in load_schools()])
-
-@app.get("/api/schools/<school_id>")
-@require_auth
-def read_school(school_id: str):
-    school = get_school(school_id)
-    if not school:
-        return jsonify({"error": "SCHOOL_NOT_FOUND"}), 404
-    return jsonify(school)
-
-@app.post("/api/schools")
-@require_auth
-def create_school():
-    incoming = request.get_json(force=True)
-    official_name = str(incoming.get("official_name", "")).strip()
-    broadcast_name = str(incoming.get("broadcast_name", "")).strip()
-    if not official_name or not broadcast_name:
-        return jsonify({"error": "SCHOOL_NAME_REQUIRED"}), 400
-
-    duplicates = school_duplicate_candidates(incoming)
-    if duplicates and not bool(incoming.get("confirm_duplicate", False)):
-        return jsonify({"error": "LIKELY_DUPLICATE", "matches": duplicates}), 409
-
-    schools = load_schools()
-    school_id = normalize_school_id(incoming.get("id") or broadcast_name)
-    base_id = school_id
-    suffix = 2
-    while any(s.get("id") == school_id for s in schools):
-        school_id = f"{base_id}-{suffix}"
-        suffix += 1
-
-    general_social, social_errors = normalize_social_block(incoming.get("general_social") or {})
-    if social_errors:
-        return jsonify({"error": "INVALID_SOCIAL_URL", "fields": social_errors}), 400
-
-    programs = incoming.get("programs") or {}
-    if "Football" in programs:
-        football_social, football_errors = normalize_social_block(programs.get("Football") or {})
-        if football_errors:
-            return jsonify({"error": "INVALID_SOCIAL_URL", "fields": football_errors}), 400
-        programs["Football"].update(football_social)
-
-    school = {
-        "id": school_id,
-        "csrn_id": str(incoming.get("csrn_id", "")).strip() or next_csrn_school_id(str(incoming.get("state", "MS")), str(incoming.get("classification", "")), schools),
-        "official_name": official_name,
-        "broadcast_name": broadcast_name,
-        "nickname": str(incoming.get("nickname", "")).strip(),
-        "short_name": str(incoming.get("short_name", broadcast_name)).strip(),
-        "city": str(incoming.get("city", "")).strip(),
-        "county": str(incoming.get("county", "")).strip(),
-        "active": bool(incoming.get("active", True)),
-        "preferred_scorebug_name": str(incoming.get("preferred_scorebug_name", broadcast_name)).strip(),
-        "pronunciation_guide": str(incoming.get("pronunciation_guide", "")).strip(),
-        "venue_id": str(incoming.get("venue_id", "")).strip(),
-        "primary_color": incoming.get("primary_color", "#C9203B"),
-        "secondary_color": incoming.get("secondary_color", "#FFFFFF"),
-        "primary_logo": str(incoming.get("primary_logo", "")).strip(),
-        "alternate_logo": str(incoming.get("alternate_logo", "")).strip(),
-        "general_social": general_social,
-        "venues": incoming.get("venues") or [],
-        "programs": programs,
-        "state": str(incoming.get("state", "MS")).strip() or "MS",
-        "classification": str(incoming.get("classification", "")).strip(),
-        "region": str(incoming.get("region", "")).strip(),
-        "district": str(incoming.get("district", "")).strip(),
-        "mhsaa_id": str(incoming.get("mhsaa_id", "")).strip(),
-        "source_data": incoming.get("source_data") or {"provider": "Manual", "source_url": "", "retrieved_at": "", "district": ""},
-        "user_overrides": incoming.get("user_overrides") or {},
-        "verification_status": str(incoming.get("verification_status", "unverified")),
-        "default_broadcast_logo_id": str(incoming.get("default_broadcast_logo_id", "")).strip(),
-        "logo_status": str(incoming.get("logo_status", "candidate")),
-        "logo_metadata": incoming.get("logo_metadata") or {"source_url": "", "transparent_background_status": "unknown", "approval_status": "candidate", "shape_standard": "round", "master_canvas": "1024x1024-round", "safe_area": "circle-90-percent", "scorebug_derivative": "256x256-round"},
-        "notes": str(incoming.get("notes", "")).strip()
-    }
-
-    schools.append(school)
-    save_schools(schools)
-    return jsonify(school), 201
-
-@app.put("/api/schools/<school_id>")
-@require_auth
-def update_school(school_id: str):
-    incoming = request.get_json(force=True)
-    schools = load_schools()
-    index = next((i for i, s in enumerate(schools) if s.get("id") == school_id), None)
-    if index is None:
-        return jsonify({"error": "SCHOOL_NOT_FOUND"}), 404
-
-    school = schools[index]
-    if "general_social" in incoming:
-        normalized_social, social_errors = normalize_social_block(incoming.get("general_social") or {})
-        if social_errors:
-            return jsonify({"error": "INVALID_SOCIAL_URL", "fields": social_errors}), 400
-        incoming["general_social"] = normalized_social
-    if "programs" in incoming and "Football" in incoming["programs"]:
-        normalized_football, football_errors = normalize_social_block(incoming["programs"].get("Football") or {})
-        if football_errors:
-            return jsonify({"error": "INVALID_SOCIAL_URL", "fields": football_errors}), 400
-        incoming["programs"]["Football"].update(normalized_football)
-
-    school = schools[index]
-    for key in (
-        "official_name", "broadcast_name", "nickname", "mascot", "short_name", "city", "county", "active", "school_address", "phone", "website", "preferred_scorebug_name", "pronunciation_guide", "venue_id", "csrn_id", "primary_color",
-        "secondary_color", "primary_logo", "alternate_logo",
-        "general_social", "venues", "programs", "state", "classification", "region", "district", "mhsaa_id", "source_data", "user_overrides", "verification_status", "default_broadcast_logo_id", "logo_status", "logo_metadata", "notes"
-    ):
-        if key in incoming:
-            school[key] = incoming[key]
-
-    schools[index] = school
-    save_schools(schools)
-    linked_logo_id = str(school.get("default_broadcast_logo_id", "") or "").strip()
-    if linked_logo_id:
-        logos = load_logos()
-        linked = next((row for row in logos if str(row.get("id", "")) == linked_logo_id), None)
-        if linked is not None:
-            linked["approval_status"] = str(school.get("logo_status", linked.get("approval_status", "candidate")))
-            if school.get("primary_logo"):
-                linked["round_master_path"] = school.get("primary_logo")
-            save_logos(logos)
-    return jsonify(school)
-
-@app.delete("/api/schools/<school_id>")
-@require_auth
-def delete_school(school_id: str):
-    schools = load_schools()
-    school = next((s for s in schools if s.get("id") == school_id), None)
-    if not school:
-        return jsonify({"error": "SCHOOL_NOT_FOUND"}), 404
-    save_schools([s for s in schools if s.get("id") != school_id])
-    return jsonify({"ok": True})
-
-
-
-@app.post("/api/schools/duplicate-check")
-@require_auth
-def duplicate_check():
-    incoming = request.get_json(force=True)
-    return jsonify({"matches": school_duplicate_candidates(incoming, str(incoming.get("exclude_id", "")))})
-
-@app.get("/api/imports/mhsaa/5A/analyze")
-@require_auth
-def analyze_mhsaa_5a():
-    manifest = load_json(MHSAA_5A_FILE, {"schools": []})
-    existing = load_schools()
-    results = []
-    for candidate in manifest.get("schools", []):
-        matches = school_duplicate_candidates(candidate)
-        exact = next((s for s in existing if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        results.append({**candidate, "status": "existing" if exact else ("possible_duplicate" if matches else "new"), "matches": matches})
-    return jsonify({
-        "classification": "5A",
-        "source": manifest.get("source", {}),
-        "found": len(results),
-        "new": sum(1 for r in results if r["status"] == "new"),
-        "existing": sum(1 for r in results if r["status"] == "existing"),
-        "possible_duplicates": sum(1 for r in results if r["status"] == "possible_duplicate"),
-        "schools": results,
-    })
-
-@app.post("/api/imports/mhsaa/5A")
-@require_auth
-def import_mhsaa_5a():
-    options = request.get_json(silent=True) or {}
-    manifest = load_json(MHSAA_5A_FILE, {"schools": []})
-    schools = load_schools()
-    venues = load_venues()
-    imported = 0
-    skipped = 0
-    created_ids: list[str] = []
-    for candidate in manifest.get("schools", []):
-        exact = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        if exact:
-            # Enrich the authoritative classification/region without replacing user customization.
-            exact["classification"] = "5A"
-            exact["region"] = str(candidate.get("region", ""))
-            exact.setdefault("state", "MS")
-            exact.setdefault("csrn_id", next_csrn_school_id("MS", "5A", schools))
-            exact.setdefault("source_data", {}).update(candidate.get("source_data", {}))
-            ensure_school_schema(exact, schools)
-            skipped += 1
-            continue
-        school_id = normalize_school_id(candidate["broadcast_name"])
-        base_id, suffix = school_id, 2
-        while any(s.get("id") == school_id for s in schools):
-            school_id = f"{base_id}-{suffix}"; suffix += 1
-        venue_id = f"{school_id}-football"
-        school = {
-            "id": school_id,
-            "csrn_id": next_csrn_school_id("MS", "5A", schools),
-            "official_name": candidate["official_name"],
-            "broadcast_name": candidate["broadcast_name"],
-            "short_name": candidate["broadcast_name"],
-            "preferred_scorebug_name": candidate["broadcast_name"],
-            "nickname": "", "city": "", "county": "", "state": "MS", "active": True,
-            "classification": "5A", "region": str(candidate.get("region", "")), "district": "", "mhsaa_id": "",
-            "primary_color": "#808080", "secondary_color": "#FFFFFF",
-            "primary_logo": "", "alternate_logo": "", "default_broadcast_logo_id": "", "logo_status": "candidate",
-            "logo_metadata": {"source_url": "", "transparent_background_status": "unknown", "approval_status": "candidate", "shape_standard": "round", "master_canvas": "1024x1024-round", "safe_area": "circle-90-percent", "scorebug_derivative": "256x256-round"},
-            "general_social": {"facebook": "", "x": "", "instagram": "", "youtube": "", "website": ""},
-            "venue_id": venue_id if options.get("create_venues", True) else "",
-            "venues": [{"id": venue_id, "name": f"{candidate['broadcast_name']} Football Venue", "address1": "", "address2": "", "city": "", "state": "MS", "postal_code": "", "weather_radius_miles": 25}] if options.get("create_venues", True) else [],
-            "programs": {"Football": {"facebook": "", "x": "", "instagram": "", "youtube": "", "website": "", "venue_id": venue_id if options.get("create_venues", True) else "", "notes": ""}},
-            "source_data": candidate.get("source_data", {}), "user_overrides": {}, "verification_status": "candidate",
-            "pronunciation_guide": "", "notes": "Imported as a 5A candidate record; complete identity, venue, colors, logo and social fields during review."
-        }
-        schools.append(school)
-        if options.get("create_venues", True):
-            venues.append({"id": venue_id, "school_id": school_id, "csrn_school_id": school["csrn_id"], "sport": "Football", "name": f"{candidate['broadcast_name']} Football Venue", "address1": "", "address2": "", "city": "", "state": "MS", "postal_code": "", "latitude": None, "longitude": None, "approval_status": "candidate", "broadcast_notes": ""})
-        imported += 1
-        created_ids.append(school["csrn_id"])
-    save_schools(schools)
-    save_venues(venues)
-    return jsonify({"imported": imported, "skipped_existing": skipped, "created_ids": created_ids, "total_schools": len(schools)})
-
-
-
-@app.get("/api/imports/mhsaa/5A/branding/analyze")
-@require_auth
-def analyze_mhsaa_5a_branding():
-    manifest = load_json(MHSAA_5A_BRANDING_FILE, {"schools": []})
-    schools = load_schools()
-    results = []
-    for candidate in manifest.get("schools", []):
-        school = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        if not school:
-            status = "school_missing"
-        elif school.get("primary_logo") or str(school.get("branding_status", "")).lower() in {"approved", "manual"}:
-            status = "preserved"
-        else:
-            status = "ready"
-        results.append({**candidate, "status": status, "school_id": school.get("id", "") if school else ""})
-    return jsonify({
-        "found": len(results),
-        "ready": sum(1 for r in results if r["status"] == "ready"),
-        "preserved": sum(1 for r in results if r["status"] == "preserved"),
-        "school_missing": sum(1 for r in results if r["status"] == "school_missing"),
-        "schools": results,
-        "source": manifest.get("source", {}),
-    })
-
-@app.post("/api/imports/mhsaa/5A/branding")
-@require_auth
-def import_mhsaa_5a_branding():
-    manifest = load_json(MHSAA_5A_BRANDING_FILE, {"schools": []})
-    schools = load_schools()
-    updated = 0
-    preserved = 0
-    missing = []
-    for candidate in manifest.get("schools", []):
-        school = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        if not school:
-            missing.append(candidate.get("official_name", ""))
-            continue
-        # Existing processed logos/colors are considered user-reviewed and are never overwritten.
-        if school.get("primary_logo") or str(school.get("branding_status", "")).lower() in {"approved", "manual"}:
-            preserved += 1
-            continue
-        school["primary_color"] = candidate.get("primary_color", school.get("primary_color", "#808080"))
-        school["secondary_color"] = candidate.get("secondary_color", school.get("secondary_color", "#FFFFFF"))
-        school["accent_color"] = candidate.get("accent_color", "")
-        school["branding_status"] = "candidate"
-        school["branding_source"] = {
-            "provider": candidate.get("source_provider", "CSRN research seed"),
-            "source_url": candidate.get("source_url", ""),
-            "checked_at": manifest.get("source", {}).get("checked_at", ""),
-            "verification_status": "candidate",
-            "notes": candidate.get("notes", "Candidate colors require visual approval."),
-        }
-        updated += 1
-    save_schools(schools)
-    return jsonify({"updated": updated, "preserved": preserved, "missing_schools": missing})
-
-@app.get("/api/imports/mhsaa/5A/enrichment/analyze")
-@require_auth
-def analyze_mhsaa_5a_enrichment():
-    manifest = load_json(MHSAA_5A_ENRICHMENT_FILE, {"schools": []})
-    schools = load_schools()
-    results = []
-    for candidate in manifest.get("schools", []):
-        school = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        missing = []
-        if not school:
-            status = "school_missing"
-        else:
-            status = "ready"
-            for key in ("mascot", "phone", "website"):
-                if not candidate.get(key): missing.append(key)
-            address = candidate.get("school_address", {})
-            if not address.get("address1"): missing.append("school_address")
-        results.append({"official_name": candidate.get("official_name"), "status": status, "missing_source_fields": missing})
-    return jsonify({
-        "classification": "5A", "found": len(results),
-        "ready": sum(1 for r in results if r["status"] == "ready"),
-        "school_missing": sum(1 for r in results if r["status"] == "school_missing"),
-        "source": manifest.get("source", {}), "schools": results
-    })
-
-@app.post("/api/imports/mhsaa/5A/enrichment")
-@require_auth
-def enrich_mhsaa_5a():
-    manifest = load_json(MHSAA_5A_ENRICHMENT_FILE, {"schools": []})
-    schools = load_schools(); venues = load_venues(); logos = load_logos()
-    updated = 0; missing_schools = []; missing_mascot = 0; missing_address = 0; missing_website = 0; venue_verification_needed = 0; logo_pending = 0
-    for candidate in manifest.get("schools", []):
-        school = next((s for s in schools if str(s.get("official_name", "")).casefold() == str(candidate.get("official_name", "")).casefold()), None)
-        if not school:
-            missing_schools.append(candidate.get("official_name", "")); continue
-        overrides = school.get("user_overrides") or {}
-        mascot = candidate.get("mascot", "")
-        if mascot and not overrides.get("mascot"):
-            school["mascot"] = mascot; school["nickname"] = school.get("nickname") or mascot
-        elif not mascot: missing_mascot += 1
-        address = candidate.get("school_address", {})
-        if address.get("address1"):
-            school["school_address"] = address
-            school["city"] = school.get("city") or address.get("city", "")
-        else: missing_address += 1
-        if candidate.get("phone") and not overrides.get("phone"): school["phone"] = candidate.get("phone")
-        if candidate.get("website") and not overrides.get("website"):
-            school["website"] = candidate.get("website")
-            school.setdefault("general_social", {})["website"] = school.get("general_social", {}).get("website") or candidate.get("website")
-        elif not candidate.get("website"): missing_website += 1
-        school.setdefault("source_data", {}).update({"provider":"MHSAA School Directory","directory_source_url":candidate.get("source_url", ""),"directory_checked_at":manifest.get("source", {}).get("checked_at", "")})
-        school["verification_status"] = "candidate_enriched"
-        school.setdefault("logo_metadata", {}).update({"source_url":candidate.get("source_url", ""),"approval_status":"candidate","shape_standard":"round","master_canvas":"1024x1024-round","scorebug_derivative":"256x256-round"})
-        school["logo_status"] = school.get("logo_status") or "candidate"
-        logo_pending += 1
-        venue_id = school.get("venue_id") or f"{school.get('id')}-football"
-        school["venue_id"] = venue_id
-        venue = next((v for v in venues if v.get("id") == venue_id or v.get("school_id") == school.get("id")), None)
-        venue_payload = {"id": venue_id, "school_id": school.get("id"), "csrn_school_id": school.get("csrn_id", ""), "sport":"Football", "name":f"{school.get('broadcast_name') or candidate.get('official_name')} Football Stadium", **address, "latitude":None, "longitude":None, "on_campus_assumed":True, "venue_address_source":"school_address", "venue_verified":False, "approval_status":"candidate", "broadcast_notes":"Defaulted to school address; verify whether the stadium is off campus."}
-        if venue: venue.update({k:v for k,v in venue_payload.items() if k not in ("broadcast_notes",) or not venue.get(k)})
-        else: venues.append(venue_payload)
-        school["venues"] = [venue_payload if v.get("id") == venue_id else v for v in school.get("venues", [])] or [venue_payload]
-        school.setdefault("programs", {}).setdefault("Football", {})["venue_id"] = venue_id
-        venue_verification_needed += 1; updated += 1
-    save_schools(schools); save_venues(venues); save_logos(logos)
-    return jsonify({"updated":updated,"missing_schools":missing_schools,"missing_mascot":missing_mascot,"missing_address":missing_address,"missing_website":missing_website,"logo_pending_approval":logo_pending,"venue_verification_needed":venue_verification_needed})
-
-
-
-def _hex(rgb: tuple[int, int, int]) -> str:
-    return "#%02X%02X%02X" % rgb
-
-def extract_logo_colors(image: Image.Image) -> list[str]:
-    rgba = image.convert("RGBA")
-    sample = rgba.copy(); sample.thumbnail((240, 240))
-    chromatic=[]; white_count=0; black_count=0; visible=0
-    for r,g,b,a in sample.getdata():
-        if a < 64:
-            continue
-        visible += 1
-        mx=max(r,g,b); mn=min(r,g,b); saturation=mx-mn
-        if r >= 238 and g >= 238 and b >= 238:
-            white_count += 1
-            continue
-        if r <= 28 and g <= 28 and b <= 28:
-            black_count += 1
-            continue
-        if saturation < 16 and 45 < mx < 225:
-            continue
-        chromatic.append((r,g,b))
-    ranked=[]
-    if chromatic:
-        strip=Image.new("RGB",(len(chromatic),1)); strip.putdata(chromatic)
-        quant=strip.quantize(colors=10,method=Image.Quantize.MEDIANCUT).convert("RGB")
-        counts=quant.getcolors(maxcolors=256) or []
-        ranked=[rgb for _,rgb in sorted(counts,reverse=True)]
-    chosen=[]
-    for rgb in ranked:
-        if all(sum((rgb[i]-other[i])**2 for i in range(3)) > 2600 for other in chosen):
-            chosen.append(rgb)
-        if len(chosen)==2:
-            break
-    if not chosen:
-        chosen=[(128,128,128)]
-    neutral = (255,255,255) if white_count >= black_count else (0,0,0)
-    # Prefer a neutral secondary when it is visibly present; school branding commonly pairs one strong color with white/black.
-    neutral_share=(max(white_count,black_count)/visible) if visible else 0
-    if neutral_share >= 0.035:
-        secondary=neutral
-    elif len(chosen)>1:
-        secondary=chosen[1]
-    else:
-        secondary=(255,255,255)
-    return [_hex(chosen[0]), _hex(secondary)]
-
-def normalize_round_logo(source: Image.Image, size: int) -> Image.Image:
-    img=source.convert("RGBA")
-    bbox=img.getbbox()
-    if bbox: img=img.crop(bbox)
-    max_content=int(size*0.92)
-    scale=min(max_content/max(1,img.width), max_content/max(1,img.height))
-    new_size=(max(1,round(img.width*scale)),max(1,round(img.height*scale)))
-    img=img.resize(new_size,Image.Resampling.LANCZOS)
-    canvas=Image.new("RGBA",(size,size),(0,0,0,0))
-    canvas.alpha_composite(img,((size-img.width)//2,(size-img.height)//2))
-    mask=Image.new("L",(size,size),0)
-    from PIL import ImageDraw
-    ImageDraw.Draw(mask).ellipse((0,0,size-1,size-1),fill=255)
-    canvas.putalpha(ImageChops.multiply(canvas.getchannel("A"),mask))
-    return canvas
-
-
-@app.get("/school-logos/<school_id>/<filename>")
-def school_logo_file(school_id: str, filename: str):
-    return send_from_directory(DATA_DIR / "Logos" / normalize_school_id(school_id), filename)
-
-@app.post("/api/schools/<school_id>/logo/process")
-@require_auth
-def process_school_logo(school_id: str):
-    schools=load_schools(); school=next((x for x in schools if x.get("id")==school_id),None)
-    if not school: return jsonify({"error":"SCHOOL_NOT_FOUND"}),404
-    upload=request.files.get("logo")
-    if not upload or not upload.filename: return jsonify({"error":"LOGO_FILE_REQUIRED"}),400
-    try:
-        raw=upload.read()
-        image=Image.open(io.BytesIO(raw)); image.load()
-    except Exception:
-        return jsonify({"error":"INVALID_IMAGE"}),400
-    folder=DATA_DIR / "Logos" / normalize_school_id(school_id); folder.mkdir(parents=True,exist_ok=True)
-    ext=(Path(upload.filename).suffix.lower() or '.png')
-    if ext not in ('.png','.jpg','.jpeg','.webp'): ext='.png'
-    original=folder / f"original{ext}"; original.write_bytes(raw)
-    master=normalize_round_logo(image,1024); scorebug=normalize_round_logo(image,256)
-    master.save(folder/'round-master.png'); scorebug.save(folder/'round-scorebug.png')
-    colors=extract_logo_colors(master)
-    rel_master=f"/school-logos/{normalize_school_id(school_id)}/round-master.png"
-    rel_score=f"/school-logos/{normalize_school_id(school_id)}/round-scorebug.png"
-    logo_id=f"{school.get('csrn_id') or school_id}-primary"
-    school['primary_logo']=rel_master; school['default_broadcast_logo_id']=logo_id; school['logo_status']='candidate'
-    school['primary_color']=colors[0]; school['secondary_color']=colors[1]
-    school.setdefault('logo_metadata',{}).update({
-        'original_filename':upload.filename,'original_path':str(original.relative_to(BASE_DIR)).replace('\\','/'),
-        'round_master_path':rel_master,'scorebug_path':rel_score,'approval_status':'candidate',
-        'transparent_background_status':'normalized','shape_standard':'round','master_canvas':'1024x1024-round',
-        'safe_area':'circle-92-percent','scorebug_derivative':'256x256-round','extracted_colors':colors
-    })
-    save_schools(schools)
-    logos=load_logos(); record=next((x for x in logos if x.get('id')==logo_id),None)
-    payload={'id':logo_id,'school_id':school_id,'csrn_school_id':school.get('csrn_id',''),'designation':'primary',
-             'approval_status':'candidate','original_path':str(original.relative_to(BASE_DIR)).replace('\\','/'),
-             'round_master_path':rel_master,'scorebug_path':rel_score,'extracted_colors':colors}
-    if record: record.update(payload)
-    else: logos.append(payload)
-    save_logos(logos)
-    return jsonify({'school':school,'logo':payload,'primary_color':colors[0],'secondary_color':colors[1],
-                    'preview_url':rel_master,'message':'Round candidate logo created; review colors and approve before broadcast use.'})
-
-@app.get("/api/venues")
-@require_auth
-def list_venues():
-    return jsonify(load_venues())
-
-@app.get("/api/logos")
-@require_auth
-def list_logos():
-    return jsonify(load_logos())
-
-
-@app.get("/api/upgrade/candidate")
-def upgrade_candidate():
-    return jsonify(inspect_candidate(BASE_DIR))
-
-@app.get("/api/upgrade/status")
-def upgrade_status():
-    return jsonify(copy.deepcopy(last_upgrade_report))
-
-@app.post("/api/upgrade/migrate")
-def run_upgrade_migration():
-    incoming = request.get_json(silent=True) or {}
-    include_security = bool(incoming.get("include_security", True))
-    with upgrade_lock:
-        report = migrate(BASE_DIR, DEFAULT_CONFIG, include_security=include_security)
-        last_upgrade_report.clear()
-        last_upgrade_report.update(report)
-    if report.get("security_migrated"):
-        # Migration occurs before authentication, so the migrated session-signing
-        # key can be activated safely without restarting the server.
-        app.secret_key = load_security()["secret_key"]
-    report["active_pin"] = (
-        "PREVIOUS_PIN" if report.get("security_migrated")
-        else "CREATE_NEW_PIN"
-    )
-    report["pin_message"] = (
-        "Migration is complete. Unlock the Production Suite with the operator PIN from the previous build."
-        if report.get("security_migrated") else
-        "Migration is complete. Create a new 6-digit operator PIN on this screen."
-    )
-    return jsonify(report)
-
-
-@app.get("/api/obs/status")
-@require_auth
-def obs_status():
-    return jsonify(copy.deepcopy(last_obs_status))
-
-@app.post("/api/obs/test")
-@require_auth
-def test_obs_connection():
-    cfg = load_config()
+        return get_state_service().apply_change(
+            changes,
+            save_undo=save_undo,
+        ).data["state"]
+
+def load_obs_status() -> dict[str, Any]:
     with obs_status_lock:
-        result = validate_obs_read_only(cfg.get("obs", {}))
-        last_obs_status.clear()
-        last_obs_status.update(result)
-    return jsonify(result)
+        return copy.deepcopy(last_obs_status)
 
 
-def command_scorebug_visibility(visible: bool) -> dict[str, Any]:
-    cfg = load_config()
-    obs_settings = cfg.get("obs", {})
-    if not obs_settings.get("controlled_commands", False):
-        raise OBSConnectionError("Controlled OBS commands are disabled in Settings.")
-    result = set_scorebug_visibility(obs_settings, visible)
+def save_obs_status(status: dict[str, Any]) -> None:
     with obs_status_lock:
         last_obs_status.clear()
-        last_obs_status.update(result)
-    return result
+        last_obs_status.update(copy.deepcopy(status))
 
 
-@app.post("/api/obs/scorebug-visibility")
-@require_auth
-def obs_scorebug_visibility():
-    incoming = request.get_json(force=True)
-    visible = incoming.get("visible")
-    if not isinstance(visible, bool):
-        return jsonify({"error": "VISIBLE_MUST_BE_BOOLEAN"}), 400
-    try:
-        result = command_scorebug_visibility(visible)
-    except OBSConnectionError as exc:
-        return jsonify({"error": "OBS_COMMAND_BLOCKED", "message": str(exc)}), 409
-    return jsonify(result)
-
-
-@app.post("/api/obs/program-visual-mode")
-@require_auth
-def obs_program_visual_mode():
-    incoming = request.get_json(force=True)
-    mode = str(incoming.get("mode", "")).lower()
-    cfg = load_config()
-    if not cfg.get("obs", {}).get("controlled_commands", False):
-        return jsonify({"error": "OBS_COMMAND_BLOCKED", "message": "Controlled OBS commands are disabled in Settings."}), 409
-    try:
-        result = set_program_visual_mode(cfg.get("obs", {}), mode)
-    except OBSConnectionError as exc:
-        return jsonify({"error": "OBS_COMMAND_BLOCKED", "message": str(exc)}), 409
-    with obs_status_lock:
-        last_obs_status.clear()
-        last_obs_status.update(result)
+def update_obs_visual_state(mode: str) -> dict[str, Any]:
     with lock:
         state = load_state()
         push_history(state)
         state["visual_mode"] = mode
         save_state(state)
-    return jsonify({"state": state, "obs": result})
+        return state
 
 
-@app.get("/api/config")
-@require_auth
-def get_config():
-    return jsonify(load_config())
+OBS_SERVICE: OBSService | None = None
 
-@app.post("/api/config")
-@require_auth
-def update_config():
-    incoming = request.get_json(force=True)
-    current = load_config()
-    if "social" in incoming:
-        normalized_social, social_errors = normalize_social_block(incoming.get("social") or {})
-        if social_errors:
-            return jsonify({"error": "INVALID_SOCIAL_URL", "fields": social_errors}), 400
-        incoming["social"] = normalized_social
-    for section in current:
-        if section in incoming and isinstance(incoming[section], dict):
-            current[section].update(incoming[section])
-    # Protect application identity fields.
-    current["application"]["version"] = "Version 1.5 Alpha — Personnel Engine v1"
-    current["application"]["build"] = "V1.5A-PERSONNEL1-R2"
-    save_config(current)
-    return jsonify(current)
 
-@app.get("/api/diagnostics")
-@require_auth
-def diagnostics():
-    return jsonify(diagnostic_status())
+def get_obs_service() -> OBSService:
+    global OBS_SERVICE
+    if OBS_SERVICE is None:
+        OBS_SERVICE = OBSService(
+            load_config=load_config,
+            load_status=load_obs_status,
+            save_status=save_obs_status,
+            validate_obs=validate_obs_read_only,
+            set_scorebug_visibility=set_scorebug_visibility,
+            set_program_visual_mode=set_program_visual_mode,
+            update_visual_state=update_obs_visual_state,
+        )
+    return OBS_SERVICE
 
-@app.get("/api/state")
-def get_state():
-    # Read-only endpoint for both authenticated control devices and OBS overlay.
-    return jsonify(public_state(load_state()))
 
-def update_linked_broadcast_status(broadcast_id: str, status: str, extra: dict[str, Any] | None = None) -> None:
-    if not broadcast_id:
-        return
-    items = load_broadcasts()
-    item = next((x for x in items if x.get("broadcast_id") == broadcast_id), None)
-    if not item:
-        return
-    item["status"] = status
-    item["updated_at"] = int(time.time())
-    if status == "live": item.setdefault("started_at", int(time.time()))
-    if status == "completed": item["completed_at"] = int(time.time())
-    if extra: item.update(extra)
-    save_broadcasts(items)
-    path = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
-    path.write_text(json.dumps(item, indent=2), encoding="utf-8")
+PAGE_ROUTES_BLUEPRINT = create_page_blueprint(
+    PageRoutesDependencies(
+        application_identity=lambda: application_identity(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(PAGE_ROUTES_BLUEPRINT)
+
+
+BROADCAST_PACKAGE_ROUTES_BLUEPRINT = create_broadcast_package_blueprint(
+    BroadcastPackageRoutesDependencies(
+        require_auth=require_auth,
+        get_package_service=get_broadcast_package_service,
+        public_state=lambda state: public_state(state),
+    )
+)
+APPLICATION_BLUEPRINTS.append(BROADCAST_PACKAGE_ROUTES_BLUEPRINT)
+
+
+SPONSOR_ROUTES_BLUEPRINT = create_sponsor_blueprint(
+    SponsorRoutesDependencies(
+        require_auth=require_auth,
+        get_sponsor_service=get_sponsor_service,
+        load_sponsors=lambda: load_sponsors(),
+        load_assets=lambda: load_assets(),
+        save_assets=lambda items: save_assets(items),
+        clean_asset_record=lambda payload, asset_id: clean_asset_record(
+            payload,
+            asset_id,
+        ),
+        asset_file_hash=lambda path: asset_file_hash(path),
+        get_asset_upload_dir=lambda: ASSET_UPLOAD_DIR,
+        get_sponsor_upload_dir=lambda: SPONSOR_UPLOAD_DIR,
+        clock=lambda: time.time(),
+        token_hex=lambda length: secrets.token_hex(length),
+    )
+)
+APPLICATION_BLUEPRINTS.append(SPONSOR_ROUTES_BLUEPRINT)
+
+ASSET_ROUTES_BLUEPRINT = create_asset_blueprint(
+    AssetRoutesDependencies(
+        require_auth=require_auth,
+        get_asset_service=get_asset_service,
+        get_upload_dir=lambda: ASSET_UPLOAD_DIR,
+        extension_allowed=AssetService.extension_allowed,
+        normalize_asset_id=AssetService.normalize_id,
+        clock=lambda: time.time(),
+        token_hex=lambda length: secrets.token_hex(length),
+    )
+)
+APPLICATION_BLUEPRINTS.append(ASSET_ROUTES_BLUEPRINT)
+
+
+PERSONNEL_ROUTES_BLUEPRINT = create_personnel_blueprint(
+    PersonnelRoutesDependencies(
+        require_auth=require_auth,
+        get_personnel_service=get_personnel_service,
+        get_headshots_dir=lambda: PERSONNEL_HEADSHOTS_DIR,
+        normalize_personnel_id=PersonnelService.normalize_id,
+    )
+)
+APPLICATION_BLUEPRINTS.append(PERSONNEL_ROUTES_BLUEPRINT)
+
+ROSTER_ROUTES_BLUEPRINT = create_roster_blueprint(
+    RosterRoutesDependencies(
+        require_auth=require_auth,
+        get_roster_service=get_roster_service,
+    )
+)
+APPLICATION_BLUEPRINTS.append(ROSTER_ROUTES_BLUEPRINT)
+
+VENUE_ROUTES_BLUEPRINT = create_venue_blueprint(
+    VenueRoutesDependencies(
+        require_auth=require_auth,
+        get_venue_service=get_venue_service,
+    )
+)
+APPLICATION_BLUEPRINTS.append(VENUE_ROUTES_BLUEPRINT)
+
+
+SCHOOL_ROUTES_BLUEPRINT = create_school_blueprint(
+    SchoolRoutesDependencies(
+        require_auth=require_auth,
+        get_school_service=get_school_service,
+    )
+)
+APPLICATION_BLUEPRINTS.append(SCHOOL_ROUTES_BLUEPRINT)
+
+ASSOCIATION_ROUTES_BLUEPRINT = create_association_blueprint(
+    AssociationRoutesDependencies(
+        require_auth=require_auth,
+        get_profile_service=get_association_profile_service,
+        get_workflow_service=get_association_workflow_service,
+        get_import_service=get_association_import_service,
+        get_supplement_service=get_association_supplement_service,
+        get_dragonfly_service=get_dragonfly_service,
+        get_dragonfly_sync_service=get_dragonfly_sync_service,
+        get_school_service=get_school_service,
+        load_mhsaa_profile=lambda: load_json(MHSAA_5A_PROFILE_FILE, {}),
+        load_mhsaa_manifest=lambda: load_json(
+            MHSAA_5A_FILE,
+            {"schools": []},
+        ),
+        load_mhsaa_branding_manifest=lambda: load_json(
+            MHSAA_5A_BRANDING_FILE,
+            {"schools": []},
+        ),
+        load_mhsaa_enrichment_manifest=lambda: load_json(
+            MHSAA_5A_ENRICHMENT_FILE,
+            {"schools": []},
+        ),
+    )
+)
+APPLICATION_BLUEPRINTS.append(ASSOCIATION_ROUTES_BLUEPRINT)
+
+MHSAA_DIVISION_ROUTES_BLUEPRINT = create_mhsaa_division_blueprint(
+    require_auth=require_auth,
+    get_import_service=get_association_import_service,
+    imports_dir=IMPORTS_DIR,
+)
+APPLICATION_BLUEPRINTS.append(MHSAA_DIVISION_ROUTES_BLUEPRINT)
+
+
+def _hex(rgb: tuple[int, int, int]) -> str:
+    return LogoService._hex(rgb)
+
+
+def extract_logo_colors(image: Image.Image) -> list[str]:
+    return LogoService.extract_colors(image)
+
+
+def normalize_round_logo(source: Image.Image, size: int) -> Image.Image:
+    return LogoService.normalize_round_logo(source, size)
+
+
+LOGO_ROUTES_BLUEPRINT = create_logo_blueprint(
+    LogoRoutesDependencies(
+        require_auth=require_auth,
+        get_logo_service=get_logo_service,
+        get_base_dir=lambda: BASE_DIR,
+        get_school_logo_dir=lambda school_id: (
+            DATA_DIR / "Logos" / normalize_school_id(school_id)
+        ),
+        normalize_school_id=normalize_school_id,
+    )
+)
+APPLICATION_BLUEPRINTS.append(LOGO_ROUTES_BLUEPRINT)
+
+
+UPGRADE_SERVICE: UpgradeService | None = None
+
+
+def activate_upgrade_secret_key(secret_key: str) -> None:
+    current_app.secret_key = secret_key
+
+
+def get_upgrade_service() -> UpgradeService:
+    global UPGRADE_SERVICE
+    if UPGRADE_SERVICE is None:
+        UPGRADE_SERVICE = UpgradeService(
+            current_dir=BASE_DIR,
+            defaults=DEFAULT_CONFIG,
+            inspect_candidate=inspect_candidate,
+            migrate=migrate,
+            load_security=load_security,
+            activate_secret_key=activate_upgrade_secret_key,
+            report_store=last_upgrade_report,
+            migration_lock=upgrade_lock,
+        )
+    return UPGRADE_SERVICE
+
+
+SECURITY_UPGRADE_ROUTES_BLUEPRINT = create_security_upgrade_blueprint(
+    SecurityUpgradeRoutesDependencies(
+        get_security_service=lambda: SECURITY_SERVICE,
+        load_security=load_security,
+        authenticated=authenticated,
+        clock=time.time,
+        get_upgrade_service=get_upgrade_service,
+    )
+)
+APPLICATION_BLUEPRINTS.append(SECURITY_UPGRADE_ROUTES_BLUEPRINT)
+
+
+OBS_ROUTES_BLUEPRINT = create_obs_blueprint(
+    OBSRoutesDependencies(
+        require_auth=require_auth,
+        get_obs_service=lambda: get_obs_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(OBS_ROUTES_BLUEPRINT)
+
+
+def command_scorebug_visibility(visible: bool) -> dict[str, Any]:
+    result = get_obs_service().scorebug_visibility(visible)
+    if not result.ok:
+        raise OBSConnectionError(
+            str(result.data.get("message", result.code))
+        )
+    return result.data["obs"]
+
+
+def update_linked_broadcast_status(
+    broadcast_id: str,
+    status: str,
+    extra: dict[str, Any] | None = None,
+) -> None:
+    get_broadcast_service().update_linked_status(
+        broadcast_id,
+        status,
+        extra,
+    )
+
 
 def migrate_venue_names() -> None:
-    venues=load_venues(); changed=False
-    for venue in venues:
-        name=str(venue.get("name", ""))
-        if name.endswith(" Football Venue"):
-            school=name[:-len(" Football Venue")].strip()
-            venue["name"]=f"{school} HS Football Field"; changed=True
-        elif name.endswith(" Football Stadium"):
-            school=name[:-len(" Football Stadium")].strip()
-            venue["name"]=f"{school} HS Football Field"; changed=True
-    if changed: save_venues(venues)
+    get_venue_service().migrate_legacy_names()
+
 
 def readiness_payload() -> dict[str, Any]:
-    state=load_state(); cfg=load_config(); obs=copy.deepcopy(last_obs_status); checks=[]
-    def add(key,label,ok,note,action=""): checks.append({"key":key,"label":label,"ok":bool(ok),"note":note,"action":action})
-    add("obs","OBS WebSocket",bool(obs.get("reachable") and obs.get("authenticated")),"Connected and authenticated.","Open OBS, enable the WebSocket server, then retry.")
-    add("scene","Scorebug scene",bool(obs.get("required_scene_exists")),"Required scorebug scene found.",f"In OBS create or load scene: {cfg.get('obs',{}).get('required_scene','10.01 - FOOTBALL SCOREBUG')}")
-    add("browser","Browser source",bool(obs.get("browser_source_exists")),"Browser source found; a hidden scorebug is still ready.",f"In OBS add Browser Source {cfg.get('obs',{}).get('browser_source','BRWSR - Football Scorebug')} using http://127.0.0.1:5050/overlay")
-    add("overlay","Overlay endpoint",True,"Overlay endpoint is reachable.")
-    add("visual","Program visual",bool(cfg.get("obs",{}).get("program_visual_scene")),"Program Visual is configured.","Configure the Program Visual scene in Settings.")
-    return {"ready":all(c["ok"] for c in checks),"checks":checks,"overlay_url":"http://127.0.0.1:5050/overlay","state":public_state(state)}
+    return get_diagnostics_service().readiness().data["readiness"]
 
-@app.get("/api/readiness")
-@require_auth
-def readiness():
-    migrate_venue_names()
-    return jsonify(readiness_payload())
 
-@app.post("/api/broadcasts/<broadcast_id>/load")
-@require_auth
-def load_planned_broadcast(broadcast_id: str):
-    item = next((x for x in load_broadcasts() if x.get("broadcast_id") == broadcast_id and not x.get("archived")), None)
-    if not item:
-        return jsonify({"error": "NOT_FOUND"}), 404
-    current = load_state()
-    if current.get("broadcast_id") == broadcast_id and current.get("broadcast_created"):
-        return jsonify(current)
-    snapshot = item.get("live_state") if isinstance(item.get("live_state"), dict) else None
-    if snapshot:
-        state = normalize_state(snapshot)
-    else:
-        state = copy.deepcopy(DEFAULT_STATE)
-        state.update({
-            "broadcast_created": True, "broadcast_id": broadcast_id,
-            "sport": item.get("sport", "Football"), "season": item.get("season", ""),
-            "week": item.get("week", "1"), "classification": item.get("classification", ""),
-            "level": item.get("level", "Varsity"), "division": item.get("division", "Boys"),
-            "home_school_id": item.get("home_school_id", ""), "visitor_school_id": item.get("visitor_school_id", ""),
-            "home_team": item.get("home_team", "Home"), "visitor_team": item.get("visitor_team", "Visitor"),
-            "home_identity": item.get("home_identity") or broadcast_identity(get_school(item.get("home_school_id", "")), item.get("sport", "Football")),
-            "visitor_identity": item.get("visitor_identity") or broadcast_identity(get_school(item.get("visitor_school_id", "")), item.get("sport", "Football")),
-            "venue_id": item.get("venue_id", ""), "venue": item.get("venue", ""),
-            "date": item.get("date", ""), "scheduled_start": item.get("scheduled_start", "07:00 PM"),
-            "visual_mode": item.get("visual_mode", "graphic"), "crew": item.get("crew", {}),
-            "status": item.get("status", "planned"),
-            "broadcast_phase": "final" if item.get("status") == "completed" else ("live" if item.get("status") == "live" else "pregame"),
-            "scorebug_visible": False,
-            "home_score": item.get("final_home_score", 0) if item.get("status") == "completed" else 0,
-            "visitor_score": item.get("final_visitor_score", 0) if item.get("status") == "completed" else 0,
-        })
-    state["status"] = item.get("status", state.get("status", "planned"))
-    state["review_mode"] = state["status"] == "completed"
-    # Reconcile a saved snapshot with the status selected in Game Manager.
-    # This allows a completed game to be changed back to Live and reopened.
-    if state["status"] == "live":
-        state["broadcast_phase"] = "live"
-    elif state["status"] == "planned":
-        state["broadcast_phase"] = "pregame"
-    elif state["status"] == "completed":
-        state["broadcast_phase"] = "final"
-    save_state(state)
-    return jsonify(state)
+SYSTEM_ROUTES_BLUEPRINT = create_system_blueprint(
+    SystemRoutesDependencies(
+        require_auth=require_auth,
+        get_configuration_service=get_configuration_service,
+        diagnostic_status=diagnostic_status,
+        load_state=load_reconciled_state,
+        load_runtime_state=load_state,
+        public_state=public_state,
+        runtime_state=runtime_state,
+        readiness_payload=readiness_payload,
+        load_build_journal=load_build_journal,
+    )
+)
+APPLICATION_BLUEPRINTS.append(SYSTEM_ROUTES_BLUEPRINT)
 
-@app.post("/api/initialize-broadcast")
-@require_auth
-def initialize_broadcast():
-    # Compatibility endpoint retained for older clients. The Prepared stage was removed.
-    state = load_state()
-    if not state.get("broadcast_id"):
-        return jsonify({"error": "NO_ACTIVE_BROADCAST"}), 409
-    payload = readiness_payload()
-    return jsonify({"state": state, "readiness": payload, "deprecated": True})
+COIN_TOSS_ROUTES_BLUEPRINT = create_coin_toss_blueprint(
+    require_auth=require_auth,
+    load_state=load_state,
+    save_state=save_state,
+    public_state=public_state,
+    transaction_lock=lock,
+    clock=time.time,
+)
+APPLICATION_BLUEPRINTS.append(COIN_TOSS_ROUTES_BLUEPRINT)
 
-@app.post("/api/start-broadcast")
-@require_auth
-def start_broadcast():
-    state=load_state()
-    if not state.get("broadcast_id"):
-        return jsonify({"error":"NO_ACTIVE_BROADCAST"}),409
-    state["status"]="live"
-    state["broadcast_phase"]="live"
-    state["scorebug_visible"]=True
-    save_state(state)
-    update_linked_broadcast_status(state["broadcast_id"],"live")
-    obs_result=None
-    if load_config().get("obs", {}).get("controlled_commands", False):
-        try:
-            obs_result=command_scorebug_visibility(True)
-        except OBSConnectionError as exc:
-            obs_result={"error":str(exc)}
-    record=next((x for x in load_broadcasts() if x.get("broadcast_id")==state["broadcast_id"]),None)
-    return jsonify({"state":public_state(state),"broadcast":record,"obs":obs_result})
 
-@app.post("/api/resume-broadcast")
-@require_auth
-def resume_broadcast():
-    """Reopen a completed broadcast without discarding its saved game data."""
-    with lock:
-        state = load_state()
-        broadcast_id = str(state.get("broadcast_id", "")).strip()
-        if not broadcast_id:
-            return jsonify({"error": "NO_ACTIVE_BROADCAST"}), 409
-        state["status"] = "live"
-        state["broadcast_phase"] = "live"
-        state["review_mode"] = False
-        # Keep the scorebug hidden until the operator deliberately shows it.
-        state["scorebug_visible"] = False
-        save_state(state)
-        items = load_broadcasts()
-        item = next((row for row in items if row.get("broadcast_id") == broadcast_id), None)
-        if item:
-            item["status"] = "live"
-            item["updated_at"] = int(time.time())
-            item.pop("completed_at", None)
-            item.pop("final_home_score", None)
-            item.pop("final_visitor_score", None)
-            save_broadcasts(items)
-            detail = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
-            detail.write_text(json.dumps(item, indent=2), encoding="utf-8")
-        return jsonify(public_state(state))
+BROADCAST_LIFECYCLE_SERVICE: BroadcastLifecycleService | None = None
 
-@app.post("/api/create-broadcast")
-@require_auth
-def create_broadcast():
-    data = request.get_json(force=True)
-    cfg = load_config()
-    defaults = cfg["broadcast_defaults"]
-    sport = data.get("sport", defaults.get("sport", "Football"))
-    home_school_id = str(data.get("home_school_id", "")).strip()
-    visitor_school_id = str(data.get("visitor_school_id", "")).strip()
-    home_school = get_school(home_school_id) if home_school_id else None
-    visitor_school = get_school(visitor_school_id) if visitor_school_id else None
-    home_name = (str(home_school.get("broadcast_name", "")).strip() if home_school else str(data.get("home_team", "")).strip()) or "Home"
-    visitor_name = (str(visitor_school.get("broadcast_name", "")).strip() if visitor_school else str(data.get("visitor_team", "")).strip()) or "Visitor"
-    classification = str(data.get("classification") or (home_school or {}).get("classification") or (visitor_school or {}).get("classification") or "Open").strip()
-    season = str(data.get("season") or time.strftime("%Y")).strip()
-    week = str(data.get("week") or "1").strip()
-    venue = venue_for_school(home_school)
-    venue_name = str(data.get("venue") or (venue or {}).get("name") or defaults.get("venue", "Caledonia High School")).strip()
-    venue_id = str((venue or {}).get("id", ""))
-    broadcast_id = next_broadcast_id(sport, season, classification, week)
-    state = copy.deepcopy(DEFAULT_STATE)
-    state.update({
-        "broadcast_created": True, "broadcast_id": broadcast_id, "sport": sport,
-        "season": season, "week": week, "classification": classification,
-        "level": data.get("level", "Varsity"), "division": data.get("division", "Boys"),
-        "home_team": home_name, "visitor_team": visitor_name,
-        "home_school_id": home_school_id, "visitor_school_id": visitor_school_id,
-        "home_identity": broadcast_identity(home_school, sport),
-        "visitor_identity": broadcast_identity(visitor_school, sport),
-        "venue": venue_name, "venue_id": venue_id,
-        "date": data.get("date", ""), "scheduled_start": data.get("scheduled_start", "07:00 PM"),
-        "visual_mode": data.get("visual_mode", defaults.get("visual_mode", "graphic")),
-        "production_type": str(data.get("production_type", "game") or "game"),
-        "broadcast_phase": "pregame", "status": "planned",
-        "crew": {key: str(data.get("crew", {}).get(key, "")) for key in ("play_by_play", "color_analyst", "sideline_reporter", "statistician", "producer")},
-    })
-    # Planning in Game Manager does not change live OBS program state.
-    record = {
-        "broadcast_id": broadcast_id, "created_at": int(time.time()), "updated_at": int(time.time()),
-        "status": "planned", "sport": sport, "season": season, "classification": classification, "week": week,
-        "date": state["date"], "scheduled_start": state["scheduled_start"],
-        "home_school_id": home_school_id, "visitor_school_id": visitor_school_id,
-        "home_team": home_name, "visitor_team": visitor_name,
-        "home_identity": state["home_identity"], "visitor_identity": state["visitor_identity"],
-        "venue_id": venue_id, "venue": venue_name, "graphics_profile": "CSRN Default",
-        "obs_profile": cfg.get("obs", {}).get("profile", "CSRN Production"),
-        "visual_mode": state["visual_mode"], "crew": state["crew"],
-        "production_type": state.get("production_type", "game")
+
+def get_broadcast_lifecycle_service() -> BroadcastLifecycleService:
+    global BROADCAST_LIFECYCLE_SERVICE
+    if BROADCAST_LIFECYCLE_SERVICE is None:
+        BROADCAST_LIFECYCLE_SERVICE = BroadcastLifecycleService(
+            load_broadcasts=load_broadcasts,
+            load_packages=load_packages,
+            load_state=load_state,
+            save_state=save_state,
+            normalize_state=normalize_state,
+            default_state=lambda: copy.deepcopy(DEFAULT_STATE),
+            get_school=get_school,
+            build_identity=broadcast_identity,
+            readiness=readiness_payload,
+            update_linked_status=update_linked_broadcast_status,
+            load_config=load_config,
+            command_scorebug_visibility=command_scorebug_visibility,
+            public_state=public_state,
+            resume_record=get_broadcast_service().resume_record,
+            transaction_lock=lock,
+        )
+    return BROADCAST_LIFECYCLE_SERVICE
+
+
+BROADCAST_LIFECYCLE_ROUTES_BLUEPRINT = create_broadcast_lifecycle_blueprint(
+    BroadcastLifecycleRoutesDependencies(
+        require_auth=require_auth,
+        get_lifecycle_service=get_broadcast_lifecycle_service,
+    )
+)
+APPLICATION_BLUEPRINTS.append(BROADCAST_LIFECYCLE_ROUTES_BLUEPRINT)
+
+BROADCAST_ROUTES_BLUEPRINT = create_broadcast_blueprint(
+    BroadcastRoutesDependencies(
+        require_auth=require_auth,
+        get_broadcast_service=get_broadcast_service,
+        get_broadcaster_print_service=get_broadcaster_print_service,
+    )
+)
+APPLICATION_BLUEPRINTS.append(BROADCAST_ROUTES_BLUEPRINT)
+
+
+GAME_OPERATIONS_SERVICE: GameOperationsService | None = None
+
+
+def get_game_operations_service() -> GameOperationsService:
+    global GAME_OPERATIONS_SERVICE
+    if GAME_OPERATIONS_SERVICE is None:
+        GAME_OPERATIONS_SERVICE = GameOperationsService(
+            load_state=load_state,
+            save_state=save_state,
+            default_state=lambda: copy.deepcopy(DEFAULT_STATE),
+            push_history=push_history,
+            source_allowed=EventService.source_allowed,
+            locked_payload=EventService.locked_payload,
+            update_linked_status=update_linked_broadcast_status,
+            load_config=load_config,
+            command_scorebug_visibility=command_scorebug_visibility,
+            archive_final_state=write_broadcast_final_archive,
+            transaction_lock=lock,
+        )
+    return GAME_OPERATIONS_SERVICE
+
+
+LIVE_GAME_ROUTES_BLUEPRINT = create_live_game_blueprint(
+    LiveGameRoutesDependencies(
+        require_auth=require_auth,
+        get_game_operations_service=lambda: get_game_operations_service(),
+        get_event_service=lambda: get_event_service(),
+        get_rules_service=lambda: get_rules_service(),
+        get_statistics_service=lambda: get_statistics_service(),
+        load_state=lambda: load_state(),
+        load_state_for_reporting=lambda: load_state_for_reporting(),
+        load_rosters=lambda: load_rosters(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(LIVE_GAME_ROUTES_BLUEPRINT)
+
+
+GAME_DAY_SAFETY_SERVICE: GameDaySafetyService | None = None
+
+
+def get_game_day_safety_service() -> GameDaySafetyService:
+    global GAME_DAY_SAFETY_SERVICE
+    if GAME_DAY_SAFETY_SERVICE is None:
+        GAME_DAY_SAFETY_SERVICE = GameDaySafetyService(
+            base_dir=BASE_DIR,
+            data_dir=DATA_DIR,
+            backup_root=GAME_DAY_BACKUP_DIR,
+            state_file=STATE_FILE,
+            security_file=SECURITY_FILE,
+            config_file=CONFIG_FILE,
+            version_file=VERSION_FILE,
+            clock=time.time,
+        )
+    return GAME_DAY_SAFETY_SERVICE
+
+
+GAME_DAY_SAFETY_ROUTES_BLUEPRINT = create_game_day_safety_blueprint(
+    GameDaySafetyRoutesDependencies(
+        require_auth=require_auth,
+        get_safety_service=lambda: get_game_day_safety_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(GAME_DAY_SAFETY_ROUTES_BLUEPRINT)
+
+
+RECOVERY_SERVICE: RecoveryService | None = None
+
+
+def get_recovery_service() -> RecoveryService:
+    global RECOVERY_SERVICE
+    if RECOVERY_SERVICE is None:
+        RECOVERY_SERVICE = RecoveryService(
+            safety_service=get_game_day_safety_service(),
+            data_dir=DATA_DIR,
+            backup_root=GAME_DAY_BACKUP_DIR,
+            recovery_root=GAME_DAY_RECOVERY_DIR,
+            state_file=STATE_FILE,
+            security_file=SECURITY_FILE,
+            version_file=VERSION_FILE,
+            load_state=load_state,
+            clock=time.time,
+            transaction_lock=lock,
+        )
+    return RECOVERY_SERVICE
+
+
+RECOVERY_ROUTES_BLUEPRINT = create_recovery_blueprint(
+    RecoveryRoutesDependencies(
+        require_auth=require_auth,
+        get_recovery_service=lambda: get_recovery_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(RECOVERY_ROUTES_BLUEPRINT)
+
+
+COMMISSIONING_SERVICE: HardwareOBSCommissioningService | None = None
+
+
+def get_commissioning_service() -> HardwareOBSCommissioningService:
+    global COMMISSIONING_SERVICE
+    if COMMISSIONING_SERVICE is None:
+        COMMISSIONING_SERVICE = HardwareOBSCommissioningService(
+            profile_file=COMMISSIONING_FILE,
+            load_config=load_config,
+            validate_obs=lambda: get_obs_service().test_connection().data["obs"],
+            clock=time.time,
+        )
+    return COMMISSIONING_SERVICE
+
+
+COMMISSIONING_ROUTES_BLUEPRINT = create_commissioning_blueprint(
+    CommissioningRoutesDependencies(
+        require_auth=require_auth,
+        get_commissioning_service=lambda: get_commissioning_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(COMMISSIONING_ROUTES_BLUEPRINT)
+
+
+CAPTION_SERVICE: CaptionService | None = None
+CAPTION_RUNTIME: CaptionRuntime | None = None
+
+
+def get_caption_service() -> CaptionService:
+    global CAPTION_SERVICE
+    if CAPTION_SERVICE is None:
+        CAPTION_SERVICE = CaptionService(
+            profile_file=CAPTION_PROFILE_FILE,
+            state_file=CAPTION_STATE_FILE,
+            transcripts_dir=CAPTION_TRANSCRIPTS_DIR,
+            clock=time.time,
+        )
+    return CAPTION_SERVICE
+
+
+def current_caption_broadcast_id() -> str:
+    return str(load_state().get("broadcast_id") or "unscheduled")
+
+
+def _caption_active_rosters(state: dict[str, Any]) -> list[dict[str, Any]]:
+    sport = str(state.get("sport") or "Football").strip().casefold()
+    level = str(state.get("level") or "Varsity").strip().casefold()
+    linked_ids = {str(value) for value in (state.get("package_roster_ids") or []) if str(value).strip()}
+    school_ids = {
+        str(state.get("home_school_id") or "").strip(),
+        str(state.get("visitor_school_id") or "").strip(),
     }
-    with lock:
-        items = load_broadcasts()
-        items.append(record)
-        save_broadcasts(items)
-        (DATA_DIR / "Broadcasts" / f"{broadcast_id}.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
-    warnings=[]
-    for side,school in (("Home",home_school),("Visitor",visitor_school)):
-        if school and not logo_certification(school)[0]:
-            warnings.append(f"{side} has no certified logo; {school_monogram(school.get('broadcast_name') or school.get('official_name',''))} monogram will be used.")
-    return jsonify({"broadcast": record, "warnings": warnings})
+    school_ids.discard("")
+    team_names = {
+        str(state.get("home_team") or "").strip().casefold(),
+        str(state.get("visitor_team") or "").strip().casefold(),
+    }
+    team_names.discard("")
 
-@app.get("/api/broadcasts")
-@require_auth
-def list_broadcasts():
-    items = [item for item in load_broadcasts() if not item.get("archived")]
-    items = sorted(items, key=lambda x: (str(x.get("date", "")), str(x.get("scheduled_start", ""))), reverse=True)
-    return jsonify(items)
+    def roster_school_name(roster: dict[str, Any]) -> str:
+        school = get_school(str(roster.get("school_id", "") or ""))
+        return str(
+            (school or {}).get("broadcast_name")
+            or (school or {}).get("official_name")
+            or roster.get("school_id", "")
+        ).strip().casefold()
 
-@app.get("/api/broadcasts/<broadcast_id>")
-@require_auth
-def get_broadcast_record(broadcast_id: str):
-    item=next((x for x in load_broadcasts() if x.get("broadcast_id") == broadcast_id), None)
-    return (jsonify(item), 200) if item else (jsonify({"error":"NOT_FOUND"}),404)
+    def is_candidate(roster: dict[str, Any]) -> bool:
+        roster_id = str(roster.get("id", "") or "")
+        if linked_ids and roster_id in linked_ids:
+            return True
+        roster_school_id = str(roster.get("school_id", "") or "").strip()
+        school_match = roster_school_id in school_ids or roster_school_name(roster) in team_names
+        sport_match = not roster.get("sport") or str(roster.get("sport", "")).strip().casefold() == sport
+        return school_match and sport_match
 
-@app.put("/api/broadcasts/<broadcast_id>")
-@require_auth
-def update_broadcast_record(broadcast_id: str):
-    data=request.get_json(force=True); items=load_broadcasts(); item=next((x for x in items if x.get("broadcast_id")==broadcast_id),None)
-    if not item: return jsonify({"error":"NOT_FOUND"}),404
-    home_id=str(data.get("home_school_id",item.get("home_school_id","")) or ""); visitor_id=str(data.get("visitor_school_id",item.get("visitor_school_id","")) or "")
-    home=get_school(home_id) if home_id else None; visitor=get_school(visitor_id) if visitor_id else None
-    for key in ("sport","season","classification","week","level","division","date","scheduled_start","venue","venue_id","visual_mode","crew"):
-        if key in data: item[key]=data[key]
-    item.update({"home_school_id":home_id,"visitor_school_id":visitor_id,"home_team":(home or {}).get("broadcast_name") or data.get("home_team") or item.get("home_team"),"visitor_team":(visitor or {}).get("broadcast_name") or data.get("visitor_team") or item.get("visitor_team"),"home_identity":broadcast_identity(home,item.get("sport","Football")) if home else item.get("home_identity",{}),"visitor_identity":broadcast_identity(visitor,item.get("sport","Football")) if visitor else item.get("visitor_identity",{}),"updated_at":int(time.time())})
-    save_broadcasts(items); (DATA_DIR/"Broadcasts"/f"{broadcast_id}.json").write_text(json.dumps(item,indent=2),encoding="utf-8")
-    state=load_state()
-    if state.get("broadcast_id")==broadcast_id:
-        for key in ("sport","season","classification","week","level","division","date","scheduled_start","venue","venue_id","visual_mode","crew","home_school_id","visitor_school_id","home_team","visitor_team","home_identity","visitor_identity"):
-            if key in item: state[key]=copy.deepcopy(item[key])
-        save_state(state)
-    warnings=[]
-    for side,school in (("Home",home),("Visitor",visitor)):
-        if school and not logo_certification(school)[0]: warnings.append(f"{side} has no certified logo; {school_monogram(school.get('broadcast_name') or school.get('official_name',''))} monogram will be used.")
-    return jsonify({"broadcast":item,"warnings":warnings})
-
-@app.put("/api/broadcasts/<broadcast_id>/status")
-@require_auth
-def set_broadcast_status(broadcast_id: str):
-    incoming=request.get_json(force=True); status=str(incoming.get("status", "")).lower()
-    if status == "prepared":
-        status = "planned"
-    if status not in {"planned","live","completed"}: return jsonify({"error":"INVALID_STATUS"}),400
-    items=load_broadcasts(); item=next((x for x in items if x.get("broadcast_id") == broadcast_id), None)
-    if not item: return jsonify({"error":"NOT_FOUND"}),404
-    item["status"]=status; item["updated_at"]=int(time.time()); save_broadcasts(items)
-    path=DATA_DIR/"Broadcasts"/f"{broadcast_id}.json"
-    if path.exists(): path.write_text(json.dumps(item,indent=2),encoding="utf-8")
-    return jsonify(item)
-
-@app.delete("/api/broadcasts/<broadcast_id>")
-@require_auth
-def delete_broadcast_record(broadcast_id: str):
-    items=load_broadcasts()
-    item=next((x for x in items if x.get("broadcast_id")==broadcast_id),None)
-    if not item:
-        return jsonify({"error":"NOT_FOUND"}),404
-    items=[x for x in items if x.get("broadcast_id")!=broadcast_id]
-    save_broadcasts(items)
-    detail=DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
-    if detail.exists():
-        detail.unlink()
-    state=load_state()
-    if state.get("broadcast_id")==broadcast_id:
-        save_state(copy.deepcopy(DEFAULT_STATE))
-    return jsonify({"deleted":broadcast_id})
-
-@app.get("/api/build-journal")
-@require_auth
-def build_journal():
-    return jsonify(load_build_journal())
-
-@app.post("/api/score")
-@require_auth
-def update_score():
-    data = request.get_json(force=True)
-    team = data.get("team")
-    delta = int(data.get("delta", 0))
-    if team not in {"home", "visitor"} or delta not in {-1, 1, 2, 3, 6}:
-        return jsonify({"error": "INVALID_SCORE_REQUEST"}), 400
-    with lock:
-        state = load_state()
-        push_history(state)
-        key = "home_score" if team == "home" else "visitor_score"
-        state[key] = max(0, int(state.get(key, 0)) + delta)
-        if state["broadcast_phase"] == "pregame":
-            state["broadcast_phase"] = "live"
-        save_state(state)
-        if state.get("broadcast_id") and state.get("status") != "live":
-            state["status"]="live"; save_state(state); update_linked_broadcast_status(state["broadcast_id"],"live")
-    return jsonify(state)
-
-@app.post("/api/set")
-@require_auth
-def set_value():
-    data = request.get_json(force=True)
-    allowed = {"quarter", "down", "distance", "clock_visible", "possession", "scorebug_visible", "broadcast_phase", "ticker_visible", "ticker_speed"}
-    changes = {k: v for k, v in data.items() if k in allowed}
-    return jsonify(apply_change(changes))
+    rosters = [roster for roster in load_rosters() if isinstance(roster, dict) and is_candidate(roster)]
+    preferred = [
+        roster
+        for roster in rosters
+        if str(roster.get("level", "") or "").strip().casefold() in {"", level, "varsity"}
+    ]
+    return preferred or rosters
 
 
-@app.get("/roster-headshots/<filename>")
-def roster_headshot_file(filename: str):
-    return send_from_directory(HEADSHOTS_DIR, filename)
+def _caption_name_terms_from_rosters(state: dict[str, Any]) -> list[str]:
+    terms: list[str] = []
+    for roster in _caption_active_rosters(state):
+        for player in roster.get("players", []) if isinstance(roster.get("players"), list) else []:
+            if not isinstance(player, dict):
+                continue
+            if str(player.get("status", "active") or "active").strip().casefold() == "inactive":
+                continue
+            first = str(player.get("first_name") or "").strip()
+            last = str(player.get("last_name") or "").strip()
+            preferred = str(player.get("preferred_name") or "").strip()
+            pronunciation = str(player.get("pronunciation") or "").strip()
+            number = str(player.get("number") or "").strip()
+            full_name = " ".join(part for part in (first, last) if part)
+            display_name = " ".join(part for part in (preferred or first, last) if part)
+            for value in (full_name, display_name, preferred, last, pronunciation):
+                if value:
+                    terms.append(value)
+            if number and full_name:
+                terms.append(f"number {number} {full_name}")
+            if number and display_name and display_name != full_name:
+                terms.append(f"number {number} {display_name}")
+    return terms
 
-@app.post("/api/rosters/<roster_id>/players/<player_id>/headshot")
-@require_auth
-def upload_player_headshot(roster_id: str, player_id: str):
-    upload = request.files.get("headshot")
-    if not upload or not upload.filename:
-        return jsonify({"error": "HEADSHOT_FILE_REQUIRED"}), 400
-    ext = Path(upload.filename).suffix.lower()
-    if ext not in (".png", ".jpg", ".jpeg", ".webp"):
-        return jsonify({"error": "UNSUPPORTED_IMAGE_TYPE"}), 400
-    try:
-        raw = upload.read()
-        image = Image.open(io.BytesIO(raw))
-        image.load()
-        if image.width < 64 or image.height < 64:
-            return jsonify({"error": "IMAGE_TOO_SMALL"}), 400
-    except Exception:
-        return jsonify({"error": "INVALID_IMAGE"}), 400
-    rosters = load_rosters()
-    roster = next((r for r in rosters if str(r.get("id")) == roster_id), None)
+
+def _caption_name_terms_from_personnel(state: dict[str, Any]) -> list[str]:
+    school_ids = {
+        str(state.get("home_school_id") or "").strip(),
+        str(state.get("visitor_school_id") or "").strip(),
+        "",
+    }
+    terms: list[str] = []
+    for person in load_broadcasters():
+        if not isinstance(person, dict):
+            continue
+        if str(person.get("status", "active") or "active").strip().casefold() == "inactive":
+            continue
+        school_id = str(person.get("school_id") or "").strip()
+        category = str(person.get("category") or "").strip().casefold()
+        role = str(person.get("role") or person.get("primary_role") or person.get("title") or "").strip().casefold()
+        if school_id and school_id not in school_ids:
+            continue
+        if school_id or category in {"coach", "broadcast talent"} or "coach" in role or "play-by-play" in role or "analyst" in role:
+            for key in ("full_name", "name", "preferred_name", "pronunciation"):
+                value = str(person.get(key) or "").strip()
+                if value:
+                    terms.append(value)
+            title = str(person.get("title") or person.get("role") or "").strip()
+            name = str(person.get("full_name") or person.get("name") or "").strip()
+            if title and name:
+                terms.append(f"{title} {name}")
+    return terms
+
+
+def current_caption_prompt_terms() -> list[str]:
+    state = load_state()
+    terms: list[str] = []
+    for side in ("home", "visitor"):
+        terms.extend(
+            [
+                state.get(f"{side}_team", ""),
+                state.get(f"{side}_identity", {}).get("broadcast_name", ""),
+                state.get(f"{side}_identity", {}).get("official_name", ""),
+                state.get(f"{side}_identity", {}).get("preferred_scorebug_name", ""),
+                state.get(f"{side}_identity", {}).get("mascot", ""),
+            ]
+        )
+    terms.extend(["Cavaliers", "first and ten", "yard line"])
+    terms.extend(_caption_name_terms_from_rosters(state))
+    terms.extend(_caption_name_terms_from_personnel(state))
+    seen: set[str] = set()
+    cleaned: list[str] = []
+    for term in terms:
+        value = " ".join(str(term or "").split())
+        key = value.casefold()
+        if value and key not in seen:
+            seen.add(key)
+            cleaned.append(value)
+    return cleaned
+
+
+def get_caption_runtime() -> CaptionRuntime:
+    global CAPTION_RUNTIME
+    if CAPTION_RUNTIME is None:
+        CAPTION_RUNTIME = CaptionRuntime(
+            caption_service=get_caption_service(),
+            load_broadcast_id=current_caption_broadcast_id,
+            build_prompt_terms=current_caption_prompt_terms,
+            clock=time.time,
+        )
+    return CAPTION_RUNTIME
+
+
+CAPTION_ROUTES_BLUEPRINT = create_caption_blueprint(
+    CaptionRoutesDependencies(
+        require_auth=require_auth,
+        get_caption_service=lambda: get_caption_service(),
+        get_caption_runtime=lambda: get_caption_runtime(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(CAPTION_ROUTES_BLUEPRINT)
+
+
+WEATHER_SERVICE: VenueWeatherService | None = None
+
+
+def get_weather_service() -> VenueWeatherService:
+    global WEATHER_SERVICE
+    if WEATHER_SERVICE is None:
+        WEATHER_SERVICE = VenueWeatherService(
+            state_file=WEATHER_STATE_FILE,
+            load_state=load_state,
+            load_config=load_config,
+            load_venues=load_venues,
+            save_venues=save_venues,
+            load_schools=load_schools,
+            clock=time.time,
+        )
+    return WEATHER_SERVICE
+
+
+WEATHER_ROUTES_BLUEPRINT = create_weather_blueprint(
+    WeatherRoutesDependencies(
+        require_auth=require_auth,
+        get_weather_service=lambda: get_weather_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(WEATHER_ROUTES_BLUEPRINT)
+
+
+def rehearsal_system_gates() -> dict[str, Any]:
+    preflight = get_game_day_safety_service().preflight().data.get("preflight", {})
+    commissioning = get_commissioning_service().report().data.get("report", {})
+    recovery = get_recovery_service().status().data.get("recovery", {})
+    caption = get_caption_service().status().data
+    weather = get_weather_service().status().data.get("weather", {})
+
+    channels = [
+        item
+        for item in caption.get("profile", {}).get("channels", [])
+        if item.get("enabled")
+    ]
+    names = [str(item.get("speaker", "")).strip() for item in channels]
+    placeholders = {
+        f"Announcer {index}" for index in range(1, 13)
+    }
+    captions_ready = (
+        len(names) >= 2
+        and len({name.casefold() for name in names if name}) == len(names)
+        and all(name and name not in placeholders for name in names)
+    )
+
+    venue = weather.get("venue", {}) if isinstance(weather, dict) else {}
+    latitude = venue.get("latitude") if isinstance(venue, dict) else None
+    longitude = venue.get("longitude") if isinstance(venue, dict) else None
+    weather_ready = bool(
+        latitude is not None
+        and longitude is not None
+        and int(weather.get("last_success_at", 0) or 0) > 0
+        and not weather.get("stale", True)
+    )
+
+    recovery_ready = bool(
+        not recovery.get("unclean_shutdown")
+        and not recovery.get("live_broadcast_active", True)
+    )
+
+    return {
+        "game_day_preflight": {
+            "label": "Game-day preflight",
+            "ready": bool(preflight.get("ready", False)),
+            "note": "All required storage, state, and backup checks pass."
+            if preflight.get("ready")
+            else "Game-day preflight has a required failure.",
+        },
+        "hardware_obs_commissioning": {
+            "label": "Hardware and OBS commissioning",
+            "ready": bool(commissioning.get("ready", False)),
+            "note": "P4next, OBS, recording, and network commissioning is complete."
+            if commissioning.get("ready")
+            else "Hardware or OBS commissioning remains incomplete.",
+        },
+        "recovery_state": {
+            "label": "Recovery and shutdown state",
+            "ready": recovery_ready,
+            "note": "No unclean shutdown is unresolved and no broadcast is live."
+            if recovery_ready
+            else "Resolve the unclean-shutdown marker or stop the live broadcast.",
+        },
+        "caption_assignments": {
+            "label": "Customer-assigned caption channels",
+            "ready": captions_ready,
+            "note": "At least two unique customer-assigned speakers are configured."
+            if captions_ready
+            else "Assign at least two unique speaker names; neutral Announcer placeholders do not satisfy release readiness.",
+        },
+        "weather_monitoring": {
+            "label": "Venue weather monitoring",
+            "ready": weather_ready,
+            "note": "The active venue has coordinates and a fresh successful weather update."
+            if weather_ready
+            else "Verify venue coordinates and complete a non-stale weather refresh.",
+        },
+    }
+
+
+REHEARSAL_SERVICE: OperationalRehearsalService | None = None
+
+
+def get_rehearsal_service() -> OperationalRehearsalService:
+    global REHEARSAL_SERVICE
+    if REHEARSAL_SERVICE is None:
+        REHEARSAL_SERVICE = OperationalRehearsalService(
+            state_file=REHEARSAL_STATE_FILE,
+            release_manifest_file=RELEASE_MANIFEST_FILE,
+            version_file=VERSION_FILE,
+            load_system_gates=rehearsal_system_gates,
+            create_snapshot=lambda **kwargs: get_game_day_safety_service().create_snapshot(**kwargs),
+            register_known_good=lambda **kwargs: get_recovery_service().register_known_good(**kwargs),
+            clock=time.time,
+        )
+    return REHEARSAL_SERVICE
+
+
+REHEARSAL_ROUTES_BLUEPRINT = create_rehearsal_blueprint(
+    RehearsalRoutesDependencies(
+        require_auth=require_auth,
+        get_rehearsal_service=lambda: get_rehearsal_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(REHEARSAL_ROUTES_BLUEPRINT)
+
+
+ENTITLEMENT_SERVICE: EntitlementService | None = None
+
+
+def get_entitlement_service() -> EntitlementService:
+    global ENTITLEMENT_SERVICE
+    if ENTITLEMENT_SERVICE is None:
+        ENTITLEMENT_SERVICE = EntitlementService(
+            paths=PRODUCT_PATHS,
+            verifier=None,
+            clock=time.time,
+        )
+    return ENTITLEMENT_SERVICE
+
+
+DEPLOYMENT_SERVICE: DeploymentService | None = None
+
+
+def get_deployment_service() -> DeploymentService:
+    global DEPLOYMENT_SERVICE
+    if DEPLOYMENT_SERVICE is None:
+        DEPLOYMENT_SERVICE = DeploymentService(
+            paths=PRODUCT_PATHS,
+            version_file=VERSION_FILE,
+            entitlement_service=get_entitlement_service(),
+            create_snapshot=lambda **kwargs: get_game_day_safety_service().create_snapshot(**kwargs),
+            clock=time.time,
+        )
+    return DEPLOYMENT_SERVICE
+
+
+DEPLOYMENT_ROUTES_BLUEPRINT = create_deployment_blueprint(
+    DeploymentRoutesDependencies(
+        require_auth=require_auth,
+        get_deployment_service=lambda: get_deployment_service(),
+        get_entitlement_service=lambda: get_entitlement_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(DEPLOYMENT_ROUTES_BLUEPRINT)
+
+
+THEME_SERVICE: GraphicsThemeService | None = None
+
+
+def get_theme_service() -> GraphicsThemeService:
+    global THEME_SERVICE
+    if THEME_SERVICE is None:
+        THEME_SERVICE = GraphicsThemeService(
+            state_file=THEME_STATE_FILE,
+            load_state=load_state,
+            load_config=load_config,
+            clock=time.time,
+        )
+    return THEME_SERVICE
+
+
+THEME_ROUTES_BLUEPRINT = create_theme_blueprint(
+    ThemeRoutesDependencies(
+        require_auth=require_auth,
+        get_theme_service=lambda: get_theme_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(THEME_ROUTES_BLUEPRINT)
+
+
+SOCIAL_SERVICE: SocialPublishingService | None = None
+FACEBOOK_CONNECTION_SERVICE: FacebookConnectionService | None = None
+FACEBOOK_CREDENTIAL_VAULT = FacebookCredentialVault(FACEBOOK_CREDENTIAL_FILE)
+
+
+def get_social_service() -> SocialPublishingService:
+    global SOCIAL_SERVICE
+    if SOCIAL_SERVICE is None:
+        resolver = SocialAssetResolver(
+            base_dir=BASE_DIR,
+            data_dir=DATA_DIR,
+            asset_upload_dir=ASSET_UPLOAD_DIR,
+            headshots_dir=HEADSHOTS_DIR,
+        )
+        SOCIAL_SERVICE = SocialPublishingService(
+            state_file=SOCIAL_STATE_FILE,
+            renderer=SocialCardRenderer(
+                output_dir=SOCIAL_CARDS_DIR,
+                asset_resolver=resolver,
+            ),
+            adapters=default_adapter_registry(
+                credential_resolver=FACEBOOK_CREDENTIAL_VAULT.resolve
+            ),
+            load_broadcast_state=load_state_for_reporting,
+            load_config=load_config,
+            load_rosters=load_rosters,
+            load_sponsors=load_sponsors,
+            active_sponsor_by_id=active_sponsor_by_id,
+            get_theme_status=lambda: get_theme_service().status(),
+            credential_available=FACEBOOK_CREDENTIAL_VAULT.available,
+            clock=time.time,
+        )
+    return SOCIAL_SERVICE
+
+
+
+
+def get_facebook_connection_service() -> FacebookConnectionService:
+    global FACEBOOK_CONNECTION_SERVICE
+    if FACEBOOK_CONNECTION_SERVICE is None:
+        FACEBOOK_CONNECTION_SERVICE = FacebookConnectionService(
+            settings_file=FACEBOOK_CONNECTION_FILE,
+            vault=FACEBOOK_CREDENTIAL_VAULT,
+            save_social_account=lambda payload: get_social_service().configure_account(payload),
+            remove_social_account=lambda account_id, confirmation: get_social_service().remove_account(
+                account_id, confirmation
+            ),
+            clock=time.time,
+        )
+    return FACEBOOK_CONNECTION_SERVICE
+
+SOCIAL_ROUTES_BLUEPRINT = create_social_blueprint(
+    SocialRoutesDependencies(
+        require_auth=require_auth,
+        get_social_service=lambda: get_social_service(),
+        get_facebook_connection_service=lambda: get_facebook_connection_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(SOCIAL_ROUTES_BLUEPRINT)
+
+
+RECAP_SERVICE: GroundedGameRecapService | None = None
+
+
+def _create_recap_social_draft(recap: dict[str, Any]):
+    summary = str(recap.get("social_summary") or recap.get("lead") or "").strip()
+    return get_social_service().create_draft(
+        "FINAL",
+        payload={
+            "headline": str(recap.get("headline") or "FINAL").strip(),
+            "message": summary,
+            "detail": summary,
+            "postgame_summary": True,
+            "recap_id": str(recap.get("id") or ""),
+            "broadcast_id": str(recap.get("broadcast_id") or ""),
+        },
+        force_duplicate=True,
+    )
+
+
+def get_recap_service() -> GroundedGameRecapService:
+    global RECAP_SERVICE
+    if RECAP_SERVICE is None:
+        RECAP_SERVICE = GroundedGameRecapService(
+            state_file=RECAP_STATE_FILE,
+            load_broadcast_state=load_state_for_reporting,
+            create_social_draft=_create_recap_social_draft,
+            clock=time.time,
+        )
+    return RECAP_SERVICE
+
+
+RECAP_ROUTES_BLUEPRINT = create_recap_blueprint(
+    RecapRoutesDependencies(
+        require_auth=require_auth,
+        get_recap_service=lambda: get_recap_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(RECAP_ROUTES_BLUEPRINT)
+
+
+SUPPORT_MEDIA_SERVICE: SupportMediaService | None = None
+
+
+def get_support_media_service() -> SupportMediaService:
+    global SUPPORT_MEDIA_SERVICE
+    if SUPPORT_MEDIA_SERVICE is None:
+        SUPPORT_MEDIA_SERVICE = SupportMediaService(
+            headshots_dir=HEADSHOTS_DIR,
+            load_rosters=load_rosters,
+            save_rosters=save_rosters,
+        )
+    return SUPPORT_MEDIA_SERVICE
+
+
+SUPPORT_ROUTES_BLUEPRINT = create_support_blueprint(
+    SupportRoutesDependencies(
+        require_auth=require_auth,
+        get_support_media_service=lambda: get_support_media_service(),
+        get_headshots_dir=lambda: HEADSHOTS_DIR,
+        connection_port=5050,
+    )
+)
+APPLICATION_BLUEPRINTS.append(SUPPORT_ROUTES_BLUEPRINT)
+
+
+def activate_primary_graphic(state: dict[str, Any], active: str) -> None:
+    """Keep the legacy mutating helper while delegating graphic rules."""
+    updated = get_graphics_service().activate_primary(state, active)
+    state.clear()
+    state.update(updated)
+
+
+GRAPHICS_ROUTES_BLUEPRINT = create_graphics_blueprint(
+    GraphicsRoutesDependencies(
+        require_auth=require_auth,
+        get_graphics_service=lambda: get_graphics_service(),
+        load_state=lambda: load_state(),
+        save_state=lambda state: save_state(state),
+        public_state=lambda state: public_state(state),
+        transaction_lock=lock,
+    )
+)
+APPLICATION_BLUEPRINTS.append(GRAPHICS_ROUTES_BLUEPRINT)
+
+
+def automation_player(roster_id: str, player_id: str):
+    roster = next((r for r in load_rosters() if str(r.get("id")) == str(roster_id)), None)
+    player = next((p for p in (roster or {}).get("players", []) if str(p.get("id")) == str(player_id)), None)
+    return roster, player
+
+def player_display(player):
+    return GraphicsService.player_display(player)
+
+
+def normalize_position(value):
+    return GraphicsService.normalize_position(value)
+
+
+def event_position(player, defensive=False):
+    return GraphicsService.event_position(player, defensive=defensive)
+
+
+def manual_automation_player(data, team_name):
+    if not isinstance(data, dict) or not str(data.get("number", "")).strip():
+        return None
+    number = str(data.get("number", "")).strip()
+    name = str(data.get("name", "")).strip() or f"{team_name} {number}"
+    parts = name.split(" ", 1)
+    return {
+        "id": "",
+        "number": number,
+        "preferred_name": name,
+        "first_name": parts[0] if parts else name,
+        "last_name": parts[1] if len(parts) > 1 else "",
+        "position": normalize_position(data.get("position")),
+        "secondary_position": "",
+        "grade": "",
+        "height": "",
+        "weight": "",
+        "headshot": "",
+        "manual": True,
+    }
+
+def show_automation_player_graphic(
+    state,
+    roster,
+    player,
+    graphic_type,
+    duration,
+    defensive=False,
+    eyebrow="",
+    play_detail="",
+):
+    result = get_graphics_service().show_automation_player(
+        state,
+        roster,
+        player,
+        graphic_type,
+        duration,
+        defensive=defensive,
+        eyebrow=eyebrow,
+        play_detail=play_detail,
+    )
+    state.clear()
+    state.update(result.data["state"])
+
+
+def canonical_team_key(state: dict[str, Any], value: Any) -> str:
+    return StatisticsService.canonical_team_key(state, value)
+
+
+def canonical_team_name(state: dict[str, Any], value: Any) -> str:
+    return StatisticsService.canonical_team_name(state, value)
+
+
+def resolve_game_roster_player(state: dict[str, Any], team: str, number: Any) -> dict[str, str]:
+    """Resolve a jersey against the active broadcast rosters.
+
+    Alpha.3f deliberately prefers rosters linked to the loaded broadcast package,
+    then falls back to school/sport matching. Season mismatches no longer make a
+    valid linked roster disappear during a resumed broadcast.
+    """
+    jersey = str(number or "").strip()
+    if not jersey:
+        return {"number": "", "name": "", "resolved": False}
+    team_key = canonical_team_key(state, team)
+    school_id = str(state.get(f"{team_key}_school_id", "") or "") if team_key in {"home", "visitor"} else ""
+    team_name = canonical_team_name(state, team_key).strip().lower()
+    sport = str(state.get("sport") or "Football").strip().lower()
+    level = str(state.get("level") or "Varsity").strip().lower()
+    all_rosters = load_rosters()
+    linked_ids = {str(x) for x in (state.get("package_roster_ids") or []) if str(x).strip()}
+
+    def roster_school_name(roster: dict[str, Any]) -> str:
+        school = get_school(str(roster.get("school_id", "") or ""))
+        return str((school or {}).get("broadcast_name") or (school or {}).get("official_name") or "").strip().lower()
+
+    def belongs_to_team(roster: dict[str, Any]) -> bool:
+        rid = str(roster.get("id", "") or "")
+        if linked_ids and rid not in linked_ids:
+            return False
+        roster_school = str(roster.get("school_id", "") or "")
+        school_match = bool(school_id and roster_school == school_id) or bool(team_name and roster_school_name(roster) == team_name)
+        sport_match = not roster.get("sport") or str(roster.get("sport", "")).strip().lower() == sport
+        return school_match and sport_match
+
+    candidates = [r for r in all_rosters if belongs_to_team(r)]
+    if not candidates and linked_ids:
+        # Package metadata can become stale; recover by matching the active teams.
+        candidates = [r for r in all_rosters if ((school_id and str(r.get("school_id", "")) == school_id) or (team_name and roster_school_name(r) == team_name)) and (not r.get("sport") or str(r.get("sport", "")).strip().lower() == sport)]
+    roster = next((r for r in candidates if str(r.get("level", "")).strip().lower() == level), None)
+    roster = roster or next((r for r in candidates if str(r.get("level", "")).strip().lower() == "varsity"), None) or (candidates[0] if candidates else None)
     if not roster:
-        return jsonify({"error": "ROSTER_NOT_FOUND"}), 404
-    player = next((p for p in roster.get("players", []) if str(p.get("id")) == player_id), None)
+        return {"number": jersey, "name": "", "resolved": False}
+    player = next((p for p in roster.get("players", []) if str(p.get("status", "active")).lower() != "inactive" and str(p.get("number", "")).strip() == jersey), None)
     if not player:
-        return jsonify({"error": "PLAYER_NOT_FOUND"}), 404
-    safe_roster = re.sub(r"[^A-Za-z0-9_-]+", "-", roster_id).strip("-") or "roster"
-    safe_player = re.sub(r"[^A-Za-z0-9_-]+", "-", player_id).strip("-") or "player"
-    filename = f"{safe_roster}__{safe_player}{ext}"
-    path = HEADSHOTS_DIR / filename
-    path.write_bytes(raw)
-    url = f"/roster-headshots/{filename}"
-    player["headshot"] = url
-    player["headshot_source"] = "uploaded"
-    player["headshot_original_filename"] = upload.filename
-    save_rosters(rosters)
-    return jsonify({"headshot": url, "player": player})
+        return {"number": jersey, "name": "", "resolved": False}
+    name = str(player.get("preferred_name") or f"{player.get('first_name','')} {player.get('last_name','')}".strip()).strip()
+    return {"number": jersey, "name": name, "resolved": True, "roster_id": str(roster.get("id", "")), "player_id": str(player.get("id", ""))}
 
-@app.post("/api/graphics/lower-third")
-@require_auth
-def update_lower_third():
-    data = request.get_json(force=True) or {}
-    action = str(data.get("action", "update")).lower()
-    with lock:
-        state = load_state()
-        current = dict(state.get("lower_third") or {})
-        defaults = copy.deepcopy(DEFAULT_STATE["lower_third"])
-        defaults.update(current)
-        if action == "clear":
-            lower = copy.deepcopy(DEFAULT_STATE["lower_third"])
-        else:
-            lower = defaults
-            for key in ("eyebrow", "headline", "secondary", "footer", "logo_source", "accent_source", "custom_accent"):
-                if key in data:
-                    lower[key] = str(data.get(key, ""))[:180]
-            try:
-                lower["duration"] = max(0, min(120, int(data.get("duration", lower.get("duration", 0)) or 0)))
-            except (TypeError, ValueError):
-                lower["duration"] = 0
-            if action == "hide":
-                lower["visible"] = False
-                lower["expires_at"] = 0
-            elif action in {"show", "update"}:
-                lower["visible"] = bool(data.get("visible", action == "show"))
-                if lower["visible"] and lower["duration"] > 0:
-                    lower["expires_at"] = int(time.time()) + lower["duration"]
-                elif lower["visible"]:
-                    lower["expires_at"] = 0
-            lower["updated_at"] = int(time.time())
-        state["lower_third"] = lower
-        save_state(state)
-    return jsonify(public_state(state))
+STATISTICS_SERVICE: StatisticsService | None = None
 
-@app.post("/api/graphics/player")
-@require_auth
-def update_player_graphic():
-    data = request.get_json(force=True) or {}
-    action = str(data.get("action", "update")).lower()
-    with lock:
-        state = load_state()
-        current = dict(state.get("player_graphic") or {})
-        defaults = copy.deepcopy(DEFAULT_STATE["player_graphic"])
-        defaults.update(current)
-        if action == "clear":
-            graphic = copy.deepcopy(DEFAULT_STATE["player_graphic"])
-        else:
-            graphic = defaults
-            for key in ("graphic_type", "roster_id", "player_id", "eyebrow", "sponsor_lead_in", "sponsor_name", "sponsor_logo"):
-                if key in data:
-                    graphic[key] = str(data.get(key, ""))[:240]
-            roster_id = str(data.get("roster_id", graphic.get("roster_id", ""))).strip()
-            player_id = str(data.get("player_id", graphic.get("player_id", ""))).strip()
-            roster = next((r for r in load_rosters() if str(r.get("id")) == roster_id), None)
-            player = next((p for p in (roster or {}).get("players", []) if str(p.get("id")) == player_id), None)
-            if roster and player:
-                school = next((sc for sc in load_schools() if str(sc.get("id")) == str(roster.get("school_id"))), {})
-                full_name = " ".join([str(player.get("first_name", "")).strip(), str(player.get("last_name", "")).strip()]).strip()
-                display_name = str(player.get("preferred_name", "")).strip() or full_name
-                identity = broadcast_identity(school, str(roster.get("sport", "Football"))) if school else {}
-                graphic.update({
-                    "school_id": roster.get("school_id", ""),
-                    "full_name": full_name,
-                    "display_name": display_name,
-                    "number": str(player.get("number", "")),
-                    "position": str(player.get("position", "")),
-                    "secondary_position": str(player.get("secondary_position", "")),
-                    "grade": str(player.get("grade", "")),
-                    "height": str(player.get("height", "")),
-                    "weight": str(player.get("weight", "")),
-                    "headshot": str(player.get("headshot", "")),
-                    "team_logo": str(identity.get("logo", "")),
-                    "team_name": str(school.get("broadcast_name") or school.get("official_name") or roster.get("school_id", "")),
-                    "team_color": str(identity.get("primary_color") or school.get("primary_color") or "#C9203B"),
-                })
-            try:
-                graphic["duration"] = max(0, min(120, int(data.get("duration", graphic.get("duration", 0)) or 0)))
-            except (TypeError, ValueError):
-                graphic["duration"] = 0
-            if action == "hide":
-                graphic["visible"] = False
-                graphic["expires_at"] = 0
-            elif action in {"show", "update"}:
-                if not graphic.get("player_id"):
-                    return jsonify({"error": "PLAYER_REQUIRED"}), 400
-                graphic["visible"] = bool(data.get("visible", action == "show"))
-                if graphic["visible"] and graphic["duration"] > 0:
-                    graphic["expires_at"] = int(time.time()) + graphic["duration"]
-                elif graphic["visible"]:
-                    graphic["expires_at"] = 0
-            graphic["updated_at"] = int(time.time())
-        state["player_graphic"] = graphic
-        save_state(state)
-    return jsonify(public_state(state))
 
-@app.post("/api/graphics/personnel")
-@require_auth
-def update_personnel_graphic():
-    data=request.get_json(force=True) or {}
-    action=str(data.get("action","update")).lower()
-    with lock:
-        state=load_state(); graphic=copy.deepcopy(DEFAULT_STATE["personnel_graphic"]); graphic.update(state.get("personnel_graphic") or {})
-        if action=="clear": graphic=copy.deepcopy(DEFAULT_STATE["personnel_graphic"])
-        else:
-            pid=str(data.get("personnel_id",graphic.get("personnel_id",""))).strip(); person=next((x for x in load_broadcasters() if str(x.get("id"))==pid),None)
-            if person:
-                school=next((x for x in load_schools() if str(x.get("id"))==str(person.get("school_id",""))),{})
-                identity=broadcast_identity(school,"Football") if school else {}
-                full=str(person.get("full_name") or person.get("name") or "").strip(); preferred=str(person.get("preferred_name","")).strip() or full
-                graphic.update({"personnel_id":pid,"full_name":full,"display_name":preferred,"title":str(person.get("title") or person.get("role") or ""),"role":str(person.get("role", "")),"organization":str(person.get("organization") or school.get("broadcast_name") or school.get("official_name") or ""),"headshot":str(person.get("headshot","")),"logo":str(identity.get("logo") or "/static/csrn-logo.png"),"accent":str(identity.get("primary_color") or "#C9203B")})
-            for key in ("graphic_type","eyebrow","sponsor_lead_in","sponsor_name","sponsor_logo"):
-                if key in data: graphic[key]=str(data.get(key,""))[:240]
-            try: graphic["duration"]=max(0,min(120,int(data.get("duration",graphic.get("duration",0)) or 0)))
-            except: graphic["duration"]=0
-            if action=="hide": graphic["visible"]=False; graphic["expires_at"]=0
-            elif action in {"show","update"}:
-                if not graphic.get("personnel_id"): return jsonify({"error":"PERSONNEL_REQUIRED"}),400
-                graphic["visible"]=True
-                graphic["expires_at"]=int(time.time())+graphic["duration"] if graphic["duration"] else 0
-            graphic["updated_at"]=int(time.time())
-        state["personnel_graphic"]=graphic; save_state(state)
-    return jsonify(public_state(state))
+def get_statistics_service() -> StatisticsService:
+    global STATISTICS_SERVICE
+    if STATISTICS_SERVICE is None:
+        STATISTICS_SERVICE = StatisticsService()
+    return STATISTICS_SERVICE
 
-@app.post("/api/event-trigger")
-@require_auth
-def event_trigger():
-    data = request.get_json(force=True)
-    team = str(data.get("team", "")).lower()
-    event = str(data.get("event", "")).upper()
-    if team not in {"home", "visitor"} or event not in {"TD", "FG", "TURNOVER"}:
-        return jsonify({"error": "INVALID_EVENT"}), 400
-    with lock:
-        state = load_state()
-        if not state.get("broadcast_id"):
-            return jsonify({"error": "NO_ACTIVE_BROADCAST"}), 409
-        push_history(state)
-        score_key = "home_score" if team == "home" else "visitor_score"
-        before = {
-            "home_score": int(state.get("home_score", 0)),
-            "visitor_score": int(state.get("visitor_score", 0)),
-            "possession": state.get("possession", "home"),
-        }
-        delta = 6 if event == "TD" else 3 if event == "FG" else 0
-        if delta:
-            state[score_key] = max(0, int(state.get(score_key, 0)) + delta)
-        if event == "TURNOVER":
-            state["possession"] = team
-        if state.get("status") != "live":
-            state["status"] = "live"
-            state["broadcast_phase"] = "live"
-            update_linked_broadcast_status(state.get("broadcast_id", ""), "live")
-        team_name = state.get("home_team") if team == "home" else state.get("visitor_team")
-        label = {"TD": "Touchdown", "FG": "Field Goal", "TURNOVER": "Turnover"}[event]
-        payload = {
-            "id": f"EV-{int(time.time() * 1000)}",
-            "team": team,
-            "team_name": team_name,
-            "event": event,
-            "label": label,
-            "score_delta": delta,
-            "created_at": int(time.time()),
-            "quarter": str(state.get("quarter", "1") or "1"),
-            "broadcast_id": state.get("broadcast_id", ""),
-            "before": before,
-            "after": {
-                "home_score": int(state.get("home_score", 0)),
-                "visitor_score": int(state.get("visitor_score", 0)),
-                "possession": state.get("possession", "home"),
-            },
-            "media_trigger": {
-                "key": f"{event.lower()}_{team}",
-                "assigned": False,
-                "graphics": None,
-                "audio": None,
-                "video": None,
-            },
-        }
-        state["last_event"] = payload
-        events = list(state.get("events") or [])
-        events.append(payload)
-        state["events"] = events[-200:]
-        save_state(state)
-    return jsonify({
-        "state": public_state(state),
-        "trigger": payload,
-        "media_assigned": False,
-        "message": f"{label}: {team_name}" + (f" (+{delta})" if delta else " — possession updated"),
+
+def build_statistics(state: dict[str, Any]) -> dict[str, Any]:
+    return get_statistics_service().report(state).data["statistics"]
+
+
+PENALTY_RULES: dict[tuple[str, str], dict[str, Any]] = {
+    ("Offensive", "Holding"): {"yards": 10, "replay_down": True},
+    ("Offensive", "False Start"): {"yards": 5, "replay_down": True, "dead_ball": True},
+    ("Offensive", "Illegal Motion"): {"yards": 5, "replay_down": True},
+    ("Offensive", "Illegal Formation"): {"yards": 5, "replay_down": True},
+    ("Offensive", "Delay of Game"): {"yards": 5, "replay_down": True},
+    ("Offensive", "Intentional Grounding"): {"yards": 5, "loss_of_down": True},
+    ("Offensive", "Personal Foul"): {"yards": 15, "replay_down": True},
+    ("Offensive", "Unsportsmanlike Conduct"): {"yards": 15, "replay_down": True},
+    ("Defensive", "Holding"): {"yards": 10, "automatic_first_down": True},
+    ("Defensive", "Pass Interference"): {"yards": 15, "automatic_first_down": True},
+    ("Defensive", "Roughing the Passer"): {"yards": 15, "automatic_first_down": True},
+    ("Defensive", "Personal Foul"): {"yards": 15, "automatic_first_down": True},
+    ("Defensive", "Unsportsmanlike Conduct"): {"yards": 15, "automatic_first_down": True},
+    ("Defensive", "Offside"): {"yards": 5, "replay_down": True},
+    ("Defensive", "Encroachment"): {"yards": 5, "replay_down": True, "dead_ball": True},
+    ("Special Teams", "Kick Catch Interference"): {"yards": 15, "automatic_first_down": False},
+    ("Special Teams", "Illegal Block"): {"yards": 10},
+    ("Special Teams", "Running Into Kicker"): {"yards": 5},
+    ("Special Teams", "Roughing Kicker"): {"yards": 15, "automatic_first_down": True},
+}
+
+def int_distance(value: Any, fallback: int = 10) -> int:
+    try:
+        return max(1, min(99, int(str(value))))
+    except (TypeError, ValueError):
+        return fallback
+
+def advance_down(down: str) -> str:
+    return {"1st": "2nd", "2nd": "3rd", "3rd": "4th", "4th": "1st"}.get(str(down), str(down) or "1st")
+
+
+def sync_play_from_event(state: dict[str, Any], event: dict[str, Any]) -> None:
+    """Keep the Alpha.2 canonical play record synchronized with its source event."""
+    plays = list(state.get("plays") or [])
+    play = next((row for row in plays if row.get("event_id") == event.get("id") or row.get("play_id") == event.get("play_id")), None)
+    if not play:
+        return
+    auto = event.get("automation") or {}
+    before = event.get("before") or {}
+    play.update({
+        "quarter": str(event.get("quarter", play.get("quarter", "1"))),
+        "down": str(before.get("down", play.get("down", ""))),
+        "distance": str(before.get("distance", play.get("distance", ""))),
+        "ball_spot": str(before.get("ball_spot", play.get("ball_spot", ""))),
+        "play_type": auto.get("play_type") or str(event.get("event", "")).lower(),
+        "result": event.get("description", play.get("result", "")),
+        "yards": auto.get("yards", play.get("yards", "")),
+        "undone": bool(event.get("undone", False)),
     })
+    state["plays"] = plays
 
-@app.post("/api/toggle-scorebug")
-@require_auth
-def toggle_scorebug():
-    with lock:
-        state = load_state()
-        active_broadcast_id = state.get("broadcast_id", "")
-        next_visible = not bool(state.get("scorebug_visible"))
-        if load_config().get("obs", {}).get("controlled_commands", False):
-            try:
-                command_scorebug_visibility(next_visible)
-            except OBSConnectionError as exc:
-                return jsonify({"error": "OBS_COMMAND_BLOCKED", "message": str(exc)}), 409
-        push_history(state)
-        # Visibility is deliberately isolated from broadcast lifecycle and active selection.
-        state["scorebug_visible"] = next_visible
-        state["broadcast_id"] = active_broadcast_id
-        save_state(state)
-        return jsonify(state)
+def correction_entry(kind: str, operator: str, before: dict[str, Any], after: dict[str, Any], event_id: str = "", note: str = "") -> dict[str, Any]:
+    return {
+        "id": f"COR-{int(time.time()*1000)}", "kind": kind, "operator": operator,
+        "event_id": event_id, "before": before, "after": after, "note": note,
+        "created_at": int(time.time()),
+    }
 
-@app.post("/api/toggle-halftime")
-@require_auth
-def toggle_halftime():
-    with lock:
-        state = load_state()
-        push_history(state)
-        if state["broadcast_phase"] == "halftime":
-            state["broadcast_phase"] = "live"
-            state["quarter"] = "3"
-            state["scorebug_visible"] = True
-        else:
-            state["broadcast_phase"] = "halftime"
-            state["scorebug_visible"] = False
-        save_state(state)
-        return jsonify(state)
+def append_correction(state: dict[str, Any], entry: dict[str, Any]) -> None:
+    rows = list(state.get("correction_log") or [])
+    rows.append(entry)
+    state["correction_log"] = rows[-500:]
 
-@app.post("/api/end-game")
-@require_auth
-def end_game():
-    with lock:
-        state = load_state()
-        push_history(state)
-        state["broadcast_phase"] = "final"
-        state["scorebug_visible"] = False
-        state["status"] = "completed"
-        save_state(state)
-        update_linked_broadcast_status(state.get("broadcast_id", ""), "completed", {"final_home_score":state.get("home_score",0),"final_visitor_score":state.get("visitor_score",0)})
-        return jsonify(state)
+def apply_penalty_enforcement(state: dict[str, Any], category: str, name: str, yards: int, outcome: str) -> dict[str, Any]:
+    options = copy.deepcopy(state.get("_pending_penalty_options") or {})
+    possession = str(state.get("possession", "home") or "home").lower()
+    if category == "Defensive":
+        default_selected_team = "visitor" if possession == "home" else "home"
+    else:
+        default_selected_team = possession
+    selected_team = str(options.get("selected_team") or default_selected_team)
+    requested_unit = str(options.get("requested_unit") or category)
+    return PenaltyService.enforce(
+        state,
+        selected_team=selected_team,
+        requested_unit=requested_unit,
+        name=name,
+        yards=yards,
+        outcome=outcome,
+        spot_to_coord=spot_to_coord,
+        coord_to_spot=coord_to_spot,
+        team_direction=team_direction,
+        enforcement_spot=options.get("enforcement_spot", ""),
+        half_distance=bool(options.get("half_distance")),
+        automatic_first_down=bool(options.get("automatic_first_down")),
+        loss_of_down=bool(options.get("loss_of_down")),
+        untimed_down=bool(options.get("untimed_down")),
+        retry_down=bool(options.get("retry_down")),
+    )
 
-@app.post("/api/reset-data")
-@require_auth
-def reset_data():
-    with lock:
-        current = load_state()
-        reset = copy.deepcopy(DEFAULT_STATE)
-        # Reset only game-operation data. Preserve the selected broadcast and
-        # its schedule/identity so an accidentally completed game can resume.
-        reset.update({
-            "broadcast_created": bool(current.get("broadcast_id")),
-            "broadcast_id": current.get("broadcast_id", ""),
-            "sport": current.get("sport", "Football"),
-            "season": current.get("season", ""),
-            "week": current.get("week", "1"),
-            "classification": current.get("classification", ""),
-            "level": current.get("level", "Varsity"),
-            "division": current.get("division", "Boys"),
-            "home_team": current.get("home_team", "Caledonia"),
-            "visitor_team": current.get("visitor_team", "Visitor"),
-            "home_school_id": current.get("home_school_id", ""),
-            "visitor_school_id": current.get("visitor_school_id", ""),
-            "home_identity": current.get("home_identity", {}),
-            "visitor_identity": current.get("visitor_identity", {}),
-            "venue_id": current.get("venue_id", ""),
-            "venue": current.get("venue", "Caledonia High School"),
-            "date": current.get("date", ""),
-            "scheduled_start": current.get("scheduled_start", ""),
-            "visual_mode": current.get("visual_mode", "graphic"),
-            "crew": current.get("crew", {}),
-            "status": current.get("status", "planned"),
-            "broadcast_phase": "final" if current.get("status") == "completed" else "pregame",
-            "review_mode": current.get("status") == "completed",
-            "scorebug_visible": False,
-        })
-        save_state(reset)
-        return jsonify(reset)
+def local_addresses() -> list[str]:
+    return get_support_media_service().local_addresses()
 
-@app.post("/api/new-broadcast")
-@require_auth
-def new_broadcast():
-    with lock:
-        state = copy.deepcopy(DEFAULT_STATE)
-        save_state(state)
-        return jsonify(state)
 
-@app.post("/api/undo")
-@require_auth
-def undo():
-    with lock:
-        state = load_state()
-        events = list(state.get("events") or [])
-        target = next((event for event in reversed(events) if not event.get("undone") and event.get("before")), None)
-        if target:
-            before = target.get("before") or {}
-            state["home_score"] = int(before.get("home_score", state.get("home_score", 0)))
-            state["visitor_score"] = int(before.get("visitor_score", state.get("visitor_score", 0)))
-            state["possession"] = before.get("possession", state.get("possession", "home"))
-            target["undone"] = True
-            target["undone_at"] = int(time.time())
-            state["events"] = events
-            state["last_event"] = {
-                "id": f"UNDO-{int(time.time() * 1000)}",
-                "event": "UNDO",
-                "label": f"Undo: {target.get('label', target.get('event', 'Event'))}",
-                "team": target.get("team", ""),
-                "team_name": target.get("team_name", ""),
-                "score_delta": 0,
-                "created_at": int(time.time()),
-                "quarter": str(state.get("quarter", "1") or "1"),
-                "broadcast_id": state.get("broadcast_id", ""),
-                "target_event_id": target.get("id", ""),
-            }
-            save_state(state)
-        else:
-            history = state.get("history", [])
-            if history:
-                previous = history.pop()
-                previous["history"] = history
-                state = normalize_state(previous)
-                save_state(state)
-        return jsonify(state)
+EVENT_SERVICE: EventService | None = None
+
+
+def get_event_service() -> EventService:
+    global EVENT_SERVICE
+    if EVENT_SERVICE is None:
+        EVENT_SERVICE = EventService(
+            load_state=load_state,
+            save_state=save_state,
+            public_state=public_state,
+            push_history=push_history,
+            update_linked_status=update_linked_broadcast_status,
+            automation_player=automation_player,
+            manual_player=manual_automation_player,
+            player_display=player_display,
+            show_player_graphic=show_automation_player_graphic,
+            apply_penalty=apply_penalty_enforcement,
+            spot_to_coord=spot_to_coord,
+            team_direction=team_direction,
+            normalize_state=normalize_state,
+            default_player_graphic=lambda: copy.deepcopy(
+                DEFAULT_STATE["player_graphic"]
+            ),
+            resolve_player=resolve_game_roster_player,
+            on_event=lambda event: get_social_service().queue_event(event),
+            transaction_lock=lock,
+        )
+    return EVENT_SERVICE
+
+
+def game_data_source_allowed(state: dict[str, Any], source: str) -> bool:
+    return EventService.source_allowed(state, source)
+
+
+def authority_rejection(state: dict[str, Any]):
+    return jsonify(EventService.locked_payload(state)), 409
+
+
+def spot_to_coord(value: Any) -> int:
+    return RulesService.spot_to_coord(value)
+
+
+def coord_to_spot(coord: int) -> str:
+    return RulesService.coord_to_spot(coord)
+
+
+def team_direction(state: dict[str, Any], team: str) -> int:
+    return RulesService.team_direction(state, team)
+
+
+def opposite(team: str) -> str:
+    return RulesService.opposite(team)
+
+
+def advance_down(down: str) -> str:
+    return RulesService.advance_down(down)
+
+
+RULES_SERVICE: RulesService | None = None
+
+
+def get_rules_service() -> RulesService:
+    global RULES_SERVICE
+    if RULES_SERVICE is None:
+        RULES_SERVICE = RulesService(
+            load_state=load_state,
+            save_state=save_state,
+            push_history=push_history,
+            source_allowed=game_data_source_allowed,
+            locked_payload=EventService.locked_payload,
+            resolve_player=resolve_game_roster_player,
+            show_player_graphic=show_automation_player_graphic,
+            transaction_lock=lock,
+        )
+    return RULES_SERVICE
+
 
 def local_ip() -> str:
+    return SupportMediaService.local_ip()
+
+
+def create_app(
+    config_overrides: dict[str, Any] | None = None,
+) -> Flask:
+    """Build a configured CSRN application from the consolidated Blueprints."""
+
+    security = load_security()
+    return create_application(
+        __name__,
+        blueprints=tuple(APPLICATION_BLUEPRINTS),
+        secret_key=str(security["secret_key"]),
+        session_seconds=SESSION_SECONDS,
+        config_overrides=config_overrides,
+    )
+
+
+app = create_app()
+
+
+
+# Gate 18.4 R11.7 - coalesce expensive public-state reads across concurrent clients.
+from state_read_cache import install_state_read_cache
+install_state_read_cache(app)
+from runtime_state_cache import install_runtime_state_cache
+install_runtime_state_cache(app)
+from theme_public_state_cache import install_theme_public_state_cache
+install_theme_public_state_cache(app)
+
+# CSRN UNIVERSAL PREGAME DELAY R14
+from pregame_presentation import install_pregame_presentation
+install_pregame_presentation(app)
+
+def _record_clean_shutdown_and_stop(signum, frame):
+    """Handle a deliberate SIGINT/SIGTERM (e.g. Ctrl+C) by writing the clean
+    shutdown marker before the process exits.
+
+    This intentionally does NOT run on a force-kill (e.g. `taskkill /F`,
+    which delivers no catchable signal) or on an unhandled crash — those
+    cases must still leave the marker in place so the next startup reports
+    UNCLEAN_SHUTDOWN_DETECTED.
+    """
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except OSError:
-        return "127.0.0.1"
+        signal_name = signal.Signals(signum).name
+    except ValueError:
+        signal_name = str(signum)
+    try:
+        get_recovery_service().mark_clean_shutdown()
+        print(f"\nReceived {signal_name} — recording clean application shutdown...")
+    except Exception as exc:
+        print(f"[WARN] Could not record clean shutdown marker: {exc}")
+    # Re-raise so Waitress's own (SystemExit, KeyboardInterrupt) handling in
+    # server.run() still gets a chance to close its sockets cleanly.
+    raise SystemExit(0)
+
 
 if __name__ == "__main__":
     ensure_data_architecture()
     load_config()
     from waitress import serve
 
+    signal.signal(signal.SIGINT, _record_clean_shutdown_and_stop)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, _record_clean_shutdown_and_stop)
+
     ip = local_ip()
+    media_directory = ASSET_UPLOAD_DIR.parent / "SponsorAdvertisements"
+    try:
+        media_port = start_isolated_media_server(media_directory, ASSET_UPLOAD_DIR)
+    except OSError as exc:
+        print(f"[FAIL] Isolated media server could not start on port 5051: {exc}")
+        print("CSRN will not start in an unsafe mode that serves local video/audio media through Waitress.")
+        raise SystemExit(1) from exc
+
     print("\nCSRN Production Suite — Command Center is running.")
+    print(f"State authority: drive_backed={DRIVE_BACKED_GAME_DAY_STATE} mirror={STATE_FILE} authority={STATE_AUTHORITY_PATH}")
     print("Laptop: http://127.0.0.1:5050")
     print(f"Phone/iPad: http://{ip}:5050")
     print("OBS overlay: http://127.0.0.1:5050/overlay")
-    print("Server: Waitress production server\n")
-    serve(app, host="0.0.0.0", port=5050, threads=8)
+    print(f"Media server: http://127.0.0.1:{media_port} — READY")
+    print("Server: Waitress production server — READY\n")
+    serve(app, host="0.0.0.0", port=5050, threads=16)
+
+
+
+
+
+
+
+
+
+
+
+

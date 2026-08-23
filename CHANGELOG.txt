@@ -1,177 +1,144 @@
-VERSION 1.5 ALPHA — PERSONNEL ENGINE V1 CORRECTED R1
-- Fixed local personnel headshot serving in the UI preview and OBS overlay.
-- Migrates legacy /data/Personnel/Headshots paths to /personnel-headshots URLs.
-- Removed redundant On-Air Title field from the visible editor; graphics use Role / Primary Assignment.
-- Added improved personnel pronunciation suggestion guidance and editable verification workflow.
+Version 1.13.0-alpha.8f — Player Identity Repair and Source Alignment
+Build V1.13A8F-SOURCE-ALIGNMENT
+- Corrected fictional player headshot URLs.
+- Corrected fictional school-logo URLs and renderer aliases.
+- Prevented missing fixture media from silently resolving to unrelated CSRN branding where valid team media exists.
+- Removed the unused root command-center page duplicate.
+- Removed the obsolete standalone headshot-management utility.
+- Replaced the temporary Facebook tunnel launcher with documented direct setup.
+- Consolidated fictional rehearsal media under the versioned fixture tree.
+- Removed fictional venues from operational venue data.
+- Removed Social Publishing runtime state from Git tracking while preserving local data.
+- Added regression coverage for source/runtime/fixture separation.
 
-Version 1.4 Alpha — Player Graphics Engine v2 Final Polish
-- Rebuilt the jersey number and position area as a dedicated identity panel.
-- Enlarged the jersey number and strengthened position hierarchy.
-- Enlarged headshots, event labels, names, nicknames, and bio details.
-- Reduced team watermark opacity for better readability.
-- Upgraded sponsor treatment to a taller two-line presentation bar.
-- Kept sponsor bar hidden when no sponsor is assigned.
-- Preserved roster-driven player selection, local headshots, timed display, and OBS animation.
+Version 1.13.0-alpha.8e
+- Closed grouped menus after selection, outside click, and Escape.
+- Replaced main-suite-only navigation buttons with real cross-page links.
+- Preserved local no-reload module switching on the main suite.
+- Restored navigation from Social Publishing and Game Recaps to all suite sections.
 
-VERSION 1.2 ALPHA — GRAPHICS ENGINE V1
-- Added reusable Graphics module.
-- Added Lower Third Master editor and live overlay layer.
-- Added CSRN/home/visitor logo selection.
-- Added CSRN/home/visitor/custom accent selection.
-- Added persistent and timed display modes.
-- Lower third automatically repositions above the scorebug and ticker.
-- Existing Event Engine and Phase 2 workflows preserved.
+Version 1.13.0-alpha.8d
+- Rebuilt from the verified Phase 6.12a grouped-navigation and readiness payload.
+- Installed the active page to both root index.html and templates/index.html.
+- Preserved Release Readiness state after selection and refresh.
+- Added installer verification for grouped navigation and readiness functions.
 
-VERSION 1.1 ALPHA — EVENT ENGINE V1 HOTFIX 1
-- Fixed upgrade discovery for semantic-version folders such as Version 1.0 Alpha Hotfix 3.
-- Previous school, venue, logo, broadcast, settings, security, logs, and statistics data now migrate correctly.
-- Legacy Build_#### folders remain supported.
+Version 1.13.0-alpha.8a
+- Added grouped responsive navigation across the main suite, Social Publishing, and Game Recaps.
+- Added a Football Release Readiness preflight with pass, warning, and fail results.
+- Added downloadable rehearsal/readiness reports.
+- Reordered navigation around game-day operator priority.
+Version 1.13.0-alpha.7b
+- Added deterministic article-style postgame recaps with controlled sentence variation.
+- Added recorded Player of the Game inclusion and postgame sponsor selection.
+- Added article-to-social sponsor provenance and reliable full-page discard redirect.
+- Preserved zero-account, zero-subscription article generation.
+Version 1.13.0-alpha.7a
+- Adds a clear grounded postgame recap-to-social publishing handoff.
+- Creates FINAL social drafts with recap and broadcast provenance metadata.
+- Refreshes Social Publishing after a confirmed draft discard.
+- Adds optional Copy graphic support to the assisted-manual X package.
+- Keeps X text-only/manual with no OAuth, API credits, or automatic posting.
 
-Version 1.1 Alpha — Event Engine v1 — 2026-07-12
-- TD adds 6 points to the selected team.
-- FG adds 3 points to the selected team.
-- Turnover assigns possession to the selected team.
-- Added event confirmation, persistent event log, and Undo integration.
-- Added unassigned graphics/audio/video trigger hooks for future Media Engine work.
-- Reserved production_type=interview in the data model for future non-game broadcasts.
+Version 1.13.0-alpha.6z
+- Allows assisted-manual X packages to be prepared from fresh unapproved drafts.
+- Removes discarded cards from the active queue immediately after server confirmation.
+- Adds visible X preparation feedback and clearer package eligibility.
 
-Version 1.0 Alpha Hotfix 3 — 2026-07-12
-- Automatically refreshes OBS readiness when a broadcast is loaded.
-- Adds Resume Broadcast for accidentally completed games.
-- Preserves broadcast linkage when Reset Game Data is used.
-- Reconciles Game Manager status changes when reopening a saved broadcast.
+Version 1.13.0-alpha.6y
+- Replaces the assisted-manual X package panel with a true top-layer dialog.
+- Adds a visible preparing state and success/error feedback to the X package action.
+- Makes every X dialog action an explicit non-submit control.
+- Adds a fallback open state when the browser cannot use showModal().
 
-Version 1.0 Alpha Hotfix 1 — 2026-07-12
-- Simplified lifecycle to Planned, Live, Completed.
-- Removed Prepared controls from the operator interface.
-- Added Check OBS timestamped feedback.
-- Fixed scorebug visibility changes clearing or disrupting the active broadcast.
-- Renamed branding action to Apply Branding.
+Version 1.13.0-alpha.6x
+- Restores the complete Social Draft Lifecycle service after the conversion-outcome build regression.
+- Expires unpublished live-event drafts at game final, after eight hours, or when another game becomes active.
+- Rejects expired and wrong-game drafts at approval, Facebook publishing, automatic queue, and X-package boundaries.
+- Opens assisted-manual X packages in a visible modal with copy, download, and compose actions.
+- Keeps expired, discarded, and archived records outside the active queue while preserving audit history.
 
-CSRN PRODUCTION SUITE — CHANGELOG
-=================================
+Version 1.13.0-alpha.6v
+- Adds Discard draft for unpublished items while retaining audit history.
+- Adds live Facebook post removal with explicit confirmation and recorded retraction status.
+- Adds Archive draft after all public posts have been removed.
+- Separates active drafts from archived and discarded records in Social Publishing.
+- Prevents duplicate publishing actions and preserves lifecycle timestamps and prior statuses.
 
-Version 1.0 Alpha — Phase 2 Stable Baseline
-Released: July 12, 2026
-Internal build ID: V1.0A-P2-STABLE
-Promoted from: Build 0019 Corrected R4 Hotfix 6
+Version 1.13.0-alpha.6u
+- Prefixes bare jersey-number references with # even when an imported event has no roster linkage.
+- Rebuilds standard sponsor presentation as a large unified logo-and-name lockup.
+- Increases sponsor footer depth and mobile-readable sponsor typography.
 
-PHASE 2 STABLE CAPABILITIES
-- School, venue, logo, branding, and broadcast databases
-- MHSAA Class 5A pilot import and enrichment workflow
-- Certified round school logos with generated CSRN monogram fallback
-- Game Manager creation, editing, deletion, and lifecycle status management
-- Command Center loading of planned, prepared, live, and completed broadcasts
-- Persistent live state for recovery, reload, and completed-game review
-- OBS WebSocket diagnostics and Browser Source integration
-- Adaptive football scorebug for Graphic and Camera modes
-- Team-color possession glow and football possession marker
-- Optional game clock visibility
-- Down and distance controls
-- Simplified mobile game-control interface
-- Long school-name wrapping and production-locked football scorebug layout
+Version 1.13.0-alpha.6t
+- Rebuilds standard sponsor presentation as a unified commercial lockup.
+- Enlarges the sponsor footer and sponsor-name typography for phone readability.
+- Places standard sponsor artwork inside a large high-contrast panel instead of a token-size corner mark.
+- Keeps full-width mode reserved for dedicated horizontal sponsor banner artwork.
 
-KEY DEVELOPMENT MILESTONES
-- Build 0015: school identity integration and persistent broadcast forms
-- Build 0016: scheduling controls, school promotion, venue/logo foundations
-- Build 0017: MHSAA 5A database import, enrichment, branding, and round-logo pipeline
-- Build 0018: Game Manager, broadcast lifecycle, readiness checks, and OBS overlay linkage
-- Build 0019: adaptive scorebug, possession redesign, recovery workflow, monogram fallback, and final Phase 2 stabilization
+Version 1.13.0-alpha.6s
+- Prefixes number-only player references with # in public draft copy.
+- Uses the scoring/event team logo instead of always displaying the home organization logo.
+- Requires a dedicated wide sponsor-banner asset for full-width sponsor footer mode.
+- Enlarges standard sponsor marks for phone readability and warns when banner artwork is missing.
+- Adds operator guidance for collecting 1200 x 180 transparent PNG sponsor banners.
 
-POST-PHASE-2 ROADMAP
-- Branding audit and expanded asset management
-- Statistician mode and detailed play entry
-- Media/stinger assignment for TD, FG, and turnover hooks
-- Broadcast archive controls
-- Basketball and other sport-specific scorebugs
-- Sponsor, commercial, replay, and automation engines
+Version 1.13.0-alpha.6r
+- Adds compact, iPhone-legible standalone cards for recorded extra points and two-point conversions.
+- Uses the conversion event score snapshot so touchdown and conversion posts show the score at that moment.
+- Adds standard and full-width sponsor-footer layout options to manual, highlight, edit, and correction workflows.
+- Crops transparent padding from sponsor artwork and increases sponsor/footer mobile-safe sizing.
+- Raises minimum social-card text sizes and reports the minimum rendered font in layout metadata.
 
-Detailed historical entries remain available in:
-Data/Logs/build_journal.json
+Version 1.13.0-alpha.6q
+- Replaces the ambiguous browser correction prompt with a full draft editor.
+- Edits unpublished drafts in place and creates clearly labeled correction drafts for published posts.
+- Includes a recorded extra point or two-point conversion in touchdown social copy.
+- Applies the selected sponsor consistently to manual and eligible-play draft creation.
+- Lists only sponsors that are actually active and eligible for attachment.
 
-Version 1.1 Alpha — Event Engine v1 Hotfix 3
-- Replaced browser confirm dialogs for TD/FG/Turnover with a responsive in-app confirmation sheet.
-- Event records now include the active quarter.
-- Event history renders quarter and local timestamp for each entry.
-- Preserves event history in the active broadcast live-state snapshot.
+Version 1.13.0-alpha.6p
+- Fits long team names and scores without clipping on Facebook and X cards.
+- Uses headshot-aware copy widths and controlled multiline headline, score, matchup, and detail layout.
+- Adds organization-level player-name policies: preferred first plus last, official roster name, or exact preferred display name.
+- Converts interception-return touchdowns to the public headline PICK SIX and preserves the roster-authoritative player name in draft copy.
+- Adds active-sponsor selection to draft creation and reserves a dedicated sponsor footer with lead-in, name, and logo.
+- Surfaces renderer fit warnings in the Draft Queue before approval.
 
-Version 1.1 Alpha Event Engine v1 Hotfix 4
-- Persistent viewer event ticker below scorebug
-- Ticker show/hide and speed controls
-- Undone events excluded from ticker
-- Event icons, team colors, score-after-play, faded last-event banner
-- Muted undone event styling
+Version 1.13.0-alpha.6o
+- Preserves roster and preferred-display-name capitalization in yardage-prefixed touchdown descriptions.
+- Preserves player-name capitalization in turnover-return touchdown descriptions.
+- Preserves existing event-description capitalization when yardage is corrected.
+- Adds regression coverage for roster-name fidelity across event creation and correction.
 
+Version 1.13.0-alpha.6n
+- Preserves Facebook OAuth Page-selection handoff across operator login.
+- Routes Facebook callback results through the public Command Center login page.
+- Passes the pending selection ID to Page-list and Page-select endpoints.
+- Preserves protected-page return targets when an operator session expires.
 
-Version 1.3 Alpha — Roster Engine v1
-- Added season-based Roster Engine linked to school, sport, season, level, and division.
-- Varsity is the default; JV, Middle School, JUCO, College, and Other remain supported.
-- Added editable player records with jersey number, names, position, grade, height, weight, captain, starter, headshot reference, and Active/Inactive status.
-- Added duplicate jersey-number warnings, player removal, roster deletion, CSV template, and CSV import.
+Version 1.13.0-alpha.3h
+- Fixed roster read loop that rewrote the database and created a snapshot on every API read.
+- Bounded one-time recovery scanning, added mtime cache, atomic writes, and no-op write detection.
+- Removed duplicate state request and render after UI mutations.
+- Reused roster data when opening play entry.
 
+CSRN Production Suite 1.13.0-alpha.3g — Database Integrity Recovery
 
-Version 1.3 Alpha — Roster Engine v1 Corrected R4
-- Corrected roster/player editor alignment and responsive placement.
-- Added sport-specific primary and secondary position selectors with Athlete fallback.
-- Added selectable grade and feet/inches height controls.
-- Added editable pronunciation with automatic suggestion and verification flag.
-- Added printable active-roster broadcast sheet.
-- Expanded CSV import/export fields while preserving existing player data.
+- Prevents missing or malformed roster files from being silently replaced with an empty database.
+- Searches upgrade backups and prior installation folders for the most complete roster database.
+- Automatically restores the best available roster database and records a recovery report.
+- Creates timestamped roster snapshots before every roster database write.
+- Preserves the existing football rules and special-teams fixes from Alpha.3f.
 
+Important: recovery can only restore roster data that still exists in a backup or prior installation folder.
 
-Version 1.3 Alpha — Roster Engine v1 Corrected R4
-- Fixed Print Roster failure caused by an undefined schoolsCache variable.
-- Reworked automatic pronunciation suggestions into syllable-style guides using hyphens and capitalized stress.
-- Added clear pronunciation-entry guidance and examples.
-- Automatic pronunciation remains an editable suggestion; verified operator entries take precedence.
+Phase 6.7 - Installer, Updates, and Licensing Foundation
+- External installed-mode customer data paths.
+- Hash-validated staged updates and customer-safe support bundles.
+- Provider-verified licensing and feature/sport entitlement boundaries.
 
-
-Version 1.4 Alpha — Player Graphics Engine v1
-- Added roster-driven Player Identification Master.
-- Added player graphic show/hide/clear API and overlay asset.
-- Added sponsor lead-in and optional sponsor logo support.
-- Printable roster now shows Full Name and Preferred Name separately.
-
-Version 1.4 Alpha — Player Graphics Engine v1 Corrected R4
-- Corrected application/footer/build metadata.
-- Printable roster now separates Full Name and Preferred Name.
-- Added visible Player Identification Master controls to Graphics module.
-
-
-Version 1.4 Alpha — Player Graphics Engine v1 Corrected R4
-- Added local player headshot upload and app-served storage.
-- Fixed player name/meta text color in OBS.
-- Renamed Touchdown Scorer graphic label to Touchdown.
-- Aligned player graphic to the scorebug body rather than the possession football.
-- Added image fallback handling for invalid URLs.
-
-Version 1.4 Alpha Corrected R4
-- Full player name followed by preferred name on air.
-- Larger event label and player details.
-- Jersey number embossed over headshot.
-- Positions moved above team logo.
-- Enforced white on-air player text.
-
-
-Version 1.4 Alpha — Player Graphics Engine v1 Corrected R5
-- Moved jersey number to the right identity panel and removed the # prefix.
-- Enlarged jersey number and positions.
-- Added low-opacity team-logo watermark behind player information.
-- Added a separate conditional sponsor bar above the player card.
-- Sponsor bar supports lead-in, sponsor name, and sponsor logo.
-
-
-Version 1.5 Alpha — Personnel Engine v1
-- Expanded Broadcast Team into a reusable Personnel Engine.
-- Added coaches, talent, administrators, officials, interview guests, and production staff categories.
-- Added pronunciation, preferred name, title, organization, school link, biography, active status, and local headshots.
-- Added Personnel Identification Master for coach, talent, official, administrator, and interview graphics.
-
-
-Version 1.5 Alpha — Personnel Engine v1 Corrected R2
-- Added full-width Sponsor Banner v2 for personnel graphics.
-- Increased sponsor-name prominence and added two-line hierarchy.
-- Added category-specific personnel role lists.
-- Added Coach's Corner and Interview graphic types.
-- Added sponsor preview in Graphics module.
-- Personnel Engine freeze candidate.
+Phase 6.8 - Graphics Theme Engine
+- Eight original presets through one shared token engine.
+- Controlled overrides, saved variants, and season locking.
+- Shared scorebug, lower-third, caption, weather, and social-card styling.

@@ -1,0 +1,99 @@
+{
+  "schema": "csrn-friday-night-stadium-player-library-v1",
+  "release": "R18-R2",
+  "runtime_recoloring": false,
+  "one_player_per_png": true,
+  "palette_count": 14,
+  "player_count": 28,
+  "canvas": [
+    900,
+    900
+  ],
+  "target_player_height": 790,
+  "assets": [
+    {
+      "key": "scarlet",
+      "hex": "#C51F30",
+      "visitor": "visitor-28-scarlet.png",
+      "home": "home-31-scarlet.png"
+    },
+    {
+      "key": "maroon",
+      "hex": "#7A1832",
+      "visitor": "visitor-28-maroon.png",
+      "home": "home-31-maroon.png"
+    },
+    {
+      "key": "orange",
+      "hex": "#E46C0A",
+      "visitor": "visitor-28-orange.png",
+      "home": "home-31-orange.png"
+    },
+    {
+      "key": "gold",
+      "hex": "#D8A51D",
+      "visitor": "visitor-28-gold.png",
+      "home": "home-31-gold.png"
+    },
+    {
+      "key": "yellow",
+      "hex": "#F2D21B",
+      "visitor": "visitor-28-yellow.png",
+      "home": "home-31-yellow.png"
+    },
+    {
+      "key": "kelly-green",
+      "hex": "#18864B",
+      "visitor": "visitor-28-kelly-green.png",
+      "home": "home-31-kelly-green.png"
+    },
+    {
+      "key": "dark-green",
+      "hex": "#0D5D3A",
+      "visitor": "visitor-28-dark-green.png",
+      "home": "home-31-dark-green.png"
+    },
+    {
+      "key": "royal-blue",
+      "hex": "#2457C5",
+      "visitor": "visitor-28-royal-blue.png",
+      "home": "home-31-royal-blue.png"
+    },
+    {
+      "key": "navy",
+      "hex": "#152A4A",
+      "visitor": "visitor-28-navy.png",
+      "home": "home-31-navy.png"
+    },
+    {
+      "key": "columbia-blue",
+      "hex": "#5CA8D8",
+      "visitor": "visitor-28-columbia-blue.png",
+      "home": "home-31-columbia-blue.png"
+    },
+    {
+      "key": "purple",
+      "hex": "#6B3FA0",
+      "visitor": "visitor-28-purple.png",
+      "home": "home-31-purple.png"
+    },
+    {
+      "key": "black",
+      "hex": "#1A1A1A",
+      "visitor": "visitor-28-black.png",
+      "home": "home-31-black.png"
+    },
+    {
+      "key": "charcoal",
+      "hex": "#4A4A4A",
+      "visitor": "visitor-28-charcoal.png",
+      "home": "home-31-charcoal.png"
+    },
+    {
+      "key": "white",
+      "hex": "#E8E8E8",
+      "visitor": "visitor-28-white.png",
+      "home": "home-31-white.png"
+    }
+  ]
+}

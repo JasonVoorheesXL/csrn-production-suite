@@ -1,0 +1,74 @@
+{
+  "package": 2,
+  "r18_r3": true,
+  "colors": [
+    "kelly-green",
+    "dark-green",
+    "royal-blue",
+    "navy",
+    "columbia-blue"
+  ],
+  "assets": [
+    {
+      "file": "visitor-28-kelly-green.png",
+      "role": "visitor",
+      "color": "kelly-green",
+      "sha256": "c55360f5ab0b9b40a15f033a68bfcf6be6813c4d9b8ce235dc030e006a65d752"
+    },
+    {
+      "file": "home-31-kelly-green.png",
+      "role": "home",
+      "color": "kelly-green",
+      "sha256": "b14b2d42ff28b05320876fa6981fc0a6f7e5bed36a212a6c3c28a35aa7a369da"
+    },
+    {
+      "file": "visitor-28-dark-green.png",
+      "role": "visitor",
+      "color": "dark-green",
+      "sha256": "79d7483054eb8d1538088746caed397e70676269dd35eb2ffd4a36df6cfcb336"
+    },
+    {
+      "file": "home-31-dark-green.png",
+      "role": "home",
+      "color": "dark-green",
+      "sha256": "ba6cfe4722f22ca959c69eaba91600c0ed8e4664c4c6647501ac82563c52308b"
+    },
+    {
+      "file": "visitor-28-royal-blue.png",
+      "role": "visitor",
+      "color": "royal-blue",
+      "sha256": "53a5fee02fc8c8034c605fa2bf118c83f90a6f52f55be246f32418ef47e39f59"
+    },
+    {
+      "file": "home-31-royal-blue.png",
+      "role": "home",
+      "color": "royal-blue",
+      "sha256": "d40cbefcffa3020ac25c2a435ff9c8d22b2d3780bacf7e5cb80abbad8d809dde"
+    },
+    {
+      "file": "visitor-28-navy.png",
+      "role": "visitor",
+      "color": "navy",
+      "sha256": "11c52321879443e584a8a900ff87061a3d3149cd7d6943ec9b2c6029d005523e"
+    },
+    {
+      "file": "home-31-navy.png",
+      "role": "home",
+      "color": "navy",
+      "sha256": "61898fab308f151a8565bc6fd2cbfce7fba27b14865d872c0da363a5cf476efe"
+    },
+    {
+      "file": "visitor-28-columbia-blue.png",
+      "role": "visitor",
+      "color": "columbia-blue",
+      "sha256": "7f21ddef5e61f685cef7c520151bef2270e124ed0b9d442c4f44808a6b6c8d26"
+    },
+    {
+      "file": "home-31-columbia-blue.png",
+      "role": "home",
+      "color": "columbia-blue",
+      "sha256": "0e4e93ecf8a66fc05f930d99a76cd2e02b180ca64238bfa845cee83eaa0a71c5"
+    }
+  ],
+  "runtime_behavior": "select-finished-png-no-runtime-recolor"
+}

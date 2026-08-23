@@ -1,0 +1,1688 @@
+#csrnProductionThemeHost,
+#csrnProductionThemePlayerHost{
+  position:absolute;
+  inset:0;
+  width:1920px;
+  height:1080px;
+  overflow:hidden;
+  pointer-events:none;
+}
+#csrnProductionThemeHost{z-index:45}
+#csrnProductionThemePlayerHost{z-index:55}
+#csrnProductionThemeHost[hidden],
+#csrnProductionThemePlayerHost[hidden]{display:none!important}
+#csrnProductionThemeLayout,
+#csrnProductionThemePlayerLayout{
+  position:absolute;
+  inset:0;
+  width:1920px;
+  height:1080px;
+  overflow:hidden;
+}
+#csrnProductionThemeTickerHost{
+  display:none!important;
+}
+
+html.csrn-production-theme-scorebug-active #scorebug{
+  display:none!important;
+  visibility:hidden!important;
+}
+html.csrn-production-theme-scorebug-active #playerGraphic{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+}
+html.csrn-production-theme-ticker-active #eventTicker{
+  display:none!important;
+  visibility:hidden!important;
+}
+html.csrn-production-theme-player-active #playerGraphic{
+  display:none!important;
+  visibility:hidden!important;
+}
+
+.csrn-theme-ticker-viewport{
+  min-width:0;
+  width:100%;
+  overflow:hidden;
+  white-space:nowrap;
+  display:flex;
+  align-items:center;
+}
+.csrn-theme-ticker-track{
+  display:flex;
+  align-items:center;
+  width:max-content;
+  min-width:max-content;
+  white-space:nowrap;
+  will-change:transform;
+}
+.csrn-theme-ticker-copy{
+  display:inline-block;
+  white-space:nowrap;
+  padding-right:64px;
+}
+
+.package-stadium-approved .bl-fns-top-ticker .csrn-theme-ticker-viewport{
+  height:32px;
+  color:#ffb000;
+  font:900 22px/1 "Arial Narrow",Arial,sans-serif;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  filter:drop-shadow(0 0 3px #ff9d0066);
+}
+.package-8bit-approved .bl-8bit-top-ticker .csrn-theme-ticker-viewport{
+  height:32px;
+  color:#7fc8ff;
+  font:900 21px/1 monospace;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  text-shadow:0 0 4px #318dff,0 0 10px #318dff88;
+}
+.package-heritage-newspaper .hp-wire-copy .csrn-theme-ticker-viewport{
+  height:100%;
+  font:900 13px/1 Arial,sans-serif;
+  letter-spacing:.4px;
+  text-transform:uppercase;
+}
+.n2-ticker span .csrn-theme-ticker-viewport,
+.n2-ticker .csrn-theme-ticker-viewport{
+  height:100%;
+  color:#fff;
+  font:800 22px/1 Arial,sans-serif;
+  letter-spacing:2px;
+  text-transform:uppercase;
+}
+
+.csrn-production-led-override{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  height:100%;
+  white-space:nowrap;
+  font-family:"Courier New",monospace;
+  font-weight:900;
+  line-height:1;
+  letter-spacing:.08em;
+}
+.package-8bit-approved .csrn-production-led-override{
+  color:#ffd51f;
+  text-shadow:0 0 3px #ffb000,0 0 8px #ffb000;
+}
+.package-stadium-approved .csrn-production-led-override{
+  color:#ffb000;
+  text-shadow:0 0 4px #ff8a00,0 0 10px #ff8a00;
+}
+.package-8bit-approved .bl-8bit-clock-led.csrn-production-led-override,
+.package-stadium-approved .bl-fns-clock-led.csrn-production-led-override{
+  font-size:44px;
+}
+.package-8bit-approved .bl-8bit-small-led.csrn-production-led-override,
+.package-stadium-approved .bl-fns-small-led.csrn-production-led-override{
+  font-size:38px;
+}
+
+
+html.csrn-production-theme-player-pending #playerGraphic,
+html.csrn-production-theme-player-active #playerGraphic{
+  display:none!important;
+  visibility:hidden!important;
+}
+
+.csrn-production-player-number-fallback{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  height:100%;
+  font:900 64px/1 "Arial Narrow",Arial,sans-serif;
+  letter-spacing:-.04em;
+}
+
+
+html.csrn-production-theme-player-pending #playerGraphic,
+html.csrn-production-theme-player-active #playerGraphic{
+  transition:none!important;
+  animation:none!important;
+  transform:none!important;
+  opacity:0!important;
+  visibility:hidden!important;
+  display:none!important;
+}
+
+
+/* Gate 16.7 R11 — production-only player presentation legibility.
+   Frozen theme engines and their markup remain unchanged. */
+#csrnProductionThemeLayout .bl-fns-player-replacement > small{
+  font-size:18px!important;
+  line-height:1.05!important;
+  letter-spacing:.07em!important;
+}
+
+#csrnProductionThemeLayout .bl-fns-player-replacement > strong{
+  font-size:34px!important;
+  line-height:1.02!important;
+  letter-spacing:.01em!important;
+  max-width:560px!important;
+  overflow-wrap:anywhere;
+}
+
+#csrnProductionThemeLayout .bl-fns-player-replacement > span{
+  font-size:20px!important;
+  line-height:1.18!important;
+  max-width:620px!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere;
+}
+
+#csrnProductionThemeLayout .bl-fns-player-replacement .bl-fns-player-portrait b,
+#csrnProductionThemeLayout .bl-fns-player-replacement .csrn-production-player-number-fallback{
+  font-size:76px!important;
+}
+
+
+/* Gate 16.7 R12 — user-requested ~75% increase over R11 player text. */
+#csrnProductionThemeLayout .bl-fns-player-replacement > small{
+  font-size:32px!important;
+  line-height:1!important;
+  letter-spacing:.05em!important;
+}
+
+#csrnProductionThemeLayout .bl-fns-player-replacement > strong{
+  font-size:60px!important;
+  line-height:.98!important;
+  letter-spacing:0!important;
+  max-width:650px!important;
+  overflow-wrap:anywhere;
+}
+
+#csrnProductionThemeLayout .bl-fns-player-replacement > span{
+  font-size:35px!important;
+  line-height:1.08!important;
+  max-width:690px!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere;
+}
+
+#csrnProductionThemeLayout .bl-fns-player-replacement .bl-fns-player-portrait b,
+#csrnProductionThemeLayout .bl-fns-player-replacement .csrn-production-player-number-fallback{
+  font-size:96px!important;
+}
+
+
+/* Gate 16.7 R13 — iPhone readability increase.
+   Substantially larger text than R12 for small-screen viewers. */
+#csrnProductionThemeLayout .bl-fns-player-replacement > small{
+  font-size:44px!important;
+  line-height:1!important;
+  letter-spacing:.045em!important;
+}
+
+#csrnProductionThemeLayout .bl-fns-player-replacement > strong{
+  font-size:86px!important;
+  line-height:.96!important;
+  letter-spacing:0!important;
+  max-width:760px!important;
+  overflow-wrap:anywhere!important;
+}
+
+#csrnProductionThemeLayout .bl-fns-player-replacement > span{
+  font-size:52px!important;
+  line-height:1.05!important;
+  max-width:790px!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+}
+
+#csrnProductionThemeLayout .bl-fns-player-replacement .bl-fns-player-portrait b,
+#csrnProductionThemeLayout .bl-fns-player-replacement .csrn-production-player-number-fallback{
+  font-size:116px!important;
+}
+
+
+/* Gate 16.7 R14 — selector correction.
+   Use the shared video-mode contract so 8-Bit and Friday Night both receive
+   the intended broadcast-scale player typography. */
+#csrnProductionThemeLayout [data-video-mode="player"] > small{
+  font-size:44px!important;
+  line-height:1!important;
+  letter-spacing:.045em!important;
+}
+
+#csrnProductionThemeLayout [data-video-mode="player"] > strong{
+  font-size:86px!important;
+  line-height:.96!important;
+  letter-spacing:0!important;
+  max-width:760px!important;
+  overflow-wrap:anywhere!important;
+}
+
+#csrnProductionThemeLayout [data-video-mode="player"] > span{
+  font-size:52px!important;
+  line-height:1.05!important;
+  max-width:790px!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+}
+
+#csrnProductionThemeLayout [data-video-mode="player"] .csrn-production-player-number-fallback,
+#csrnProductionThemeLayout [data-video-mode="player"] .bl-fns-player-portrait b,
+#csrnProductionThemeLayout [data-video-mode="player"] .bl-8bit-player-portrait b{
+  font-size:116px!important;
+}
+
+
+/* Gate 16.7 R15 — final player typography tuning.
+   Approximately 30% smaller than R14 while preserving the corrected
+   shared [data-video-mode="player"] selector. */
+#csrnProductionThemeLayout [data-video-mode="player"] > small{
+  font-size:31px!important;
+  line-height:1!important;
+  letter-spacing:.05em!important;
+}
+
+#csrnProductionThemeLayout [data-video-mode="player"] > strong{
+  font-size:60px!important;
+  line-height:.98!important;
+  letter-spacing:0!important;
+  max-width:720px!important;
+  overflow-wrap:anywhere!important;
+}
+
+#csrnProductionThemeLayout [data-video-mode="player"] > span{
+  font-size:36px!important;
+  line-height:1.08!important;
+  max-width:760px!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+}
+
+#csrnProductionThemeLayout [data-video-mode="player"] .csrn-production-player-number-fallback,
+#csrnProductionThemeLayout [data-video-mode="player"] .bl-fns-player-portrait b,
+#csrnProductionThemeLayout [data-video-mode="player"] .bl-8bit-player-portrait b{
+  font-size:82px!important;
+}
+
+#csrnProductionThemeLayout .package-stadium-approved [data-video-mode="player"],
+#csrnProductionThemeLayout .package-stadium-approved [data-video-mode="player"] *{
+  transition:none!important;
+  animation:none!important;
+}
+
+
+/* Gate 16.7 R17 — manual spotlight Show/Update bridge.
+   Player Highlight and Sponsor Spotlight remain legacy-rendered for now,
+   but must sit above the themed production board while visible. */
+html.csrn-production-theme-scorebug-active #playerHighlight,
+html.csrn-production-theme-scorebug-active #sponsorSpotlight{
+  z-index:80!important;
+}
+
+
+/* Gate 16.7 R18 — central video-board ownership.
+   When the frozen theme is rendering highlight/sponsor inside its video board,
+   suppress the legacy full-screen takeover rather than layering it above. */
+html.csrn-production-theme-highlight-active #playerHighlight{
+  display:none!important;
+  visibility:hidden!important;
+}
+
+html.csrn-production-theme-sponsor-active #sponsorSpotlight{
+  display:none!important;
+  visibility:hidden!important;
+}
+
+#csrnProductionThemeLayout .csrn-production-board-media{
+  display:block;
+  width:100%;
+  height:100%;
+  max-width:100%;
+  max-height:100%;
+  object-fit:contain;
+}
+
+#csrnProductionThemeLayout [data-video-mode="highlight"] .bl-fns-video-feed{
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+#csrnProductionThemeLayout [data-video-mode="highlight"] .bl-fns-video-feed .csrn-production-board-media{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+}
+
+#csrnProductionThemeLayout [data-video-mode="sponsor"] .csrn-production-sponsor-media{
+  max-width:72%;
+  max-height:68%;
+  margin:0 auto 12px;
+  object-fit:contain;
+}
+
+
+/* Gate 16.7 R19 — central video-board media polish. */
+#csrnProductionThemeLayout [data-video-mode="highlight"].csrn-production-highlight-board{
+  display:flex!important;
+  align-items:stretch!important;
+  justify-content:stretch!important;
+  width:100%!important;
+  height:100%!important;
+  padding:0!important;
+  margin:0!important;
+  overflow:hidden!important;
+  background:#000!important;
+}
+
+#csrnProductionThemeLayout .csrn-production-highlight-video{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:none!important;
+  max-height:none!important;
+  margin:0!important;
+  padding:0!important;
+  object-fit:contain!important;
+  background:#000!important;
+}
+
+#csrnProductionThemeLayout .csrn-production-highlight-fallback{
+  margin:auto;
+  padding:36px;
+  text-align:center;
+  font-family:"Courier New",monospace;
+}
+#csrnProductionThemeLayout .csrn-production-highlight-fallback strong{
+  display:block;
+  font-size:52px;
+  line-height:1;
+}
+#csrnProductionThemeLayout .csrn-production-highlight-fallback span{
+  display:block;
+  margin-top:16px;
+  font-size:28px;
+}
+
+#csrnProductionThemeLayout [data-video-mode="sponsor"].csrn-production-sponsor-board{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  height:100%!important;
+  padding:26px 44px!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+  text-align:center!important;
+}
+
+#csrnProductionThemeLayout .csrn-production-sponsor-media-wrap{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:1 1 auto;
+  min-height:0;
+  width:100%;
+}
+
+#csrnProductionThemeLayout .csrn-production-sponsor-asset{
+  display:block!important;
+  max-width:82%!important;
+  max-height:78%!important;
+  width:auto!important;
+  height:auto!important;
+  object-fit:contain!important;
+  margin:auto!important;
+}
+
+#csrnProductionThemeLayout .csrn-production-sponsor-copy{
+  flex:0 0 auto;
+  width:100%;
+  padding-top:12px;
+  font-family:"Courier New",monospace;
+  text-transform:uppercase;
+}
+#csrnProductionThemeLayout .csrn-production-sponsor-copy small{
+  display:block;
+  font-size:26px!important;
+  font-weight:900;
+  line-height:1;
+  letter-spacing:.12em;
+}
+#csrnProductionThemeLayout .csrn-production-sponsor-copy strong{
+  display:block;
+  margin-top:8px;
+  font-size:54px!important;
+  line-height:1;
+  letter-spacing:.035em;
+}
+#csrnProductionThemeLayout .csrn-production-sponsor-copy span{
+  display:block;
+  margin-top:10px;
+  font-size:26px!important;
+  line-height:1.15;
+  text-transform:none;
+}
+
+#csrnProductionThemeLayout .package-8bit-approved .csrn-production-sponsor-copy small{
+  color:#ffd51f!important;
+  text-shadow:0 0 5px #ffb000;
+}
+#csrnProductionThemeLayout .package-8bit-approved .csrn-production-sponsor-copy strong{
+  color:#fff!important;
+  text-shadow:2px 2px 0 #000;
+}
+#csrnProductionThemeLayout .package-8bit-approved .csrn-production-sponsor-copy span{
+  color:#f5f5f5!important;
+}
+
+
+/* Gate 16.7 R20 — 8-Bit central video-board boundary correction.
+   The production media overlay is constrained to the physical center board
+   opening while ticker, date panel, score towers, and bottom instruments
+   remain part of the frozen cabinet. */
+#csrnProductionThemeLayout.package-8bit-approved{
+  position:relative!important;
+}
+
+#csrnProductionThemeLayout.package-8bit-approved > .csrn-production-video-board-overlay{
+  position:absolute!important;
+  left:22.5%!important;
+  top:23.5%!important;
+  width:55%!important;
+  height:57.5%!important;
+  z-index:24!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+  background:#000!important;
+  padding:0!important;
+  margin:0!important;
+}
+
+#csrnProductionThemeLayout.package-8bit-approved > .csrn-production-video-board-overlay.csrn-production-highlight-board{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+#csrnProductionThemeLayout.package-8bit-approved > .csrn-production-video-board-overlay .csrn-production-highlight-video{
+  width:100%!important;
+  height:100%!important;
+  max-width:100%!important;
+  max-height:100%!important;
+  object-fit:contain!important;
+  background:#000!important;
+}
+
+#csrnProductionThemeLayout.package-8bit-approved > .csrn-production-video-board-overlay.csrn-production-sponsor-board{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:24px 38px!important;
+}
+
+#csrnProductionThemeLayout.package-8bit-approved > .csrn-production-video-board-overlay .csrn-production-sponsor-copy small{
+  font-size:30px!important;
+}
+
+#csrnProductionThemeLayout.package-8bit-approved > .csrn-production-video-board-overlay .csrn-production-sponsor-copy strong{
+  font-size:58px!important;
+}
+
+#csrnProductionThemeLayout.package-8bit-approved > .csrn-production-video-board-overlay .csrn-production-sponsor-copy span{
+  font-size:30px!important;
+}
+
+
+/* Gate 16.7 R21 — central board layer ownership + sponsor scale.
+   Geometry is now also applied inline by the runtime; these declarations are
+   the visual contract and fallback. */
+#csrnProductionThemeLayout > .csrn-production-video-board-overlay{
+  position:absolute!important;
+  left:22.5%!important;
+  top:23.5%!important;
+  width:55%!important;
+  height:57.5%!important;
+  z-index:2147483000!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+  background:#000!important;
+  padding:0!important;
+  margin:0!important;
+  pointer-events:none!important;
+  isolation:isolate!important;
+}
+
+#csrnProductionThemeLayout > .csrn-production-video-board-overlay.csrn-production-highlight-board{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+#csrnProductionThemeLayout > .csrn-production-video-board-overlay .csrn-production-highlight-video{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:100%!important;
+  max-height:100%!important;
+  margin:0!important;
+  padding:0!important;
+  object-fit:contain!important;
+  background:#000!important;
+}
+
+#csrnProductionThemeLayout > .csrn-production-video-board-overlay.csrn-production-sponsor-board{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:18px!important;
+  padding:28px 44px!important;
+  text-align:center!important;
+}
+
+#csrnProductionThemeLayout > .csrn-production-video-board-overlay .csrn-production-sponsor-media-wrap{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  min-height:0!important;
+  flex:1 1 auto!important;
+}
+
+#csrnProductionThemeLayout > .csrn-production-video-board-overlay .csrn-production-sponsor-asset{
+  display:block!important;
+  max-width:72%!important;
+  max-height:68%!important;
+  width:auto!important;
+  height:auto!important;
+  object-fit:contain!important;
+  margin:0 auto!important;
+}
+
+#csrnProductionThemeLayout > .csrn-production-video-board-overlay .csrn-production-sponsor-copy{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  max-width:92%!important;
+  margin:0 auto!important;
+  text-align:center!important;
+}
+
+#csrnProductionThemeLayout > .csrn-production-video-board-overlay .csrn-production-sponsor-copy small{
+  display:block!important;
+  width:100%!important;
+  margin:0 0 10px!important;
+  text-align:center!important;
+  font-size:44px!important;
+  line-height:1!important;
+  letter-spacing:.06em!important;
+}
+
+#csrnProductionThemeLayout > .csrn-production-video-board-overlay .csrn-production-sponsor-copy strong{
+  display:block!important;
+  width:100%!important;
+  margin:0!important;
+  text-align:center!important;
+  font-size:84px!important;
+  line-height:.98!important;
+  letter-spacing:.01em!important;
+}
+
+#csrnProductionThemeLayout > .csrn-production-video-board-overlay .csrn-production-sponsor-copy span{
+  display:block!important;
+  width:100%!important;
+  margin:12px 0 0!important;
+  text-align:center!important;
+  font-size:44px!important;
+  line-height:1.08!important;
+}
+
+
+/* Gate 16.7 R23 — native 8-Bit video-board binding.
+   Production media now populates the frozen .bl-8bit-video-board mode element
+   itself. No percentage-positioned production overlay is used. */
+#csrnProductionThemeLayout .package-8bit-approved .bl-8bit-video-board{
+  position:relative!important;
+  overflow:hidden!important;
+}
+
+#csrnProductionThemeLayout .package-8bit-approved .bl-8bit-video-board
+  > [data-video-mode="highlight"].csrn-production-native-video-mode{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  grid-template-columns:none!important;
+  padding:0!important;
+  margin:0!important;
+  overflow:hidden!important;
+  background:#000!important;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+}
+
+#csrnProductionThemeLayout .package-8bit-approved .bl-8bit-video-board
+  > [data-video-mode="highlight"] .csrn-production-highlight-video{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:100%!important;
+  max-height:100%!important;
+  margin:0!important;
+  padding:0!important;
+  object-fit:contain!important;
+  background:#000!important;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+}
+
+#csrnProductionThemeLayout .package-8bit-approved .bl-8bit-video-board
+  > [data-video-mode="highlight"] .csrn-production-highlight-fallback{
+  position:absolute!important;
+  inset:0!important;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+}
+
+#csrnProductionThemeLayout .package-8bit-approved .bl-8bit-video-board
+  > [data-video-mode="sponsor"].csrn-production-native-video-mode{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:18px!important;
+  padding:26px 42px!important;
+  margin:0!important;
+  overflow:hidden!important;
+  text-align:center!important;
+  background:#020305!important;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+}
+
+#csrnProductionThemeLayout .package-8bit-approved .bl-8bit-video-board
+  > [data-video-mode="sponsor"] .csrn-production-sponsor-media-wrap{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  min-height:0!important;
+  flex:1 1 auto!important;
+  margin:0 auto!important;
+}
+
+#csrnProductionThemeLayout .package-8bit-approved .bl-8bit-video-board
+  > [data-video-mode="sponsor"] .csrn-production-sponsor-asset{
+  display:block!important;
+  max-width:68%!important;
+  max-height:62%!important;
+  width:auto!important;
+  height:auto!important;
+  object-fit:contain!important;
+  margin:0 auto!important;
+}
+
+#csrnProductionThemeLayout .package-8bit-approved .bl-8bit-video-board
+  > [data-video-mode="sponsor"] .csrn-production-sponsor-copy{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  max-width:94%!important;
+  margin:0 auto!important;
+  text-align:center!important;
+}
+
+#csrnProductionThemeLayout .package-8bit-approved .bl-8bit-video-board
+  > [data-video-mode="sponsor"] .csrn-production-sponsor-copy small{
+  align-self:center!important;
+  width:100%!important;
+  margin:0 0 8px!important;
+  text-align:center!important;
+  font:900 44px/1 "Courier New",monospace!important;
+  letter-spacing:.06em!important;
+  color:var(--pixel-amber)!important;
+}
+
+#csrnProductionThemeLayout .package-8bit-approved .bl-8bit-video-board
+  > [data-video-mode="sponsor"] .csrn-production-sponsor-copy strong{
+  align-self:center!important;
+  width:100%!important;
+  margin:0!important;
+  text-align:center!important;
+  font:900 84px/.98 "Courier New",monospace!important;
+  text-transform:uppercase!important;
+  color:#fff!important;
+}
+
+#csrnProductionThemeLayout .package-8bit-approved .bl-8bit-video-board
+  > [data-video-mode="sponsor"] .csrn-production-sponsor-copy span{
+  align-self:center!important;
+  width:100%!important;
+  margin:10px 0 0!important;
+  text-align:center!important;
+  font:700 44px/1.08 "Courier New",monospace!important;
+  color:#d0d8df!important;
+}
+
+/* Old R20/R21 percentage overlays must never participate after R23. */
+#csrnProductionThemeLayout > .csrn-production-video-board-overlay{
+  display:none!important;
+  visibility:hidden!important;
+}
+
+
+/* Gate 16.8 R2 — native Friday Night Stadium production binding.
+   Production media populates the frozen .bl-fns-video-board mode element
+   directly. No secondary board or percentage-positioned overlay is created. */
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-video-board{
+  position:relative!important;
+  overflow:hidden!important;
+}
+
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-video-board
+  > [data-video-mode="highlight"].csrn-production-native-video-mode{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  grid-template-columns:none!important;
+  padding:0!important;
+  margin:0!important;
+  overflow:hidden!important;
+  background:#000!important;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+}
+
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-video-board
+  > [data-video-mode="highlight"] .csrn-production-highlight-video{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:100%!important;
+  max-height:100%!important;
+  margin:0!important;
+  padding:0!important;
+  object-fit:contain!important;
+  background:#000!important;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+}
+
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-video-board
+  > [data-video-mode="highlight"] .csrn-production-highlight-fallback{
+  position:absolute!important;
+  inset:0!important;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+}
+
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-video-board
+  > [data-video-mode="sponsor"].csrn-production-native-video-mode{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:18px!important;
+  padding:26px 44px!important;
+  margin:0!important;
+  overflow:hidden!important;
+  text-align:center!important;
+  background:#020305!important;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+}
+
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-video-board
+  > [data-video-mode="sponsor"] .csrn-production-sponsor-media-wrap{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  min-height:0!important;
+  flex:1 1 auto!important;
+  margin:0 auto!important;
+}
+
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-video-board
+  > [data-video-mode="sponsor"] .csrn-production-sponsor-asset{
+  display:block!important;
+  max-width:68%!important;
+  max-height:62%!important;
+  width:auto!important;
+  height:auto!important;
+  object-fit:contain!important;
+  margin:0 auto!important;
+}
+
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-video-board
+  > [data-video-mode="sponsor"] .csrn-production-sponsor-copy{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  max-width:94%!important;
+  margin:0 auto!important;
+  text-align:center!important;
+}
+
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-video-board
+  > [data-video-mode="sponsor"] .csrn-production-sponsor-copy small{
+  align-self:center!important;
+  width:100%!important;
+  margin:0 0 8px!important;
+  text-align:center!important;
+  font-size:44px!important;
+  line-height:1!important;
+  letter-spacing:.06em!important;
+}
+
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-video-board
+  > [data-video-mode="sponsor"] .csrn-production-sponsor-copy strong{
+  align-self:center!important;
+  width:100%!important;
+  margin:0!important;
+  text-align:center!important;
+  font-size:84px!important;
+  line-height:.98!important;
+  text-transform:uppercase!important;
+}
+
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-video-board
+  > [data-video-mode="sponsor"] .csrn-production-sponsor-copy span{
+  align-self:center!important;
+  width:100%!important;
+  margin:10px 0 0!important;
+  text-align:center!important;
+  font-size:44px!important;
+  line-height:1.08!important;
+}
+
+
+/* Gate 16.8 R3 — strict themed media ownership.
+   JS enforces this every poll; these rules are the CSS backstop. */
+html.csrn-production-theme-highlight-active body #playerHighlight,
+html.csrn-production-theme-highlight-active #playerHighlight{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+html.csrn-production-theme-sponsor-active body #sponsorSpotlight,
+html.csrn-production-theme-sponsor-active #sponsorSpotlight{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+
+/* Gate 16.9 R2 — Heritage Press native production binding. */
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-highlight-window.csrn-production-native-video-mode{
+  position:relative!important;
+  overflow:hidden!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:0!important;
+  background:#111!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-highlight-window .csrn-production-highlight-video{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  max-width:100%!important;
+  max-height:100%!important;
+  object-fit:contain!important;
+  background:#111!important;
+  filter:grayscale(1) contrast(1.05)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-sponsor-feature.csrn-production-native-video-mode.csrn-production-sponsor-board{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  padding:18px 24px!important;
+  gap:12px!important;
+  background:transparent!important;
+  color:var(--hp-ink)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-sponsor-feature .csrn-production-sponsor-media-wrap{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  flex:1 1 auto!important;
+  width:100%!important;
+  min-height:0!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-sponsor-feature .csrn-production-sponsor-asset{
+  max-width:62%!important;
+  max-height:58%!important;
+  width:auto!important;
+  height:auto!important;
+  object-fit:contain!important;
+  filter:grayscale(.85) contrast(1.12)!important;
+  mix-blend-mode:multiply;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-sponsor-feature .csrn-production-sponsor-copy{
+  width:100%!important;
+  max-width:94%!important;
+  text-align:center!important;
+  font-family:Georgia,"Times New Roman",serif!important;
+  color:var(--hp-ink)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-sponsor-feature .csrn-production-sponsor-copy small{
+  font:900 18px/1.05 Arial,Helvetica,sans-serif!important;
+  letter-spacing:.12em!important;
+  text-transform:uppercase!important;
+  color:var(--hp-rubric)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-sponsor-feature .csrn-production-sponsor-copy strong{
+  display:block!important;
+  margin-top:8px!important;
+  font:900 42px/.95 Georgia,"Times New Roman",serif!important;
+  text-transform:uppercase!important;
+  color:var(--hp-ink)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-sponsor-feature .csrn-production-sponsor-copy span{
+  display:block!important;
+  margin-top:10px!important;
+  font:700 22px/1.15 Georgia,"Times New Roman",serif!important;
+  color:var(--hp-ink)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-foundation{
+  display:flex!important;
+  flex-direction:column!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  padding:10px 14px!important;
+  border:3px double var(--hp-rule)!important;
+  background:
+    repeating-linear-gradient(0deg,rgba(24,18,12,.035) 0 1px,transparent 1px 4px),
+    rgba(244,234,211,.42)!important;
+  color:var(--hp-ink)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-kicker{
+  flex:0 0 auto;
+  padding-bottom:7px;
+  border-bottom:2px solid var(--hp-rule);
+  text-align:center;
+  font:900 17px/1 Arial,Helvetica,sans-serif;
+  letter-spacing:.18em;
+  color:var(--hp-rubric);
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-matchup{
+  flex:1 1 auto;
+  min-height:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 128px minmax(0,1fr);
+  align-items:center;
+  gap:14px;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-team{
+  min-width:0;
+  display:grid;
+  grid-template-columns:110px minmax(0,1fr);
+  align-items:center;
+  gap:16px;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-team.home{
+  grid-template-columns:minmax(0,1fr) 110px;
+  text-align:right;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-team.home .csrn-heritage-clash-mark{order:2}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-mark{
+  width:104px;height:104px;
+  border:5px double var(--hp-rule);
+  border-radius:50%;
+  display:grid;place-items:center;
+  overflow:hidden;
+  background:rgba(255,255,255,.22);
+  filter:grayscale(1) contrast(1.2);
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-mark img{
+  width:88%;height:88%;object-fit:contain;mix-blend-mode:multiply;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-mark strong{
+  font:900 42px/1 Georgia,"Times New Roman",serif;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-copy small{
+  display:block;font:900 12px/1 Arial,Helvetica,sans-serif;letter-spacing:.12em;color:var(--hp-rubric);
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-copy strong{
+  display:block;margin-top:6px;font:900 34px/.92 Georgia,"Times New Roman",serif;text-transform:uppercase;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-copy span{
+  display:block;margin-top:5px;font:700 18px/1 Georgia,"Times New Roman",serif;text-transform:uppercase;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-versus{
+  text-align:center;
+  border-inline:1px solid rgba(43,36,26,.55);
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-versus small,
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-versus span{
+  display:block;font:900 10px/1.2 Arial,Helvetica,sans-serif;letter-spacing:.08em;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-versus strong{
+  display:block;margin:6px 0;font:900 72px/.8 Georgia,"Times New Roman",serif;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-note{
+  flex:0 0 auto;
+  padding-top:7px;
+  border-top:1px solid var(--hp-rule);
+  text-align:center;
+  font:700 11px/1.1 Arial,Helvetica,sans-serif;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  opacity:.72;
+}
+
+
+/* Gate 16.9 R3 — Heritage native spotlight ownership + newspaper media finish. */
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-opening > .hp-player-feature.csrn-production-heritage-player-host{
+  display:grid!important;grid-template-columns:minmax(190px,34%) minmax(0,1fr)!important;
+  gap:22px!important;align-items:stretch!important;width:100%!important;height:100%!important;
+  min-height:0!important;padding:16px!important;margin:0!important;overflow:hidden!important;
+  background:transparent!important;color:var(--hp-ink)!important;transform:none!important;
+  transition:none!important;animation:none!important;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-player-photo{
+  min-width:0!important;min-height:0!important;display:flex!important;align-items:center!important;
+  justify-content:center!important;overflow:hidden!important;border:4px double var(--hp-rule)!important;
+  background:rgba(255,255,255,.22)!important;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-player-photo img{
+  display:block!important;width:100%!important;height:100%!important;object-fit:cover!important;
+  filter:grayscale(1) contrast(1.08) sepia(.06)!important;mix-blend-mode:multiply;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-player-number-fallback{
+  font:900 78px/.9 Georgia,"Times New Roman",serif!important;color:var(--hp-ink)!important;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-player-story{
+  min-width:0!important;display:flex!important;flex-direction:column!important;justify-content:center!important;
+  padding:8px 12px!important;border-block:3px double var(--hp-rule)!important;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-player-story small{
+  display:block!important;font:900 16px/1 Arial,Helvetica,sans-serif!important;letter-spacing:.13em!important;color:var(--hp-rubric)!important;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-player-story h2{
+  margin:10px 0 8px!important;font:900 48px/.92 Georgia,"Times New Roman",serif!important;text-transform:uppercase!important;color:var(--hp-ink)!important;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-player-story .subhead{
+  margin:0!important;font:700 20px/1.12 Georgia,"Times New Roman",serif!important;color:var(--hp-ink)!important;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-player-story .detail{
+  margin:14px 0 0!important;padding-top:10px!important;border-top:1px solid var(--hp-rule)!important;
+  font:700 22px/1.15 Georgia,"Times New Roman",serif!important;color:var(--hp-ink)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-highlight-window.csrn-production-heritage-highlight-window{
+  position:relative!important;width:100%!important;height:100%!important;min-height:0!important;
+  padding:0!important;margin:0!important;overflow:hidden!important;border:4px double var(--hp-rule)!important;
+  background:#15130f!important;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-highlight-window.csrn-production-heritage-highlight-window .csrn-production-highlight-video{
+  display:block!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;
+  object-fit:contain!important;margin:0!important;padding:0!important;background:#15130f!important;
+  filter:grayscale(1) contrast(1.06) sepia(.05)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-sponsor-feature.csrn-production-heritage-sponsor-host{
+  display:grid!important;grid-template-rows:minmax(0,1fr) auto!important;align-items:center!important;justify-items:center!important;
+  width:100%!important;height:100%!important;min-height:0!important;padding:18px 26px!important;
+  border:4px double var(--hp-rule)!important;background:repeating-linear-gradient(0deg,rgba(24,18,12,.035) 0 1px,transparent 1px 4px),rgba(244,234,211,.48)!important;
+  color:var(--hp-ink)!important;text-align:center!important;transform:none!important;transition:none!important;animation:none!important;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-sponsor-feature.csrn-production-heritage-sponsor-host .csrn-production-sponsor-media-wrap{
+  display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;min-height:0!important;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-sponsor-feature.csrn-production-heritage-sponsor-host .csrn-production-sponsor-asset{
+  display:block!important;max-width:58%!important;max-height:76%!important;width:auto!important;height:auto!important;object-fit:contain!important;
+  filter:none!important;mix-blend-mode:normal!important;background:transparent!important;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-sponsor-feature.csrn-production-heritage-sponsor-host .csrn-production-sponsor-copy{
+  width:100%!important;max-width:94%!important;padding-top:12px!important;border-top:2px solid var(--hp-rule)!important;text-align:center!important;color:var(--hp-ink)!important;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-sponsor-feature.csrn-production-heritage-sponsor-host .csrn-production-sponsor-copy small{
+  display:block!important;font:900 15px/1 Arial,Helvetica,sans-serif!important;letter-spacing:.14em!important;text-transform:uppercase!important;color:var(--hp-rubric)!important;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-sponsor-feature.csrn-production-heritage-sponsor-host .csrn-production-sponsor-copy strong{
+  display:block!important;margin-top:7px!important;font:900 38px/.95 Georgia,"Times New Roman",serif!important;text-transform:uppercase!important;color:var(--hp-ink)!important;
+}
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-sponsor-feature.csrn-production-heritage-sponsor-host .csrn-production-sponsor-copy span{
+  display:block!important;margin-top:8px!important;font:700 20px/1.12 Georgia,"Times New Roman",serif!important;color:var(--hp-ink)!important;
+}
+
+html.csrn-production-theme-player-active body #playerGraphic,
+html.csrn-production-theme-player-active #playerGraphic{
+  display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;
+}
+
+
+/* Gate 16.9 R4 — player spotlight layout and grayscale finish. */
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-opening > .hp-player-feature.csrn-production-heritage-player-host *{box-sizing:border-box!important;}
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-opening > .hp-player-feature.csrn-production-heritage-player-host .csrn-heritage-player-photo img{filter:grayscale(1) contrast(1.08) sepia(.06)!important;-webkit-filter:grayscale(1) contrast(1.08) sepia(.06)!important;mix-blend-mode:multiply!important;}
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-highlight-window.csrn-production-heritage-highlight-window .csrn-production-highlight-video{filter:grayscale(1) contrast(1.06) sepia(.05)!important;-webkit-filter:grayscale(1) contrast(1.06) sepia(.05)!important;}
+
+
+/* Gate 16.9 R6 — Heritage standard neutral football clash.
+   No team logos. Team identity is live typography only. */
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-live-opening.csrn-heritage-clash-feature{
+  display:grid!important;
+  grid-template-rows:auto auto minmax(0,1fr) auto!important;
+  gap:8px!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:0!important;
+  padding:12px 14px!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+  border:4px double var(--hp-rule)!important;
+  background:
+    repeating-linear-gradient(0deg,rgba(45,34,20,.022) 0 1px,transparent 1px 4px),
+    transparent!important;
+  color:var(--hp-ink)!important;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-heading{
+  text-align:center!important;
+  border-bottom:3px double var(--hp-rule)!important;
+  padding:0 0 7px!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-heading small{
+  display:block!important;
+  margin:0!important;
+  font:900 12px/1 Arial,Helvetica,sans-serif!important;
+  letter-spacing:.18em!important;
+  color:var(--hp-rubric)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-heading h2{
+  display:block!important;
+  margin:5px 0 0!important;
+  font:900 27px/.95 Georgia,"Times New Roman",serif!important;
+  letter-spacing:.035em!important;
+  text-transform:uppercase!important;
+  color:var(--hp-ink)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-identities{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 80px minmax(0,1fr)!important;
+  align-items:center!important;
+  gap:12px!important;
+  padding:2px 8px 5px!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-identity{
+  min-width:0!important;
+  text-align:center!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-identity small{
+  display:block!important;
+  margin:0!important;
+  font:900 10px/1 Arial,Helvetica,sans-serif!important;
+  letter-spacing:.13em!important;
+  color:var(--hp-rubric)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-identity strong{
+  display:block!important;
+  margin:4px 0 0!important;
+  font:900 25px/.94 Georgia,"Times New Roman",serif!important;
+  text-transform:uppercase!important;
+  color:var(--hp-ink)!important;
+  white-space:normal!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-identity span{
+  display:block!important;
+  margin:3px 0 0!important;
+  font:700 15px/1 Georgia,"Times New Roman",serif!important;
+  text-transform:uppercase!important;
+  color:var(--hp-ink)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-identity em{
+  display:block!important;
+  min-height:12px!important;
+  margin:5px 0 0!important;
+  font:700 italic 11px/1 Georgia,"Times New Roman",serif!important;
+  color:var(--hp-ink)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-vs{
+  display:grid!important;
+  place-items:center!important;
+  width:68px!important;
+  height:52px!important;
+  margin:auto!important;
+  border-block:3px double var(--hp-rule)!important;
+  font:900 37px/.9 Georgia,"Times New Roman",serif!important;
+  color:var(--hp-ink)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-artwork{
+  position:relative!important;
+  min-width:0!important;
+  min-height:0!important;
+  height:100%!important;
+  margin:0!important;
+  overflow:hidden!important;
+  border:3px solid var(--hp-rule)!important;
+  background:rgba(231,219,190,.3)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-artwork img{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  object-fit:cover!important;
+  object-position:center 48%!important;
+  filter:grayscale(1) sepia(.08) contrast(1.04)!important;
+  -webkit-filter:grayscale(1) sepia(.08) contrast(1.04)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-artwork figcaption{
+  position:absolute!important;
+  left:0!important;
+  right:0!important;
+  bottom:0!important;
+  padding:5px 8px!important;
+  border-top:1px solid var(--hp-rule)!important;
+  background:rgba(238,227,201,.86)!important;
+  text-align:center!important;
+  font:700 italic 10px/1.1 Georgia,"Times New Roman",serif!important;
+  letter-spacing:.025em!important;
+  color:var(--hp-ink)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-clash-meta{
+  display:flex!important;
+  justify-content:space-between!important;
+  align-items:center!important;
+  gap:12px!important;
+  padding-top:6px!important;
+  border-top:3px double var(--hp-rule)!important;
+  font:900 9px/1 Arial,Helvetica,sans-serif!important;
+  letter-spacing:.08em!important;
+  text-transform:uppercase!important;
+  color:var(--hp-ink)!important;
+}
+
+/* Rejected R2 clash placeholder elements are never rendered by R6. */
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .csrn-heritage-clash-feature .csrn-heritage-clash-mark,
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .csrn-heritage-clash-feature .csrn-heritage-clash-team,
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .csrn-heritage-clash-feature .csrn-heritage-clash-note{
+  display:none!important;
+}
+
+
+/* Gate 16.9 R6 R2 — Heritage clash becomes a full-video-box neutral art plate.
+   No team-name or record copy is rendered inside the clash. The adjacent Heritage
+   newspaper columns already carry matchup information. */
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-live-opening.csrn-heritage-clash-fullbleed{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+  padding:0!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+  border:4px double var(--hp-rule)!important;
+  background:
+    repeating-linear-gradient(0deg,rgba(45,34,20,.02) 0 1px,transparent 1px 4px),
+    transparent!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-live-opening.csrn-heritage-clash-fullbleed .csrn-heritage-clash-artwork{
+  position:relative!important;
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+  margin:0!important;
+  overflow:hidden!important;
+  border:0!important;
+  background:transparent!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-live-opening.csrn-heritage-clash-fullbleed .csrn-heritage-clash-artwork img{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  object-fit:cover!important;
+  object-position:center center!important;
+  filter:grayscale(1) sepia(.08) contrast(1.04)!important;
+  -webkit-filter:grayscale(1) sepia(.08) contrast(1.04)!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-live-opening.csrn-heritage-clash-fullbleed .csrn-heritage-clash-artwork figcaption,
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-live-opening.csrn-heritage-clash-fullbleed .csrn-heritage-clash-heading,
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-live-opening.csrn-heritage-clash-fullbleed .csrn-heritage-clash-identities,
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-live-opening.csrn-heritage-clash-fullbleed .csrn-heritage-clash-meta,
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-live-opening.csrn-heritage-clash-fullbleed .csrn-heritage-clash-vs,
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-live-opening.csrn-heritage-clash-fullbleed .csrn-heritage-clash-identity{
+  display:none!important;
+}
+
+
+/* Gate 16.9 R6 R4 — Clash geometry is identical to the accepted Heritage
+   Player Highlight media-frame contract. */
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-live-opening.csrn-heritage-clash-highlight-host{
+  display:flex!important;
+  align-items:stretch!important;
+  justify-content:stretch!important;
+  width:100%!important;
+  height:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+  padding:0!important;
+  margin:0!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+  background:transparent!important;
+  transform:none!important;
+  transition:none!important;
+  animation:none!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-live-opening.csrn-heritage-clash-highlight-host
+  > .hp-highlight-window.csrn-production-heritage-highlight-window.csrn-heritage-clash-artwork{
+  flex:1 1 auto!important;
+  width:100%!important;
+  height:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+  max-width:none!important;
+  max-height:none!important;
+  margin:0!important;
+  padding:0!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+}
+
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-live-opening.csrn-heritage-clash-highlight-host
+  .csrn-heritage-clash-image.csrn-production-highlight-video{
+  display:block!important;
+  width:100%!important;
+  height:100%!important;
+  min-width:100%!important;
+  min-height:100%!important;
+  max-width:none!important;
+  max-height:none!important;
+  margin:0!important;
+  padding:0!important;
+  object-fit:cover!important;
+  object-position:center center!important;
+  filter:grayscale(1) sepia(.08) contrast(1.04)!important;
+  -webkit-filter:grayscale(1) sepia(.08) contrast(1.04)!important;
+}
+
+
+/* Gate 16.9 R7 — Heritage Highlight Grayscale Finish.
+   Browser-side only: no transcoding or media duplication. */
+#csrnProductionThemeLayout.package-heritage-newspaper
+  .hp-highlight-window video,
+#csrnProductionThemeLayout.package-heritage-newspaper
+  .hp-highlight-window .csrn-production-highlight-video,
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-highlight-window video,
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-highlight-window .csrn-production-highlight-video{
+  filter:grayscale(100%) contrast(1.05)!important;
+  -webkit-filter:grayscale(100%) contrast(1.05)!important;
+}
+
+
+/* Gate 16.9 R8 — Heritage Newsprint Media Tone Finish.
+   Heritage Player, Highlight, and Clash media are rendered as ink-on-paper
+   rather than hard neutral grayscale. Sponsor artwork remains untouched. */
+
+/* Heritage paper backdrop for tonal blending. */
+#csrnProductionThemeLayout .package-heritage-newspaper .csrn-heritage-player-photo,
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-highlight-window.csrn-production-heritage-highlight-window,
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .csrn-heritage-clash-artwork{
+  background:var(--hp-paper)!important;
+}
+
+/* Player Spotlight — warm newsprint monochrome. */
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .csrn-heritage-player-photo img{
+  filter:grayscale(100%) sepia(18%) contrast(.96) brightness(1.02)!important;
+  -webkit-filter:grayscale(100%) sepia(18%) contrast(.96) brightness(1.02)!important;
+  mix-blend-mode:multiply!important;
+  opacity:.97!important;
+}
+
+/* Player Highlight — browser-side newsprint tone, no transcoding. */
+#csrnProductionThemeLayout.package-heritage-newspaper
+  .hp-highlight-window video,
+#csrnProductionThemeLayout.package-heritage-newspaper
+  .hp-highlight-window .csrn-production-highlight-video,
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-highlight-window video,
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-highlight-window .csrn-production-highlight-video{
+  filter:grayscale(100%) sepia(18%) contrast(.96) brightness(1.02)!important;
+  -webkit-filter:grayscale(100%) sepia(18%) contrast(.96) brightness(1.02)!important;
+  mix-blend-mode:multiply!important;
+  opacity:.97!important;
+}
+
+/* Clash — same ink-on-paper treatment as the other Heritage media. */
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .csrn-heritage-clash-image.csrn-production-highlight-video,
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .csrn-heritage-clash-artwork img{
+  filter:grayscale(100%) sepia(18%) contrast(.96) brightness(1.02)!important;
+  -webkit-filter:grayscale(100%) sepia(18%) contrast(.96) brightness(1.02)!important;
+  mix-blend-mode:multiply!important;
+  opacity:.97!important;
+}
+
+/* Sponsor explicitly stays color / normal blend. */
+#csrnProductionThemeLayout .package-heritage-newspaper
+  .hp-sponsor-feature.csrn-production-heritage-sponsor-host
+  .csrn-production-sponsor-asset{
+  filter:none!important;
+  -webkit-filter:none!important;
+  mix-blend-mode:normal!important;
+  opacity:1!important;
+}
+
+
+/* Gate 16.9 R9 — Heritage Readability Finish.
+   Increase Gridiron Dispatch and Sports Wire legibility for OBS/social playback. */
+#csrnProductionThemeLayout.package-heritage-newspaper .hp-dispatch,
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-dispatch{
+  padding:0 2px 6px!important;
+  gap:4px!important;
+}
+#csrnProductionThemeLayout.package-heritage-newspaper .hp-dispatch>small,
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-dispatch>small{
+  display:block!important;
+  font:900 15px/1.08 Arial,Helvetica,sans-serif!important;
+  letter-spacing:.12em!important;
+  text-transform:uppercase!important;
+}
+#csrnProductionThemeLayout.package-heritage-newspaper .hp-dispatch>strong,
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-dispatch>strong{
+  display:block!important;
+  font:900 24px/1.02 Georgia,"Times New Roman",serif!important;
+  text-transform:uppercase!important;
+}
+#csrnProductionThemeLayout.package-heritage-newspaper .hp-dispatch>p,
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-dispatch>p{
+  margin:4px 0 0!important;
+  font:700 18px/1.22 Georgia,"Times New Roman",serif!important;
+}
+#csrnProductionThemeLayout.package-heritage-newspaper .hp-dispatch footer,
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-dispatch footer{
+  font:900 12px/1 Arial,Helvetica,sans-serif!important;
+  letter-spacing:.12em!important;
+  text-transform:uppercase!important;
+}
+#csrnProductionThemeLayout.package-heritage-newspaper .hp-footer,
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-footer{
+  min-height:100%!important;
+  padding-block:4px!important;
+  align-items:center!important;
+}
+#csrnProductionThemeLayout.package-heritage-newspaper .hp-wire-title,
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-wire-title{
+  font:1000 16px/1 Arial,Helvetica,sans-serif!important;
+  letter-spacing:2.2px!important;
+}
+#csrnProductionThemeLayout.package-heritage-newspaper .hp-wire-copy,
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-wire-copy{
+  display:flex!important;
+  align-items:center!important;
+  padding:4px 14px!important;
+}
+#csrnProductionThemeLayout.package-heritage-newspaper .hp-wire-copy .csrn-theme-ticker-viewport,
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-wire-copy .csrn-theme-ticker-viewport{
+  font:900 16px/1.04 Arial,Helvetica,sans-serif!important;
+  letter-spacing:.55px!important;
+}
+#csrnProductionThemeLayout.package-heritage-newspaper .hp-page-id,
+#csrnProductionThemeLayout .package-heritage-newspaper .hp-page-id{
+  font:900 13px/1 Arial,Helvetica,sans-serif!important;
+  letter-spacing:1.2px!important;
+}
+
+
+/* Gate 17.0 R2 — 8-Bit Lower Data Readability Polish.
+   Social/mobile legibility pass for the four production-overridden football
+   data values only: Clock, Quarter, Down, and To Go. Possession, Ball On,
+   tower scores, dynamic clash art, and frozen engine geometry are untouched. */
+#csrnProductionThemeLayout .package-8bit-approved .csrn-production-led-override,
+#csrnProductionThemeLayout.package-8bit-approved .csrn-production-led-override{
+  text-shadow:0 0 1px #ffb000,0 0 4px #ffb000!important;
+}
+#csrnProductionThemeLayout .package-8bit-approved .bl-8bit-clock-led.csrn-production-led-override,
+#csrnProductionThemeLayout.package-8bit-approved .bl-8bit-clock-led.csrn-production-led-override{
+  font-size:66px!important;
+  line-height:.92!important;
+  letter-spacing:.045em!important;
+}
+#csrnProductionThemeLayout .package-8bit-approved .bl-8bit-small-led.csrn-production-led-override,
+#csrnProductionThemeLayout.package-8bit-approved .bl-8bit-small-led.csrn-production-led-override{
+  font-size:57px!important;
+  line-height:.92!important;
+  letter-spacing:.045em!important;
+}
+
+/* R18 R3 next-push overlay polish: preserve Stadium after refresh and match frozen engine fit. */
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-team-tower>.bl-fns-logo,
+#csrnProductionThemeLayout.package-stadium-approved .bl-fns-team-tower>.bl-fns-logo{
+  position:relative!important;
+  padding:12px!important;
+  box-sizing:border-box!important;
+}
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-team-tower>.bl-fns-logo img,
+#csrnProductionThemeLayout.package-stadium-approved .bl-fns-team-tower>.bl-fns-logo img{
+  display:block!important;
+  position:absolute!important;
+  inset:12%!important;
+  width:76%!important;
+  height:76%!important;
+  max-width:none!important;
+  max-height:none!important;
+  padding:0!important;
+  object-fit:contain!important;
+  object-position:center center!important;
+}
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-football-bottom .bl-fns-small-led,
+#csrnProductionThemeLayout.package-stadium-approved .bl-fns-football-bottom .bl-fns-small-led,
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-primary-clock .bl-fns-clock-led,
+#csrnProductionThemeLayout.package-stadium-approved .bl-fns-primary-clock .bl-fns-clock-led,
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-clock-led.csrn-production-led-override,
+#csrnProductionThemeLayout.package-stadium-approved .bl-fns-clock-led.csrn-production-led-override,
+#csrnProductionThemeLayout .package-stadium-approved .bl-fns-small-led.csrn-production-led-override,
+#csrnProductionThemeLayout.package-stadium-approved .bl-fns-small-led.csrn-production-led-override{
+  color:var(--fns-home-display)!important;
+  filter:drop-shadow(0 0 4px color-mix(in srgb,var(--fns-home-display) 70%,transparent))!important;
+  text-shadow:none!important;
+}

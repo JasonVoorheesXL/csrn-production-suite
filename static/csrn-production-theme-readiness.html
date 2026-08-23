@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CSRN Production Theme Readiness Probe</title>
+<link rel="stylesheet" href="/static/csrn-broadcast-layout-engine.css?v=16.3-r2">
+<link rel="stylesheet" href="/static/csrn-friday-night-stadium-engine.css?v=16.3-r2">
+<link rel="stylesheet" href="/static/csrn-eight-bit-gameday-engine.css?v=16.3-r2">
+<link rel="stylesheet" href="/static/csrn-heritage-press-engine.css?v=16.3-r2">
+<link rel="stylesheet" href="/static/csrn-neon-r2-engine.css?v=16.3-r2">
+<link rel="stylesheet" href="/static/csrn-neon-softball-r42-driver.css?v=16.3-r2">
+<link rel="stylesheet" href="/static/csrn-neon-baseball-r43-driver.css?v=16.3-r2">
+<style>
+html,body{margin:0;min-height:100%;background:#0d1016;color:#f4f6f8;font-family:Arial,Helvetica,sans-serif}
+main{max-width:960px;margin:0 auto;padding:32px}
+h1{font-size:28px;margin:0 0 10px}
+p{color:#c8ced8}
+table{width:100%;border-collapse:collapse;margin-top:24px;background:#161b24}
+th,td{padding:12px;border:1px solid #303846;text-align:left}
+[data-ready="true"]{color:#86d993}
+[data-ready="false"]{color:#ff9b9b}
+code{color:#d7e5ff}
+</style>
+</head>
+<body>
+<main>
+<h1>Production Theme Engine Readiness Probe</h1>
+<p>This isolated page validates engine loading without entering or modifying the live OBS overlay.</p>
+<p>Overall status: <strong id="overall" data-ready="false">Checking…</strong></p>
+<table>
+<thead><tr><th>Package</th><th>Global</th><th>Render entry</th><th>Ready</th></tr></thead>
+<tbody id="results"></tbody>
+</table>
+<pre id="json" aria-live="polite"></pre>
+</main>
+
+<script src="/static/csrn-broadcast-layout-engine.js?v=16.3-r2"></script>
+<script src="/static/csrn-friday-night-stadium-engine.js?v=16.3-r2"></script>
+<script src="/static/csrn-eight-bit-gameday-engine.js?v=16.3-r2"></script>
+<script src="/static/csrn-heritage-press-engine.js?v=16.3-r2"></script>
+<script src="/static/csrn-neon-r2-engine.js?v=16.3-r2"></script>
+<script src="/static/csrn-neon-softball-r42-driver.js?v=16.3-r2"></script>
+<script src="/static/csrn-neon-baseball-r43-driver.js?v=16.3-r2"></script>
+<script src="/static/csrn-production-theme-readiness-probe.js?v=16.3-r2"></script>
+</body>
+</html>

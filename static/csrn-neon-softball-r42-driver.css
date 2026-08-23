@@ -1,0 +1,8 @@
+/* Gate 15.3 R42A Neon softball template-driver integration. */
+.n2-softball-r42{position:absolute;inset:0;pointer-events:none;background-repeat:no-repeat;background-size:cover;background-position:center 50%}
+.package-neon-r2[data-sport="softball"] .n2-softball-r42.home-color{z-index:1;background-color:var(--n2-left-raw);-webkit-mask:url('/static/neon-r2/softball-r42-home-jersey-color-slot.png') center 50%/cover no-repeat;mask:url('/static/neon-r2/softball-r42-home-jersey-color-slot.png') center 50%/cover no-repeat}
+.package-neon-r2[data-sport="softball"] .n2-softball-r42.visitor-color{z-index:2;background-color:var(--n2-right-raw);-webkit-mask:url('/static/neon-r2/softball-r42-visitor-jersey-color-slot.png') center 50%/cover no-repeat;mask:url('/static/neon-r2/softball-r42-visitor-jersey-color-slot.png') center 50%/cover no-repeat}
+.package-neon-r2[data-sport="softball"] .n2-softball-r42.scene{z-index:3;background-image:url('/static/neon-r2/softball-r42-scene-with-jersey-holes.png')}
+.package-neon-r2[data-sport="softball"] .n2-softball-r42.home-texture{z-index:4;background-image:url('/static/neon-r2/softball-r42-home-jersey-texture-luminosity.png');mix-blend-mode:luminosity}
+.package-neon-r2[data-sport="softball"] .n2-softball-r42.visitor-texture{z-index:5;background-image:url('/static/neon-r2/softball-r42-visitor-jersey-texture-luminosity.png');mix-blend-mode:luminosity}
+.package-neon-r2[data-sport="softball"] .n2-opening:after{z-index:6;opacity:.18}

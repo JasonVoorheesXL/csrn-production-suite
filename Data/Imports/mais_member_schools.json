@@ -1,0 +1,1621 @@
+{
+  "association": "MAIS",
+  "source": {
+    "provider": "MAIS Member School Directory",
+    "url": "https://home.msais.org/test2/directory_demo.php"
+  },
+  "schools": [
+    {
+      "official_name": "Adams Cty Chr. Sch",
+      "broadcast_name": "Adams Cty Chr. Sch",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Amite School Center",
+      "broadcast_name": "Amite School Center",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Annunciation Catholic Sch",
+      "broadcast_name": "Annunciation Catholic Sch",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Bayou Academy",
+      "broadcast_name": "Bayou Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Benedict Day School",
+      "broadcast_name": "Benedict Day School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Ben's Ford Christian",
+      "broadcast_name": "Ben's Ford Christian",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Benton Academy",
+      "broadcast_name": "Benton Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Bowling Green School",
+      "broadcast_name": "Bowling Green School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Briarfield Academy",
+      "broadcast_name": "Briarfield Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Brookhaven Academy",
+      "broadcast_name": "Brookhaven Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "By Faith Academy",
+      "broadcast_name": "By Faith Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Calhoun Academy",
+      "broadcast_name": "Calhoun Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Canton Academy",
+      "broadcast_name": "Canton Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Carroll Academy",
+      "broadcast_name": "Carroll Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Cathedral Catholic School",
+      "broadcast_name": "Cathedral Catholic School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Central Hinds Academy",
+      "broadcast_name": "Central Hinds Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Central Holmes Chr.",
+      "broadcast_name": "Central Holmes Chr.",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Central School",
+      "broadcast_name": "Central School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Centreville Academy",
+      "broadcast_name": "Centreville Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Christ Covenant School",
+      "broadcast_name": "Christ Covenant School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Christian Collegiate",
+      "broadcast_name": "Christian Collegiate",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Claiborne Academy",
+      "broadcast_name": "Claiborne Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Clinton Chr. Academy",
+      "broadcast_name": "Clinton Chr. Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Columbia Academy",
+      "broadcast_name": "Columbia Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Columbus Chr. Academy",
+      "broadcast_name": "Columbus Chr. Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Copiah Academy",
+      "broadcast_name": "Copiah Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Deer Creek School",
+      "broadcast_name": "Deer Creek School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Delta Academy",
+      "broadcast_name": "Delta Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Delta Streets Academy",
+      "broadcast_name": "Delta Streets Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Desoto School",
+      "broadcast_name": "Desoto School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Discovery Chr. School",
+      "broadcast_name": "Discovery Chr. School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "East Rankin Academy",
+      "broadcast_name": "East Rankin Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Emmanuel Chr. School",
+      "broadcast_name": "Emmanuel Chr. School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "First Pres. Day School",
+      "broadcast_name": "First Pres. Day School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Franklin Academy",
+      "broadcast_name": "Franklin Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Gateway Chr. - Wiggins",
+      "broadcast_name": "Gateway Chr. - Wiggins",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Gateway Chr. Academy",
+      "broadcast_name": "Gateway Chr. Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Grace Community School",
+      "broadcast_name": "Grace Community School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Greater Praise Chr.",
+      "broadcast_name": "Greater Praise Chr.",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Greenville Chr. School",
+      "broadcast_name": "Greenville Chr. School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Hartfield Academy",
+      "broadcast_name": "Hartfield Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Hebron Chr. School",
+      "broadcast_name": "Hebron Chr. School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Heritage Academy",
+      "broadcast_name": "Heritage Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Heritage Chr. Academy",
+      "broadcast_name": "Heritage Chr. Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Hillcrest Chr. School",
+      "broadcast_name": "Hillcrest Chr. School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Holy Family School",
+      "broadcast_name": "Holy Family School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Hope Academy",
+      "broadcast_name": "Hope Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Humphreys Academy",
+      "broadcast_name": "Humphreys Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Indianola Academy",
+      "broadcast_name": "Indianola Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Innova Preparatory School",
+      "broadcast_name": "Innova Preparatory School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Jackson Academy",
+      "broadcast_name": "Jackson Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Jackson Prep",
+      "broadcast_name": "Jackson Prep",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Kemper Academy",
+      "broadcast_name": "Kemper Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Kirk Academy",
+      "broadcast_name": "Kirk Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Lamar Chr. School",
+      "broadcast_name": "Lamar Chr. School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Lamar School",
+      "broadcast_name": "Lamar School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Laurel Chr. School",
+      "broadcast_name": "Laurel Chr. School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Leake Academy",
+      "broadcast_name": "Leake Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Learning Tree Chr.",
+      "broadcast_name": "Learning Tree Chr.",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Lee Academy-AR",
+      "broadcast_name": "Lee Academy-AR",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Lee Academy-MS",
+      "broadcast_name": "Lee Academy-MS",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Leflore Chr. School",
+      "broadcast_name": "Leflore Chr. School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "MRA",
+      "broadcast_name": "MRA",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Magnolia Hts. School",
+      "broadcast_name": "Magnolia Hts. School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Manchester Academy",
+      "broadcast_name": "Manchester Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Marshall Academy",
+      "broadcast_name": "Marshall Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Marvell Academy",
+      "broadcast_name": "Marvell Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Mercy Chr. Academy",
+      "broadcast_name": "Mercy Chr. Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Mid-South Gifted Academy",
+      "broadcast_name": "Mid-South Gifted Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Mother Goose Chr. Academy",
+      "broadcast_name": "Mother Goose Chr. Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "MSAISnet",
+      "broadcast_name": "MSAISnet",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Mt. Salus Chr. School",
+      "broadcast_name": "Mt. Salus Chr. School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "New Jerusalem Chr.",
+      "broadcast_name": "New Jerusalem Chr.",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Newton County Academy",
+      "broadcast_name": "Newton County Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "North Delta School",
+      "broadcast_name": "North Delta School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "North Sunflower Academy",
+      "broadcast_name": "North Sunflower Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Northeast Baptist School",
+      "broadcast_name": "Northeast Baptist School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Oak Forest Academy",
+      "broadcast_name": "Oak Forest Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Oak Hill Academy",
+      "broadcast_name": "Oak Hill Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Park Place Chr. Academy",
+      "broadcast_name": "Park Place Chr. Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Parklane Academy",
+      "broadcast_name": "Parklane Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Pearl Academy",
+      "broadcast_name": "Pearl Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Pillow Academy",
+      "broadcast_name": "Pillow Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Porters Chapel Academy",
+      "broadcast_name": "Porters Chapel Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Prairie View Academy",
+      "broadcast_name": "Prairie View Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Prentiss Chr. School",
+      "broadcast_name": "Prentiss Chr. School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Presbyterian Chr. School",
+      "broadcast_name": "Presbyterian Chr. School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "PURE Academy",
+      "broadcast_name": "PURE Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Reading Nook Academy",
+      "broadcast_name": "Reading Nook Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Rebul Academy",
+      "broadcast_name": "Rebul Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Regents School of Oxford",
+      "broadcast_name": "Regents School of Oxford",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "River Oaks School",
+      "broadcast_name": "River Oaks School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Riverdale Academy",
+      "broadcast_name": "Riverdale Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Riverfield Academy",
+      "broadcast_name": "Riverfield Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Rossville Chr. Academy",
+      "broadcast_name": "Rossville Chr. Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Sacred Heart School",
+      "broadcast_name": "Sacred Heart School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Sage Chr. Academy",
+      "broadcast_name": "Sage Chr. Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Silliman Institute",
+      "broadcast_name": "Silliman Institute",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Simpson Academy",
+      "broadcast_name": "Simpson Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "St. Anthony Catholic",
+      "broadcast_name": "St. Anthony Catholic",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "St. Elizabeth Catholic",
+      "broadcast_name": "St. Elizabeth Catholic",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "St. Joseph Catholic - Mad",
+      "broadcast_name": "St. Joseph Catholic - Mad",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "St. Patrick Catholic",
+      "broadcast_name": "St. Patrick Catholic",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "St. Richard School",
+      "broadcast_name": "St. Richard School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Starkville Academy",
+      "broadcast_name": "Starkville Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Sumrall Baptist Kind",
+      "broadcast_name": "Sumrall Baptist Kind",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Sylva Bay Academy",
+      "broadcast_name": "Sylva Bay Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Tallulah Academy",
+      "broadcast_name": "Tallulah Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Tensas Academy",
+      "broadcast_name": "Tensas Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "The 3-D School",
+      "broadcast_name": "The 3-D School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "The Redeemers School",
+      "broadcast_name": "The Redeemers School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "The Wkday Preschool",
+      "broadcast_name": "The Wkday Preschool",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Tri-County Academy",
+      "broadcast_name": "Tri-County Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Tunica Academy",
+      "broadcast_name": "Tunica Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Union Chr. Academy",
+      "broadcast_name": "Union Chr. Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "United Chr. Academy",
+      "broadcast_name": "United Chr. Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Vicksburg Catholic School",
+      "broadcast_name": "Vicksburg Catholic School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Washington School",
+      "broadcast_name": "Washington School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Wayne Academy",
+      "broadcast_name": "Wayne Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "West Memphis Chr. School",
+      "broadcast_name": "West Memphis Chr. School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "WCCA",
+      "broadcast_name": "WCCA",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Winona Chr. School",
+      "broadcast_name": "Winona Chr. School",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Winston Academy",
+      "broadcast_name": "Winston Academy",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    },
+    {
+      "official_name": "Woodlawn Prep",
+      "broadcast_name": "Woodlawn Prep",
+      "state": "MS",
+      "classification": "",
+      "region": "",
+      "source_data": {
+        "association": "MAIS",
+        "provider": "MAIS Member School Directory",
+        "source_url": "https://home.msais.org/test2/directory_demo.php",
+        "branding_status": "not_provided_by_directory"
+      }
+    }
+  ]
+}

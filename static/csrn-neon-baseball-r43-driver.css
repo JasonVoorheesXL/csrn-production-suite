@@ -1,0 +1,8 @@
+/* Gate 15.3 R43A Neon baseball template-driver integration. */
+.n2-baseball-r43{position:absolute;inset:0;pointer-events:none;background-repeat:no-repeat;background-size:cover;background-position:center 50%}
+.package-neon-r2[data-sport="baseball"] .n2-baseball-r43.home-color{z-index:1;background-color:var(--n2-left-raw);-webkit-mask:url('/static/neon-r2/baseball-r43-home-jersey-color-slot.png') center 50%/cover no-repeat;mask:url('/static/neon-r2/baseball-r43-home-jersey-color-slot.png') center 50%/cover no-repeat}
+.package-neon-r2[data-sport="baseball"] .n2-baseball-r43.visitor-color{z-index:2;background-color:var(--n2-right-raw);-webkit-mask:url('/static/neon-r2/baseball-r43-visitor-jersey-color-slot.png') center 50%/cover no-repeat;mask:url('/static/neon-r2/baseball-r43-visitor-jersey-color-slot.png') center 50%/cover no-repeat}
+.package-neon-r2[data-sport="baseball"] .n2-baseball-r43.scene{z-index:3;background-image:url('/static/neon-r2/baseball-r43-scene-with-jersey-holes.png')}
+.package-neon-r2[data-sport="baseball"] .n2-baseball-r43.home-texture{z-index:4;background-image:url('/static/neon-r2/baseball-r43-home-jersey-texture-luminosity.png');mix-blend-mode:luminosity}
+.package-neon-r2[data-sport="baseball"] .n2-baseball-r43.visitor-texture{z-index:5;background-image:url('/static/neon-r2/baseball-r43-visitor-jersey-texture-luminosity.png');mix-blend-mode:luminosity}
+.package-neon-r2[data-sport="baseball"] .n2-opening:after{z-index:6;opacity:.18}
