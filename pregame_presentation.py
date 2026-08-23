@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import sys
 import threading
 import time
 import inspect
@@ -18,6 +19,15 @@ from flask import Blueprint, Response, jsonify, request
 _LOCK = threading.RLock()
 _INSTALLED = False
 _NWS_CACHE: dict[str, Any] = {"key": "", "at": 0, "periods": []}
+
+
+def _csrn_app() -> Any:
+    for name in ("__main__", "app"):
+        module = sys.modules.get(name)
+        if module is not None and hasattr(module, "load_state"):
+            return module
+    import app as csrn_app
+    return csrn_app
 
 
 def _runtime_file() -> Path:
@@ -61,13 +71,13 @@ def _default_settings() -> dict[str, Any]:
 
 
 def _state() -> dict[str, Any]:
-    import app as csrn_app
+    csrn_app = _csrn_app()
     raw = csrn_app.load_state()
     return raw if isinstance(raw, dict) else {}
 
 
 def _broadcast_records() -> list[dict[str, Any]]:
-    import app as csrn_app
+    csrn_app = _csrn_app()
     try:
         result = csrn_app.get_broadcast_service().list_records()
         rows = result.data.get("broadcasts", []) if getattr(result, "ok", False) else []
@@ -182,7 +192,7 @@ def _venue_coordinates(weather: dict[str, Any], active: dict[str, Any], state: d
         candidates.append(venue)
     candidates.extend([active, state])
 
-    import app as csrn_app
+    csrn_app = _csrn_app()
     venue_row: dict[str, Any] = {}
     try:
         venue_id = str(active.get("venue_id") or state.get("venue_id") or "").strip()
@@ -374,7 +384,7 @@ def _weather(active: dict[str, Any], state: dict[str, Any], game: dict[str, Any]
 
 
 def _config() -> dict[str, Any]:
-    import app as csrn_app
+    csrn_app = _csrn_app()
     try:
         value = csrn_app.load_config()
         return value if isinstance(value, dict) else {}
@@ -383,7 +393,7 @@ def _config() -> dict[str, Any]:
 
 
 def _schools() -> list[dict[str, Any]]:
-    import app as csrn_app
+    csrn_app = _csrn_app()
     try:
         rows = csrn_app.load_schools()
         return rows if isinstance(rows, list) else []
@@ -730,7 +740,7 @@ def install_pregame_presentation(app: Any) -> None:
     if _INSTALLED or getattr(app, "_csrn_pregame_presentation_installed", False):
         return
 
-    import app as csrn_app
+    csrn_app = _csrn_app()
     require_auth = getattr(csrn_app, "require_auth", lambda fn: fn)
 
     bp = Blueprint("pregame_presentation", __name__)
