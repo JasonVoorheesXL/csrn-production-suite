@@ -2621,9 +2621,8 @@ function playerImage(player) {
 
 function playerDisplayName(player) {
   const name = textValue(player.name, "Player");
-  const last = name.trim().split(/\s+/).slice(-1)[0] || name;
   const number = textValue(player.number, "");
-  return number ? `#${number} ${last}` : last;
+  return name.trim() && name.trim() !== number ? name.trim() : (number ? `#${number}` : "Player");
 }
 
 function leaderCandidate(player, title, value, label, detail, weight) {
