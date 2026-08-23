@@ -30,6 +30,7 @@ def test_collegiate_football_uses_field_position_panel_not_legacy_down_box():
     assert "bl-college-score-clock-row" in js
     assert 'data-bind="game.possessionLogo"' in js
     assert 'data-bind="game.possessionText"' in js
+    assert 'data-college-rail="${side}"' in js
     assert "bl-college-endzone" in js
     assert "bl-college-five-yard-lines" in js
     assert "bl-college-hashmarks" in js
@@ -40,7 +41,8 @@ def test_collegiate_football_uses_field_position_panel_not_legacy_down_box():
     assert "function collegiateStage" in js
     assert "bl-collegiate-tech" in css
     assert "bl-college-score-clock-row" in css
-    assert "bl-college-team-glass" in css
+    assert "bl-college-rail-card" in css
+    assert "bl-player-leader.has-photo" in css
     assert "bl-college-endzone" in css
     assert "bl-college-five-yard-lines" in css
     assert "bl-college-hashmarks" in css

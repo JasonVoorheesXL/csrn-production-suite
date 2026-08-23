@@ -628,8 +628,21 @@
   function collegiateTeamPanel(team, side) {
     return `<section class="bl-college-team bl-${side}" data-module="${side}.team">
       <div class="bl-college-side-label">${side === "home" ? "HOME" : "VISITOR"}</div>
-      <div class="bl-college-team-glass" aria-hidden="true">
-        <i></i><i></i><i></i>
+      <div class="bl-college-rail" data-college-rail="${side}">
+        <article class="bl-college-rail-card bl-team-snapshot">
+          <span>Team Snapshot</span>
+          <div class="bl-college-stat-grid">
+            <b><small>YDS</small><strong data-stat="total_yards">-</strong></b>
+            <b><small>1D</small><strong data-stat="first_downs">-</strong></b>
+            <b><small>TO</small><strong data-stat="turnovers_gained">-</strong></b>
+          </div>
+          <em data-stat="rush_pass">R/P - / -</em>
+        </article>
+        <article class="bl-college-rail-card bl-player-leader is-empty">
+          <span>Player Leader</span>
+          <strong data-player="name">Awaiting Stats</strong>
+          <em data-player="line">Live leaders rotate here</em>
+        </article>
       </div>
       <div class="bl-college-identity" data-module="${side}.identity">
         <small data-bind="${side}.mascot">${esc(team.mascot)}</small>

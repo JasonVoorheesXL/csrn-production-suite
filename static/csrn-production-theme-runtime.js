@@ -28,6 +28,7 @@
 const PUBLIC_STATE_URL = "/api/themes/public-state";
 const RUNTIME_STATE_URL = "/api/runtime-state";
 const CAPTION_STATE_URL = "/api/captions/overlay-state";
+const STATISTICS_URL = "/api/statistics";
 const CAPTION_STICKY_MS = 2800;
 const SCORE_HOST_ID = "csrnProductionThemeHost";
 const SCORE_LAYOUT_ID = "csrnProductionThemeLayout";
@@ -102,6 +103,7 @@ let renderSignature = "";
 let tickerRenderSignature = "";
 let tickerBroadcastId = "";
 const tickerKnownTransientKeys = new Set();
+const collegiateStatisticsCache = {broadcastId:"", fetchedAt:0, data:null, promise:null};
 /* CSRN_THEME_SIGNATURE_DIFF_DIAGNOSTIC_R4
    Temporary diagnostic only. Logs exactly which destructive-render signature
    fields changed between polls. Does not alter render behavior.
@@ -1453,6 +1455,7 @@ function patchLiveGameState(runtime = lastRuntimeForClockPatch) {
 
   applyFootballBoardOverrides(root, currentAlias, runtime);
   patchThemeScoresAndPossession(root, currentAlias, runtime);
+  patchCollegiateRails(root, runtime, collegiateStatisticsCache.data);
 }
 
 function patchActiveFootballBoard(runtime = lastRuntimeForClockPatch) {
@@ -2580,6 +2583,130 @@ async function fetchJson(url) {
   return response.json();
 }
 
+async function fetchCollegiateStatistics(runtime, alias) {
+  if (alias !== "collegiate_traditional") return null;
+  const broadcastId = textValue(runtime?.broadcast_id, "");
+  if (!broadcastId) return null;
+  const now = Date.now();
+  if (
+    collegiateStatisticsCache.data &&
+    collegiateStatisticsCache.broadcastId === broadcastId &&
+    now - collegiateStatisticsCache.fetchedAt < 5000
+  ) {
+    return collegiateStatisticsCache.data;
+  }
+  if (collegiateStatisticsCache.promise) return collegiateStatisticsCache.promise;
+  collegiateStatisticsCache.promise = fetchJson(STATISTICS_URL)
+    .then(data => {
+      collegiateStatisticsCache.broadcastId = broadcastId;
+      collegiateStatisticsCache.fetchedAt = Date.now();
+      collegiateStatisticsCache.data = data;
+      return data;
+    })
+    .catch(() => collegiateStatisticsCache.data)
+    .finally(() => {
+      collegiateStatisticsCache.promise = null;
+    });
+  return collegiateStatisticsCache.promise;
+}
+
+function statDisplay(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? String(numeric) : "-";
+}
+
+function playerImage(player) {
+  return textValue(player.headshot, player.photo, player.image, player.image_url, player.media_url);
+}
+
+function playerDisplayName(player) {
+  const name = textValue(player.name, "Player");
+  const last = name.trim().split(/\s+/).slice(-1)[0] || name;
+  const number = textValue(player.number, "");
+  return number ? `#${number} ${last}` : last;
+}
+
+function leaderCandidate(player, title, value, label, detail, weight) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return null;
+  return {
+    title,
+    name: playerDisplayName(player),
+    line: `${numeric} ${label}`,
+    detail,
+    image: playerImage(player),
+    weight: numeric * weight
+  };
+}
+
+function collegiatePlayerLeaders(statistics, side) {
+  const players = Array.isArray(statistics?.players) ? statistics.players : [];
+  const candidates = [];
+  players
+    .filter(player => String(player.team || "").toLowerCase() === side)
+    .forEach(player => {
+      [
+        leaderCandidate(player, "QB Leader", player.passing_yards, "PASS YDS", Number(player.passing_touchdowns || 0) > 0 ? `${player.passing_touchdowns} PASS TD` : `${statDisplay(player.completions)}/${statDisplay(player.pass_attempts)}`, 1),
+        leaderCandidate(player, "Rush Leader", player.rushing_yards, "RUSH YDS", Number(player.rushing_touchdowns || 0) > 0 ? `${player.rushing_touchdowns} RUSH TD` : `${statDisplay(player.rushing_attempts)} ATT`, 2.2),
+        leaderCandidate(player, "Receiving Leader", player.receiving_yards, "REC YDS", Number(player.receptions || 0) > 0 ? `${player.receptions} REC` : "", 2.1),
+        leaderCandidate(player, "Defensive Leader", player.sacks, "SACKS", "", 45),
+        leaderCandidate(player, "Takeaway Leader", player.interceptions, "INT", "", 55),
+        leaderCandidate(player, "Takeaway Leader", player.fumble_recoveries, "FR", "", 45),
+        leaderCandidate(player, "Scoring Leader", player.points, "PTS", Number(player.touchdowns || 0) > 0 ? `${player.touchdowns} TD` : "", 8)
+      ].forEach(candidate => {
+        if (candidate) candidates.push(candidate);
+      });
+    });
+  return candidates.sort((a, b) => b.weight - a.weight);
+}
+
+function patchCollegiateRails(root, runtime, statistics) {
+  if (currentAlias !== "collegiate_traditional" || !root || !statistics) return;
+  ["visitor", "home"].forEach((side, sideIndex) => {
+    const rail = root.querySelector(`[data-college-rail="${side}"]`);
+    if (!rail) return;
+    const team = objectValue(statistics.teams?.[side]);
+    const totalYards = rail.querySelector('[data-stat="total_yards"]');
+    const firstDowns = rail.querySelector('[data-stat="first_downs"]');
+    const turnovers = rail.querySelector('[data-stat="turnovers_gained"]');
+    const rushPass = rail.querySelector('[data-stat="rush_pass"]');
+    if (totalYards) totalYards.textContent = statDisplay(team.total_yards);
+    if (firstDowns) firstDowns.textContent = statDisplay(team.first_downs);
+    if (turnovers) turnovers.textContent = statDisplay(team.turnovers_gained);
+    if (rushPass) {
+      rushPass.textContent = `R/P ${statDisplay(team.rushing_yards)} / ${statDisplay(team.passing_yards)}`;
+    }
+
+    const leaderNode = rail.querySelector(".bl-player-leader");
+    if (!leaderNode) return;
+    const leaders = collegiatePlayerLeaders(statistics, side);
+    const leader = leaders.length
+      ? leaders[(Math.floor(Date.now() / 8000) + sideIndex) % leaders.length]
+      : null;
+    leaderNode.querySelectorAll("img").forEach(node => node.remove());
+    leaderNode.classList.toggle("is-empty", !leader);
+    leaderNode.classList.toggle("has-photo", Boolean(leader?.image));
+    const title = leaderNode.querySelector("span");
+    const name = leaderNode.querySelector('[data-player="name"]');
+    const line = leaderNode.querySelector('[data-player="line"]');
+    if (!leader) {
+      if (title) title.textContent = "Player Leader";
+      if (name) name.textContent = "Awaiting Stats";
+      if (line) line.textContent = "Live leaders rotate here";
+      return;
+    }
+    if (leader.image) {
+      const image = document.createElement("img");
+      image.src = leader.image;
+      image.alt = "";
+      leaderNode.prepend(image);
+    }
+    if (title) title.textContent = leader.title;
+    if (name) name.textContent = leader.name;
+    if (line) line.textContent = [leader.line, leader.detail].filter(Boolean).join(" · ");
+  });
+}
+
 async function renderSelected() {
   if (renderBusy) return "busy";
   renderBusy = true;
@@ -2602,6 +2729,7 @@ async function renderSelected() {
       fetchJson(RUNTIME_STATE_URL),
       fetchJson(CAPTION_STATE_URL).catch(() => ({visible:false, segments:[]}))
     ]);
+    const collegiateStatistics = await fetchCollegiateStatistics(runtime, alias);
     const captionSegment = activeCaptionSegment(captionState);
     runtimeClockRunning = runtime.clock_running === true;
     lastRuntimeForClockPatch = runtime;
@@ -2637,6 +2765,7 @@ async function renderSelected() {
     csrnLogThemeSignatureDiffR4(signature);
     if (alias === currentAlias && signature === renderSignature) {
       patchLiveGameState(runtime);
+      patchCollegiateRails(scoreLayout(), runtime, collegiateStatistics);
       patchThemeTicker(runtime);
       patchCaptionDom(alias, captionState);
       return "unchanged";
@@ -2680,6 +2809,7 @@ async function renderSelected() {
     await paintFridayNightLayeredFootballClash(scoreTarget, alias, activeVideoMode, state);
 
     applyFootballBoardOverrides(scoreTarget, alias, runtime);
+    patchCollegiateRails(scoreTarget, runtime, collegiateStatistics);
     repairRenderedPlayerMedia(scoreTarget, state);
     mountCentralBoardMedia(scoreTarget, runtime, activeVideoMode, alias);
     populateHeritagePlayerHost(scoreTarget, runtime, state, alias, activeVideoMode);
