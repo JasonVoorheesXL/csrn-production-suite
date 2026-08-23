@@ -571,7 +571,7 @@ html, body {{
 <div class="cover-header">
     <div class="brand">CSRN GAME-DAY QUICK REFERENCE</div>
     <h1>{visitor_name} at {home_name}</h1>
-    <div class="matchup">{sport} | {level}</div>
+    <div class="matchup">{sport} &middot; {level}</div>
     <div class="meta">
         {date} | {start}<br>
         {venue}<br>

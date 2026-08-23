@@ -173,3 +173,16 @@ def test_resolve_rosters_returns_none_when_nothing_matches() -> None:
     service = make_service(rosters=[roster(school_id="home-school")])
     home, _ = service._resolve_rosters(game)
     assert home is None
+
+
+def test_render_document_uses_middle_dot_entity_for_matchup_separator() -> None:
+    service = make_service()
+    document = service._render_document(
+        broadcast(),
+        roster(id="home-roster", school_id="home-school"),
+        roster(id="visitor-roster", school_id="visitor-school"),
+    )
+
+    assert "Football &middot; Varsity" in document
+    assert "Football ? Varsity" not in document
+    assert "Football | Varsity" not in document
