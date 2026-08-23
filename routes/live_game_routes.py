@@ -242,14 +242,24 @@ def create_live_game_blueprint(
         log_route(event_type="SERVER_MUTATION", route="/api/set", action=str(payload.get("period_action") or "set"), request_id=request_id, payload=payload, status=200, started=started, before=before, after=load_summary_safely(), result=result)
         return jsonify(result.data["state"])
 
+    def build_statistics_payload() -> dict[str, Any]:
+        state = load_state_for_reporting()
+        result = dependencies.get_statistics_service().report(state)
+        return decorate_statistics_headshots(result.data["statistics"], state)
+
     @routes.get("/api/statistics")
     @dependencies.require_auth
     def statistics_report():
-        state = load_state_for_reporting()
-        result = dependencies.get_statistics_service().report(
-            state
-        )
-        return jsonify(decorate_statistics_headshots(result.data["statistics"], state))
+        return jsonify(build_statistics_payload())
+
+    @routes.get("/api/statistics/overlay-state")
+    def statistics_overlay_state():
+        # Read-only, unauthenticated: the OBS overlay (Collegiate Tech's
+        # rotating stat rails and player-leader cards) has no operator login
+        # session, so it cannot call the authenticated /api/statistics above.
+        # Same payload, public, matching the existing /api/state and
+        # /api/captions/overlay-state pattern.
+        return jsonify(build_statistics_payload())
 
     @routes.get("/api/play-register")
     @dependencies.require_auth

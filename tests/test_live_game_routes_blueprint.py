@@ -260,6 +260,20 @@ def test_statistics_delegates_active_state(live_game_client) -> None:
     assert statistics.calls == [{"home_score": 14, "private": "hidden"}]
 
 
+def test_statistics_overlay_state_is_registered_and_unauthenticated(live_game_client) -> None:
+    # The OBS overlay has no operator login session (it's the public
+    # /overlay page), so the Collegiate Tech rotating stat rails and
+    # player-leader cards must be able to reach this without auth headers.
+    client, app, _, _, _, statistics = live_game_client
+    assert "/api/statistics/overlay-state" in {
+        rule.rule for rule in app.url_map.iter_rules()
+    }
+    response = client.get("/api/statistics/overlay-state")
+    assert response.status_code == 200
+    assert response.get_json() == {"home": {"score": 14}}
+    assert statistics.calls == [{"home_score": 14, "private": "hidden"}]
+
+
 def test_statistics_decorates_player_headshots_from_active_rosters(live_game_client) -> None:
     client, app, _, _, _, statistics = live_game_client
     app.config["_live_game_state"].update(
