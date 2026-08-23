@@ -627,13 +627,43 @@
 
   function collegiateTeamPanel(team, side) {
     return `<section class="bl-college-team bl-${side}" data-module="${side}.team">
+      <div class="bl-college-side-label">${side === "home" ? "HOME" : "VISITOR"}</div>
+      <strong class="bl-college-score" data-module="${side}.score" data-bind="${side}.score">${esc(team.score)}</strong>
       ${collegiateLogo(team, side)}
       <div class="bl-college-identity" data-module="${side}.identity">
         <span data-bind="${side}.name">${esc(team.shortName || team.name)}</span>
         <small data-bind="${side}.mascot">${esc(team.mascot)}</small>
       </div>
-      <strong class="bl-college-score" data-module="${side}.score" data-bind="${side}.score">${esc(team.score)}</strong>
     </section>`;
+  }
+
+  function collegiateVenueName(state) {
+    const school = String(state.home.name || state.home.shortName || "HOME").trim();
+    const mascot = String(state.home.mascot || "").trim();
+    return `${[school, mascot].filter(Boolean).join(" ")} STADIUM`;
+  }
+
+  function collegiateStageSide(team, side) {
+    return `<div class="bl-college-stage-side bl-${side}">
+      ${collegiateLogo(team, side)}
+      <strong>${esc(team.shortName || team.name)}</strong>
+      <span>${esc(team.mascot)}</span>
+    </div>`;
+  }
+
+  function collegiateStage(state) {
+    return `<section class="bl-college-stage" data-module="video.board">
+      <div class="bl-college-stage-field" aria-hidden="true"></div>
+      ${collegiateStageSide(state.visitor, "visitor")}
+      <div class="bl-college-vs">VS</div>
+      ${collegiateStageSide(state.home, "home")}
+    </section>`;
+  }
+
+  function collegiateThemeVars(state) {
+    const visitor = normalizedTeamColor(state.visitor && state.visitor.primary) || "#064624";
+    const home = normalizedTeamColor(state.home && state.home.primary) || "#0A2342";
+    return `style="--visitor-primary:${visitor};--home-primary:${home}"`;
   }
 
   function collegiateField(state) {
@@ -648,11 +678,13 @@
     const driveStart = field.driveStart || state.game.driveStart || "-";
     const firstDownSpot = field.firstDownSpot || state.game.firstDownSpot || "-";
     const downDistance = field.downDistance || state.game.downDistance || "-";
+    const hasFirstDown = firstDownSpot !== "-";
     const yardNumbers = ["10","20","30","40","50","40","30","20","10"].map((yard) => `<span>${yard}</span>`).join("");
-    return `<section class="bl-college-field" data-module="game.field" data-direction="${esc(direction)}" data-possession="${esc(possession)}" data-has-drive-start="${driveStart !== "-" ? "true" : "false"}" data-field-visible="${visible ? "true" : "false"}" style="--ball-x:${ballPct}%;--drive-x:${drivePct}%;--first-x:${firstPct}%">
+    return `<section class="bl-college-field" data-module="game.field" data-direction="${esc(direction)}" data-possession="${esc(possession)}" data-has-drive-start="${driveStart !== "-" ? "true" : "false"}" data-has-first-down="${hasFirstDown ? "true" : "false"}" data-field-visible="${visible ? "true" : "false"}" style="--ball-x:${ballPct}%;--drive-x:${drivePct}%;--first-x:${firstPct}%">
       <div class="bl-college-field-grid" aria-hidden="true">
         <div class="bl-college-yard-numbers">${yardNumbers}</div>
         <i class="bl-college-drive-start"></i>
+        <i class="bl-college-line-scrimmage"></i>
         <i class="bl-college-first-down"></i>
         <i class="bl-college-ball-marker"><span></span></i>
         <b class="bl-college-direction-arrow"></b>
@@ -667,18 +699,15 @@
   }
 
   function collegiateFootballScorebug(state, sport) {
-    return `<div class="bl-scorebug bl-collegiate bl-collegiate-tech bl-sport-${sport}" data-possession="${esc(state.game.possession || "home")}">
-      <div class="bl-college-frame-rail"></div>
+    return `<div class="bl-scorebug bl-collegiate bl-collegiate-tech bl-sport-${sport}" data-possession="${esc(state.game.possession || "home")}" ${collegiateThemeVars(state)}>
+      <div class="bl-college-cabinet" aria-hidden="true"></div>
       <div class="bl-college-live-strip"><b>LIVE</b><span class="bl-college-ticker-copy">${esc(state.ticker.text || "CSRN LIVE")}</span><em>CSRN</em></div>
-      ${collegiateTeamPanel(state.visitor, "visitor")}
-      <section class="bl-college-core" data-module="game.state">
-        <div class="bl-college-clock-row">
-          <span>Q<span data-bind="game.period">${esc(state.game.period)}</span></span>
-          <strong data-bind="game.clock">${esc(state.game.clock)}</strong>
-        </div>
+      <header class="bl-college-venue"><i></i><strong>${esc(collegiateVenueName(state))}</strong><i></i></header>
+      <main class="bl-college-main-display">${collegiateTeamPanel(state.visitor, "visitor")}${collegiateStage(state)}${collegiateTeamPanel(state.home, "home")}</main>
+      <section class="bl-college-control-bank" data-module="game.state">
+        <div class="bl-college-clock-row"><span>Q<span data-bind="game.period">${esc(state.game.period)}</span></span><strong data-bind="game.clock">${esc(state.game.clock)}</strong></div>
         ${collegiateField(state)}
       </section>
-      ${collegiateTeamPanel(state.home, "home")}
     </div>`;
   }
 
@@ -1458,7 +1487,7 @@
       componentRendererFamily: "collegiate",
       sports:{
         football:{components:{
-          scorebug:{zone:"bottom-center",width:1410,height:225,layer:100},ticker:{zone:"bottom-center",height:58,layer:110,allowOverlapWith:["scorebug"]},
+          scorebug:{zone:"full-safe",width:1840,height:1000,layer:100},ticker:{zone:"top-center",height:58,layer:110,allowOverlapWith:["scorebug"]},
           playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80},
           highlightVideo:{zone:"top-right",layer:70},sponsor:{zone:"top-left",layer:60},
           captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120}

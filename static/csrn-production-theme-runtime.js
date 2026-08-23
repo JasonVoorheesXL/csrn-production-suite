@@ -1260,6 +1260,7 @@ function applyFootballBoardOverrides(root, alias, runtime) {
       fieldRoot.dataset.direction = field.direction;
       fieldRoot.dataset.possession = field.possession;
       fieldRoot.dataset.hasDriveStart = field.driveStart ? "true" : "false";
+      fieldRoot.dataset.hasFirstDown = field.firstDownSpot ? "true" : "false";
       fieldRoot.dataset.fieldVisible = field.visible ? "true" : "false";
     }
     root.querySelectorAll('[data-bind="game.clock"]').forEach(node => {
@@ -1387,6 +1388,19 @@ function patchThemeScoresAndPossession(root, alias, runtime) {
     if (periodValue) periodValue.textContent = productionFootballPeriod(runtime);
     if (clockValue) clockValue.textContent = productionClock(runtime);
     if (downValue) downValue.textContent = productionDownDistance(runtime).combined;
+    return;
+  }
+
+  if (alias === "collegiate_traditional") {
+    root.querySelectorAll('[data-bind="home.score"]').forEach(node => {
+      node.textContent = String(homeScore);
+    });
+    root.querySelectorAll('[data-bind="visitor.score"]').forEach(node => {
+      node.textContent = String(visitorScore);
+    });
+    root.querySelectorAll(".bl-collegiate-tech").forEach(node => {
+      node.dataset.possession = possession;
+    });
   }
 }
 

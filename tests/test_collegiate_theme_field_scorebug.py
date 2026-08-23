@@ -26,8 +26,13 @@ def test_collegiate_football_uses_field_position_panel_not_legacy_down_box():
     assert 'data-module="game.field"' in js
     assert "bl-college-ticker-copy" in js
     assert "bl-college-first-down" in js
+    assert "bl-college-line-scrimmage" in js
     assert "bl-college-drive-start" in js
+    assert 'scorebug:{zone:"full-safe",width:1840,height:1000' in js
+    assert "function collegiateStage" in js
     assert "bl-collegiate-tech" in css
+    assert "backdrop-filter:blur" in css
+    assert 'content:"1ST DOWN"' in css
     assert "font-variant-numeric:tabular-nums" in css
 
 
@@ -38,3 +43,4 @@ def test_collegiate_runtime_patches_live_field_state_without_rerender():
     assert 'tickerSelector: ".bl-college-ticker-copy"' in runtime
     assert '[data-bind="game.ballSpot"]' in runtime
     assert "--first-x" in runtime
+    assert "dataset.hasFirstDown" in runtime
