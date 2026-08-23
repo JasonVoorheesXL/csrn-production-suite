@@ -1281,6 +1281,23 @@ function applyFootballBoardOverrides(root, alias, runtime) {
     root.querySelectorAll('[data-bind="game.firstDownSpot"]').forEach(node => {
       node.textContent = field.firstDownSpot || "-";
     });
+    root.querySelectorAll('[data-bind="game.possessionLogo"]').forEach(node => {
+      const side = field.possession === "visitor" ? "visitor" : "home";
+      const identity = objectValue(runtime[`${side}_identity`]);
+      const logo = textValue(identity.logo, runtime[`${side}_logo`]);
+      const name = textValue(runtime[`${side}_team`], side).trim();
+      node.replaceChildren();
+      if (logo) {
+        const image = document.createElement("img");
+        image.src = logo;
+        image.alt = "";
+        node.appendChild(image);
+        return;
+      }
+      const fallback = document.createElement("span");
+      fallback.textContent = name.slice(0, 3).toUpperCase() || side.slice(0, 1).toUpperCase();
+      node.appendChild(fallback);
+    });
   }
 }
 

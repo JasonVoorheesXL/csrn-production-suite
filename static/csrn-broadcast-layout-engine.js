@@ -628,7 +628,6 @@
   function collegiateTeamPanel(team, side) {
     return `<section class="bl-college-team bl-${side}" data-module="${side}.team">
       <div class="bl-college-side-label">${side === "home" ? "HOME" : "VISITOR"}</div>
-      <strong class="bl-college-score" data-module="${side}.score" data-bind="${side}.score">${esc(team.score)}</strong>
       ${collegiateLogo(team, side)}
       <div class="bl-college-identity" data-module="${side}.identity">
         <span data-bind="${side}.name">${esc(team.shortName || team.name)}</span>
@@ -637,10 +636,23 @@
     </section>`;
   }
 
-  function collegiateVenueName(state) {
-    const school = String(state.home.name || state.home.shortName || "HOME").trim();
-    const mascot = String(state.home.mascot || "").trim();
-    return `${[school, mascot].filter(Boolean).join(" ")} STADIUM`;
+  function collegiateScoreChip(team, side) {
+    return `<section class="bl-college-score-chip bl-${side}" data-module="${side}.score">
+      <span>${side === "home" ? "HOME" : "VISITOR"}</span>
+      <strong data-bind="${side}.score">${esc(team.score)}</strong>
+      <b data-bind="${side}.name">${esc(team.shortName || team.name)}</b>
+    </section>`;
+  }
+
+  function collegiateScoreClockRow(state) {
+    return `<header class="bl-college-score-clock-row">
+      ${collegiateScoreChip(state.visitor, "visitor")}
+      <section class="bl-college-clock-row" data-module="game.state">
+        <span>Quarter <b data-bind="game.period">${esc(state.game.period)}</b></span>
+        <strong data-bind="game.clock">${esc(state.game.clock)}</strong>
+      </section>
+      ${collegiateScoreChip(state.home, "home")}
+    </header>`;
   }
 
   function collegiateStageSide(team, side) {
@@ -680,13 +692,19 @@
     const downDistance = field.downDistance || state.game.downDistance || "-";
     const hasFirstDown = firstDownSpot !== "-";
     const yardNumbers = ["10","20","30","40","50","40","30","20","10"].map((yard) => `<span>${yard}</span>`).join("");
+    const possessionTeam = possession === "visitor" ? state.visitor : state.home;
+    const possessionLogo = possessionTeam.logo
+      ? `<img src="${esc(possessionTeam.logo)}" alt="">`
+      : `<span>${esc(collegiateInitials(possessionTeam))}</span>`;
     return `<section class="bl-college-field" data-module="game.field" data-direction="${esc(direction)}" data-possession="${esc(possession)}" data-has-drive-start="${driveStart !== "-" ? "true" : "false"}" data-has-first-down="${hasFirstDown ? "true" : "false"}" data-field-visible="${visible ? "true" : "false"}" style="--ball-x:${ballPct}%;--drive-x:${drivePct}%;--first-x:${firstPct}%">
       <div class="bl-college-field-grid" aria-hidden="true">
         <div class="bl-college-yard-numbers">${yardNumbers}</div>
+        <div class="bl-college-hashmarks top"></div>
+        <div class="bl-college-hashmarks bottom"></div>
         <i class="bl-college-drive-start"></i>
         <i class="bl-college-line-scrimmage"></i>
         <i class="bl-college-first-down"></i>
-        <i class="bl-college-ball-marker"><span></span></i>
+        <i class="bl-college-ball-marker" data-bind="game.possessionLogo">${possessionLogo}</i>
         <b class="bl-college-direction-arrow"></b>
       </div>
       <div class="bl-college-field-meta">
@@ -702,10 +720,9 @@
     return `<div class="bl-scorebug bl-collegiate bl-collegiate-tech bl-sport-${sport}" data-possession="${esc(state.game.possession || "home")}" ${collegiateThemeVars(state)}>
       <div class="bl-college-cabinet" aria-hidden="true"></div>
       <div class="bl-college-live-strip"><b>LIVE</b><span class="bl-college-ticker-copy">${esc(state.ticker.text || "CSRN LIVE")}</span><em>CSRN</em></div>
-      <header class="bl-college-venue"><i></i><strong>${esc(collegiateVenueName(state))}</strong><i></i></header>
+      ${collegiateScoreClockRow(state)}
       <main class="bl-college-main-display">${collegiateTeamPanel(state.visitor, "visitor")}${collegiateStage(state)}${collegiateTeamPanel(state.home, "home")}</main>
       <section class="bl-college-control-bank" data-module="game.state">
-        <div class="bl-college-clock-row"><span>Q<span data-bind="game.period">${esc(state.game.period)}</span></span><strong data-bind="game.clock">${esc(state.game.clock)}</strong></div>
         ${collegiateField(state)}
       </section>
     </div>`;
