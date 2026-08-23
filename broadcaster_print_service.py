@@ -10,6 +10,8 @@ from typing import Any, Callable, Mapping
 
 from playwright.sync_api import sync_playwright
 
+from runtime_diagnostics_service import get_runtime_diagnostics
+
 
 Record = dict[str, Any]
 ObjectLoader = Callable[[], list[Record]]
@@ -152,6 +154,7 @@ class BroadcasterPrintService:
                 rosters,
                 broadcast,
                 home_school_id,
+                "home",
             )
 
         if visitor is None:
@@ -159,36 +162,131 @@ class BroadcasterPrintService:
                 rosters,
                 broadcast,
                 visitor_school_id,
+                "visitor",
             )
 
         return home, visitor
 
+    # Match tiers tried in order: exact (sport, season, level, division),
+    # then relax division (most likely to differ by formatting -- "Boys" vs
+    # "boys", "AAA" vs "AAA "), then relax level too. sport and season are
+    # never relaxed -- a roster for the wrong sport or the wrong season is
+    # never an acceptable fallback.
+    _MATCH_TIERS: tuple[tuple[str, ...], ...] = (
+        ("sport", "season", "level", "division"),
+        ("sport", "season", "level"),
+        ("sport", "season"),
+    )
+
     @staticmethod
+    def _roster_match_field(roster: Mapping[str, Any], field: str) -> str:
+        value = str(roster.get(field, "") or "")
+        return value if field == "season" else value.casefold()
+
+    @classmethod
+    def _wanted_match_fields(cls, broadcast: Mapping[str, Any]) -> dict[str, str]:
+        return {
+            field: cls._roster_match_field(broadcast, field)
+            for field in ("sport", "season", "level", "division")
+        }
+
+    @classmethod
     def _fallback_roster(
+        cls,
         rosters: list[Record],
         broadcast: Mapping[str, Any],
         school_id: str,
+        side: str,
     ) -> Record | None:
         if not school_id:
             return None
 
-        sport = str(broadcast.get("sport", "")).casefold()
-        season = str(broadcast.get("season", ""))
-        level = str(broadcast.get("level", "")).casefold()
-        division = str(broadcast.get("division", "")).casefold()
+        wanted = cls._wanted_match_fields(broadcast)
+        candidates = [
+            roster
+            for roster in rosters
+            if str(roster.get("school_id", "")) == school_id
+        ]
 
-        return next(
+        log_fields = {
+            "side": side,
+            "school_id": school_id,
+            "broadcast_id": str(broadcast.get("broadcast_id", "") or ""),
+            "broadcast_sport": wanted["sport"],
+            "broadcast_season": wanted["season"],
+            "broadcast_level": wanted["level"],
+            "broadcast_division": wanted["division"],
+        }
+
+        if not candidates:
+            get_runtime_diagnostics().record(
+                "BROADCASTER_PRINT_ROSTER_FALLBACK",
+                result="NO_ROSTER_FOR_SCHOOL",
+                **log_fields,
+            )
+            return None
+
+        for tier_index, tier_fields in enumerate(cls._MATCH_TIERS):
+            match = next(
+                (
+                    roster
+                    for roster in candidates
+                    if all(
+                        cls._roster_match_field(roster, field) == wanted[field]
+                        for field in tier_fields
+                    )
+                ),
+                None,
+            )
+            if match is None:
+                continue
+            if tier_index > 0:
+                relaxed = [
+                    field
+                    for field in ("level", "division")
+                    if field not in tier_fields
+                ]
+                get_runtime_diagnostics().record(
+                    "BROADCASTER_PRINT_ROSTER_FALLBACK",
+                    result="RELAXED_MATCH",
+                    matched_fields=list(tier_fields),
+                    relaxed_fields=relaxed,
+                    roster_id=str(match.get("id", "")),
+                    roster_level=str(match.get("level", "") or ""),
+                    roster_division=str(match.get("division", "") or ""),
+                    **log_fields,
+                )
+            return match
+
+        # No tier matched. Report the field-by-field diagnosis against the
+        # closest candidate (one matching sport+season if any exist, else
+        # just the first candidate for this school) instead of failing
+        # silently.
+        closest = next(
             (
                 roster
-                for roster in rosters
-                if str(roster.get("school_id", "")) == school_id
-                and str(roster.get("sport", "")).casefold() == sport
-                and str(roster.get("season", "")) == season
-                and str(roster.get("level", "")).casefold() == level
-                and str(roster.get("division", "")).casefold() == division
+                for roster in candidates
+                if cls._roster_match_field(roster, "sport") == wanted["sport"]
+                and cls._roster_match_field(roster, "season") == wanted["season"]
             ),
-            None,
+            candidates[0],
         )
+        get_runtime_diagnostics().record(
+            "BROADCASTER_PRINT_ROSTER_FALLBACK",
+            result="NO_MATCH",
+            candidate_count=len(candidates),
+            closest_roster_id=str(closest.get("id", "")),
+            sport_matched=cls._roster_match_field(closest, "sport") == wanted["sport"],
+            season_matched=cls._roster_match_field(closest, "season") == wanted["season"],
+            level_matched=cls._roster_match_field(closest, "level") == wanted["level"],
+            division_matched=cls._roster_match_field(closest, "division") == wanted["division"],
+            closest_roster_sport=cls._roster_match_field(closest, "sport"),
+            closest_roster_season=cls._roster_match_field(closest, "season"),
+            closest_roster_level=cls._roster_match_field(closest, "level"),
+            closest_roster_division=cls._roster_match_field(closest, "division"),
+            **log_fields,
+        )
+        return None
 
     def _render_document(
         self,
