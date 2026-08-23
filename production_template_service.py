@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 from pathlib import Path
 from typing import Any
+
+from product_paths import resolve_product_paths
 
 SCHEMA = "csrn-production-template-state-v1"
 DEFAULT_PACKAGE_ID = "legacy"
@@ -21,13 +24,27 @@ APPROVED_PACKAGE_IDS = frozenset(
     }
 )
 _LOCK = threading.RLock()
+_BASE_DIR = Path(__file__).resolve().parent
+
+
+def _default_state_path() -> Path:
+    # Same CSRN_DATA_ROOT/CSRN_RUNTIME_ROOT/CSRN_INSTALLED-aware resolution
+    # app.py uses for DATA_DIR, so this file lands in the same Data/ root as
+    # everything else -- and, critically, so an isolated CSRN_DATA_ROOT set
+    # for tests/simulations actually isolates this module too, instead of
+    # silently falling back to the process's launch directory.
+    paths = resolve_product_paths(
+        _BASE_DIR,
+        frozen=bool(getattr(sys, "frozen", False) or "--installed" in sys.argv),
+    )
+    return paths.data_dir / "production_template_state.json"
 
 
 def state_path() -> Path:
     override = os.environ.get("CSRN_PRODUCTION_TEMPLATE_STATE_PATH", "").strip()
     if override:
         return Path(override)
-    return Path.cwd() / "Data" / "production_template_state.json"
+    return _default_state_path()
 
 
 def _normalize(value: Any) -> str:
