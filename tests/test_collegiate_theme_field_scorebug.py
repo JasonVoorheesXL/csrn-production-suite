@@ -24,10 +24,14 @@ def test_collegiate_football_uses_field_position_panel_not_legacy_down_box():
     assert "function collegiateFootballScorebug" in js
     assert "function collegiateField" in js
     assert "function collegiateScoreClockRow" in js
+    assert "function collegiateFieldSpotLabel" in js
     assert 'data-module="game.field"' in js
     assert "bl-college-ticker-copy" in js
     assert "bl-college-score-clock-row" in js
     assert 'data-bind="game.possessionLogo"' in js
+    assert 'data-bind="game.possessionText"' in js
+    assert "bl-college-endzone" in js
+    assert "bl-college-five-yard-lines" in js
     assert "bl-college-hashmarks" in js
     assert "bl-college-first-down" in js
     assert "bl-college-line-scrimmage" in js
@@ -36,6 +40,9 @@ def test_collegiate_football_uses_field_position_panel_not_legacy_down_box():
     assert "function collegiateStage" in js
     assert "bl-collegiate-tech" in css
     assert "bl-college-score-clock-row" in css
+    assert "bl-college-team-glass" in css
+    assert "bl-college-endzone" in css
+    assert "bl-college-five-yard-lines" in css
     assert "bl-college-hashmarks" in css
     assert "grid-template-columns:minmax(0,1fr)" in css
     assert "backdrop-filter:blur" in css
@@ -50,5 +57,7 @@ def test_collegiate_runtime_patches_live_field_state_without_rerender():
     assert 'tickerSelector: ".bl-college-ticker-copy"' in runtime
     assert '[data-bind="game.ballSpot"]' in runtime
     assert '[data-bind="game.possessionLogo"]' in runtime
+    assert '[data-bind="game.possessionText"]' in runtime
+    assert "function collegiateFieldSpotLabel" in runtime
     assert "--first-x" in runtime
     assert "dataset.hasFirstDown" in runtime

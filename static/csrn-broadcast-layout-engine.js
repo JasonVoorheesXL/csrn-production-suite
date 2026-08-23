@@ -628,9 +628,10 @@
   function collegiateTeamPanel(team, side) {
     return `<section class="bl-college-team bl-${side}" data-module="${side}.team">
       <div class="bl-college-side-label">${side === "home" ? "HOME" : "VISITOR"}</div>
-      ${collegiateLogo(team, side)}
+      <div class="bl-college-team-glass" aria-hidden="true">
+        <i></i><i></i><i></i>
+      </div>
       <div class="bl-college-identity" data-module="${side}.identity">
-        <span data-bind="${side}.name">${esc(team.shortName || team.name)}</span>
         <small data-bind="${side}.mascot">${esc(team.mascot)}</small>
       </div>
     </section>`;
@@ -678,6 +679,27 @@
     return `style="--visitor-primary:${visitor};--home-primary:${home}"`;
   }
 
+  function collegiateTeamMascot(state, side) {
+    const team = side === "visitor" ? state.visitor : state.home;
+    return String(team.mascot || team.shortName || team.name || (side === "visitor" ? "Visitor" : "Home")).trim();
+  }
+
+  function collegiatePossessionLabel(state, possession) {
+    const side = possession === "visitor" ? "visitor" : "home";
+    return collegiateTeamMascot(state, side);
+  }
+
+  function collegiateFieldSpotLabel(state, rawSpot, possession, direction) {
+    const text = String(rawSpot || "").trim();
+    const match = text.match(/^(LEFT|RIGHT)\s+(.+)$/i);
+    if (!match) return text || "-";
+    const ownSide = direction === "left" ? "RIGHT" : "LEFT";
+    const offenseSide = possession === "visitor" ? "visitor" : "home";
+    const defenseSide = offenseSide === "visitor" ? "home" : "visitor";
+    const teamSide = match[1].toUpperCase() === ownSide ? offenseSide : defenseSide;
+    return `${collegiateTeamMascot(state, teamSide)} ${match[2]}`;
+  }
+
   function collegiateField(state) {
     const field = state.game.field || {};
     const ballPct = clampPercent(field.ballPct, 50);
@@ -690,6 +712,9 @@
     const driveStart = field.driveStart || state.game.driveStart || "-";
     const firstDownSpot = field.firstDownSpot || state.game.firstDownSpot || "-";
     const downDistance = field.downDistance || state.game.downDistance || "-";
+    const possessionLabel = collegiatePossessionLabel(state, possession);
+    const ballSpotLabel = collegiateFieldSpotLabel(state, ballSpot, possession, direction);
+    const firstDownSpotLabel = collegiateFieldSpotLabel(state, firstDownSpot, possession, direction);
     const hasFirstDown = firstDownSpot !== "-";
     const yardNumbers = ["10","20","30","40","50","40","30","20","10"].map((yard) => `<span>${yard}</span>`).join("");
     const possessionTeam = possession === "visitor" ? state.visitor : state.home;
@@ -698,7 +723,10 @@
       : `<span>${esc(collegiateInitials(possessionTeam))}</span>`;
     return `<section class="bl-college-field" data-module="game.field" data-direction="${esc(direction)}" data-possession="${esc(possession)}" data-has-drive-start="${driveStart !== "-" ? "true" : "false"}" data-has-first-down="${hasFirstDown ? "true" : "false"}" data-field-visible="${visible ? "true" : "false"}" style="--ball-x:${ballPct}%;--drive-x:${drivePct}%;--first-x:${firstPct}%">
       <div class="bl-college-field-grid" aria-hidden="true">
+        <div class="bl-college-endzone bl-left"><span></span></div>
+        <div class="bl-college-endzone bl-right"><span></span></div>
         <div class="bl-college-yard-numbers">${yardNumbers}</div>
+        <div class="bl-college-five-yard-lines"></div>
         <div class="bl-college-hashmarks top"></div>
         <div class="bl-college-hashmarks bottom"></div>
         <i class="bl-college-drive-start"></i>
@@ -708,10 +736,10 @@
         <b class="bl-college-direction-arrow"></b>
       </div>
       <div class="bl-college-field-meta">
-        <span><small>Drive</small><b data-bind="game.driveStart">${esc(driveStart)}</b></span>
+        <span><small>Possession</small><b data-bind="game.possessionText">${esc(possessionLabel)}</b></span>
         <span><small>Down</small><b data-bind="game.downDistance">${esc(downDistance)}</b></span>
-        <span><small>Ball</small><b data-bind="game.ballSpot">${esc(ballSpot)}</b></span>
-        <span><small>Line</small><b data-bind="game.firstDownSpot">${esc(firstDownSpot)}</b></span>
+        <span><small>Ball</small><b data-bind="game.ballSpot">${esc(ballSpotLabel)}</b></span>
+        <span><small>Line to gain</small><b data-bind="game.firstDownSpot">${esc(firstDownSpotLabel)}</b></span>
       </div>
     </section>`;
   }

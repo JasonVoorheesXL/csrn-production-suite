@@ -1127,6 +1127,27 @@ function productionFieldState(source, gameSource = {}, canonicalField = {}) {
   };
 }
 
+function collegiateMascotForSide(runtime, side) {
+  const identity = objectValue(runtime[`${side}_identity`]);
+  return textValue(
+    identity.mascot,
+    runtime[`${side}_mascot`],
+    runtime[`${side}_team`],
+    side === "visitor" ? "Visitor" : "Home"
+  ).trim();
+}
+
+function collegiateFieldSpotLabel(runtime, field, rawSpot) {
+  const text = String(rawSpot || "").trim();
+  const match = text.match(/^(LEFT|RIGHT)\s+(.+)$/i);
+  if (!match) return text || "-";
+  const ownSide = field.direction === "left" ? "RIGHT" : "LEFT";
+  const offenseSide = field.possession === "visitor" ? "visitor" : "home";
+  const defenseSide = offenseSide === "visitor" ? "home" : "visitor";
+  const teamSide = match[1].toUpperCase() === ownSide ? offenseSide : defenseSide;
+  return `${collegiateMascotForSide(runtime, teamSide)} ${match[2]}`;
+}
+
 const STADIUM_LED_GLYPHS = Object.freeze({
   " ":["00000","00000","00000","00000","00000","00000","00000"],
   "0":["01110","10001","10011","10101","11001","10001","01110"],
@@ -1273,13 +1294,17 @@ function applyFootballBoardOverrides(root, alias, runtime) {
       node.textContent = field.downDistance;
     });
     root.querySelectorAll('[data-bind="game.ballSpot"]').forEach(node => {
-      node.textContent = field.visible ? (field.ballSpot || "-") : "-";
+      node.textContent = field.visible ? collegiateFieldSpotLabel(runtime, field, field.ballSpot) : "-";
     });
     root.querySelectorAll('[data-bind="game.driveStart"]').forEach(node => {
       node.textContent = field.driveStart || "-";
     });
     root.querySelectorAll('[data-bind="game.firstDownSpot"]').forEach(node => {
-      node.textContent = field.firstDownSpot || "-";
+      node.textContent = collegiateFieldSpotLabel(runtime, field, field.firstDownSpot);
+    });
+    root.querySelectorAll('[data-bind="game.possessionText"]').forEach(node => {
+      const side = field.possession === "visitor" ? "visitor" : "home";
+      node.textContent = collegiateMascotForSide(runtime, side);
     });
     root.querySelectorAll('[data-bind="game.possessionLogo"]').forEach(node => {
       const side = field.possession === "visitor" ? "visitor" : "home";
