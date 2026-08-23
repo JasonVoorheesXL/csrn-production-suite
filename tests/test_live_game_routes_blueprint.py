@@ -128,10 +128,11 @@ class StubRulesService:
 class StubStatisticsService:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.result = {"home": {"score": 14}}
 
     def report(self, state: dict[str, Any]) -> StubResult:
         self.calls.append(state)
-        return StubResult("OK", {"statistics": {"home": {"score": 14}}})
+        return StubResult("OK", {"statistics": self.result})
 
 
 @pytest.fixture
@@ -140,6 +141,8 @@ def live_game_client():
     events = StubEventService()
     rules = StubRulesService()
     statistics = StubStatisticsService()
+    state = {"home_score": 14, "private": "hidden"}
+    rosters: list[dict[str, Any]] = []
 
     def require_auth(view: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(view)
@@ -152,6 +155,8 @@ def live_game_client():
 
     app = Flask(__name__)
     app.config.update(TESTING=True, SECRET_KEY="live-game-route-test")
+    app.config["_live_game_state"] = state
+    app.config["_live_game_rosters"] = rosters
     app.register_blueprint(
         create_live_game_blueprint(
             LiveGameRoutesDependencies(
@@ -160,7 +165,8 @@ def live_game_client():
                 get_event_service=lambda: events,
                 get_rules_service=lambda: rules,
                 get_statistics_service=lambda: statistics,
-                load_state=lambda: {"home_score": 14, "private": "hidden"},
+                load_state=lambda: state,
+                load_rosters=lambda: rosters,
             )
         )
     )
@@ -252,6 +258,61 @@ def test_statistics_delegates_active_state(live_game_client) -> None:
     assert response.status_code == 200
     assert response.get_json() == {"home": {"score": 14}}
     assert statistics.calls == [{"home_score": 14, "private": "hidden"}]
+
+
+def test_statistics_decorates_player_headshots_from_active_rosters(live_game_client) -> None:
+    client, app, _, _, _, statistics = live_game_client
+    app.config["_live_game_state"].update(
+        {
+            "season": "2026",
+            "sport": "Football",
+            "home_school_id": "northwood",
+            "visitor_school_id": "pine-valley",
+        }
+    )
+    app.config["_live_game_rosters"].extend(
+        [
+            {
+                "school_id": "northwood",
+                "sport": "Football",
+                "season": "2026",
+                "players": [
+                    {
+                        "number": "2",
+                        "first_name": "Drew",
+                        "last_name": "Mason",
+                        "headshot": "/roster-headshots/drew.png",
+                    }
+                ],
+            },
+            {
+                "school_id": "pine-valley",
+                "sport": "Football",
+                "season": "2026",
+                "players": [
+                    {
+                        "number": "88",
+                        "first_name": "Receiver",
+                        "last_name": "Only",
+                        "headshot": "/roster-headshots/receiver.png",
+                    }
+                ],
+            },
+        ]
+    )
+    statistics.result = {
+        "players": [
+            {"team": "home", "number": "2", "name": "Drew Mason"},
+            {"team": "visitor", "number": "99", "name": "Missing Player"},
+        ]
+    }
+
+    response = client.get("/api/statistics", headers=auth_headers())
+
+    assert response.status_code == 200
+    players = response.get_json()["players"]
+    assert players[0]["headshot"] == "/roster-headshots/drew.png"
+    assert "headshot" not in players[1]
 
 
 def test_control_source_maps_invalid_authority(live_game_client) -> None:

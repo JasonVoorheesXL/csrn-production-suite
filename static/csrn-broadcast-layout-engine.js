@@ -632,11 +632,10 @@
         <article class="bl-college-rail-card bl-team-snapshot">
           <span>Team Snapshot</span>
           <div class="bl-college-stat-grid">
-            <b><small>YDS</small><strong data-stat="total_yards">-</strong></b>
-            <b><small>1D</small><strong data-stat="first_downs">-</strong></b>
+            <b><small>PASS</small><strong data-stat="passing_yards">-</strong></b>
+            <b><small>RUSH</small><strong data-stat="rushing_yards">-</strong></b>
             <b><small>TO</small><strong data-stat="turnovers_gained">-</strong></b>
           </div>
-          <em data-stat="rush_pass">R/P - / -</em>
         </article>
         <article class="bl-college-rail-card bl-player-leader is-empty">
           <span>Player Leader</span>

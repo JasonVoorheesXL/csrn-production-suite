@@ -36,6 +36,7 @@ class LiveGameRoutesDependencies:
     # the archived per-broadcast file once a broadcast has been finalized and
     # its live state cleared — see app.load_state_for_reporting().
     load_state_for_reporting: Callable[[], State] | None = None
+    load_rosters: Callable[[], list[dict[str, Any]]] | None = None
 
 
 def create_live_game_blueprint(
@@ -48,6 +49,89 @@ def create_live_game_blueprint(
     def load_state_for_reporting() -> State:
         loader = dependencies.load_state_for_reporting or dependencies.load_state
         return loader()
+
+    def normalized_player_name(player: dict[str, Any]) -> str:
+        return " ".join(
+            str(
+                player.get("display_name")
+                or player.get("preferred_name")
+                or f"{player.get('first_name', '')} {player.get('last_name', '')}"
+                or player.get("name", "")
+            ).casefold().split()
+        )
+
+    def decorate_statistics_headshots(statistics: dict[str, Any], state: State) -> dict[str, Any]:
+        if dependencies.load_rosters is None:
+            return statistics
+        players = statistics.get("players")
+        if not isinstance(players, list):
+            return statistics
+        try:
+            rosters = dependencies.load_rosters()
+        except Exception:
+            return statistics
+        if not isinstance(rosters, list):
+            return statistics
+
+        active_school_ids = {
+            "home": str(state.get("home_school_id", "") or ""),
+            "visitor": str(state.get("visitor_school_id", "") or ""),
+        }
+        roster_players: dict[str, list[dict[str, Any]]] = {"home": [], "visitor": []}
+        season = str(state.get("season", "") or "")
+        sport = str(state.get("sport", "") or "").casefold()
+        for side, school_id in active_school_ids.items():
+            if not school_id:
+                continue
+            candidates = [
+                roster for roster in rosters
+                if isinstance(roster, dict)
+                and str(roster.get("school_id", "") or "") == school_id
+            ]
+            if season:
+                season_matches = [
+                    roster for roster in candidates
+                    if str(roster.get("season", "") or "") == season
+                ]
+                if season_matches:
+                    candidates = season_matches
+            if sport:
+                sport_matches = [
+                    roster for roster in candidates
+                    if str(roster.get("sport", "") or "").casefold() == sport
+                ]
+                if sport_matches:
+                    candidates = sport_matches
+            for roster in candidates:
+                roster_players[side].extend([
+                    player for player in roster.get("players", [])
+                    if isinstance(player, dict)
+                ])
+
+        for row in players:
+            if not isinstance(row, dict) or row.get("headshot"):
+                continue
+            side = str(row.get("team", "") or "")
+            candidates = roster_players.get(side, [])
+            number = str(row.get("number", "") or "").strip()
+            matched = None
+            if number:
+                matched = next(
+                    (
+                        player for player in candidates
+                        if str(player.get("number", "") or "").strip() == number
+                    ),
+                    None,
+                )
+            else:
+                target_name = " ".join(str(row.get("name", "") or "").casefold().split())
+                matched = next(
+                    (player for player in candidates if normalized_player_name(player) == target_name),
+                    None,
+                )
+            if matched and matched.get("headshot"):
+                row["headshot"] = str(matched.get("headshot") or "")
+        return statistics
 
     def state_summary(state: State | None) -> dict[str, Any]:
         if not isinstance(state, dict):
@@ -161,10 +245,11 @@ def create_live_game_blueprint(
     @routes.get("/api/statistics")
     @dependencies.require_auth
     def statistics_report():
+        state = load_state_for_reporting()
         result = dependencies.get_statistics_service().report(
-            load_state_for_reporting()
+            state
         )
-        return jsonify(result.data["statistics"])
+        return jsonify(decorate_statistics_headshots(result.data["statistics"], state))
 
     @routes.get("/api/play-register")
     @dependencies.require_auth

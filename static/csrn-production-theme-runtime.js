@@ -2666,22 +2666,18 @@ function patchCollegiateRails(root, runtime, statistics) {
     const rail = root.querySelector(`[data-college-rail="${side}"]`);
     if (!rail) return;
     const team = objectValue(statistics.teams?.[side]);
-    const totalYards = rail.querySelector('[data-stat="total_yards"]');
-    const firstDowns = rail.querySelector('[data-stat="first_downs"]');
+    const passingYards = rail.querySelector('[data-stat="passing_yards"]');
+    const rushingYards = rail.querySelector('[data-stat="rushing_yards"]');
     const turnovers = rail.querySelector('[data-stat="turnovers_gained"]');
-    const rushPass = rail.querySelector('[data-stat="rush_pass"]');
-    if (totalYards) totalYards.textContent = statDisplay(team.total_yards);
-    if (firstDowns) firstDowns.textContent = statDisplay(team.first_downs);
+    if (passingYards) passingYards.textContent = statDisplay(team.passing_yards);
+    if (rushingYards) rushingYards.textContent = statDisplay(team.rushing_yards);
     if (turnovers) turnovers.textContent = statDisplay(team.turnovers_gained);
-    if (rushPass) {
-      rushPass.textContent = `R/P ${statDisplay(team.rushing_yards)} / ${statDisplay(team.passing_yards)}`;
-    }
 
     const leaderNode = rail.querySelector(".bl-player-leader");
     if (!leaderNode) return;
     const leaders = collegiatePlayerLeaders(statistics, side);
     const leader = leaders.length
-      ? leaders[(Math.floor(Date.now() / 8000) + sideIndex) % leaders.length]
+      ? leaders[(Math.floor(Date.now() / 12000) + sideIndex) % leaders.length]
       : null;
     leaderNode.querySelectorAll("img").forEach(node => node.remove());
     leaderNode.classList.toggle("is-empty", !leader);

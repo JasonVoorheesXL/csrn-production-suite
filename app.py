@@ -2294,6 +2294,7 @@ LIVE_GAME_ROUTES_BLUEPRINT = create_live_game_blueprint(
         get_statistics_service=lambda: get_statistics_service(),
         load_state=lambda: load_state(),
         load_state_for_reporting=lambda: load_state_for_reporting(),
+        load_rosters=lambda: load_rosters(),
     )
 )
 APPLICATION_BLUEPRINTS.append(LIVE_GAME_ROUTES_BLUEPRINT)
