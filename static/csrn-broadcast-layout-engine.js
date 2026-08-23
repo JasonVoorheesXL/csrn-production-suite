@@ -1545,9 +1545,9 @@
       sports:{
         football:{components:{
           scorebug:{zone:"full-safe",width:1840,height:1000,layer:100},ticker:{zone:"top-center",height:58,layer:110,allowOverlapWith:["scorebug"]},
-          playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80},
-          highlightVideo:{zone:"top-right",layer:70},sponsor:{zone:"top-left",layer:60},
-          captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120}
+          playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80,allowOverlapWith:["scorebug"]},
+          highlightVideo:{zone:"top-right",layer:70,allowOverlapWith:["scorebug"]},sponsor:{zone:"top-left",layer:60,allowOverlapWith:["scorebug"]},
+          captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120,allowOverlapWith:["scorebug"]}
         }},
         basketball:{components:{
           scorebug:{zone:"bottom-center",layer:100},ticker:{zone:"bottom-center",layer:110,allowOverlapWith:["scorebug"]},
