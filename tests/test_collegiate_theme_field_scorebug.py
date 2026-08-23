@@ -31,6 +31,7 @@ def test_collegiate_football_uses_field_position_panel_not_legacy_down_box():
     assert 'scorebug:{zone:"full-safe",width:1840,height:1000' in js
     assert "function collegiateStage" in js
     assert "bl-collegiate-tech" in css
+    assert "grid-template-columns:minmax(0,1fr)" in css
     assert "backdrop-filter:blur" in css
     assert 'content:"1ST DOWN"' in css
     assert "font-variant-numeric:tabular-nums" in css
