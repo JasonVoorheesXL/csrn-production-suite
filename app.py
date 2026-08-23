@@ -2933,6 +2933,7 @@ def show_automation_player_graphic(
     defensive=False,
     eyebrow="",
     play_detail="",
+    sponsor_id="",
 ):
     result = get_graphics_service().show_automation_player(
         state,
@@ -2943,6 +2944,7 @@ def show_automation_player_graphic(
         defensive=defensive,
         eyebrow=eyebrow,
         play_detail=play_detail,
+        sponsor_id=sponsor_id,
     )
     state.clear()
     state.update(result.data["state"])

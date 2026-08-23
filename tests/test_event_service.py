@@ -251,6 +251,75 @@ def test_touchdown_ignores_stale_player_id_when_submitted_number_differs() -> No
     assert store["events"][0]["automation"]["player_name"] == "Home"
 
 
+def test_sack_triggers_player_spotlight() -> None:
+    # PLAY events are entered against the offense (team in possession) --
+    # base_state() has home on offense. The sacking (defensive) player is
+    # still whoever is resolved via player_id/roster_id, independent of
+    # `team`, exactly like the existing return_td turnover case.
+    service, store, calls, _ = build_service()
+    result = service.trigger({
+        "team": "home",
+        "event": "PLAY",
+        "play_type": "pass",
+        "pass_outcome": "sack",
+        "player_id": "P1",
+        "graphic_duration": 6,
+    })
+    assert result.ok
+    assert calls["graphics"]
+    _, kwargs = calls["graphics"][-1]
+    assert kwargs["eyebrow"] == "SACK"
+    assert kwargs["defensive"] is True
+    assert store["player_graphic"]["visible"] is True
+
+
+def test_turnover_without_return_touchdown_triggers_player_spotlight() -> None:
+    service, store, calls, _ = build_service()
+    result = service.trigger({
+        "team": "visitor",
+        "event": "TURNOVER",
+        "turnover_type": "interception",
+        "player_id": "P1",
+        "graphic_duration": 6,
+    })
+    assert result.ok
+    assert calls["graphics"]
+    _, kwargs = calls["graphics"][-1]
+    assert kwargs["eyebrow"] == "TURNOVER"
+    assert kwargs["defensive"] is True
+    assert store["player_graphic"]["visible"] is True
+
+
+def test_first_down_triggers_player_spotlight() -> None:
+    service, store, calls, _ = build_service()
+    result = service.trigger({
+        "team": "home",
+        "event": "FIRST_DOWN",
+        "player_id": "P1",
+        "graphic_duration": 6,
+    })
+    assert result.ok
+    assert calls["graphics"]
+    _, kwargs = calls["graphics"][-1]
+    assert kwargs["eyebrow"] == "FIRST DOWN"
+    assert kwargs["defensive"] is False
+    assert store["player_graphic"]["visible"] is True
+
+
+def test_touchdown_player_graphic_carries_submitted_sponsor_id() -> None:
+    service, _, calls, _ = build_service()
+    service.trigger({
+        "team": "home",
+        "event": "TD",
+        "player_id": "P1",
+        "graphic_duration": 8,
+        "sponsor_id": "SPONSOR-1",
+    })
+    assert calls["graphics"]
+    _, kwargs = calls["graphics"][-1]
+    assert kwargs["sponsor_id"] == "SPONSOR-1"
+
+
 def test_quick_correction_rejects_invalid_down() -> None:
     state = base_state()
     state["game_data_authority"] = "statistician"

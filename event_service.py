@@ -562,8 +562,21 @@ class EventService:
                 30,
                 0,
             )
+            sack = (
+                event_code == "PLAY"
+                and play_type == "pass"
+                and str(incoming.get("pass_outcome", "")).lower() == "sack"
+            )
+            turnover_spotlight = event_code == "TURNOVER" and not return_td
+            first_down_spotlight = event_code == "FIRST_DOWN"
             if (
-                (event_code in {"TD", "2PT"} or return_td)
+                (
+                    event_code in {"TD", "2PT"}
+                    or return_td
+                    or sack
+                    or turnover_spotlight
+                    or first_down_spotlight
+                )
                 and player
                 and str(player.get("id", "") or "").strip()
             ):
@@ -573,16 +586,38 @@ class EventService:
                     else "DEFENSIVE TOUCHDOWN"
                     if return_td
                     else "TOUCHDOWN"
+                    if event_code == "TD"
+                    else "SACK"
+                    if sack
+                    else "TURNOVER"
+                    if turnover_spotlight
+                    else "FIRST DOWN"
+                )
+                graphic_type = (
+                    "two_point"
+                    if event_code == "2PT"
+                    else "sack"
+                    if sack
+                    else "turnover"
+                    if turnover_spotlight
+                    else "first_down"
+                    if first_down_spotlight
+                    else "touchdown"
                 )
                 self._show_player_graphic(
                     state,
                     roster,
                     player,
-                    "two_point" if event_code == "2PT" else "touchdown",
+                    graphic_type,
                     duration,
-                    defensive=(event_code == "TURNOVER" and return_td),
+                    defensive=(
+                        (event_code == "TURNOVER" and return_td)
+                        or sack
+                        or turnover_spotlight
+                    ),
                     eyebrow=eyebrow,
                     play_detail=description,
+                    sponsor_id=str(incoming.get("sponsor_id", "") or "").strip(),
                 )
 
             play_number = self._clamp_int(

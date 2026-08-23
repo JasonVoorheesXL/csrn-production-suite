@@ -744,6 +744,7 @@ class GraphicsService:
         defensive: bool = False,
         eyebrow: str = "",
         play_detail: str = "",
+        sponsor_id: str = "",
     ) -> GraphicsResult:
         updated = copy.deepcopy(state)
         normalized_duration = self._duration(duration)
@@ -808,6 +809,9 @@ class GraphicsService:
                 "updated_at": now,
             }
         )
+        if str(sponsor_id or "").strip():
+            self._apply_sponsor(graphic, {"sponsor_id": sponsor_id})
+
         active_player = dict(updated.get("player_graphic") or {})
         active_highlight = dict(updated.get("player_highlight") or {})
         if (
