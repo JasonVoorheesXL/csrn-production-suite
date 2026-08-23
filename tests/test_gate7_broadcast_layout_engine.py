@@ -21,8 +21,13 @@ def test_layout_engine_defines_shared_contracts_and_theme_owned_renderers() -> N
     assert "COMPONENT_TYPES" in source
     assert "resolvePlacements" in source
     assert "renderPackage" in source
-    for renderer in ("modern", "pixel", "minimal", "press", "stadium", "neon", "collegiate", "classic"):
+    for renderer in ("modern", "pixel", "minimal", "press", "stadium", "neon", "classic"):
         assert re.search(rf"\b{renderer}\(state,\s*sport\)", source)
+    # collegiate owns the shared video-board mode (player spotlight/highlight
+    # video/sponsor spotlight rotating through the VS stage), threaded from
+    # renderPackage()'s options.videoMode -- the one renderer with a third
+    # parameter for it.
+    assert re.search(r"\bcollegiate\(state,\s*sport,\s*videoMode\)", source)
     for component in ("scorebug", "ticker", "playerCard", "highlightVideo", "sponsor", "captions"):
         assert f'"{component}"' in source
 

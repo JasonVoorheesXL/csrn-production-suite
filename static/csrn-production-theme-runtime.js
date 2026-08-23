@@ -545,7 +545,16 @@ function mergePlayerState(base, runtime) {
     headshot: image,
     logo: textValue(graphic.team_logo, graphic.logo, player.logo),
     teamColor: textValue(graphic.team_color, player.teamColor),
-    team_color: textValue(graphic.team_color, player.team_color)
+    team_color: textValue(graphic.team_color, player.team_color),
+    eyebrow: textValue(graphic.eyebrow, player.eyebrow, "PLAYER SPOTLIGHT"),
+    sponsorId: textValue(graphic.sponsor_id, player.sponsorId),
+    sponsor_id: textValue(graphic.sponsor_id, player.sponsor_id),
+    sponsorName: textValue(graphic.sponsor_name, player.sponsorName),
+    sponsor_name: textValue(graphic.sponsor_name, player.sponsor_name),
+    sponsorLogo: textValue(graphic.sponsor_logo, player.sponsorLogo),
+    sponsor_logo: textValue(graphic.sponsor_logo, player.sponsor_logo),
+    sponsorLeadIn: textValue(graphic.sponsor_lead_in, player.sponsorLeadIn, "Presented by"),
+    sponsor_lead_in: textValue(graphic.sponsor_lead_in, player.sponsor_lead_in, "Presented by")
   });
 
   base.player = player;
@@ -1683,7 +1692,8 @@ function primaryGraphicVisible(record) {
 function themedVideoBoardSupported(alias) {
   return alias === "eight_bit_gameday" ||
     alias === "friday_night_stadium" ||
-    alias === "heritage_press";
+    alias === "heritage_press" ||
+    alias === "collegiate_traditional";
 }
 
 function themeVideoModeFor(alias, runtime) {
@@ -2183,7 +2193,8 @@ function nativeVideoBoardHost(root, alias, mode) {
 
   const auditedNativeBoards = Object.freeze({
     eight_bit_gameday: ".bl-8bit-video-board",
-    friday_night_stadium: ".bl-fns-video-board"
+    friday_night_stadium: ".bl-fns-video-board",
+    collegiate_traditional: ".bl-college-stage"
   });
 
   if (Object.prototype.hasOwnProperty.call(auditedNativeBoards, alias)) {

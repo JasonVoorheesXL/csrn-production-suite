@@ -52,6 +52,41 @@ def test_collegiate_football_uses_field_position_panel_not_legacy_down_box():
     assert "font-variant-numeric:tabular-nums" in css
 
 
+def test_collegiate_video_board_supports_player_highlight_and_sponsor_modes():
+    js = read("static/csrn-broadcast-layout-engine.js")
+    css = read("static/csrn-broadcast-layout-engine.css")
+    runtime = read("static/csrn-production-theme-runtime.js")
+
+    # Video board content is threaded from renderPackage() -> componentFrame()
+    # -> the collegiate scorebug renderer -> collegiateStage(), the same
+    # shape Friday Night Stadium's own boardMarkup()/videoContent() split
+    # uses, so it fits into the existing options.videoMode plumbing.
+    assert "componentFrame(component, manifest, state, sport, options.videoMode)" in js
+    assert "function componentFrame(component, manifest, state, sport, videoMode)" in js
+    assert "collegiate(state, sport, videoMode)" in js
+    assert "collegiateFootballScorebug(state, sport, videoMode)" in js
+    assert "function collegiateVideoBoardContent(state, mode)" in js
+    assert "function collegiateStage(state, videoMode)" in js
+    assert 'data-video-mode="highlight"' in js
+    assert 'data-video-mode="sponsor"' in js
+    assert 'data-video-mode="player"' in js
+    assert "function collegiateSponsorLockup" in js
+    assert "bl-college-sponsor-lockup" in js
+
+    # Registered into the shared runtime's video-board mode/host dispatch so
+    # the overlay actually calls into the above instead of leaving Collegiate
+    # on the legacy separate-zone player/highlight/sponsor components.
+    assert 'alias === "collegiate_traditional";' in runtime
+    assert "collegiate_traditional: \".bl-college-stage\"" in runtime
+    assert "eyebrow: textValue(graphic.eyebrow" in runtime
+    assert "sponsorName: textValue(graphic.sponsor_name" in runtime
+    assert "sponsorLogo: textValue(graphic.sponsor_logo" in runtime
+
+    assert "bl-college-video-replacement" in css
+    assert "bl-college-player-portrait" in css
+    assert "bl-college-sponsor-lockup" in css
+
+
 def test_collegiate_runtime_patches_live_field_state_without_rerender():
     runtime = read("static/csrn-production-theme-runtime.js")
     assert "function productionFieldState" in runtime

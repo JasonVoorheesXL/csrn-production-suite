@@ -676,12 +676,72 @@
     </div>`;
   }
 
-  function collegiateStage(state) {
+  function collegiateClashStage(state) {
+    return `${collegiateStageSide(state.visitor, "visitor")}
+      <div class="bl-college-vs">VS</div>
+      ${collegiateStageSide(state.home, "home")}`;
+  }
+
+  function collegiateSponsorLockup(entity) {
+    const name = String((entity && entity.sponsorName) || "").trim();
+    if (!name) return "";
+    const logo = (entity && entity.sponsorLogo) || "";
+    const leadIn = String((entity && entity.sponsorLeadIn) || "Presented by").trim() || "Presented by";
+    return `<div class="bl-college-sponsor-lockup">
+      ${logo ? `<img src="${esc(logo)}" alt="">` : ""}
+      <span><small>${esc(leadIn)}</small><b>${esc(name)}</b></span>
+    </div>`;
+  }
+
+  function collegiateSpotlightDetail(player) {
+    return [player.position, player.play_detail || player.detail]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  function collegiateVideoBoardContent(state, mode) {
+    if (mode === "highlight") {
+      const highlight = state.highlight || {};
+      return `<div class="bl-college-video-replacement bl-college-highlight" data-video-mode="highlight">
+        <div class="bl-college-video-feed">VIDEO</div>
+        <div class="bl-college-video-copy">
+          <small>PLAYER HIGHLIGHT</small>
+          <strong>${esc(highlight.title)}</strong>
+          <span>${esc(highlight.detail)}</span>
+        </div>
+      </div>`;
+    }
+    if (mode === "sponsor") {
+      const sponsor = state.sponsor || {};
+      return `<div class="bl-college-video-replacement bl-college-sponsor" data-video-mode="sponsor">
+        ${sponsor.logo ? `<img class="bl-college-sponsor-logo" src="${esc(sponsor.logo)}" alt="">` : ""}
+        <div class="bl-college-video-copy">
+          <small>PRESENTED BY</small>
+          <strong>${esc(sponsor.name)}</strong>
+          <span>${esc(sponsor.line)}</span>
+        </div>
+      </div>`;
+    }
+    if (mode === "player") {
+      const player = state.player || {};
+      return `<div class="bl-college-video-replacement bl-college-player" data-video-mode="player">
+        <div class="bl-college-player-portrait">${player.headshot ? `<img src="${esc(player.headshot)}" alt="">` : `<b>#${esc(player.number)}</b>`}</div>
+        <div class="bl-college-video-copy">
+          <small>${esc(player.eyebrow || "PLAYER SPOTLIGHT")}</small>
+          <strong>${esc(player.name)}</strong>
+          <span>${esc(collegiateSpotlightDetail(player))}</span>
+          ${collegiateSponsorLockup(player)}
+        </div>
+      </div>`;
+    }
+    return collegiateClashStage(state);
+  }
+
+  function collegiateStage(state, videoMode) {
     return `<section class="bl-college-stage" data-module="video.board">
       <div class="bl-college-stage-field" aria-hidden="true"></div>
-      ${collegiateStageSide(state.visitor, "visitor")}
-      <div class="bl-college-vs">VS</div>
-      ${collegiateStageSide(state.home, "home")}
+      ${collegiateVideoBoardContent(state, videoMode)}
     </section>`;
   }
 
@@ -756,12 +816,12 @@
     </section>`;
   }
 
-  function collegiateFootballScorebug(state, sport) {
+  function collegiateFootballScorebug(state, sport, videoMode) {
     return `<div class="bl-scorebug bl-collegiate bl-collegiate-tech bl-sport-${sport}" data-possession="${esc(state.game.possession || "home")}" ${collegiateThemeVars(state)}>
       <div class="bl-college-cabinet" aria-hidden="true"></div>
       <div class="bl-college-live-strip"><b>LIVE</b><span class="bl-college-ticker-copy">${esc(state.ticker.text || "CSRN LIVE")}</span><em>CSRN</em></div>
       ${collegiateScoreClockRow(state)}
-      <main class="bl-college-main-display">${collegiateTeamPanel(state.visitor, "visitor")}${collegiateStage(state)}${collegiateTeamPanel(state.home, "home")}</main>
+      <main class="bl-college-main-display">${collegiateTeamPanel(state.visitor, "visitor")}${collegiateStage(state, videoMode)}${collegiateTeamPanel(state.home, "home")}</main>
       <section class="bl-college-control-bank" data-module="game.state">
         ${collegiateField(state)}
       </section>
@@ -1126,9 +1186,9 @@
       </div>`;
     },
 
-    collegiate(state, sport) {
+    collegiate(state, sport, videoMode) {
       if (sport === "baseball" || sport === "softball") return baseballLineScore(state,"collegiate");
-      if (sport === "football") return collegiateFootballScorebug(state, sport);
+      if (sport === "football") return collegiateFootballScorebug(state, sport, videoMode);
       return `<div class="bl-scorebug bl-collegiate bl-sport-${sport}">
         <section class="bl-college-team bl-home">${explicitTeam(state.home,"home",{order:["logo","copy"],record:true})}</section>
         ${genericScore(state.home,"home")}${sportState(state,sport,"bl-college-state")}${genericScore(state.visitor,"visitor")}
@@ -1327,11 +1387,11 @@
     classic: familyRenderers("classic")
   });
 
-  function componentFrame(component, manifest, state, sport) {
+  function componentFrame(component, manifest, state, sport, videoMode) {
     if (component === "scorebug") {
       const renderer = SCOREBUG_RENDERERS[manifest.scorebugRenderer];
       if (!renderer) throw new Error(`Missing scorebug renderer: ${manifest.scorebugRenderer}`);
-      return renderer(state, sport);
+      return renderer(state, sport, videoMode);
     }
 
     const family = PACKAGE_COMPONENT_RENDERERS[manifest.componentRendererFamily];
@@ -1657,7 +1717,7 @@
       const node = document.createElement("section");
       node.className = `bl-component bl-${component}`;
       applyRect(node, placement);
-      node.innerHTML = componentFrame(component, manifest, state, sport);
+      node.innerHTML = componentFrame(component, manifest, state, sport, options.videoMode);
       root.appendChild(node);
     }
 
