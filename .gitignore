@@ -47,6 +47,7 @@ Data/Sponsors/
 Data/Backups/
 Data/Social/
 Data/Recaps/
+Data/Weather/weather_state.json
 
 # Local release output
 dist-release/
