@@ -15,7 +15,7 @@ from functools import wraps
 from pathlib import Path
 from datetime import date
 from threading import Lock
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 from urllib.parse import urlparse, quote
 
 from flask import Flask, current_app, jsonify, session
@@ -1690,24 +1690,145 @@ def persist_linked_state_snapshot(normalized: dict[str, Any]) -> None:
     broadcast_id = str(normalized.get("broadcast_id", "")).strip()
     if not broadcast_id:
         return
-    items = load_broadcasts()
-    item = next(
-        (row for row in items if row.get("broadcast_id") == broadcast_id),
-        None,
-    )
-    if not item:
-        return
     snapshot = copy.deepcopy(normalized)
-    snapshot["history"] = []
-    item["live_state"] = snapshot
-    item["status"] = normalized.get(
-        "status",
-        item.get("status", "planned"),
-    )
-    item["updated_at"] = int(time.time())
-    save_broadcasts(items)
-    detail = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
-    detail.write_text(json.dumps(item, indent=2), encoding="utf-8")
+    # Runs on a dedicated background thread (StateService's async linked-
+    # snapshot writer) whenever async_linked_snapshot=True, as it is for the
+    # production STATE_SERVICE — never inline on a request thread that might
+    # already hold `lock`. Taking `lock` here serializes this read-modify-
+    # write of Data/Broadcasts/*.json against write_broadcast_final_archive()
+    # below, which runs synchronously inside GameOperationsService's
+    # already-held transaction lock (the same `lock` object).
+    with lock:
+        items = load_broadcasts()
+        item = next(
+            (row for row in items if row.get("broadcast_id") == broadcast_id),
+            None,
+        )
+        if not item:
+            return
+        item["live_state"] = snapshot
+        item["status"] = normalized.get(
+            "status",
+            item.get("status", "planned"),
+        )
+        item["updated_at"] = int(time.time())
+        save_broadcasts(items)
+        write_broadcast_detail(item)
+
+
+def write_broadcast_final_archive(state: Mapping[str, Any]) -> bool:
+    """Archive a completed broadcast's full state — including its play-by-play
+    history — into Data/Broadcasts/<id>.json, and confirm the write by
+    reading it back from disk before reporting success.
+
+    Must be called while `lock` is already held (GameOperationsService runs
+    this synchronously inside its transaction lock), so it can't race the
+    background linked-snapshot writer above.
+
+    Returns True only once the archive has been verified on disk to contain
+    the expected history/events/plays. The caller (GameOperationsService)
+    must not clear the live state unless this returns True.
+    """
+    broadcast_id = str(state.get("broadcast_id", "")).strip()
+    if not broadcast_id:
+        return False
+
+    snapshot = copy.deepcopy(dict(state))
+    expected_history = list(snapshot.get("history") or [])
+    expected_events = list(snapshot.get("events") or [])
+    expected_plays = list(snapshot.get("plays") or [])
+
+    try:
+        items = load_broadcasts()
+        item = next(
+            (row for row in items if row.get("broadcast_id") == broadcast_id),
+            None,
+        )
+        if item is None:
+            return False
+        item["final_state_archive"] = snapshot
+        item["final_state_archived_at"] = int(time.time())
+        # Also bring the ongoing live-mirror up to the same, uncleared
+        # snapshot right now — the regular async mirror will overwrite it
+        # again shortly after with the (soon to be cleared) live state, which
+        # is fine: final_state_archive above is the durable record, live_state
+        # is only ever a reflection of whatever state.json currently holds.
+        item["live_state"] = copy.deepcopy(snapshot)
+        item["status"] = snapshot.get("status", item.get("status", "planned"))
+        item["updated_at"] = int(time.time())
+        save_broadcasts(items)
+        write_broadcast_detail(item)
+    except Exception:
+        return False
+
+    detail_path = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
+    try:
+        written = json.loads(detail_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(written, dict):
+        return False
+    archive = written.get("final_state_archive")
+    if not isinstance(archive, dict):
+        return False
+    if str(archive.get("broadcast_id", "")).strip() != broadcast_id:
+        return False
+    if (
+        list(archive.get("history") or []) != expected_history
+        or list(archive.get("events") or []) != expected_events
+        or list(archive.get("plays") or []) != expected_plays
+    ):
+        return False
+    return True
+
+
+def load_final_state_archive(broadcast_id: str) -> dict[str, Any] | None:
+    key = str(broadcast_id or "").strip()
+    if not key:
+        return None
+    detail_path = DATA_DIR / "Broadcasts" / f"{key}.json"
+    try:
+        item = json.loads(detail_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(item, dict):
+        return None
+    archive = item.get("final_state_archive")
+    return archive if isinstance(archive, dict) else None
+
+
+def load_state_for_reporting() -> dict[str, Any]:
+    """Read-only variant of load_state() for reporting consumers (recap
+    generation, social drafting, the statistics and play-register endpoints)
+    that may run after a broadcast has been finalized.
+
+    GameOperationsService.end_game() clears history/events/plays from the
+    live state.json once it has confirmed a full archive was written (see
+    write_broadcast_final_archive above). A reporting request made after
+    that point would otherwise see an empty game, so once state.json shows
+    a completed broadcast with those fields empty, this transparently backs
+    them from the archived snapshot in Data/Broadcasts/<id>.json.
+
+    Never use this for state mutation — only load_state()/save_state() are
+    the write path, and mutating a copy built from the archived fallback
+    would write archived history back into "live" state.
+    """
+    state = load_state()
+    if str(state.get("status", "")).strip().lower() != "completed":
+        return state
+    if state.get("history") or state.get("events") or state.get("plays"):
+        return state
+    broadcast_id = str(state.get("broadcast_id", "") or "").strip()
+    if not broadcast_id:
+        return state
+    archive = load_final_state_archive(broadcast_id)
+    if not archive:
+        return state
+    result = dict(state)
+    for key in ("history", "events", "plays"):
+        if archive.get(key):
+            result[key] = copy.deepcopy(archive[key])
+    return result
 
 
 def get_state_service() -> StateService:
@@ -2158,6 +2279,7 @@ def get_game_operations_service() -> GameOperationsService:
             update_linked_status=update_linked_broadcast_status,
             load_config=load_config,
             command_scorebug_visibility=command_scorebug_visibility,
+            archive_final_state=write_broadcast_final_archive,
             transaction_lock=lock,
         )
     return GAME_OPERATIONS_SERVICE
@@ -2171,6 +2293,7 @@ LIVE_GAME_ROUTES_BLUEPRINT = create_live_game_blueprint(
         get_rules_service=lambda: get_rules_service(),
         get_statistics_service=lambda: get_statistics_service(),
         load_state=lambda: load_state(),
+        load_state_for_reporting=lambda: load_state_for_reporting(),
     )
 )
 APPLICATION_BLUEPRINTS.append(LIVE_GAME_ROUTES_BLUEPRINT)
@@ -2639,7 +2762,7 @@ def get_social_service() -> SocialPublishingService:
             adapters=default_adapter_registry(
                 credential_resolver=FACEBOOK_CREDENTIAL_VAULT.resolve
             ),
-            load_broadcast_state=load_state,
+            load_broadcast_state=load_state_for_reporting,
             load_config=load_config,
             load_rosters=load_rosters,
             load_sponsors=load_sponsors,
@@ -2701,7 +2824,7 @@ def get_recap_service() -> GroundedGameRecapService:
     if RECAP_SERVICE is None:
         RECAP_SERVICE = GroundedGameRecapService(
             state_file=RECAP_STATE_FILE,
-            load_broadcast_state=load_state,
+            load_broadcast_state=load_state_for_reporting,
             create_social_draft=_create_recap_social_draft,
             clock=time.time,
         )

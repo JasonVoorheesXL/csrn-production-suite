@@ -95,6 +95,7 @@ class GameOperationsService:
         load_config: Callable[[], Mapping[str, Any]],
         command_scorebug_visibility: Callable[[bool], Any],
         transaction_lock: Any,
+        archive_final_state: Callable[[Mapping[str, Any]], bool] | None = None,
     ) -> None:
         self._load_state = load_state
         self._save_state = save_state
@@ -106,6 +107,7 @@ class GameOperationsService:
         self._load_config = load_config
         self._command_scorebug_visibility = command_scorebug_visibility
         self._transaction_lock = transaction_lock
+        self._archive_final_state = archive_final_state
 
     def score(self, payload: Mapping[str, Any] | None) -> GameOperationsResult:
         incoming = dict(payload or {})
@@ -272,6 +274,7 @@ class GameOperationsService:
                                 "final_visitor_score": state.get("visitor_score", 0),
                             },
                         )
+                    self._archive_and_clear_history_if_final(state, result_data)
                 return GameOperationsResult("OK", result_data)
 
             self._push_history(state)
@@ -377,6 +380,52 @@ class GameOperationsService:
             self._save_state(state)
             return GameOperationsResult("OK", result_data)
 
+    def _archive_and_clear_history_if_final(
+        self,
+        state: dict[str, Any],
+        result_data: dict[str, Any],
+    ) -> None:
+        """Once a broadcast has just been saved as 'completed', archive its
+        full state (including history) and, only if that archive is
+        confirmed written to disk, clear history/events/plays from the live
+        state.
+
+        Must run inside the caller's already-held transaction lock (both
+        end_game() and set_values()'s final_game branch call this from
+        within `with self._transaction_lock:`), so the archive write can't
+        race the background linked-snapshot writer.
+
+        If archiving fails or can't be confirmed, live state is left
+        completely untouched — history/events/plays are not cleared — and
+        an "archive_error" message is attached to the response state so the
+        operator sees it, instead of the data silently disappearing.
+        """
+        if self._archive_final_state is None:
+            return
+        if str(state.get("status", "")).strip().lower() != "completed":
+            return
+
+        try:
+            archived = bool(self._archive_final_state(state))
+            error_message = "" if archived else (
+                "Broadcast archive could not be confirmed; "
+                "live game history was not cleared."
+            )
+        except Exception as exc:
+            archived = False
+            error_message = f"Broadcast archive failed: {exc}"
+
+        response_state = dict(result_data.get("state") or {})
+        if archived:
+            state["history"] = []
+            state["events"] = []
+            state["plays"] = []
+            self._save_state(state)
+            response_state = copy.deepcopy(state)
+        else:
+            response_state["archive_error"] = error_message
+        result_data["state"] = response_state
+
     def end_game(self, payload: Mapping[str, Any] | None = None) -> GameOperationsResult:
         incoming = dict(payload or {})
         command_id = command_id_from(incoming)
@@ -406,6 +455,7 @@ class GameOperationsService:
                     "final_visitor_score": state.get("visitor_score", 0),
                 },
             )
+            self._archive_and_clear_history_if_final(state, result_data)
             return GameOperationsResult("OK", result_data)
 
     def reset_data(self, payload: Mapping[str, Any] | None = None) -> GameOperationsResult:

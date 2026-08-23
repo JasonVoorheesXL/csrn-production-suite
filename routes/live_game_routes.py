@@ -30,6 +30,12 @@ class LiveGameRoutesDependencies:
     get_rules_service: Callable[[], Any]
     get_statistics_service: Callable[[], Any]
     load_state: Callable[[], State]
+    # Optional: falls back to load_state when not provided (e.g. in tests that
+    # don't exercise the post-finalization reporting path). When provided,
+    # this is a read-only variant that backfills history/events/plays from
+    # the archived per-broadcast file once a broadcast has been finalized and
+    # its live state cleared — see app.load_state_for_reporting().
+    load_state_for_reporting: Callable[[], State] | None = None
 
 
 def create_live_game_blueprint(
@@ -38,6 +44,10 @@ def create_live_game_blueprint(
     """Create live-game routes without importing the application root."""
 
     routes = Blueprint("live_game_routes", __name__)
+
+    def load_state_for_reporting() -> State:
+        loader = dependencies.load_state_for_reporting or dependencies.load_state
+        return loader()
 
     def state_summary(state: State | None) -> dict[str, Any]:
         if not isinstance(state, dict):
@@ -152,14 +162,14 @@ def create_live_game_blueprint(
     @dependencies.require_auth
     def statistics_report():
         result = dependencies.get_statistics_service().report(
-            dependencies.load_state()
+            load_state_for_reporting()
         )
         return jsonify(result.data["statistics"])
 
     @routes.get("/api/play-register")
     @dependencies.require_auth
     def play_register():
-        state = dependencies.load_state()
+        state = load_state_for_reporting()
         plays = [play for play in list(state.get("plays") or []) if isinstance(play, dict)]
         events = [event for event in list(state.get("events") or []) if isinstance(event, dict)]
         payload = {
