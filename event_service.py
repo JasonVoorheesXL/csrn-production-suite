@@ -96,6 +96,15 @@ class EventService:
         return self._transaction_lock if self._transaction_lock is not None else nullcontext()
 
     @staticmethod
+    def _player_matches_submitted_number(player: Any, submitted: Any) -> bool:
+        if not player or not isinstance(submitted, Mapping):
+            return True
+        number = str(submitted.get("number", "") or "").strip()
+        if not number:
+            return True
+        return str(player.get("number", "") or "").strip() == number
+
+    @staticmethod
     def _coord_to_spot(coord: Any) -> str:
         try:
             value = max(0, min(100, int(coord)))
@@ -463,6 +472,18 @@ class EventService:
                 str(incoming.get("roster_id", "")),
                 str(incoming.get("passer_id", "")),
             )
+            if not self._player_matches_submitted_number(
+                player,
+                incoming.get("manual_player"),
+            ):
+                player = None
+                incoming["player_id"] = ""
+            if not self._player_matches_submitted_number(
+                passer,
+                incoming.get("manual_passer"),
+            ):
+                passer = None
+                incoming["passer_id"] = ""
             player = player or self._manual_player(
                 incoming.get("manual_player"),
                 team_name,
@@ -541,7 +562,11 @@ class EventService:
                 30,
                 0,
             )
-            if (event_code in {"TD", "2PT"} or return_td) and player:
+            if (
+                (event_code in {"TD", "2PT"} or return_td)
+                and player
+                and str(player.get("id", "") or "").strip()
+            ):
                 eyebrow = (
                     "TWO-POINT CONVERSION"
                     if event_code == "2PT"

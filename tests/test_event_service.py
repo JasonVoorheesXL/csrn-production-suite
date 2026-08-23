@@ -233,6 +233,24 @@ def test_touchdown_player_graphic_is_requested() -> None:
     assert store["player_graphic"]["visible"] is True
 
 
+def test_touchdown_ignores_stale_player_id_when_submitted_number_differs() -> None:
+    service, store, calls, _ = build_service()
+    result = service.trigger({
+        "team": "home",
+        "event": "TD",
+        "player_id": "P1",
+        "play_type": "rush",
+        "manual_player": {"number": "88", "name": ""},
+        "graphic_duration": 8,
+    })
+
+    assert result.ok
+    assert calls["graphics"] == []
+    assert store["events"][0]["automation"]["player_id"] == ""
+    assert store["events"][0]["automation"]["player_number"] == "88"
+    assert store["events"][0]["automation"]["player_name"] == "Home"
+
+
 def test_quick_correction_rejects_invalid_down() -> None:
     state = base_state()
     state["game_data_authority"] = "statistician"
