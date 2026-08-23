@@ -7,6 +7,7 @@ import os
 import sys
 import re
 import secrets
+import signal
 import time
 import shutil
 from functools import wraps
@@ -2795,10 +2796,37 @@ def create_app(
 app = create_app()
 
 
+def _record_clean_shutdown_and_stop(signum, frame):
+    """Handle a deliberate SIGINT/SIGTERM (e.g. Ctrl+C) by writing the clean
+    shutdown marker before the process exits.
+
+    This intentionally does NOT run on a force-kill (e.g. `taskkill /F`,
+    which delivers no catchable signal) or on an unhandled crash — those
+    cases must still leave the marker in place so the next startup reports
+    UNCLEAN_SHUTDOWN_DETECTED.
+    """
+    try:
+        signal_name = signal.Signals(signum).name
+    except ValueError:
+        signal_name = str(signum)
+    try:
+        get_recovery_service().mark_clean_shutdown()
+        print(f"\nReceived {signal_name} — recording clean application shutdown...")
+    except Exception as exc:
+        print(f"[WARN] Could not record clean shutdown marker: {exc}")
+    # Re-raise so Waitress's own (SystemExit, KeyboardInterrupt) handling in
+    # server.run() still gets a chance to close its sockets cleanly.
+    raise SystemExit(0)
+
+
 if __name__ == "__main__":
     ensure_data_architecture()
     load_config()
     from waitress import serve
+
+    signal.signal(signal.SIGINT, _record_clean_shutdown_and_stop)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, _record_clean_shutdown_and_stop)
 
     ip = local_ip()
     print("\nCSRN Production Suite — Command Center is running.")
