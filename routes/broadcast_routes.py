@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 
 
 RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
@@ -13,6 +13,7 @@ RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
 class BroadcastRoutesDependencies:
     require_auth: RouteDecorator
     get_broadcast_service: Callable[[], Any]
+    get_broadcaster_print_service: Callable[[], Any]
 
 
 def create_broadcast_blueprint(
@@ -79,5 +80,34 @@ def create_broadcast_blueprint(
         if result.code == "NOT_FOUND":
             return jsonify({"error": "NOT_FOUND"}), 404
         return jsonify(result.data)
+
+    @routes.get("/api/broadcasts/<broadcast_id>/broadcaster-print-sheet.pdf")
+    @dependencies.require_auth
+    def broadcaster_print_sheet(broadcast_id: str):
+        result = dependencies.get_broadcaster_print_service().generate(broadcast_id)
+
+        if result.code == "BROADCAST_NOT_FOUND":
+            return jsonify({"error": result.code}), 404
+
+        if result.code == "PDF_GENERATION_FAILED":
+            return jsonify(
+                {
+                    "error": result.code,
+                    "message": result.data.get(
+                        "message",
+                        "Unable to generate broadcaster print sheet.",
+                    ),
+                }
+            ), 500
+
+        response = Response(
+            result.data["pdf"],
+            mimetype="application/pdf",
+        )
+        response.headers["Content-Disposition"] = (
+            f'attachment; filename="{result.data["filename"]}"'
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     return routes

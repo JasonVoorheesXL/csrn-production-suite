@@ -197,3 +197,5 @@ def test_program_visual_mode_preserves_service_payload(obs_client) -> None:
         "obs": {"scene": "Halftime"},
     }
     assert service.calls == [("program_visual_mode", "halftime")]
+
+

@@ -20,6 +20,9 @@ class AssociationRoutesDependencies:
     get_workflow_service: Callable[[], Any]
     get_import_service: Callable[[], Any]
     get_supplement_service: Callable[[], Any]
+    get_dragonfly_service: Callable[[], Any]
+    get_dragonfly_sync_service: Callable[[], Any]
+    get_school_service: Callable[[], Any]
     load_mhsaa_profile: ManifestLoader
     load_mhsaa_manifest: ManifestLoader
     load_mhsaa_branding_manifest: ManifestLoader
@@ -213,6 +216,157 @@ def create_association_blueprint(
         )
         if not result.ok:
             return error_response(result.code)
+        return jsonify(result.data)
+
+    @routes.post("/api/imports/dragonfly/preview")
+    @dependencies.require_auth
+    def preview_dragonfly_school():
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return error_response("INVALID_REQUEST_PAYLOAD")
+
+        school_name = str(payload.get("school_name", "")).strip()
+        if not school_name:
+            return error_response("SCHOOL_NAME_REQUIRED")
+
+        result = dependencies.get_dragonfly_service().preview_school(
+            school_name,
+            association=str(
+                payload.get("association", "MHSAA")
+            ).strip() or "MHSAA",
+            city=str(payload.get("city", "")).strip(),
+            state=str(payload.get("state", "MS")).strip() or "MS",
+            sport=str(payload.get("sport", "FB")).strip() or "FB",
+        )
+
+        if not result.ok:
+            return error_response(result.code)
+
+        return jsonify(result.data)
+
+    @routes.post("/api/imports/dragonfly/sync-preview")
+    @dependencies.require_auth
+    def preview_dragonfly_sync():
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return error_response("INVALID_REQUEST_PAYLOAD")
+
+        school_name = str(payload.get("school_name", "")).strip()
+        if not school_name:
+            return error_response("SCHOOL_NAME_REQUIRED")
+
+        result = dependencies.get_dragonfly_sync_service().preview(
+            school_name,
+            school_id=str(payload.get("school_id", "")).strip(),
+            association=str(
+                payload.get("association", "MHSAA")
+            ).strip() or "MHSAA",
+            city=str(payload.get("city", "")).strip(),
+            state=str(payload.get("state", "MS")).strip() or "MS",
+            sport=str(payload.get("sport", "FB")).strip() or "FB",
+            csrn_sport=str(
+                payload.get("csrn_sport", "Football")
+            ).strip() or "Football",
+            season=str(payload.get("season", "2026")).strip() or "2026",
+            level=str(payload.get("level", "Varsity")).strip() or "Varsity",
+            division=str(
+                payload.get("division", "Boys")
+            ).strip() or "Boys",
+        )
+
+        if not result.ok:
+            return error_response(result.code)
+
+        return jsonify(result.data)
+
+    @routes.post("/api/imports/dragonfly/replace-roster")
+    @dependencies.require_auth
+    def replace_dragonfly_roster():
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return error_response("INVALID_REQUEST_PAYLOAD")
+
+        school_name = str(payload.get("school_name", "")).strip()
+        if not school_name:
+            return error_response("SCHOOL_NAME_REQUIRED")
+
+        result = dependencies.get_dragonfly_sync_service().replace_roster(
+            school_name,
+            approved=association_bool(payload.get("approved")),
+            school_id=str(payload.get("school_id", "")).strip(),
+            association=str(
+                payload.get("association", "MHSAA")
+            ).strip() or "MHSAA",
+            city=str(payload.get("city", "")).strip(),
+            state=str(payload.get("state", "MS")).strip() or "MS",
+            sport=str(payload.get("sport", "FB")).strip() or "FB",
+            csrn_sport=str(
+                payload.get("csrn_sport", "Football")
+            ).strip() or "Football",
+            season=str(payload.get("season", "2026")).strip() or "2026",
+            level=str(payload.get("level", "Varsity")).strip() or "Varsity",
+            division=str(
+                payload.get("division", "Boys")
+            ).strip() or "Boys",
+        )
+
+        if not result.ok:
+            return error_response(result.code)
+
+        return jsonify(result.data)
+
+    @routes.post("/api/imports/dragonfly/school-info-preview")
+    @dependencies.require_auth
+    def preview_dragonfly_school_info():
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return error_response("INVALID_REQUEST_PAYLOAD")
+
+        school_name = str(payload.get("school_name", "")).strip()
+        if not school_name:
+            return error_response("SCHOOL_NAME_REQUIRED")
+
+        result = dependencies.get_dragonfly_sync_service().preview_school_info(
+            school_name,
+            school_id=str(payload.get("school_id", "")).strip(),
+            association=str(
+                payload.get("association", "MHSAA")
+            ).strip() or "MHSAA",
+            city=str(payload.get("city", "")).strip(),
+            state=str(payload.get("state", "MS")).strip() or "MS",
+        )
+
+        if not result.ok:
+            return error_response(result.code)
+
+        return jsonify(result.data)
+
+    @routes.post("/api/imports/dragonfly/school-info-apply")
+    @dependencies.require_auth
+    def apply_dragonfly_school_info():
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return error_response("INVALID_REQUEST_PAYLOAD")
+
+        school_name = str(payload.get("school_name", "")).strip()
+        if not school_name:
+            return error_response("SCHOOL_NAME_REQUIRED")
+
+        result = dependencies.get_dragonfly_sync_service().apply_safe_school_info(
+            school_name,
+            approved=association_bool(payload.get("approved")),
+            school_id=str(payload.get("school_id", "")).strip(),
+            association=str(
+                payload.get("association", "MHSAA")
+            ).strip() or "MHSAA",
+            city=str(payload.get("city", "")).strip(),
+            state=str(payload.get("state", "MS")).strip() or "MS",
+            school_service=dependencies.get_school_service(),
+        )
+
+        if not result.ok:
+            return error_response(result.code)
+
         return jsonify(result.data)
 
     @routes.get("/api/imports/mhsaa/5A/analyze")

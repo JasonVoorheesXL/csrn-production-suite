@@ -277,3 +277,5 @@ def test_connection_qr_preserves_svg_response(support_client) -> None:
     assert response.mimetype == "image/svg+xml"
     assert response.headers["Cache-Control"] == "no-store"
     assert service.calls == [("qr_svg", url)]
+
+

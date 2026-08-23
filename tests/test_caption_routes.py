@@ -69,10 +69,28 @@ class StubCaptionService:
         return CaptionServiceResult("OK", {"content": f"VTT {broadcast_id}", "mimetype": "text/vtt"})
 
 
+class StubCaptionRuntime:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def status(self):
+        self.calls.append("status")
+        return {"running": False, "message": "Live captions are stopped."}
+
+    def start(self):
+        self.calls.append("start")
+        return {"running": True, "message": "Live captions started."}
+
+    def stop(self):
+        self.calls.append("stop")
+        return {"running": False, "message": "Live captions stopped."}
+
+
 @pytest.fixture
 def caption_client():
     app = Flask(__name__, template_folder="../templates")
     service = StubCaptionService()
+    runtime = StubCaptionRuntime()
 
     def require_auth(function):
         function._auth_required = True
@@ -83,22 +101,23 @@ def caption_client():
             CaptionRoutesDependencies(
                 require_auth=require_auth,
                 get_caption_service=lambda: service,
+                get_caption_runtime=lambda: runtime,
             )
         )
     )
     app.config["TESTING"] = True
-    return app.test_client(), service
+    return app.test_client(), service, runtime
 
 
 def test_public_overlay_page(caption_client) -> None:
-    client, _ = caption_client
+    client, _, _ = caption_client
     response = client.get("/captions")
     assert response.status_code == 200
     assert b"CSRN Captions" in response.data
 
 
 def test_public_overlay_state(caption_client) -> None:
-    client, service = caption_client
+    client, service, _ = caption_client
     response = client.get("/api/captions/overlay-state")
     assert response.status_code == 200
     assert response.get_json()["visible"] is True
@@ -106,85 +125,113 @@ def test_public_overlay_state(caption_client) -> None:
 
 
 def test_status_route(caption_client) -> None:
-    client, _ = caption_client
-    assert client.get("/api/captions/status").status_code == 200
+    client, _, runtime = caption_client
+    response = client.get("/api/captions/status")
+    assert response.status_code == 200
+    assert response.get_json()["runtime"]["running"] is False
+    assert "status" in runtime.calls
+
+
+def test_audio_devices_route_reports_input_devices(caption_client, monkeypatch) -> None:
+    client, _, _ = caption_client
+    monkeypatch.setattr(
+        "routes.caption_routes.available_audio_input_devices",
+        lambda: {"available": True, "devices": [{"id": "0", "name": "USB Audio", "channels": 2}]},
+    )
+    response = client.get("/api/captions/audio-devices")
+    assert response.status_code == 200
+    assert response.get_json()["devices"][0]["name"] == "USB Audio"
+
+
+def test_live_caption_runtime_routes(caption_client) -> None:
+    client, _, runtime = caption_client
+    started = client.post("/api/captions/live/start")
+    stopped = client.post("/api/captions/live/stop")
+    assert started.status_code == 200
+    assert started.get_json()["runtime"]["running"] is True
+    assert stopped.status_code == 200
+    assert stopped.get_json()["runtime"]["running"] is False
+    assert "start" in runtime.calls
+    assert "stop" in runtime.calls
 
 
 def test_profile_route(caption_client) -> None:
-    client, service = caption_client
+    client, service, _ = caption_client
     response = client.put("/api/captions/profile", json={"enabled": True})
     assert response.status_code == 200
     assert service.profile_payload == {"enabled": True}
 
 
 def test_profile_route_rejects_invalid(caption_client) -> None:
-    client, _ = caption_client
+    client, _, _ = caption_client
     response = client.put("/api/captions/profile", json={"invalid": True})
     assert response.status_code == 400
     assert response.get_json()["error"] == "INVALID_PROFILE"
 
 
 def test_ingest_route_created(caption_client) -> None:
-    client, service = caption_client
+    client, service, _ = caption_client
     response = client.post("/api/captions/segments", json={"channel": 1, "text": "Hello"})
     assert response.status_code == 201
     assert service.segment_payload["channel"] == 1
 
 
 def test_ingest_route_low_confidence_is_accepted_for_filtering(caption_client) -> None:
-    client, _ = caption_client
+    client, _, _ = caption_client
     response = client.post("/api/captions/segments", json={"result": "LOW_CONFIDENCE"})
     assert response.status_code == 202
 
 
 def test_ingest_route_disabled_channel_conflict(caption_client) -> None:
-    client, _ = caption_client
+    client, _, _ = caption_client
     response = client.post("/api/captions/segments", json={"result": "CHANNEL_DISABLED"})
     assert response.status_code == 409
 
 
 def test_visibility_route(caption_client) -> None:
-    client, service = caption_client
+    client, service, _ = caption_client
     response = client.post("/api/captions/visibility", json={"visible": False})
     assert response.status_code == 200
     assert service.visibility_value is False
 
 
 def test_visibility_route_requires_boolean(caption_client) -> None:
-    client, _ = caption_client
+    client, _, _ = caption_client
     assert client.post("/api/captions/visibility", json={"visible": "yes"}).status_code == 400
 
 
 def test_clear_route(caption_client) -> None:
-    client, service = caption_client
+    client, service, _ = caption_client
     assert client.post("/api/captions/clear").status_code == 200
     assert "clear" in service.calls
 
 
 def test_correction_route(caption_client) -> None:
-    client, service = caption_client
+    client, service, _ = caption_client
     response = client.patch("/api/captions/segments/seg-1", json={"text": "Corrected"})
     assert response.status_code == 200
     assert service.correction == ("seg-1", "Corrected")
 
 
 def test_correction_route_not_found(caption_client) -> None:
-    client, _ = caption_client
+    client, _, _ = caption_client
     assert client.patch("/api/captions/segments/missing", json={"text": "Corrected"}).status_code == 404
 
 
 def test_transcript_json_route(caption_client) -> None:
-    client, _ = caption_client
+    client, _, _ = caption_client
     response = client.get("/api/captions/transcripts/game-1")
     assert response.status_code == 200
     assert response.get_json()["broadcast_id"] == "game-1"
 
 
 def test_transcript_export_routes(caption_client) -> None:
-    client, _ = caption_client
+    client, _, _ = caption_client
     srt = client.get("/api/captions/transcripts/game-1.srt")
     vtt = client.get("/api/captions/transcripts/game-1.vtt")
     assert srt.status_code == 200
     assert b"SRT game-1" in srt.data
     assert vtt.status_code == 200
     assert b"VTT game-1" in vtt.data
+
+

@@ -7,6 +7,7 @@ import pytest
 
 from core_repositories import (
     ConfigurationRepository,
+    LocalMirroredStateRepository,
     RepositoryValidationError,
     SecurityRepository,
     StateRepository,
@@ -176,6 +177,52 @@ def test_state_rejects_invalid_score_type(tmp_path: Path) -> None:
         repository.save({**STATE_DEFAULTS, "home_score": "seven"})
 
 
+def test_local_mirrored_state_recovers_newer_drive_revision(tmp_path: Path) -> None:
+    persistence = engine(tmp_path)
+    local = tmp_path / "Local" / "state.json"
+    mirror = tmp_path / "Drive" / "state.json"
+    StateRepository(persistence, mirror, STATE_DEFAULTS).replace(
+        {**STATE_DEFAULTS, "broadcast_id": "drive-game", "state_revision": 8}
+    )
+    StateRepository(persistence, local, STATE_DEFAULTS).replace(
+        {**STATE_DEFAULTS, "broadcast_id": "old-local", "state_revision": 3}
+    )
+
+    repository = LocalMirroredStateRepository(
+        persistence,
+        authority_path=local,
+        mirror_path=mirror,
+        defaults=STATE_DEFAULTS,
+    )
+
+    loaded = repository.load()
+
+    assert loaded["broadcast_id"] == "drive-game"
+    assert loaded["state_revision"] == 8
+    assert json.loads(local.read_text(encoding="utf-8"))["state_revision"] == 8
+
+
+def test_local_mirrored_state_commits_locally_before_mirror(tmp_path: Path) -> None:
+    persistence = engine(tmp_path)
+    local = tmp_path / "Local" / "state.json"
+    mirror = tmp_path / "Drive" / "state.json"
+    repository = LocalMirroredStateRepository(
+        persistence,
+        authority_path=local,
+        mirror_path=mirror,
+        defaults=STATE_DEFAULTS,
+    )
+
+    stored = repository.replace(
+        {**STATE_DEFAULTS, "broadcast_id": "live-game", "state_revision": 12}
+    )
+
+    persisted = json.loads(local.read_text(encoding="utf-8"))
+    assert stored["state_revision"] == 12
+    assert persisted["broadcast_id"] == "live-game"
+    assert persisted["state_revision"] == 12
+
+
 def test_security_failed_attempt_workflow(tmp_path: Path) -> None:
     repository = SecurityRepository(engine(tmp_path), tmp_path / "security.json", SECURITY_DEFAULTS)
 
@@ -238,3 +285,5 @@ def test_security_rejects_negative_failed_attempts(tmp_path: Path) -> None:
 
     with pytest.raises(RepositoryValidationError):
         repository.save({**SECURITY_DEFAULTS, "failed_attempts": -1})
+
+

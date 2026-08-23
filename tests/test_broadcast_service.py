@@ -513,3 +513,4 @@ def test_update_nonofficial_contest_forces_region_game_false() -> None:
     assert record["contest_type"] == "exhibition"
     assert record["record_policy"] == "non_record"
     assert record["region_game"] is False
+

@@ -270,3 +270,5 @@ def test_missing_mapped_source_fields_are_reported_as_warnings() -> None:
     assert result.data["warnings"]["missing_source_fields"] == [
         "school.city"
     ]
+
+

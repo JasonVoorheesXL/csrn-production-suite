@@ -309,3 +309,5 @@ def test_migrate_legacy_names_is_idempotent() -> None:
     second = service.migrate_legacy_names()
     assert second.data["migrated"] == 0
     assert len(store.saved) == 1
+
+

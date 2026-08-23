@@ -199,3 +199,5 @@ def test_non_mapping_payload_and_social_block_are_rejected() -> None:
     }
     assert config["application"]["version"] == "old-version"
     assert saved == []
+
+

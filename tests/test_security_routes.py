@@ -112,3 +112,5 @@ def test_third_failed_login_applies_lockout(security_client) -> None:
     blocked = client.post("/api/login", json={"pin": "123456"})
     assert blocked.status_code == 429
     assert blocked.get_json()["error"] == "LOCKED"
+
+

@@ -30,7 +30,7 @@ class CaptionService:
     DEFAULT_PROFILE: dict[str, Any] = {
         "enabled": False,
         "overlay_visible": False,
-        "minimum_confidence": 0.72,
+        "minimum_confidence": 0.45,
         "display_delay_ms": 1200,
         "display_duration_ms": 6500,
         "max_lines": 2,
@@ -38,11 +38,20 @@ class CaptionService:
         "profanity_policy": "mask",
         "profanity_words": [],
         "theme": "standard",
+        "source_type": "manual",
+        "audio_device": "",
+        "audio_device_name": "",
+        "audio_device_host_api": "",
+        "audio_device_channels": 0,
+        "audio_capture_dtype": "float32",
+        "caption_model": "small.en",
+        "channel_mode": "speaker_labeled",
+        "speech_threshold": 0.00075,
         "channels": [
-            {"channel": 1, "speaker": "Announcer 1", "enabled": True},
-            {"channel": 2, "speaker": "Announcer 2", "enabled": True},
-            {"channel": 3, "speaker": "Announcer 3", "enabled": False},
-            {"channel": 4, "speaker": "Announcer 4", "enabled": False},
+            {"channel": 1, "device_channel": 1, "speaker": "Announcer 1", "enabled": True},
+            {"channel": 2, "device_channel": 2, "speaker": "Announcer 2", "enabled": True},
+            {"channel": 3, "device_channel": 3, "speaker": "Announcer 3", "enabled": False},
+            {"channel": 4, "device_channel": 4, "speaker": "Announcer 4", "enabled": False},
         ],
     }
 
@@ -67,6 +76,7 @@ class CaptionService:
         self.transcripts_dir = transcripts_dir
         self._clock = clock
         self._lock = Lock()
+        self._pending_transcript_segments: dict[str, list[dict[str, Any]]] = {}
         self.profile_file.parent.mkdir(parents=True, exist_ok=True)
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         self.transcripts_dir.mkdir(parents=True, exist_ok=True)
@@ -122,6 +132,15 @@ class CaptionService:
                 "profanity_policy",
                 "profanity_words",
                 "theme",
+                "source_type",
+                "audio_device",
+                "audio_device_name",
+                "audio_device_host_api",
+                "audio_device_channels",
+                "audio_capture_dtype",
+                "caption_model",
+                "channel_mode",
+                "speech_threshold",
                 "channels",
             ):
                 if key in payload:
@@ -201,10 +220,27 @@ class CaptionService:
                 "created_at_ms": created_at_ms,
                 "corrected": False,
             }
+            pending_transcript = self._pending_transcript_segments.pop(broadcast_id, [])
             transcript = self._load_transcript(broadcast_id)
+            transcript.extend(copy.deepcopy(pending_transcript))
             transcript.append(segment)
+            unique_transcript = {}
+            for item in transcript:
+                unique_transcript[str(item.get("id") or uuid.uuid4())] = item
+            transcript = list(unique_transcript.values())
             transcript.sort(key=lambda item: (int(item.get("start_ms", 0)), item.get("id", "")))
-            self._write_json(self._transcript_path(broadcast_id), transcript)
+            transcript_warning = ""
+            try:
+                self._write_json(self._transcript_path(broadcast_id), transcript)
+            except OSError as error:
+                # Google Drive can briefly lock transcript files during sync. Live
+                # caption delivery should keep going even if archival persistence
+                # needs to catch the next segment.
+                self._pending_transcript_segments[broadcast_id] = [
+                    *copy.deepcopy(pending_transcript),
+                    copy.deepcopy(segment),
+                ]
+                transcript_warning = str(error)
 
             state = self._load_state()
             current = list(state.get("current", []))
@@ -221,7 +257,10 @@ class CaptionService:
                 }
             )
             self._write_json(self.state_file, state)
-            return CaptionServiceResult("OK", {"segment": copy.deepcopy(segment), "state": state})
+            data = {"segment": copy.deepcopy(segment), "state": state}
+            if transcript_warning:
+                data["transcript_warning"] = transcript_warning
+            return CaptionServiceResult("OK", data)
 
     def set_visibility(self, visible: Any) -> CaptionServiceResult:
         if not isinstance(visible, bool):
@@ -351,6 +390,7 @@ class CaptionService:
             return "overlay_visible must be boolean"
         try:
             minimum_confidence = float(profile.get("minimum_confidence"))
+            speech_threshold = float(profile.get("speech_threshold", cls.DEFAULT_PROFILE["speech_threshold"]))
             delay = int(profile.get("display_delay_ms"))
             duration = int(profile.get("display_duration_ms"))
             max_lines = int(profile.get("max_lines"))
@@ -359,6 +399,8 @@ class CaptionService:
             return "numeric caption settings are invalid"
         if not 0 <= minimum_confidence <= 1:
             return "minimum_confidence must be between 0 and 1"
+        if not 0.0 <= speech_threshold <= 0.05:
+            return "speech_threshold must be between 0 and 0.05"
         if not 0 <= delay <= 15000:
             return "display_delay_ms must be between 0 and 15000"
         if not 1000 <= duration <= 30000:
@@ -369,6 +411,14 @@ class CaptionService:
             return "max_characters must be between 24 and 240"
         if str(profile.get("profanity_policy", "")) not in {"allow", "mask", "drop"}:
             return "profanity_policy must be allow, mask, or drop"
+        if str(profile.get("source_type", "manual")) not in {"manual", "audio_device", "system_mix", "obs_source"}:
+            return "source_type must be manual, audio_device, system_mix, or obs_source"
+        if str(profile.get("audio_capture_dtype", "float32")) not in {"float32", "int16"}:
+            return "audio_capture_dtype must be float32 or int16"
+        if str(profile.get("caption_model", "small.en")) not in {"small.en", "medium.en", "large-v3", "turbo"}:
+            return "caption_model must be small.en, medium.en, large-v3, or turbo"
+        if str(profile.get("channel_mode", "speaker_labeled")) not in {"mixed", "speaker_labeled"}:
+            return "channel_mode must be mixed or speaker_labeled"
         channels = profile.get("channels")
         if not isinstance(channels, list) or not channels:
             return "at least one channel is required"
@@ -378,11 +428,14 @@ class CaptionService:
                 return "channel entries must be objects"
             try:
                 channel = int(item.get("channel"))
+                device_channel = int(item.get("device_channel", channel))
             except (TypeError, ValueError):
                 return "channel number is invalid"
             if channel < 1 or channel > 12 or channel in seen:
                 return "channel numbers must be unique and between 1 and 12"
             seen.add(channel)
+            if device_channel < 1 or device_channel > 64:
+                return "device channel numbers must be between 1 and 64"
             if not str(item.get("speaker", "")).strip():
                 return "every channel requires a speaker name"
             if not isinstance(item.get("enabled"), bool):
@@ -394,11 +447,20 @@ class CaptionService:
         normalized = copy.deepcopy(cls.DEFAULT_PROFILE)
         normalized.update(copy.deepcopy(profile))
         normalized["minimum_confidence"] = round(float(normalized["minimum_confidence"]), 3)
+        normalized["speech_threshold"] = round(float(normalized["speech_threshold"]), 6)
         normalized["display_delay_ms"] = int(normalized["display_delay_ms"])
         normalized["display_duration_ms"] = int(normalized["display_duration_ms"])
         normalized["max_lines"] = int(normalized["max_lines"])
         normalized["max_characters"] = int(normalized["max_characters"])
         normalized["theme"] = str(normalized.get("theme", "standard")).strip() or "standard"
+        normalized["source_type"] = str(normalized.get("source_type", "manual")).strip() or "manual"
+        normalized["audio_device"] = str(normalized.get("audio_device", "")).strip()
+        normalized["audio_device_name"] = str(normalized.get("audio_device_name", "")).strip()
+        normalized["audio_device_host_api"] = str(normalized.get("audio_device_host_api", "")).strip()
+        normalized["audio_device_channels"] = max(0, int(normalized.get("audio_device_channels", 0) or 0))
+        normalized["audio_capture_dtype"] = str(normalized.get("audio_capture_dtype", "float32")).strip() or "float32"
+        normalized["caption_model"] = str(normalized.get("caption_model", "small.en")).strip() or "small.en"
+        normalized["channel_mode"] = str(normalized.get("channel_mode", "speaker_labeled")).strip() or "speaker_labeled"
         normalized["profanity_words"] = sorted(
             {
                 cls._normalize_text(word).lower()
@@ -410,6 +472,7 @@ class CaptionService:
             [
                 {
                     "channel": int(item["channel"]),
+                    "device_channel": int(item.get("device_channel", item["channel"])),
                     "speaker": str(item["speaker"]).strip(),
                     "enabled": bool(item["enabled"]),
                 }
@@ -458,9 +521,32 @@ class CaptionService:
     @staticmethod
     def _write_json(path: Path, data: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_suffix(path.suffix + ".tmp")
-        temporary.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-        temporary.replace(path)
+        content = json.dumps(data, indent=2, ensure_ascii=False)
+        temporary = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+        last_error: OSError | None = None
+        try:
+            temporary.write_text(content, encoding="utf-8")
+            for attempt in range(6):
+                try:
+                    temporary.replace(path)
+                    return
+                except PermissionError as error:
+                    last_error = error
+                    time.sleep(min(0.05 * (2**attempt), 1.0))
+            try:
+                path.write_text(content, encoding="utf-8")
+                return
+            except OSError as error:
+                last_error = error
+                raise
+        finally:
+            try:
+                if temporary.exists():
+                    temporary.unlink()
+            except OSError:
+                pass
+        if last_error:
+            raise last_error
 
     @staticmethod
     def _srt_time(value: Any) -> str:

@@ -143,3 +143,5 @@ def test_delete_venue_preserves_not_found_and_in_use_mappings(venue_client) -> N
     blocked = client.delete("/api/venues/v1", headers=auth_headers())
     assert blocked.status_code == 409
     assert blocked.get_json()["references"] == ["broadcast"]
+
+

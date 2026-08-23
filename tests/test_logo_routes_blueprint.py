@@ -185,3 +185,5 @@ def test_process_school_logo_preserves_error_mappings(
     assert response.get_json()["error"] == code
     if code == "LOGO_STORAGE_FAILED":
         assert response.get_json()["message"] == "storage failed"
+
+

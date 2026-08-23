@@ -194,3 +194,5 @@ def test_public_state_omits_saved_variants_and_raw_overrides(tmp_path: Path) -> 
     payload = instance.public_state().data["theme"]
     assert "variants" not in payload
     assert "overrides" not in payload
+
+

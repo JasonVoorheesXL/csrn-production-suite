@@ -175,7 +175,7 @@ def test_score_updates_score_marks_live_and_links_broadcast() -> None:
     assert current["home_score"] == 6
     assert current["broadcast_phase"] == "live"
     assert current["status"] == "live"
-    assert len(saved) == 2
+    assert len(saved) == 1
     assert linked == [("FB-2026-01", "live")]
     assert len(history) == 1
 
@@ -352,5 +352,9 @@ def test_new_broadcast_restores_complete_default_state() -> None:
     service, current, saved, _, _, _ = build_service()
     result = service.new_broadcast()
     assert result.ok
-    assert current == default_state()
-    assert saved == [default_state()]
+    expected = default_state()
+    expected["state_revision"] = 1
+    assert current == expected
+    assert saved == [expected]
+
+

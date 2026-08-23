@@ -241,3 +241,5 @@ def test_sponsor_asset_link_preserves_error_mappings(sponsor_client) -> None:
     service.link_result = StubResult("OK", {"sponsor": service.sponsor})
     assert client.put("/api/sponsors/bank/asset", json={"asset_id": " a "}, headers=auth_headers()).status_code == 200
     assert service.calls[-1] == ("link", ("bank", "a"))
+
+

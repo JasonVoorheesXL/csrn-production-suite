@@ -194,3 +194,5 @@ def test_snapshot_verification_maps_result_codes(safety_client) -> None:
         )
         assert response.status_code == status
         assert response.get_json()["code"] == code
+
+

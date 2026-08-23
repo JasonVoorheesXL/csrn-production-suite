@@ -1,0 +1,39 @@
+{
+  "broadcasts": {
+    "FB-2026-4A-W00-001": {
+      "mode": "auto",
+      "transition_mode": "manual",
+      "rotation_seconds": 10,
+      "storylines": [
+        "Houston enters year 2 for Head Coach Chris Walters while Caledonia enters its first season under Michael Campbell",
+        "The Hilltoppers finished 2025 with a record of 3-9 and the Cavaliers finished 1-9 in Michael Kelly's final season at Caledonia",
+        "While this is a scrimmage game, Houston leads official head to head against Caledonia with a record of 16-2.  The last time they met was November 1st 2024",
+        "This is CSRN's first broadcast in this format!   This will be a 2 quarter scrimmage."
+      ],
+      "delay_type": "weather",
+      "delay_note": "",
+      "estimated_start": "",
+      "updated_at": 1787321401
+    },
+    "FB-2026-4A-W01-001": {
+      "mode": "auto",
+      "transition_mode": "manual",
+      "rotation_seconds": 10,
+      "storylines": [],
+      "delay_type": "weather",
+      "delay_note": "",
+      "estimated_start": "",
+      "updated_at": 1787167069
+    },
+    "FB-2026-4A-W00-002": {
+      "mode": "auto",
+      "transition_mode": "manual",
+      "rotation_seconds": 10,
+      "storylines": [],
+      "delay_type": "weather",
+      "delay_note": "",
+      "estimated_start": "",
+      "updated_at": 1787313829
+    }
+  }
+}

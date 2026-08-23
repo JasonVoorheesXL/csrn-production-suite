@@ -238,3 +238,4 @@ def test_storage_failure_does_not_persist_school_or_logo_changes() -> None:
     assert result.code == "LOGO_STORAGE_FAILED"
     assert school_store.saved == []
     assert logo_store.saved == []
+

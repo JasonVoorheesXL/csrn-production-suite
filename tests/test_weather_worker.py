@@ -29,3 +29,5 @@ def test_stop_marks_worker_stopped() -> None:
     assert worker.stopped is False
     worker.stop()
     assert worker.stopped is True
+
+

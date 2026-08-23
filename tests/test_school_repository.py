@@ -61,3 +61,5 @@ def test_invalid_payload_is_recovered_or_defaulted(tmp_path: Path) -> None:
     path.write_text('{"schools":"not-a-list"}', encoding="utf-8")
     repository = SchoolRepository(engine(tmp_path), path)
     assert repository.load() == []
+
+

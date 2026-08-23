@@ -187,3 +187,5 @@ def test_delete_and_duplicate_check_preserve_contract(school_client) -> None:
             "caledonia",
         ),
     ) in service.calls
+
+

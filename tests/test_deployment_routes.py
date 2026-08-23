@@ -145,3 +145,5 @@ def test_all_deployment_routes_are_authenticated() -> None:
     endpoints = [rule.endpoint for rule in app.url_map.iter_rules() if rule.endpoint.startswith("deployment_routes.")]
     assert endpoints
     assert all(getattr(app.view_functions[name], "_csrn_requires_auth", False) for name in endpoints)
+
+

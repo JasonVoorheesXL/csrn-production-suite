@@ -192,3 +192,5 @@ def test_corrupt_snapshot_cannot_be_rehearsed_or_restored(tmp_path: Path) -> Non
     payload.write_text("{}", encoding="utf-8")
     assert recovery.rehearse_restore(snapshot_id).code == "SNAPSHOT_CORRUPT"
     assert recovery.restore_snapshot(snapshot_id, confirmation=snapshot_id).code == "SNAPSHOT_CORRUPT"
+
+

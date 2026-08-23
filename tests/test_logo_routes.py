@@ -180,3 +180,5 @@ def test_process_logo_maps_service_errors(logo_client) -> None:
         "error": "LOGO_STORAGE_FAILED",
         "message": "disk unavailable",
     }
+
+

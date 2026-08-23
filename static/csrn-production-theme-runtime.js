@@ -27,6 +27,8 @@
 
 const PUBLIC_STATE_URL = "/api/themes/public-state";
 const RUNTIME_STATE_URL = "/api/runtime-state";
+const CAPTION_STATE_URL = "/api/captions/overlay-state";
+const CAPTION_STICKY_MS = 2800;
 const SCORE_HOST_ID = "csrnProductionThemeHost";
 const SCORE_LAYOUT_ID = "csrnProductionThemeLayout";
 const PLAYER_HOST_ID = "csrnProductionThemePlayerHost";
@@ -89,7 +91,64 @@ const loadedCss = new Set();
 const loadedJs = new Map();
 let currentAlias = "legacy";
 let renderSignature = "";
+let tickerRenderSignature = "";
+let tickerBroadcastId = "";
+const tickerKnownTransientKeys = new Set();
+/* CSRN_THEME_SIGNATURE_DIFF_DIAGNOSTIC_R4
+   Temporary diagnostic only. Logs exactly which destructive-render signature
+   fields changed between polls. Does not alter render behavior.
+*/
+const CSRN_SIGNATURE_FIELDS_R4 = Object.freeze([
+  "alias",
+  "broadcast_id",
+  "home_school_id",
+  "visitor_school_id",
+  "home_team",
+  "visitor_team",
+  "home_identity",
+  "visitor_identity",
+  "venue_id",
+  "venue",
+  "date",
+  "scheduled_start",
+  "sport",
+  "video_mode",
+  "player_graphic",
+  "player_highlight",
+  "sponsor_spotlight",
+  "player_activation_key"
+]);
+
+function csrnLogThemeSignatureDiffR4(nextSignature) {
+  if (!renderSignature || renderSignature === nextSignature) return;
+  try {
+    const previous = JSON.parse(renderSignature);
+    const next = JSON.parse(nextSignature);
+    const changes = [];
+    const count = Math.max(previous.length, next.length);
+    for (let index = 0; index < count; index += 1) {
+      const before = JSON.stringify(previous[index]);
+      const after = JSON.stringify(next[index]);
+      if (before === after) continue;
+      changes.push({
+        index,
+        field: CSRN_SIGNATURE_FIELDS_R4[index] || `field_${index}`,
+        before: previous[index],
+        after: next[index]
+      });
+    }
+    if (changes.length) {
+      console.warn("[CSRN R4 SIGNATURE CHANGE] destructive theme rerender incoming", {
+        timestamp: new Date().toISOString(),
+        changes
+      });
+    }
+  } catch (error) {
+    console.warn("[CSRN R4 SIGNATURE DIFF ERROR]", error);
+  }
+}
 let renderBusy = false;
+let lastCaptionSnapshot = null;
 const playerMediaCache = new Map();
 let lastPlayerActivationKey = "";
 let pollTimer = 0;
@@ -235,6 +294,170 @@ function productionTeamSource(source, side) {
 
 function activeEvents(runtime) { return Array.isArray(runtime.ticker_items) ? runtime.ticker_items : (Array.isArray(runtime.events) ? runtime.events.filter(event => !event.undone) : []); }
 
+function activeCaptionSegment(captionState) {
+  const state = objectValue(captionState);
+  const stateUpdatedAt = Number(state.updated_at || 0);
+  if (state.visible !== true) {
+    lastCaptionSnapshot = null;
+    return null;
+  }
+
+  if (Array.isArray(state.segments) && state.segments.length) {
+    const segment = objectValue(state.segments[state.segments.length - 1]);
+    if (textValue(segment.text, "")) {
+      lastCaptionSnapshot = {
+        segment,
+        stateUpdatedAt,
+        capturedAt: Date.now()
+      };
+      return segment;
+    }
+  }
+
+  if (
+    lastCaptionSnapshot &&
+    lastCaptionSnapshot.stateUpdatedAt === stateUpdatedAt &&
+    Date.now() - lastCaptionSnapshot.capturedAt <= CAPTION_STICKY_MS
+  ) {
+    return lastCaptionSnapshot.segment;
+  }
+
+  lastCaptionSnapshot = null;
+  return null;
+}
+
+function mergeCaptionState(base, captionState) {
+  const segment = activeCaptionSegment(captionState);
+  if (!segment) {
+    base.captions = {...(base.captions || {}), speaker:"", text:""};
+    return false;
+  }
+  base.captions = {
+    ...(base.captions || {}),
+    speaker: textValue(segment.speaker, `Channel ${textValue(segment.channel, "")}`, "CAPTION"),
+    text: textValue(segment.text, "")
+  };
+  return Boolean(base.captions.text);
+}
+
+/* CSRN_CAPTION_INCREMENTAL_PATCH_R3
+   Resources publish state; themes pull state.
+   Caption-only changes mutate only the active theme's native caption DOM.
+*/
+function incrementalCaptionClass(alias) {
+  if (alias === "friday_night_stadium") return "bl-fns-caption";
+  if (alias === "eight_bit_gameday") return "bl-8bit-caption";
+  if (alias === "heritage_press") return "bl-captions bl-family-press";
+  return "csrn-theme-native-caption";
+}
+
+function incrementalCaptionHost(alias) {
+  const root = scoreLayout();
+  if (!root) return null;
+
+  if (alias === "friday_night_stadium") {
+    return root.querySelector(".bl-fns-video-board");
+  }
+  if (alias === "eight_bit_gameday") {
+    return root.querySelector(".bl-8bit-video-board");
+  }
+  if (alias === "heritage_press") {
+    return root.querySelector(".hp-opening");
+  }
+  return (
+    root.querySelector("[data-zone='caption-safe']") ||
+    root.querySelector("[data-module='video.board']") ||
+    root
+  );
+}
+
+/* CSRN_HERITAGE_NATIVE_CAPTION_FIX_R1
+   Heritage Press owns its caption presentation through native .hp-caption markup.
+   Caption state remains a fixture/resource pulled by the production runtime.
+*/
+function patchCaptionDom(alias, captionState) {
+  if (!alias || alias === "legacy") return;
+
+  const host = incrementalCaptionHost(alias);
+  if (!host) return;
+
+  const segment = activeCaptionSegment(captionState);
+  const shouldShow = Boolean(segment && textValue(segment.text, ""));
+
+  if (alias === "heritage_press") {
+    let node = host.querySelector(":scope > .hp-caption");
+
+    if (!shouldShow) {
+      if (node) node.remove();
+      return;
+    }
+
+    if (!node) {
+      node = document.createElement("div");
+      node.className = "hp-caption";
+      node.dataset.csrnLiveCaption = "true";
+      node.setAttribute("aria-live", "polite");
+      node.setAttribute("aria-atomic", "true");
+      host.appendChild(node);
+    }
+
+    let speaker = node.querySelector(":scope > b");
+    let copy = node.querySelector(":scope > span");
+
+    if (!speaker) {
+      speaker = document.createElement("b");
+      node.prepend(speaker);
+    }
+    if (!copy) {
+      copy = document.createElement("span");
+      node.appendChild(copy);
+    }
+
+    speaker.textContent = textValue(
+      segment.speaker,
+      `Channel ${textValue(segment.channel, "")}`,
+      "BROADCAST"
+    );
+    copy.textContent = textValue(segment.text, "");
+    return;
+  }
+
+  let node = host.querySelector(":scope > [data-csrn-live-caption='true']");
+
+  if (!shouldShow) {
+    if (node) node.remove();
+    return;
+  }
+
+  if (!node) {
+    node = document.createElement("div");
+    node.dataset.csrnLiveCaption = "true";
+    node.setAttribute("aria-live", "polite");
+    node.setAttribute("aria-atomic", "true");
+    host.appendChild(node);
+  }
+
+  node.className = incrementalCaptionClass(alias);
+
+  let speaker = node.querySelector(":scope > strong");
+  let copy = node.querySelector(":scope > span");
+
+  if (!speaker) {
+    speaker = document.createElement("strong");
+    node.appendChild(speaker);
+  }
+  if (!copy) {
+    copy = document.createElement("span");
+    node.appendChild(copy);
+  }
+
+  speaker.textContent = textValue(
+    segment.speaker,
+    `Channel ${textValue(segment.channel, "")}`,
+    "CAPTION"
+  );
+  copy.textContent = textValue(segment.text, "");
+}
 function eventAction(event) {
   return textValue(
     event.description,
@@ -319,7 +542,7 @@ function mergePlayerState(base, runtime) {
   return base;
 }
 
-function mergeRuntimeState(base, runtime) {
+function mergeRuntimeState(base, runtime, captionState = null) {
   const source = objectValue(runtime);
   const gameSource = objectValue(source.game, source.game_state, source.gameState);
   const homeSource = productionTeamSource(source, "home");
@@ -393,6 +616,7 @@ function mergeRuntimeState(base, runtime) {
 
   base.ticker = {...(base.ticker || {})};
   base.ticker.text = eventPlainText(source) || "CSRN LIVE";
+  base.captionsActive = mergeCaptionState(base, captionState);
 
   return mergePlayerState(base, source);
 }
@@ -414,6 +638,9 @@ function setHostState(host, active, alias, packageId, reason) {
 function deactivate(reason = "legacy") {
   currentAlias = "legacy";
   renderSignature = "";
+  tickerRenderSignature = "";
+  tickerBroadcastId = "";
+  tickerKnownTransientKeys.clear();
   lastPlayerActivationKey = "";
   restoreLegacyPlayerNeutral();
   enforceLegacyMediaOwnership("clash");
@@ -439,19 +666,27 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
-function mountScroller(target, alias, text, runtime, kind) {
-  if (!target) return false;
+function tickerItemText(event, runtime) {
+  const homeIdentity = objectValue(runtime.home_identity);
+  const visitorIdentity = objectValue(runtime.visitor_identity);
+  const identity = event.team === "home" ? homeIdentity : visitorIdentity;
+  const team = textValue(event.team_name, identity.name, event.team).toUpperCase();
+  const action = eventAction(event).toUpperCase();
+  const quarter = event.quarter ? `Q${String(event.quarter).replace(/^Q/i, "")}` : "";
+  const score = event.after
+    ? `${Number(event.after.home_score || 0)}-${Number(event.after.visitor_score || 0)}`
+    : "";
+  return [team, action, quarter, score].filter(Boolean).join(" ");
+}
+
+function mountScroller(target, alias, items, runtime, kind) {
+  if (!target || !Array.isArray(items) || items.length === 0) return false;
 
   const viewport = document.createElement("div");
   viewport.className = `csrn-theme-ticker-viewport csrn-theme-ticker-${alias}`;
 
   const track = document.createElement("div");
   track.className = "csrn-theme-ticker-track";
-
-  const safe = escapeHtml(text || "CSRN LIVE");
-  track.innerHTML =
-    `<span class="csrn-theme-ticker-copy">${safe}</span>` +
-    `<span class="csrn-theme-ticker-copy" aria-hidden="true">${safe}</span>`;
   viewport.appendChild(track);
 
   if (kind === "replace-sibling") {
@@ -461,28 +696,173 @@ function mountScroller(target, alias, text, runtime, kind) {
     target.replaceChildren(viewport);
   }
 
-  requestAnimationFrame(() => {
-    const distance = Math.max(1, track.scrollWidth / 2);
-    const moveSeconds = Math.max(18, distance / tickerSpeed(runtime));
-    const pauseSeconds = tickerPause(runtime);
-    const totalSeconds = moveSeconds + (pauseSeconds * 2);
-    const pauseOffset = totalSeconds ? pauseSeconds / totalSeconds : 0;
+  const persistentItems = items.filter(event => event.persistent === true);
+  const transientItems = items.filter(event => event.persistent !== true);
 
-    track.__csrnTickerAnimation = track.animate(
-      [
-        {transform:"translateX(0)", offset:0},
-        {transform:"translateX(0)", offset:pauseOffset},
-        {transform:"translateX(-50%)", offset:1-pauseOffset},
-        {transform:"translateX(-50%)", offset:1}
-      ],
-      {duration:totalSeconds * 1000, iterations:Infinity, easing:"linear"}
+  const separator = "   ◆   ";
+
+  function textFor(source) {
+    return source
+      .map(event => tickerItemText(event, runtime))
+      .filter(Boolean)
+      .join(separator);
+  }
+
+  function animatePersistent() {
+    const text = textFor(persistentItems);
+
+    if (!text) {
+      viewport.remove();
+      if (kind === "replace-sibling") target.style.display = "";
+      document.documentElement.classList.remove(TICKER_ACTIVE_CLASS);
+      return;
+    }
+
+    const safe = escapeHtml(text);
+
+    track.innerHTML =
+      `<span class="csrn-theme-ticker-copy">${safe}</span>` +
+      `<span class="csrn-theme-ticker-copy" aria-hidden="true">${safe}</span>`;
+
+    requestAnimationFrame(() => {
+      const distance = Math.max(1, track.scrollWidth / 2);
+      const moveSeconds = Math.max(18, distance / tickerSpeed(runtime));
+      const pauseSeconds = tickerPause(runtime);
+      const totalSeconds = moveSeconds + (pauseSeconds * 2);
+      const pauseOffset = totalSeconds ? pauseSeconds / totalSeconds : 0;
+
+      track.__csrnTickerAnimation = track.animate(
+        [
+          {transform:"translateX(0)", offset:0},
+          {transform:"translateX(0)", offset:pauseOffset},
+          {transform:"translateX(-50%)", offset:1-pauseOffset},
+          {transform:"translateX(-50%)", offset:1}
+        ],
+        {
+          duration:totalSeconds * 1000,
+          iterations:Infinity,
+          easing:"linear"
+        }
+      );
+    });
+  }
+
+  function animateTransient() {
+    const text = textFor(transientItems);
+
+    if (!text) {
+      animatePersistent();
+      return;
+    }
+
+    const safe = escapeHtml(text);
+
+    track.innerHTML =
+      `<span class="csrn-theme-ticker-copy">${safe}</span>`;
+
+    const passes = Math.max(
+      1,
+      ...transientItems.map(
+        event => Number(event.repeat_count || event.ticker_occurrences || 1) || 1
+      )
     );
-  });
 
+    requestAnimationFrame(() => {
+      const distance = Math.max(1, track.scrollWidth + viewport.clientWidth);
+      const moveSeconds = Math.max(18, distance / tickerSpeed(runtime));
+      const pauseSeconds = tickerPause(runtime);
+      const totalSeconds = moveSeconds + (pauseSeconds * 2);
+      const pauseOffset = totalSeconds ? pauseSeconds / totalSeconds : 0;
+
+      track.__csrnTickerAnimation = track.animate(
+        [
+          {transform:"translateX(100%)", offset:0},
+          {transform:"translateX(100%)", offset:pauseOffset},
+          {transform:"translateX(-100%)", offset:1-pauseOffset},
+          {transform:"translateX(-100%)", offset:1}
+        ],
+        {
+          duration:totalSeconds * 1000,
+          iterations:passes,
+          easing:"linear",
+          fill:"forwards"
+        }
+      );
+
+      track.__csrnTickerAnimation.finished
+        .then(() => {
+          if (persistentItems.length) {
+            animatePersistent();
+          } else {
+            viewport.remove();
+            if (kind === "replace-sibling") target.style.display = "";
+            document.documentElement.classList.remove(TICKER_ACTIVE_CLASS);
+          }
+        })
+        .catch(() => {});
+    });
+  }
+
+  animateTransient();
   return true;
 }
+function tickerItemKey(event) {
+  const sourceIds = Array.isArray(event.source_ids)
+    ? event.source_ids.join(",")
+    : "";
+  return [
+    event.id || event.event_id || "",
+    event.created_at || "",
+    sourceIds,
+    event.lifecycle || "",
+    event.description || "",
+    event.ticker_occurrence || ""
+  ].join("|");
+}
 
-function activateThemeTicker(scoreTarget, alias, spec, runtime) {
+function tickerStateSignature(runtime) {
+  return JSON.stringify([
+    runtime.broadcast_id || "",
+    runtime.ticker_visible !== false,
+    runtime.ticker_speed || "slow",
+    Number(runtime.ticker_pause ?? 2),
+    activeEvents(runtime).map(event => [
+      tickerItemKey(event),
+      event.persistent === true,
+      Number(event.repeat_count || event.ticker_occurrences || 1),
+      event.after || {}
+    ])
+  ]);
+}
+
+function resetTickerLifecycle(runtime = null) {
+  tickerRenderSignature = "";
+  tickerKnownTransientKeys.clear();
+  tickerBroadcastId = textValue(runtime?.broadcast_id, "");
+}
+
+function tickerItemsForPresentation(runtime, initial = false) {
+  const broadcastId = textValue(runtime?.broadcast_id, "");
+  if (broadcastId !== tickerBroadcastId) {
+    tickerKnownTransientKeys.clear();
+    tickerBroadcastId = broadcastId;
+    initial = true;
+  }
+
+  const items = activeEvents(runtime);
+  const persistent = items.filter(event => event.persistent === true);
+  const transient = items.filter(event => event.persistent !== true);
+
+  const freshTransient = initial
+    ? transient
+    : transient.filter(event => !tickerKnownTransientKeys.has(tickerItemKey(event)));
+
+  transient.forEach(event => tickerKnownTransientKeys.add(tickerItemKey(event)));
+
+  return [...freshTransient, ...persistent];
+}
+
+function activateThemeTicker(scoreTarget, alias, spec, runtime, initial = false) {
   scoreTarget.querySelectorAll(".csrn-theme-ticker-viewport").forEach(node => node.remove());
   const frozenTarget = scoreTarget.querySelector(spec.tickerSelector);
   if (!frozenTarget) return false;
@@ -491,12 +871,51 @@ function activateThemeTicker(scoreTarget, alias, spec, runtime) {
     frozenTarget.style.display = "";
   }
 
-  const liveText = eventPlainText(runtime);
-  if (!liveText || runtime.ticker_visible === false || activeEvents(runtime).length === 0) {
+  const allItems = activeEvents(runtime);
+  if (runtime.ticker_visible === false || allItems.length === 0) {
+    tickerRenderSignature = tickerStateSignature(runtime);
     return false;
   }
 
-  return mountScroller(frozenTarget, alias, liveText, runtime, spec.tickerKind);
+  const presentationItems = tickerItemsForPresentation(runtime, initial);
+  tickerRenderSignature = tickerStateSignature(runtime);
+
+  // No new transient story and no persistent scoring story:
+  // leave the ticker dark instead of replaying old routine plays.
+  if (presentationItems.length === 0) {
+    return false;
+  }
+
+  return mountScroller(
+    frozenTarget,
+    alias,
+    presentationItems,
+    runtime,
+    spec.tickerKind
+  );
+}
+
+function patchThemeTicker(runtime) {
+  if (!runtime || currentAlias === "legacy") return false;
+
+  const signature = tickerStateSignature(runtime);
+  if (signature === tickerRenderSignature) {
+    return Boolean(scoreLayout()?.querySelector(".csrn-theme-ticker-viewport"));
+  }
+
+  const scoreTarget = scoreLayout();
+  const spec = PACKAGE_ALIASES[currentAlias];
+  if (!scoreTarget || !spec) return false;
+
+  const active = activateThemeTicker(
+    scoreTarget,
+    currentAlias,
+    spec,
+    runtime,
+    false
+  );
+  document.documentElement.classList.toggle(TICKER_ACTIVE_CLASS, active);
+  return active;
 }
 
 function playerVisible(runtime) {
@@ -695,6 +1114,7 @@ function applyFootballBoardOverrides(root, alias, runtime) {
     setLedText(labeledCell(root, "QUARTER"), period, "bl-8bit-small-led");
     setLedText(labeledCell(root, "DOWN"), downDistance.down, "bl-8bit-small-led");
     setLedText(labeledCell(root, "TO GO"), downDistance.distance, "bl-8bit-small-led");
+    setLedText(labeledCell(root, "BALL ON"), ballOn, "bl-8bit-small-led");
     return;
   }
 
@@ -730,16 +1150,131 @@ function applyFootballBoardOverrides(root, alias, runtime) {
   }
 }
 
-function patchActiveFootballBoard(runtime = lastRuntimeForClockPatch) {
+function fnsPossessionNode(active) {
+  const span = document.createElement("span");
+  span.className = active
+    ? "bl-fns-possession-ball bl-fns-football-possession"
+    : "bl-fns-possession-ball is-empty";
+
+  if (!active) {
+    span.setAttribute("aria-hidden", "true");
+    return span;
+  }
+
+  span.setAttribute("aria-label", "Possession");
+  span.innerHTML =
+    '<svg viewBox="0 0 72 44" aria-hidden="true">' +
+    '<path d="M4 22C13 3 55 3 68 22 55 41 13 41 4 22Z"/>' +
+    '<path d="M36 7v30M25 22h22M29 16l14 12M43 16 29 28"/>' +
+    '</svg>';
+  return span;
+}
+
+function patchThemeScoresAndPossession(root, alias, runtime) {
+  if (!root || !runtime) return;
+
+  const homeScore = Math.max(0, Number(runtime.home_score || 0));
+  const visitorScore = Math.max(0, Number(runtime.visitor_score || 0));
+  const possession = String(runtime.possession || "home").toLowerCase();
+
+  if (alias === "friday_night_stadium") {
+    const home = root.querySelector('[data-module="home.score"]');
+    const visitor = root.querySelector('[data-module="visitor.score"]');
+
+    setStadiumLedSvg(home, homeScore, "bl-fns-score-led");
+    setStadiumLedSvg(visitor, visitorScore, "bl-fns-score-led");
+
+    for (const [node, active] of [
+      [home, possession === "home"],
+      [visitor, possession === "visitor"]
+    ]) {
+      if (!node) continue;
+      const old = node.querySelector(".bl-fns-possession-ball");
+      const next = fnsPossessionNode(active);
+      if (old) old.replaceWith(next);
+      else node.appendChild(next);
+    }
+    return;
+  }
+
+  if (alias === "eight_bit_gameday") {
+    const home = root.querySelector('[data-module="home.score"]');
+    const visitor = root.querySelector('[data-module="visitor.score"]');
+
+    setLedText(home, homeScore, "bl-8bit-score-led");
+    setLedText(visitor, visitorScore, "bl-8bit-score-led");
+
+    const possessionCell = labeledCell(root, "POSSESSION");
+    setLedText(
+      possessionCell,
+      possession === "visitor" ? "VISITOR" : "HOME",
+      "bl-8bit-possession-led"
+    );
+    return;
+  }
+
+  if (alias === "heritage_press") {
+    root.querySelectorAll('[data-bind="home.score"]').forEach(node => {
+      node.textContent = String(homeScore);
+    });
+    root.querySelectorAll('[data-bind="visitor.score"]').forEach(node => {
+      node.textContent = String(visitorScore);
+    });
+
+    // Also update Score Summary duplicates in the newspaper columns.
+    const summary = root.querySelector(".hp-team-score-rows");
+    if (summary) {
+      const rows = summary.querySelectorAll(":scope > div");
+      const homeValue = rows[0]?.querySelector("b");
+      const visitorValue = rows[1]?.querySelector("b");
+      if (homeValue) homeValue.textContent = String(homeScore);
+      if (visitorValue) visitorValue.textContent = String(visitorScore);
+    }
+
+    const possessionCell = labeledCell(root, "POSSESSION");
+    const possessionValue = possessionCell?.querySelector(":scope > b");
+    if (possessionValue) {
+      possessionValue.textContent =
+        possession === "visitor"
+          ? textValue(runtime.visitor_team, "VISITOR")
+          : textValue(runtime.home_team, "HOME");
+    }
+
+    // Heritage's state grid uses newspaper cells rather than all data-bind fields.
+    const periodCell =
+      labeledCell(root, "QUARTER") ||
+      labeledCell(root, "PERIOD");
+    const clockCell = labeledCell(root, "CLOCK");
+    const downCell = labeledCell(root, "DOWN");
+
+    const periodValue = periodCell?.querySelector(":scope > b");
+    const clockValue = clockCell?.querySelector(":scope > b");
+    const downValue = downCell?.querySelector(":scope > b");
+
+    if (periodValue) periodValue.textContent = productionFootballPeriod(runtime);
+    if (clockValue) clockValue.textContent = productionClock(runtime);
+    if (downValue) downValue.textContent = productionDownDistance(runtime).combined;
+  }
+}
+
+function patchLiveGameState(runtime = lastRuntimeForClockPatch) {
   if (!runtime || currentAlias === "legacy") return;
-  applyFootballBoardOverrides(scoreLayout(), currentAlias, runtime);
+  const root = scoreLayout();
+  if (!root) return;
+
+  applyFootballBoardOverrides(root, currentAlias, runtime);
+  patchThemeScoresAndPossession(root, currentAlias, runtime);
+}
+
+function patchActiveFootballBoard(runtime = lastRuntimeForClockPatch) {
+  patchLiveGameState(runtime);
 }
 
 function startClockPatchTimer() {
   if (clockPatchTimer) return;
   clockPatchTimer = window.setInterval(() => {
     if (lastRuntimeForClockPatch && lastRuntimeForClockPatch.clock_running === true) {
-      patchActiveFootballBoard(lastRuntimeForClockPatch);
+      patchLiveGameState(lastRuntimeForClockPatch);
     }
   }, 250);
 }
@@ -750,8 +1285,6 @@ function themedIntegratedPlayerSupported(alias) {
 
 function playerActivationKey(runtime) {
   const graphic = objectValue(runtime.player_graphic);
-  const events = activeEvents(runtime);
-  const latest = events.length ? events[events.length - 1] : {};
   return JSON.stringify([
     Boolean(graphic.visible),
     graphic.updated_at || 0,
@@ -760,10 +1293,9 @@ function playerActivationKey(runtime) {
     graphic.roster_id || "",
     graphic.full_name || graphic.display_name || graphic.name || "",
     graphic.number || "",
-    latest.id || "",
-    latest.created_at || "",
-    latest.event || "",
-    latest.team || ""
+    graphic.graphic_type || "",
+    graphic.media_url || "",
+    graphic.headshot || ""
   ]);
 }
 
@@ -1877,7 +2409,11 @@ async function renderSelected() {
       document.documentElement.classList.add(PLAYER_PENDING_CLASS);
     }
 
-    const runtime = await fetchJson(RUNTIME_STATE_URL);
+    const [runtime, captionState] = await Promise.all([
+      fetchJson(RUNTIME_STATE_URL),
+      fetchJson(CAPTION_STATE_URL).catch(() => ({visible:false, segments:[]}))
+    ]);
+    const captionSegment = activeCaptionSegment(captionState);
     runtimeClockRunning = runtime.clock_running === true;
     lastRuntimeForClockPatch = runtime;
     const playerPending =
@@ -1899,32 +2435,21 @@ async function renderSelected() {
       runtime.visitor_identity,
       runtime.venue_id,
       runtime.venue,
-      runtime.home_score,
-      runtime.visitor_score,
-      runtime.quarter,
-      runtime.period,
-      runtime.clock_visible,
       runtime.date,
       runtime.scheduled_start,
-      runtime.down,
-      runtime.distance,
-      runtime.possession,
-      runtime.ticker_visible,
-      runtime.ticker_speed,
-      runtime.ticker_pause,
-      activeEvents(runtime).map(event => [
-        event.id, event.created_at, event.undone, event.description,
-        event.team_name, event.event, event.label, event.score_delta,
-        event.quarter, event.after
-      ]),
+      runtime.sport,
+      polledVideoMode,
       runtime.player_graphic,
       runtime.player_highlight,
       runtime.sponsor_spotlight,
       activationKey
     ]);
 
+    csrnLogThemeSignatureDiffR4(signature);
     if (alias === currentAlias && signature === renderSignature) {
-      patchActiveFootballBoard(runtime);
+      patchLiveGameState(runtime);
+      patchThemeTicker(runtime);
+      patchCaptionDom(alias, captionState);
       return "unchanged";
     }
 
@@ -1932,7 +2457,7 @@ async function renderSelected() {
     const scoreTarget = scoreLayout();
     if (!scoreTarget) throw new Error("Production theme score host missing.");
 
-    const state = mergeRuntimeState(base.defaultState(), runtime);
+    const state = mergeRuntimeState(base.defaultState(), runtime, captionState);
     mergeManualMediaState(state, runtime);
     const playerMedia = await preparePlayerMedia(state, runtime);
     const activeVideoMode = polledVideoMode;
@@ -1947,7 +2472,7 @@ async function renderSelected() {
       state,
       {
         diagnostics:false,
-        activeComponents:["scorebug"],
+        activeComponents:state.captionsActive ? ["scorebug", "captions"] : ["scorebug"],
         videoMode:activeVideoMode
       }
     );
@@ -1956,12 +2481,13 @@ async function renderSelected() {
       !scoreResult ||
       !Array.isArray(scoreResult.components) ||
       !scoreResult.components.includes("scorebug") ||
-      scoreResult.components.some(component => component !== "scorebug")
+      scoreResult.components.some(component => !["scorebug", "captions"].includes(component))
     ) {
       throw new Error("Theme scorebug render contract failed.");
     }
 
     await ensureFridayNightDynamicClashReady(scoreTarget, alias, activeVideoMode, scoreResult);
+    patchCaptionDom(alias, captionState);
     await paintFridayNightLayeredFootballClash(scoreTarget, alias, activeVideoMode, state);
 
     applyFootballBoardOverrides(scoreTarget, alias, runtime);
@@ -1976,7 +2502,7 @@ async function renderSelected() {
     setHostState(scoreHost(), true, alias, packageId, "rendered");
     document.documentElement.classList.add(SCORE_ACTIVE_CLASS);
 
-    const tickerActive = activateThemeTicker(scoreTarget, alias, spec, runtime);
+    const tickerActive = activateThemeTicker(scoreTarget, alias, spec, runtime, true);
     document.documentElement.classList.toggle(TICKER_ACTIVE_CLASS, tickerActive);
 
     const integratedPlayerActive = activeVideoMode === "player";
@@ -2073,6 +2599,9 @@ window.CSRNProductionThemeRuntime = Object.freeze({
   deactivate
 });
 })();
+
+
+
 
 
 

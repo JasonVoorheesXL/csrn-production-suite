@@ -84,3 +84,5 @@ def test_build_statistics_compatibility_helper_delegates(monkeypatch: pytest.Mon
     state = {"broadcast_id": "COMPAT"}
     assert app_module.build_statistics(state) == service.result.data["statistics"]
     assert service.calls == [state]
+
+

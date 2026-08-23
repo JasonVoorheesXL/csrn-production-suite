@@ -50,3 +50,31 @@ Data/Recaps/
 
 # Local release output
 dist-release/
+
+# Manual/automated backup, rollback, and audit-log scratch.
+# These are point-in-time snapshots and generated log dumps from ad hoc
+# repair/audit tooling, not maintained source or documentation.
+.csrn-backups/
+_patch_backups/
+_gate*_rollback_*/
+_phase*_rollback_*/
+Audit/
+work/
+*.pre-*
+*.bak-*
+CSRN_GATE*.md
+CSRN_GATE*.txt
+CSRN_GATE*.zip
+CSRN_LIVE_REQUEST_AUDIT.txt
+CSRN_LIVE_VALIDATION_AUDIT_MATCHES.txt
+CSRN_VALIDATION_AUDIT_MATCHES.txt
+dragonfly_headless_debug.png
+temp-index-script.js
+_apply_mixed_ticker_lifecycle_fix.py
+_apply_ticker_renderer_fix.py
+templates/index.html.mojibake-fixed
+
+# Generated diagnostic probe output (produced by tools/caption_audio_probe.py
+# at runtime) and superseded, timestamped asset backup snapshots — not source.
+Data/Captions/Diagnostics/
+**/*-backup-r*-*/

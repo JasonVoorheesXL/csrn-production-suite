@@ -262,3 +262,5 @@ def test_touchdown_play_without_event_still_counts_team_and_player() -> None:
     result = report(state)
     assert result["teams"]["home"]["touchdowns"] == 1
     assert result["players"][0]["touchdowns"] == 1
+
+

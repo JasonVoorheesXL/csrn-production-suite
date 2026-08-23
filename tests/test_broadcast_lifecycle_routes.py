@@ -133,3 +133,5 @@ def test_resume_route_delegates(lifecycle_client) -> None:
     assert response.status_code == 200
     assert response.get_json()["status"] == "live"
     assert service.calls == [("resume", None)]
+
+

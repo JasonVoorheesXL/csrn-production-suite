@@ -282,3 +282,5 @@ def test_apply_can_confirm_possible_duplicate_explicitly() -> None:
     assert result.ok
     assert result.data["imported"] == 1
     assert len(store.schools) == 2
+
+

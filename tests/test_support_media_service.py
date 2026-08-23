@@ -215,3 +215,5 @@ def test_upload_headshot_removes_file_when_roster_save_fails(tmp_path: Path) -> 
     )
     assert result.code == "HEADSHOT_STORAGE_FAILED"
     assert not (tmp_path / "headshots" / "roster-1__player-1.png").exists()
+
+

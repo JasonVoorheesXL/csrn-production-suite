@@ -64,3 +64,5 @@ def test_windows_launcher_runs_preflight_before_application() -> None:
     assert source.count(preflight) == 1
     assert source.index(preflight) < source.index(startup)
     assert "Game-day preflight failed. The application was not started." in source
+
+

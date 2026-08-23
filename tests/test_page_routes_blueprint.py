@@ -54,3 +54,5 @@ def test_overlay_page_remains_public() -> None:
         response = client.get("/overlay")
     assert response.status_code == 200
     assert "<!doctype html>" in response.get_data(as_text=True).lower()
+
+

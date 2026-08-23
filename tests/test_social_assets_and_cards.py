@@ -189,3 +189,5 @@ def test_renderer_creates_mobile_safe_compact_extra_point_card(tmp_path: Path) -
     assert result["layout"]["card_style"] == "compact_score"
     assert result["layout"]["minimum_mobile_font"] >= 28
     assert not result["layout"]["warnings"]
+
+

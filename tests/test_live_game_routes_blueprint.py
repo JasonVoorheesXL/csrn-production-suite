@@ -40,24 +40,24 @@ class StubGameOperationsService:
         self.calls.append(("set_values", incoming))
         return self.results["set_values"]
 
-    def toggle_scorebug(self) -> StubResult:
-        self.calls.append(("toggle_scorebug", None))
+    def toggle_scorebug(self, incoming: dict[str, Any] | None = None) -> StubResult:
+        self.calls.append(("toggle_scorebug", incoming))
         return self.results["toggle_scorebug"]
 
-    def toggle_halftime(self) -> StubResult:
-        self.calls.append(("toggle_halftime", None))
+    def toggle_halftime(self, incoming: dict[str, Any] | None = None) -> StubResult:
+        self.calls.append(("toggle_halftime", incoming))
         return self.results["toggle_halftime"]
 
-    def end_game(self) -> StubResult:
-        self.calls.append(("end_game", None))
+    def end_game(self, incoming: dict[str, Any] | None = None) -> StubResult:
+        self.calls.append(("end_game", incoming))
         return self.results["end_game"]
 
-    def reset_data(self) -> StubResult:
-        self.calls.append(("reset_data", None))
+    def reset_data(self, incoming: dict[str, Any] | None = None) -> StubResult:
+        self.calls.append(("reset_data", incoming))
         return self.results["reset_data"]
 
-    def new_broadcast(self) -> StubResult:
-        self.calls.append(("new_broadcast", None))
+    def new_broadcast(self, incoming: dict[str, Any] | None = None) -> StubResult:
+        self.calls.append(("new_broadcast", incoming))
         return self.results["new_broadcast"]
 
 
@@ -71,10 +71,11 @@ class StubEventService:
             "edit": StubResult("OK", {"event": {"id": "EV-1", "description": "Edited"}}),
             "corrections": StubResult("OK", {"corrections": [{"id": "COR-1"}]}),
             "undo": StubResult("OK", {"state": {"history": []}}),
+            "restore": StubResult("OK", {"state": {"history": []}}),
         }
 
-    def set_control_source(self, authority: Any) -> StubResult:
-        self.calls.append(("set_control_source", authority))
+    def set_control_source(self, authority: Any, incoming: dict[str, Any] | None = None) -> StubResult:
+        self.calls.append(("set_control_source", (authority, incoming)))
         return self.results["set_control_source"]
 
     def trigger(self, incoming: dict[str, Any]) -> StubResult:
@@ -93,9 +94,13 @@ class StubEventService:
         self.calls.append(("corrections", None))
         return self.results["corrections"]
 
-    def undo(self) -> StubResult:
-        self.calls.append(("undo", None))
+    def undo(self, incoming: dict[str, Any] | None = None) -> StubResult:
+        self.calls.append(("undo", incoming))
         return self.results["undo"]
+
+    def restore(self, incoming: dict[str, Any] | None = None) -> StubResult:
+        self.calls.append(("restore", incoming))
+        return self.results["restore"]
 
 
 class StubRulesService:
@@ -313,7 +318,7 @@ def test_corrections_report_and_undo_delegate(live_game_client) -> None:
     assert corrections.get_json() == [{"id": "COR-1"}]
     assert undo.status_code == 200
     assert undo.get_json() == {"history": []}
-    assert events.calls == [("corrections", None), ("undo", None)]
+    assert events.calls == [("corrections", None), ("undo", {})]
 
 
 def test_toggle_scorebug_maps_obs_block(live_game_client) -> None:
@@ -349,7 +354,7 @@ def test_simple_game_operations_preserve_state_payload(
     response = client.post(path, headers=auth_headers())
     assert response.status_code == 200
     assert response.get_json() == expected
-    assert game.calls == [(method, None)]
+    assert game.calls == [(method, {})]
 
 
 def test_clock_control_delegates_payload(live_game_client) -> None:
@@ -398,3 +403,5 @@ def test_rules_play_error_mappings(live_game_client, code, status, payload) -> N
     response = client.post("/api/rules-play", json={}, headers=auth_headers())
     assert response.status_code == status
     assert response.get_json() == payload
+
+

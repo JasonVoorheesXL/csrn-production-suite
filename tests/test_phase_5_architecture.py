@@ -72,3 +72,5 @@ def test_factory_module_does_not_import_composition_root() -> None:
     source = (ROOT / "application_factory.py").read_text(encoding="utf-8")
     assert "import app" not in source
     assert "from app import" not in source
+
+

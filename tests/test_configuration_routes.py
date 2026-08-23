@@ -105,3 +105,5 @@ def test_update_config_rejects_non_object_payload(configuration_client) -> None:
     assert response.status_code == 400
     assert response.get_json() == {"error": "CONFIG_PAYLOAD_REQUIRED"}
     assert service.calls == [("update", ["not", "an", "object"])]
+
+

@@ -62,3 +62,5 @@ def test_game_day_roadmap_keeps_social_and_recap_sequence() -> None:
     assert "### 6.10 Grounded Game Recap Engine" in roadmap
     assert "player headshots" in roadmap
     assert "approved sponsor assets" in roadmap
+
+

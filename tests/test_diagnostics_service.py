@@ -179,3 +179,5 @@ def test_readiness_returns_overlay_safe_state_copy(tmp_path: Path) -> None:
     assert payload["state"] == {"broadcast_id": "B1", "public": True}
     payload["state"]["broadcast_id"] = "changed"
     assert state["broadcast_id"] == "B1"
+
+

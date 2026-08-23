@@ -213,3 +213,5 @@ def test_all_rehearsal_routes_are_authenticated() -> None:
     assert endpoints
     for endpoint in endpoints:
         assert getattr(app.view_functions[endpoint], "_csrn_requires_auth", False)
+
+

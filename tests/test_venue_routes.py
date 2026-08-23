@@ -203,3 +203,5 @@ def test_delete_venue_preserves_missing_and_in_use_contracts(venue_client) -> No
     blocked = client.delete(f"/api/venues/{VENUE_ID}")
     assert blocked.status_code == 409
     assert blocked.get_json() == {"error": "VENUE_IN_USE", **references}
+
+

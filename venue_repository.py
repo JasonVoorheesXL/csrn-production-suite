@@ -41,7 +41,7 @@ class VenueRepository:
 
         self._lock = RLock()
         self._cache: list[dict[str, Any]] | None = None
-        self._cache_mtime_ns: int | None = None
+        self._cache_signature: tuple[int, int, int] | None = None
 
     @staticmethod
     def _extract(payload: Any) -> list[dict[str, Any]]:
@@ -93,9 +93,10 @@ class VenueRepository:
 
         return True
 
-    def _mtime(self) -> int | None:
+    def _signature(self) -> tuple[int, int, int] | None:
         try:
-            return self.path.stat().st_mtime_ns
+            stat = self.path.stat()
+            return (stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size)
         except OSError:
             return None
 
@@ -120,9 +121,9 @@ class VenueRepository:
 
     def load(self) -> list[dict[str, Any]]:
         with self._lock:
-            mtime = self._mtime()
+            signature = self._signature()
 
-            if self._cache is not None and self._cache_mtime_ns == mtime:
+            if self._cache is not None and self._cache_signature == signature:
                 return copy.deepcopy(self._cache)
 
             try:
@@ -150,7 +151,7 @@ class VenueRepository:
                 self.save(normalized, force=not bool(normalized))
             else:
                 self._cache = copy.deepcopy(normalized)
-                self._cache_mtime_ns = self._mtime()
+                self._cache_signature = self._signature()
 
             return copy.deepcopy(normalized)
 
@@ -177,7 +178,7 @@ class VenueRepository:
             )
 
             self._cache = copy.deepcopy(normalized)
-            self._cache_mtime_ns = self._mtime()
+            self._cache_signature = self._signature()
 
             return copy.deepcopy(normalized)
 
@@ -196,4 +197,4 @@ class VenueRepository:
     def invalidate_cache(self) -> None:
         with self._lock:
             self._cache = None
-            self._cache_mtime_ns = None
+            self._cache_signature = None

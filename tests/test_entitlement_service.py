@@ -117,3 +117,5 @@ def test_public_license_never_exposes_signature(tmp_path: Path) -> None:
     current = service(tmp_path, verifier=lambda _: (True, "ok"))
     result = current.install_license(payload())
     assert "signature" not in result.data["license"]
+
+

@@ -47,6 +47,7 @@ class AssetService:
         "flexible",
         "sponsor_feature_still",
         "sponsor_feature_video",
+        "sponsor_advertisement_video",
         "lower_third_sponsor",
         "scorebug_sponsor",
         "player_highlight_video",

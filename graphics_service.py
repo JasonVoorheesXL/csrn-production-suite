@@ -433,10 +433,15 @@ class GraphicsService:
                         "flexible",
                         "sponsor_feature_still",
                         "sponsor_feature_video",
+                        "sponsor_advertisement_video",
                     }
                     or (
-                        placement == "sponsor_feature_video"
+                        placement in {"sponsor_feature_video", "sponsor_advertisement_video"}
                         and asset_type.casefold() != "video"
+                    )
+                    or (
+                        placement == "sponsor_advertisement_video"
+                        and str((asset or {}).get("rights_status", "")) not in self.APPROVED_RIGHTS
                     )
                     or (
                         placement == "sponsor_feature_still"
@@ -463,6 +468,12 @@ class GraphicsService:
                             )
                             else "image"
                         ),
+                        "presentation_mode": (
+                            "advertisement"
+                            if placement == "sponsor_advertisement_video"
+                            else "spotlight"
+                        ),
+                        "audio_enabled": placement == "sponsor_advertisement_video",
                     }
                 )
             elif spotlight.get("sponsor_logo"):
@@ -472,6 +483,8 @@ class GraphicsService:
                         "media_name": str(spotlight.get("sponsor_name", "")),
                         "media_url": str(spotlight.get("sponsor_logo", "")),
                         "media_type": "image",
+                        "presentation_mode": "spotlight",
+                        "audio_enabled": False,
                     }
                 )
 

@@ -22,6 +22,8 @@ def build_service(
     *,
     clock: Clock | None = None,
     retention: int = 10,
+    publish_attempts: int = 4,
+    publish_retry_delay: float = 0.0,
 ) -> tuple[GameDaySafetyService, Clock]:
     clock = clock or Clock()
     data_dir = tmp_path / "Data"
@@ -55,6 +57,8 @@ def build_service(
         clock=clock,
         minimum_free_bytes=0,
         automatic_retention=retention,
+        publish_attempts=publish_attempts,
+        publish_retry_delay=publish_retry_delay,
     )
     return service, clock
 
@@ -102,6 +106,48 @@ def test_snapshot_copies_runtime_payload_and_excludes_nested_backups(
     assert not (root / "payload" / "Data" / "Backups").exists()
     assert snapshot["file_count"] == len(snapshot["files"])
     assert snapshot["total_bytes"] > 0
+
+
+def test_snapshot_publish_retries_transient_directory_replace_failure(
+    tmp_path: Path,
+) -> None:
+    service, _ = build_service(tmp_path, publish_attempts=3)
+    original = service._replace_snapshot_directory
+    attempts = {"count": 0}
+
+    def flaky_replace(temporary_path: Path, final_path: Path) -> None:
+        attempts["count"] += 1
+        if attempts["count"] < 3:
+            raise OSError("temporary Drive lock")
+        original(temporary_path, final_path)
+
+    service._replace_snapshot_directory = flaky_replace  # type: ignore[method-assign]
+
+    result = service.create_snapshot(kind="manual", note="Pregame")
+
+    assert result.code == "SNAPSHOT_CREATED"
+    assert attempts["count"] == 3
+    root = Path(result.data["path"])
+    assert root.is_dir()
+    assert not (root.parent / f".tmp-{root.name}").exists()
+
+
+def test_snapshot_publish_failure_reports_attempts_and_cleans_staging(
+    tmp_path: Path,
+) -> None:
+    service, _ = build_service(tmp_path, publish_attempts=2)
+
+    def locked_replace(temporary_path: Path, final_path: Path) -> None:
+        raise OSError(f"locked {temporary_path.name}")
+
+    service._replace_snapshot_directory = locked_replace  # type: ignore[method-assign]
+
+    result = service.create_snapshot(kind="manual", note="Pregame")
+
+    assert result.code == "SNAPSHOT_FAILED"
+    assert "2 attempts" in result.data["message"]
+    backup_root = tmp_path / "Data" / "Backups" / "GameDay"
+    assert not list(backup_root.glob(".tmp-*"))
 
 
 def test_snapshot_list_is_newest_first(tmp_path: Path) -> None:
@@ -194,3 +240,5 @@ def test_automatic_retention_does_not_delete_manual_snapshots(
         item["snapshot_id"] == manual.data["snapshot"]["snapshot_id"]
         for item in snapshots
     )
+
+

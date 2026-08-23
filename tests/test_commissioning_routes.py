@@ -153,3 +153,5 @@ def test_incomplete_report_returns_409(commissioning_client) -> None:
     response = client.get("/api/game-day/commissioning/report")
     assert response.status_code == 409
     assert response.get_json()["code"] == "COMMISSIONING_INCOMPLETE"
+
+

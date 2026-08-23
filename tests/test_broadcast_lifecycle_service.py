@@ -308,3 +308,5 @@ def test_resume_reopens_record_and_keeps_scorebug_hidden() -> None:
     assert built["state"]["home_score"] == 28
     assert built["resumed"] == ["FB-2026-01"]
     assert result.data["state"]["public"] is True
+
+

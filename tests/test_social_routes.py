@@ -291,3 +291,5 @@ def test_facebook_page_selection_route(tmp_path: Path) -> None:
     assert response.status_code == 200
     facebook = app.config["FACEBOOK_TEST_SERVICE"]
     assert facebook.calls == [("connect_page", "selection-1", "page-1")]
+
+

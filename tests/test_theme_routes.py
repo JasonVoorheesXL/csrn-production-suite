@@ -183,3 +183,5 @@ def test_only_css_and_public_state_are_unauthenticated() -> None:
     assert public <= endpoints
     for endpoint in endpoints - public:
         assert getattr(app.view_functions[endpoint], "_csrn_requires_auth", False)
+
+

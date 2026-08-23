@@ -246,3 +246,5 @@ def test_validate_social_delegates_and_preserves_payload(personnel_client) -> No
     assert response.status_code == 200
     assert response.get_json() == service.social_result.data
     assert service.calls == [("validate_social", ("x", "@csrn"))]
+
+

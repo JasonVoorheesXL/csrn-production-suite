@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from flask import Blueprint, Response, jsonify, render_template, request
+from production_template_service import APPROVED_PACKAGE_IDS, enrich_theme_public_state_response, read_production_template_state, write_production_template_state
 
 
 RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
@@ -147,5 +148,23 @@ def create_theme_blueprint(dependencies: ThemeRoutesDependencies) -> Blueprint:
         if result.code == "VARIANT_DELETE_CONFIRMATION_REQUIRED":
             return jsonify({"error": result.code}), 409
         return jsonify(result.data)
+
+    @routes.get("/api/production-template")
+    @dependencies.require_auth
+    def csrn_get_production_template_state():
+        return read_production_template_state()
+
+    @routes.post("/api/production-template")
+    @dependencies.require_auth
+    def csrn_set_production_template_state():
+        payload = request.get_json(silent=True) or {}
+        requested = payload.get("package_id")
+        if requested not in APPROVED_PACKAGE_IDS:
+            return {"error": "invalid_production_template", "approved_package_ids": sorted(APPROVED_PACKAGE_IDS)}, 400
+        return write_production_template_state(requested)
+
+    @routes.after_app_request
+    def csrn_enrich_production_template_public_state(response):
+        return enrich_theme_public_state_response(response, request.path)
 
     return routes

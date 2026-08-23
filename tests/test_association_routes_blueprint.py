@@ -481,3 +481,5 @@ def test_enrichment_routes_delegate_with_classification_and_sport(association_cl
     assert applied.get_json() == {"enrichment": "applied"}
     assert supplement.calls[-2][2]["classification"] == "5A"
     assert supplement.calls[-1][2]["venue_sport"] == "Football"
+
+

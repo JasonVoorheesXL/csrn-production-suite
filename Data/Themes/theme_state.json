@@ -1,9 +1,16 @@
 {
-  "schema": 1,
   "active_preset": "modern_network",
-  "overrides": {},
   "locked": false,
   "locked_at": 0,
-  "variants": {},
-  "updated_at": 0
+  "overrides": {
+    "accent_color": "#FFFFFF",
+    "font_key": "system_sans",
+    "panel_opacity": 0.94,
+    "primary_color": "#B5121B",
+    "radius_px": 14,
+    "secondary_color": "#111111"
+  },
+  "schema": 1,
+  "updated_at": 1785621324,
+  "variants": {}
 }

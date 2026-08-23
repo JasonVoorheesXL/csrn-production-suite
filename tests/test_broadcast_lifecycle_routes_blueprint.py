@@ -146,3 +146,5 @@ def test_resume_returns_state_and_maps_missing(lifecycle_client) -> None:
     service.resume_result = StubResult("NO_ACTIVE_BROADCAST", {})
     missing = client.post("/api/resume-broadcast", headers=auth_headers())
     assert missing.status_code == 409
+
+

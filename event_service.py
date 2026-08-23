@@ -8,6 +8,20 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 
+from canonical_state_service import CanonicalStateFoundation
+from eligibility_service import EligibilityService
+from live_command_service import (
+    assign_next_revision,
+    attach_metadata,
+    command_result_state,
+    command_id_from,
+    command_metadata,
+    current_revision,
+    duplicate_result,
+    remember_command,
+)
+
+
 @dataclass(frozen=True)
 class EventResult:
     code: str
@@ -32,6 +46,7 @@ class EventService:
         "PENALTY",
         "EJECTION",
         "PLAY",
+        "KICKOFF",
     }
     VALID_AUTHORITIES = {"broadcaster", "statistician"}
     VALID_DOWNS = {"1st", "2nd", "3rd", "4th", "Off"}
@@ -53,6 +68,7 @@ class EventService:
         team_direction: Callable[[dict[str, Any], str], int],
         normalize_state: Callable[[Mapping[str, Any]], Mapping[str, Any]],
         default_player_graphic: Callable[[], Mapping[str, Any]],
+        resolve_player: Callable[[dict[str, Any], str, Any], Mapping[str, Any]] | None = None,
         on_event: Callable[[Mapping[str, Any]], Any] | None = None,
         transaction_lock: Any | None = None,
         now: Callable[[], float] = time.time,
@@ -71,12 +87,27 @@ class EventService:
         self._team_direction = team_direction
         self._normalize_state = normalize_state
         self._default_player_graphic = default_player_graphic
+        self._resolve_player = resolve_player
         self._on_event = on_event
         self._transaction_lock = transaction_lock
         self._now = now
 
     def _lock(self):
         return self._transaction_lock if self._transaction_lock is not None else nullcontext()
+
+    @staticmethod
+    def _coord_to_spot(coord: Any) -> str:
+        try:
+            value = max(0, min(100, int(coord)))
+        except (TypeError, ValueError):
+            value = 50
+        if value == 0:
+            return "LEFT GOAL"
+        if value == 100:
+            return "RIGHT GOAL"
+        if value == 50:
+            return "50"
+        return f"LEFT {value}" if value < 50 else f"RIGHT {100 - value}"
 
     @staticmethod
     def source_allowed(state: Mapping[str, Any], source: Any) -> bool:
@@ -96,21 +127,38 @@ class EventService:
             "message": f"Game data is controlled by the {authority} console.",
         }
 
-    def set_control_source(self, authority: Any) -> EventResult:
+    def set_control_source(
+        self,
+        authority: Any,
+        payload: Mapping[str, Any] | None = None,
+    ) -> EventResult:
+        incoming = dict(payload or {})
         authority_text = str(authority or "").lower()
         if authority_text not in self.VALID_AUTHORITIES:
             return EventResult("INVALID_CONTROL_SOURCE", {})
         with self._lock():
             state = copy.deepcopy(dict(self._load_state()))
+            command_id = command_id_from(incoming)
+            duplicate = duplicate_result(state, command_id)
+            if duplicate is not None:
+                return EventResult("OK", duplicate)
             self._push_history(state)
             state["game_data_authority"] = authority_text
             state["statistician_enabled"] = authority_text == "statistician"
             state["control_source_updated_at"] = int(self._now())
+            revision = assign_next_revision(state)
+            metadata = command_metadata(
+                incoming,
+                action="set_control_source",
+                state_revision=revision,
+            )
+            result_data = attach_metadata(
+                {"state": copy.deepcopy(dict(self._public_state(state)))},
+                metadata,
+            )
+            remember_command(state, command_id, metadata=metadata, result=result_data)
             self._save_state(state)
-        return EventResult(
-            "OK",
-            {"state": copy.deepcopy(dict(self._public_state(state)))},
-        )
+        return EventResult("OK", result_data)
 
     def trigger(self, data: Mapping[str, Any] | None) -> EventResult:
         incoming = dict(data or {})
@@ -123,6 +171,62 @@ class EventService:
             state = copy.deepcopy(dict(self._load_state()))
             if not state.get("broadcast_id"):
                 return EventResult("NO_ACTIVE_BROADCAST", {})
+            command_id = command_id_from(incoming)
+            duplicate = duplicate_result(state, command_id)
+            if duplicate is not None:
+                return EventResult("OK", duplicate)
+            phase = str(state.get("special_game_phase", "") or "").lower()
+            resolving_pending_try = phase == "pending_try"
+
+            # Try events are legal only while a try is actually pending.
+            if event_code in {"XP", "2PT"} and phase != "pending_try":
+                return EventResult(
+                    "TRY_ALREADY_RESOLVED",
+                    {
+                        "phase": phase,
+                        "team": str(state.get("possession", "") or ""),
+                    },
+                )
+
+            # A pending try belongs only to the team that just scored.
+            # enter_pending_try() preserves that scoring team as possession.
+            if event_code in {"XP", "2PT"} and phase == "pending_try":
+                scoring_team = str(state.get("possession", "") or "").lower()
+                if scoring_team in self.VALID_TEAMS and team != scoring_team:
+                    return EventResult(
+                        "INVALID_TRY_TEAM",
+                        {
+                            "phase": phase,
+                            "team": team,
+                            "scoring_team": scoring_team,
+                        },
+                    )
+
+            # KICKOFF is the minimal canonical resolution event shared by the
+            # broadcaster quick control and detailed special-teams workflows.
+            if event_code == "KICKOFF" and phase not in {"kickoff", "free_kick"}:
+                return EventResult("KICKOFF_NOT_PENDING", {"phase": phase})
+
+            if phase == "pending_try" and event_code not in {"XP", "2PT", "PENALTY", "EJECTION"}:
+                return EventResult(
+                    "SPECIAL_PHASE_REQUIRES_TRY",
+                    {
+                        "phase": phase,
+                        "team": str(state.get("possession", "") or ""),
+                    },
+                )
+            if (
+                phase in {"kickoff", "free_kick"}
+                and event_code not in {"KICKOFF", "PENALTY", "EJECTION"}
+            ):
+                return EventResult(
+                    "SPECIAL_PHASE_REQUIRES_KICK",
+                    {
+                        "phase": phase,
+                        "kicking_team": str(state.get("kicking_team", "") or ""),
+                        "receiving_team": str(state.get("receiving_team", "") or ""),
+                    },
+                )
             source = str(
                 incoming.get("source", "broadcaster") or "broadcaster"
             ).lower()
@@ -131,46 +235,68 @@ class EventService:
                     "CONTROL_SOURCE_LOCKED",
                     self.locked_payload(state),
                 )
+            roles = CanonicalStateFoundation.team_roles(state)
+            requested_play_type = str(incoming.get("play_type", "") or "").lower()
+            if event_code == "PLAY" and requested_play_type in {"run", "pass"} and team != roles.offense:
+                return EventResult(
+                    "TEAM_ROLE_MISMATCH",
+                    {
+                        "message": "Offensive plays must be entered for the team in possession.",
+                        "submitted_team": team,
+                        "offense": roles.offense,
+                        "defense": roles.defense,
+                    },
+                )
+            if event_code == "TURNOVER":
+                current_possession = str(state.get("possession", "home") or "home").lower()
+                if team == current_possession:
+                    return EventResult(
+                        "INVALID_TURNOVER_TEAM",
+                        {"message": "Turnover recovery team must be the non-possessing team."},
+                    )
+            if event_code == "EJECTION" and str(incoming.get("ejection_person_type", "Player") or "Player").strip().casefold() == "player":
+                token = str(incoming.get("ejection_person_name", "") or "").strip()
+                incoming.setdefault("ejection_player_number", token.lstrip("#") if token.lstrip("#").isdigit() else "")
+                if self._resolve_player is not None and incoming.get("ejection_player_number"):
+                    resolved = dict(self._resolve_player(state, team, incoming.get("ejection_player_number")) or {})
+                    if resolved.get("resolved"):
+                        incoming["ejection_player_id"] = str(resolved.get("player_id", "") or "")
+                        incoming["ejection_roster_id"] = str(resolved.get("roster_id", "") or "")
+                        incoming["ejection_player_name"] = str(resolved.get("name", "") or token)
 
+            ledger = state.pop("recent_commands", None)
             self._push_history(state)
+            if isinstance(state.get("history"), list):
+                state["history"] = state["history"][-50:]
+            if ledger is not None:
+                state["recent_commands"] = ledger
             score_key = "home_score" if team == "home" else "visitor_score"
-            before = {
-                "home_score": int(state.get("home_score", 0)),
-                "visitor_score": int(state.get("visitor_score", 0)),
-                "possession": state.get("possession", "home"),
-                "down": state.get("down", "1st"),
-                "distance": state.get("distance", "10"),
-                "ball_spot": state.get("ball_spot", ""),
-                "quarter": state.get("quarter", "1"),
-                "player_graphic": copy.deepcopy(
-                    state.get("player_graphic") or {}
-                ),
-                "player_highlight": copy.deepcopy(
-                    state.get("player_highlight") or {}
-                ),
-                "sponsor_spotlight": copy.deepcopy(
-                    state.get("sponsor_spotlight") or {}
-                ),
-                "graphics_queue": copy.deepcopy(
-                    state.get("graphics_queue") or []
-                ),
-            }
+            before = CanonicalStateFoundation.snapshot(state)
+            before.update({
+                "player_graphic": copy.deepcopy(state.get("player_graphic") or {}),
+                "player_highlight": copy.deepcopy(state.get("player_highlight") or {}),
+                "sponsor_spotlight": copy.deepcopy(state.get("sponsor_spotlight") or {}),
+                "graphics_queue": copy.deepcopy(state.get("graphics_queue") or []),
+            })
             return_td = bool(incoming.get("return_td")) and str(
                 incoming.get("turnover_type", "")
             ) != "downs"
             conversion_outcome = str(
                 incoming.get("conversion_outcome", "good") or "good"
             ).lower()
-            if event_code == "XP" and conversion_outcome not in {"good", "no_good"}:
+            kick_outcome = str(incoming.get("kick_outcome", "made") or "made").lower()
+            if event_code == "XP" and conversion_outcome not in {"good", "no_good", "blocked", "retry"}:
                 return EventResult("INVALID_CONVERSION_OUTCOME", {})
-            if event_code == "2PT" and conversion_outcome not in {"good", "failed"}:
+            if event_code == "2PT" and conversion_outcome not in {"good", "failed", "blocked", "retry"}:
                 return EventResult("INVALID_CONVERSION_OUTCOME", {})
+            if event_code == "FG" and kick_outcome not in {"made", "no_good", "missed", "blocked"}:
+                return EventResult("INVALID_KICK_OUTCOME", {})
             conversion_good = conversion_outcome == "good"
             delta = (
                 6
                 if event_code == "TD" or (event_code == "TURNOVER" and return_td)
                 else 3
-                if event_code == "FG"
+                if event_code == "FG" and kick_outcome == "made"
                 else 2
                 if event_code == "2PT" and conversion_good
                 else 1
@@ -182,11 +308,104 @@ class EventService:
                     0,
                     int(state.get(score_key, 0)) + delta,
                 )
+
+            if event_code == "KICKOFF":
+                kicking = str(state.get("kicking_team", "") or team).lower()
+                if kicking not in self.VALID_TEAMS:
+                    kicking = team
+                receiving = str(
+                    state.get("receiving_team", "")
+                    or CanonicalStateFoundation.opposite(kicking)
+                ).lower()
+                if receiving not in self.VALID_TEAMS:
+                    receiving = CanonicalStateFoundation.opposite(kicking)
+                if team != kicking:
+                    return EventResult(
+                        "INVALID_KICKOFF_TEAM",
+                        {
+                            "kicking_team": kicking,
+                            "submitted_team": team,
+                        },
+                    )
+
+                touchback = bool(incoming.get("kick_touchback") or incoming.get("touchback"))
+                requested_spot = str(
+                    incoming.get("kick_result_spot")
+                    or incoming.get("result_spot")
+                    or incoming.get("ball_spot")
+                    or ""
+                ).strip()
+                if touchback:
+                    result_spot = CanonicalStateFoundation._team_own_yard_spot(
+                        state,
+                        receiving,
+                        20,
+                    )
+                elif requested_spot:
+                    result_spot = self._coord_to_spot(self._spot_to_coord(requested_spot))
+                else:
+                    return EventResult(
+                        "KICKOFF_RESULT_SPOT_REQUIRED",
+                        {
+                            "kicking_team": kicking,
+                            "receiving_team": receiving,
+                        },
+                    )
+
+                state["possession"] = receiving
+                state["down"] = "1st"
+                state["distance"] = "10"
+                state["ball_spot"] = result_spot
+                state["clock_running"] = False
+                state["clock_started_at"] = 0
+                incoming["kickoff_receiving_team"] = receiving
+                incoming["kickoff_result_spot"] = result_spot
+                incoming["kickoff_touchback"] = touchback
+                CanonicalStateFoundation.clear_special_phase(state)
+
             if event_code == "TURNOVER":
                 state["possession"] = team
+                state["down"] = "1st"
+                state["distance"] = "10"
+                turnover_spot_value = (
+                    incoming.get("turnover_spot")
+                    or incoming.get("recovery_spot")
+                    or incoming.get("interception_spot")
+                    or state.get("ball_spot")
+                    or "50"
+                )
+                return_end_value = incoming.get("return_end_spot")
+                final_spot = return_end_value if return_end_value not in (None, "") else turnover_spot_value
+                if return_td:
+                    direction = self._team_direction(state, team)
+                    final_spot = "RIGHT GOAL" if direction == 1 else "LEFT GOAL"
+                state["ball_spot"] = self._coord_to_spot(self._spot_to_coord(final_spot))
+                state["clock_running"] = False
+                state["clock_started_at"] = 0
             if event_code == "FIRST_DOWN":
                 state["down"] = "1st"
                 state["distance"] = "10"
+
+            if event_code == "TD" or (event_code == "TURNOVER" and return_td):
+                CanonicalStateFoundation.enter_pending_try(state, team)
+            elif event_code in {"XP", "2PT"}:
+                if resolving_pending_try and conversion_outcome != "retry":
+                    CanonicalStateFoundation.enter_kickoff(state, team)
+            elif event_code == "FG":
+                if kick_outcome == "made":
+                    CanonicalStateFoundation.enter_kickoff(state, team)
+                else:
+                    receiving = CanonicalStateFoundation.opposite(team)
+                    CanonicalStateFoundation.clear_special_phase(state)
+                    state["possession"] = receiving
+                    state["down"] = "1st"
+                    state["distance"] = "10"
+                    if bool(incoming.get("kick_touchback")):
+                        state["ball_spot"] = CanonicalStateFoundation._team_own_yard_spot(state, receiving, 20)
+                    elif str(incoming.get("kick_result_spot", "") or "").strip():
+                        state["ball_spot"] = self._coord_to_spot(self._spot_to_coord(incoming.get("kick_result_spot")))
+                    state["clock_running"] = False
+                    state["clock_started_at"] = 0
 
             penalty_enforcement: Mapping[str, Any] = {}
             if event_code == "PENALTY":
@@ -200,13 +419,27 @@ class EventService:
                 except (TypeError, ValueError):
                     yards_value = 0
                 yards_value = max(0, min(99, yards_value))
-                penalty_enforcement = self._apply_penalty(
-                    state,
-                    category,
-                    name,
-                    yards_value,
-                    outcome,
-                )
+                if category not in {"Special Teams", "General"}:
+                    category = CanonicalStateFoundation.penalty_unit(state, team)
+                incoming["penalty_category"] = category
+                state["_pending_penalty_options"] = {
+                    "selected_team": team,
+                    "requested_unit": category,
+                    "enforcement_spot": incoming.get("penalty_enforcement_spot", ""),
+                    "half_distance": bool(incoming.get("penalty_half_distance")),
+                    "automatic_first_down": bool(incoming.get("penalty_automatic_first_down")),
+                    "loss_of_down": bool(incoming.get("penalty_loss_of_down")),
+                    "untimed_down": bool(incoming.get("penalty_untimed_down")),
+                    "retry_down": bool(incoming.get("penalty_retry_down")),
+                }
+                try:
+                    penalty_enforcement = self._apply_penalty(
+                        state, category, name, yards_value, outcome
+                    ) or {}
+                finally:
+                    state.pop("_pending_penalty_options", None)
+                category = str(penalty_enforcement.get("unit") or category)
+                incoming["penalty_category"] = category
 
             if state.get("status") != "live":
                 state["status"] = "live"
@@ -249,6 +482,25 @@ class EventService:
                     "sport": "Football",
                     "players": [],
                 }
+
+            if player:
+                if not EligibilityService.is_eligible(
+                    state, team,
+                    player_id=(player.get("id", "") if isinstance(player, Mapping) else ""),
+                    number=(player.get("number", "") if isinstance(player, Mapping) else ""),
+                    name=self._player_display(player),
+                    resolve_player=self._resolve_player,
+                ):
+                    return EventResult("PLAYER_INELIGIBLE", {"message": "Selected player is unavailable because of a recorded ejection.", "team": team})
+            if passer:
+                if not EligibilityService.is_eligible(
+                    state, team,
+                    player_id=(passer.get("id", "") if isinstance(passer, Mapping) else ""),
+                    number=(passer.get("number", "") if isinstance(passer, Mapping) else ""),
+                    name=self._player_display(passer),
+                    resolve_player=self._resolve_player,
+                ):
+                    return EventResult("PLAYER_INELIGIBLE", {"message": "Selected passer is unavailable because of a recorded ejection.", "team": team})
 
             scorer_name = self._player_display(player)
             passer_name = self._player_display(passer)
@@ -382,6 +634,27 @@ class EventService:
             state["last_event"] = payload
             state["events"] = (list(state.get("events") or []) + [payload])[-200:]
             state["plays"] = (list(state.get("plays") or []) + [play_record])[-500:]
+            revision = assign_next_revision(state)
+            metadata = command_metadata(
+                incoming,
+                action=f"event_trigger:{event_code}",
+                state_revision=revision,
+            )
+            result_data = attach_metadata(
+                {
+                    "state": command_result_state(self._public_state(state)),
+                    "trigger": copy.deepcopy(payload),
+                    "media_assigned": bool(payload["media_trigger"]["assigned"]),
+                    "message": description + (f" (+{delta})" if delta else ""),
+                },
+                metadata,
+            )
+            remember_command(
+                state,
+                command_id,
+                metadata=metadata,
+                result=result_data,
+            )
             self._save_state(state)
 
         if self._on_event is not None:
@@ -391,20 +664,16 @@ class EventService:
                 # Social draft creation can never invalidate the game event.
                 pass
 
-        return EventResult(
-            "OK",
-            {
-                "state": copy.deepcopy(dict(self._public_state(state))),
-                "trigger": copy.deepcopy(payload),
-                "media_assigned": bool(payload["media_trigger"]["assigned"]),
-                "message": description + (f" (+{delta})" if delta else ""),
-            },
-        )
+        return EventResult("OK", result_data)
 
     def quick_correction(self, data: Mapping[str, Any] | None) -> EventResult:
         incoming = dict(data or {})
         with self._lock():
             state = copy.deepcopy(dict(self._load_state()))
+            command_id = command_id_from(incoming)
+            duplicate = duplicate_result(state, command_id)
+            if duplicate is not None:
+                return EventResult("OK", duplicate)
             source = str(
                 incoming.get("source", "statistician") or "statistician"
             ).lower()
@@ -459,16 +728,28 @@ class EventService:
                     note=str(incoming.get("note", ""))[:200],
                 ),
             )
+            revision = assign_next_revision(state)
+            metadata = command_metadata(
+                incoming,
+                action="quick_correction",
+                state_revision=revision,
+            )
+            result_data = attach_metadata(
+                {"state": copy.deepcopy(dict(self._public_state(state)))},
+                metadata,
+            )
+            remember_command(state, command_id, metadata=metadata, result=result_data)
             self._save_state(state)
-        return EventResult(
-            "OK",
-            {"state": copy.deepcopy(dict(self._public_state(state)))},
-        )
+        return EventResult("OK", result_data)
 
     def edit(self, event_id: str, data: Mapping[str, Any] | None) -> EventResult:
         incoming = dict(data or {})
         with self._lock():
             state = copy.deepcopy(dict(self._load_state()))
+            command_id = command_id_from(incoming)
+            duplicate = duplicate_result(state, command_id)
+            if duplicate is not None:
+                return EventResult("OK", duplicate)
             source = str(
                 incoming.get("source", "statistician") or "statistician"
             ).lower()
@@ -508,6 +789,20 @@ class EventService:
             for field in ("description", "quarter"):
                 if field in incoming:
                     event[field] = str(incoming.get(field, ""))[:300]
+            if str(event.get("event", "")).upper() == "EJECTION":
+                eject = event.setdefault("ejection", {})
+                edit_map = {
+                    "ejection_person_type": "person_type",
+                    "ejection_person_name": "person_name",
+                    "ejection_reason": "reason",
+                    "ejection_player_id": "player_id",
+                    "ejection_roster_id": "roster_id",
+                    "ejection_player_number": "player_number",
+                    "ejection_player_name": "player_name",
+                }
+                for incoming_key, event_key in edit_map.items():
+                    if incoming_key in incoming:
+                        eject[event_key] = str(incoming.get(incoming_key, "") or "")[:200]
             after_state = event.setdefault("after", {})
             for field in ("down", "distance", "ball_spot", "possession"):
                 if field in incoming:
@@ -570,15 +865,34 @@ class EventService:
                 ),
             )
             state["events"] = events
-            state["last_event"] = event
+            # A prior edit is a canonical-history change. Rebuild dependent game
+            # state and rewrite before/after snapshots instead of patching only
+            # the currently visible controls.
+            base_revision = current_revision(state)
+            baseline = (events[0].get("before") if events else {}) or {}
+            state = CanonicalStateFoundation.rebuild(
+                state,
+                events,
+                list(state.get("plays") or []),
+                baseline=baseline,
+            )
+            state["state_revision"] = base_revision
+            revision = assign_next_revision(state)
+            metadata = command_metadata(
+                incoming,
+                action="event_edit",
+                state_revision=revision,
+            )
+            result_data = attach_metadata(
+                {
+                    "state": copy.deepcopy(dict(self._public_state(state))),
+                    "event": copy.deepcopy(event),
+                },
+                metadata,
+            )
+            remember_command(state, command_id, metadata=metadata, result=result_data)
             self._save_state(state)
-        return EventResult(
-            "OK",
-            {
-                "state": copy.deepcopy(dict(self._public_state(state))),
-                "event": copy.deepcopy(event),
-            },
-        )
+        return EventResult("OK", result_data)
 
     def corrections(self) -> EventResult:
         state = dict(self._load_state())
@@ -587,97 +901,105 @@ class EventService:
             {"corrections": copy.deepcopy(list(reversed(state.get("correction_log") or [])))},
         )
 
-    def undo(self) -> EventResult:
+    @staticmethod
+    def _restore_entry_available(state: Mapping[str, Any], entry: Mapping[str, Any]) -> bool:
+        event = entry.get("event") if isinstance(entry, Mapping) else None
+        if not isinstance(event, Mapping):
+            return False
+        event_id = str(event.get("id", ""))
+        play_id = str(event.get("play_id", ""))
+        try:
+            play_number = int(event.get("play_number", 0) or 0)
+            next_play_number = int(state.get("next_play_number", 1) or 1)
+        except (TypeError, ValueError):
+            return False
+        if play_number < 1 or next_play_number != play_number:
+            return False
+        if event_id and any(str(row.get("id", "")) == event_id for row in list(state.get("events") or [])):
+            return False
+        if play_id and any(str(row.get("play_id", "")) == play_id for row in list(state.get("plays") or [])):
+            return False
+        return True
+
+    def undo(self, payload: Mapping[str, Any] | None = None) -> EventResult:
+        incoming = dict(payload or {})
         with self._lock():
             state = copy.deepcopy(dict(self._load_state()))
+            command_id = command_id_from(incoming)
+            duplicate = duplicate_result(state, command_id)
+            if duplicate is not None:
+                return EventResult("OK", duplicate)
+            base_revision = current_revision(state)
+            result_data: dict[str, Any] | None = None
             events = list(state.get("events") or [])
             target = next(
-                (
-                    event
-                    for event in reversed(events)
-                    if not event.get("undone") and event.get("before")
-                ),
+                (event for event in reversed(events) if not event.get("undone") and event.get("before")),
                 None,
             )
             if target:
-                before = target.get("before") or {}
-                state["home_score"] = int(
-                    before.get("home_score", state.get("home_score", 0))
+                target_id = str(target.get("id", ""))
+                target_play_id = str(target.get("play_id", ""))
+                target_play = next(
+                    (copy.deepcopy(row) for row in list(state.get("plays") or [])
+                     if str(row.get("event_id", "")) == target_id
+                     or (target_play_id and str(row.get("play_id", "")) == target_play_id)),
+                    None,
                 )
-                state["visitor_score"] = int(
-                    before.get("visitor_score", state.get("visitor_score", 0))
-                )
-                for field, fallback in (
-                    ("possession", "home"),
-                    ("down", "1st"),
-                    ("distance", "10"),
-                    ("ball_spot", ""),
-                    ("quarter", "1"),
-                ):
-                    state[field] = before.get(field, state.get(field, fallback))
-                state["clock_seconds"] = int(
-                    before.get(
-                        "clock_seconds",
-                        state.get("clock_seconds", 720),
-                    )
-                    or 0
-                )
-                state["clock_running"] = bool(
-                    before.get(
-                        "clock_running",
-                        state.get("clock_running", False),
-                    )
-                )
+                redo_stack = list(state.get("redo_stack") or [])
+                redo_stack.append({
+                    "event": copy.deepcopy(target),
+                    "play": target_play,
+                    "undone_at": int(self._now()),
+                })
+                state["redo_stack"] = redo_stack[-20:]
+                remaining_events = [row for row in events if str(row.get("id", "")) != target_id]
+                remaining_plays = [
+                    row for row in list(state.get("plays") or [])
+                    if str(row.get("event_id", "")) != target_id
+                    and str(row.get("play_id", "")) != target_play_id
+                ]
                 self._append_correction(
                     state,
                     self._correction_entry(
                         "undo",
                         "operator",
                         target.get("after") or {},
-                        before,
-                        str(target.get("id", "")),
+                        target.get("before") or {},
+                        target_id,
                         f"Undid {target.get('label', target.get('event', 'event'))}",
                     ),
                 )
-                if "player_graphic" in before:
-                    state["player_graphic"] = copy.deepcopy(
-                        before.get("player_graphic")
-                        or dict(self._default_player_graphic())
-                    )
-                if "player_highlight" in before:
-                    state["player_highlight"] = copy.deepcopy(
-                        before.get("player_highlight") or {}
-                    )
-                if "sponsor_spotlight" in before:
-                    state["sponsor_spotlight"] = copy.deepcopy(
-                        before.get("sponsor_spotlight") or {}
-                    )
-                if "graphics_queue" in before:
-                    state["graphics_queue"] = copy.deepcopy(
-                        before.get("graphics_queue") or []
-                    )
-                target_id = target.get("id", "")
-                target_play_number = self._clamp_int(
-                    target.get("play_number", 0),
-                    0,
-                    1_000_000,
-                    0,
+                baseline = (remaining_events[0].get("before") if remaining_events else target.get("before")) or {}
+                state = CanonicalStateFoundation.rebuild(
+                    state,
+                    remaining_events,
+                    remaining_plays,
+                    baseline=baseline,
                 )
-                state["events"] = [
-                    row for row in events if row.get("id") != target_id
-                ]
-                state["plays"] = [
-                    row
-                    for row in list(state.get("plays") or [])
-                    if row.get("event_id") != target_id
-                    and row.get("play_id") != target.get("play_id")
-                ]
-                if target_play_number:
-                    state["next_play_number"] = target_play_number
-                remaining = [
-                    row for row in state["events"] if not row.get("undone")
-                ]
-                state["last_event"] = remaining[-1] if remaining else {}
+                state["state_revision"] = base_revision
+                if not remaining_events:
+                    saved_redo = copy.deepcopy(list(state.get("redo_stack") or []))
+                    saved_corrections = copy.deepcopy(list(state.get("correction_log") or []))
+                    for key, value in dict(target.get("before") or {}).items():
+                        if key not in {"events", "plays", "history", "redo_stack", "correction_log"}:
+                            state[key] = copy.deepcopy(value)
+                    state["events"] = []
+                    state["plays"] = []
+                    state["last_event"] = {}
+                    state["next_play_number"] = int(target.get("play_number", 1) or 1)
+                    state["redo_stack"] = saved_redo
+                    state["correction_log"] = saved_corrections
+                revision = assign_next_revision(state)
+                metadata = command_metadata(
+                    incoming,
+                    action="undo",
+                    state_revision=revision,
+                )
+                result_data = attach_metadata(
+                    {"state": copy.deepcopy(dict(self._public_state(state)))},
+                    metadata,
+                )
+                remember_command(state, command_id, metadata=metadata, result=result_data)
                 self._save_state(state)
             else:
                 history = state.get("history", [])
@@ -685,8 +1007,76 @@ class EventService:
                     previous = history.pop()
                     previous["history"] = history
                     state = copy.deepcopy(dict(self._normalize_state(previous)))
+                    state["state_revision"] = base_revision
+                    revision = assign_next_revision(state)
+                    metadata = command_metadata(
+                        incoming,
+                        action="undo",
+                        state_revision=revision,
+                    )
+                    result_data = attach_metadata(
+                        {"state": copy.deepcopy(dict(self._public_state(state)))},
+                        metadata,
+                    )
+                    remember_command(state, command_id, metadata=metadata, result=result_data)
                     self._save_state(state)
-        return EventResult("OK", {"state": copy.deepcopy(state)})
+            if result_data is None:
+                result_data = {"state": copy.deepcopy(dict(self._public_state(state)))}
+        return EventResult("OK", result_data)
+
+    def restore(self, payload: Mapping[str, Any] | None = None) -> EventResult:
+        incoming = dict(payload or {})
+        with self._lock():
+            state = copy.deepcopy(dict(self._load_state()))
+            command_id = command_id_from(incoming)
+            duplicate = duplicate_result(state, command_id)
+            if duplicate is not None:
+                return EventResult("OK", duplicate)
+            redo_stack = list(state.get("redo_stack") or [])
+            entry = redo_stack[-1] if redo_stack else None
+            if not entry or not self._restore_entry_available(state, entry):
+                return EventResult(
+                    "RESTORE_UNAVAILABLE",
+                    {
+                        "state": copy.deepcopy(dict(self._public_state(state))),
+                        "message": "No safely restorable undone event is available.",
+                    },
+                )
+            event = copy.deepcopy(dict(entry.get("event") or {}))
+            play = copy.deepcopy(entry.get("play")) if isinstance(entry.get("play"), Mapping) else None
+            events = list(state.get("events") or []) + [event]
+            plays = list(state.get("plays") or [])
+            if play is not None:
+                plays.append(play)
+            state["redo_stack"] = redo_stack[:-1]
+            self._append_correction(
+                state,
+                self._correction_entry(
+                    "restore",
+                    "operator",
+                    event.get("before") or {},
+                    event.get("after") or {},
+                    str(event.get("id", "")),
+                    f"Restored {event.get('label', event.get('event', 'event'))}",
+                ),
+            )
+            baseline = (events[0].get("before") if events else event.get("before")) or {}
+            base_revision = current_revision(state)
+            state = CanonicalStateFoundation.rebuild(state, events, plays, baseline=baseline)
+            state["state_revision"] = base_revision
+            revision = assign_next_revision(state)
+            metadata = command_metadata(
+                incoming,
+                action="restore",
+                state_revision=revision,
+            )
+            result_data = attach_metadata(
+                {"state": copy.deepcopy(dict(self._public_state(state)))},
+                metadata,
+            )
+            remember_command(state, command_id, metadata=metadata, result=result_data)
+            self._save_state(state)
+        return EventResult("OK", result_data)
 
     def _describe_event(
         self,
@@ -774,16 +1164,43 @@ class EventService:
             kind = {
                 "interception": "Interception",
                 "fumble_recovery": "Fumble recovery",
+                "muff_recovery": "Muff recovery",
+                "kicking_team_recovery": "Kicking-team recovery",
                 "downs": "Turnover on downs",
                 "other": "Turnover",
             }.get(turnover_type, "Turnover")
             label = "Defensive Touchdown" if return_td else kind
             description = f"{scorer_name or team_name} {kind.lower()}"
+            turnover_spot = str(
+                incoming.get("turnover_spot")
+                or incoming.get("recovery_spot")
+                or incoming.get("interception_spot")
+                or ""
+            ).strip()
+            return_end = str(incoming.get("return_end_spot", "") or "").strip()
+            if turnover_spot:
+                description += f" at {turnover_spot}"
+            if return_end and not return_td:
+                description += f", returned to {return_end}"
             if return_td:
                 description += " returned for a touchdown"
             if yards and return_td:
                 description = f"{yards}-yard {description}"
             return label, description
+
+        if event_code == "KICKOFF":
+            receiving = str(incoming.get("kickoff_receiving_team", "") or "").lower()
+            receiving_name = str(
+                state.get("home_team")
+                if receiving == "home"
+                else state.get("visitor_team")
+                if receiving == "visitor"
+                else "receiving team"
+            )
+            result_spot = str(incoming.get("kickoff_result_spot", "") or "").strip()
+            if bool(incoming.get("kickoff_touchback")):
+                return "Kickoff", f"{team_name} kickoff — touchback to {receiving_name}"
+            return "Kickoff", f"{team_name} kickoff — {receiving_name} ball at {result_spot}"
 
         if event_code == "FIRST_DOWN":
             method = str(
@@ -838,12 +1255,25 @@ class EventService:
             return f"{person_type} Ejected", description
 
         if event_code == "FG":
-            description = f"{scorer_name or team_name} field goal"
-            if yards:
-                description = f"{yards}-yard field goal by {scorer_name or team_name}"
-            return "Field Goal", description
+            kick_outcome = str(incoming.get("kick_outcome", "made") or "made").lower()
+            base = f"{yards}-yard field goal by {scorer_name or team_name}" if yards else f"{scorer_name or team_name} field goal"
+            if kick_outcome == "made":
+                return "Field Goal", base + " good"
+            if kick_outcome == "blocked":
+                return "Field Goal Blocked", base + " blocked"
+            return "Field Goal No Good", base + " no good"
 
         conversion_outcome = str(incoming.get("conversion_outcome", "good") or "good").lower()
+        if event_code == "2PT":
+            if conversion_outcome == "good":
+                return "Two-Point Conversion", f"Two-point conversion good for {team_name}"
+            if conversion_outcome == "retry":
+                return "Two-Point Try Retry", f"Two-point try to be retried for {team_name}"
+            return "Two-Point Conversion Failed", f"Two-point conversion failed for {team_name}"
+        if conversion_outcome == "retry":
+            return "Extra Point Retry", f"Extra point to be retried for {team_name}"
+        if conversion_outcome == "blocked":
+            return "Extra Point Blocked", f"Extra point blocked for {team_name}"
         if conversion_outcome == "no_good":
             return "Extra Point No Good", f"Extra point no good for {team_name}"
         return "Extra Point", f"Extra point good by {scorer_name or team_name}"
@@ -870,6 +1300,7 @@ class EventService:
                 if event_code in {"XP", "2PT"}
                 else ""
             ),
+            "kick_outcome": str(incoming.get("kick_outcome", "made") or "made").lower() if event_code == "FG" else "",
             "created_at": values["created_at"],
             "quarter": str(state.get("quarter", "1") or "1"),
             "broadcast_id": state.get("broadcast_id", ""),
@@ -886,13 +1317,13 @@ class EventService:
                 "enforcement": dict(values["penalty_enforcement"]),
             },
             "ejection": {
-                "person_type": str(
-                    incoming.get("ejection_person_type", "") or ""
-                ),
-                "person_name": str(
-                    incoming.get("ejection_person_name", "") or ""
-                ),
+                "person_type": str(incoming.get("ejection_person_type", "") or ""),
+                "person_name": str(incoming.get("ejection_person_name", "") or ""),
                 "reason": str(incoming.get("ejection_reason", "") or ""),
+                "player_id": str(incoming.get("ejection_player_id", "") or ""),
+                "roster_id": str(incoming.get("ejection_roster_id", "") or ""),
+                "player_number": str(incoming.get("ejection_player_number", "") or ""),
+                "player_name": str(incoming.get("ejection_player_name", "") or ""),
             },
             "after": {
                 "home_score": int(state.get("home_score", 0)),
@@ -902,6 +1333,9 @@ class EventService:
                 "distance": state.get("distance", "10"),
                 "ball_spot": state.get("ball_spot", ""),
                 "quarter": state.get("quarter", "1"),
+                "special_game_phase": state.get("special_game_phase", ""),
+                "kicking_team": state.get("kicking_team", ""),
+                "receiving_team": state.get("receiving_team", ""),
             },
             "automation": {
                 "mode": (
@@ -911,6 +1345,13 @@ class EventService:
                 ),
                 "play_type": values["play_type"],
                 "turnover_type": values["turnover_type"],
+                "turnover_team": team if event_code == "TURNOVER" else "",
+                "turnover_spot": str(incoming.get("turnover_spot") or incoming.get("recovery_spot") or incoming.get("interception_spot") or ""),
+                "return_end_spot": str(incoming.get("return_end_spot", "") or ""),
+                "return_yards": str(incoming.get("return_yards", values["yards"]) or ""),
+                "turnover_player_id": str(incoming.get("player_id", "")) if event_code == "TURNOVER" else "",
+                "turnover_player_name": values["scorer_name"] if event_code == "TURNOVER" else "",
+                "turnover_player_number": str(player.get("number", "")) if event_code == "TURNOVER" and player else "",
                 "player_id": str(incoming.get("player_id", "")),
                 "player_name": values["scorer_name"],
                 "player_number": str(player.get("number", "")) if player else "",
@@ -931,6 +1372,9 @@ class EventService:
                     if event_code in {"XP", "2PT"}
                     else ""
                 ),
+                "kick_outcome": str(incoming.get("kick_outcome", "made") or "made").lower() if event_code == "FG" else "",
+                "kick_result_spot": str(incoming.get("kick_result_spot", "") or ""),
+                "kick_touchback": bool(incoming.get("kick_touchback")),
                 "turnover": (
                     bool(incoming.get("turnover"))
                     or bool(incoming.get("fumble_lost"))
@@ -981,6 +1425,8 @@ class EventService:
             "yards": values["yards"],
             "first_down": event_code == "FIRST_DOWN" or bool(incoming.get("first_down")),
             "touchdown": event_code == "TD" or values["return_td"],
+            "kick_outcome": str(incoming.get("kick_outcome", "made") or "made").lower() if event_code == "FG" else "",
+            "conversion_outcome": str(incoming.get("conversion_outcome", "good") or "good").lower() if event_code in {"XP", "2PT"} else "",
             "turnover": (
                 event_code == "TURNOVER"
                 or bool(incoming.get("turnover"))
@@ -988,6 +1434,13 @@ class EventService:
                 or str(incoming.get("pass_outcome", "")).lower()
                 == "interception"
             ),
+            "turnover_type": str(incoming.get("turnover_type", "") or "") if event_code == "TURNOVER" else "",
+            "turnover_team": team if event_code == "TURNOVER" else "",
+            "turnover_spot": str(incoming.get("turnover_spot") or incoming.get("recovery_spot") or incoming.get("interception_spot") or values["before"].get("ball_spot", "")) if event_code == "TURNOVER" else "",
+            "return_end_spot": str(incoming.get("return_end_spot", "") or "") if event_code == "TURNOVER" else "",
+            "return_yards": str(incoming.get("return_yards", values["yards"]) or "") if event_code == "TURNOVER" else "",
+            "turnover_player_name": values["scorer_name"] if event_code == "TURNOVER" else "",
+            "turnover_player_number": str(player.get("number", "")) if event_code == "TURNOVER" and player else "",
             "fumble": bool(incoming.get("fumble")),
             "fumble_lost": bool(incoming.get("fumble_lost")),
             "pass_outcome": str(incoming.get("pass_outcome", "") or ""),

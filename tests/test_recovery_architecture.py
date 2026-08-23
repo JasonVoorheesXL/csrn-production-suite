@@ -72,3 +72,5 @@ def test_phase_6_roadmap_retains_caption_weather_theme_and_social_requirements()
     assert "### 6.9 Social Publishing Engine" in roadmap
     assert "player headshots" in roadmap
     assert "approved sponsor assets" in roadmap
+
+

@@ -74,3 +74,5 @@ def test_default_profile_matches_p4next_multitrack_contract() -> None:
     assert device["sample_rate_hz"] == 48000
     assert device["bit_depth"] == 24
     assert [item["channel"] for item in profile["channels"]] == [1, 2, 3, 4]
+
+

@@ -242,3 +242,5 @@ def test_update_delete_and_duplicate_check_map_domain_results() -> None:
     assert deleted.data == {"ok": True}
     assert missing_delete.code == "SCHOOL_NOT_FOUND"
     assert store.schools == []
+
+

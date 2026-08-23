@@ -18,6 +18,7 @@ def test_caption_public_routes_are_explicit() -> None:
     assert manifest["caption_routes.caption_overlay"].auth_required is False
     assert manifest["caption_routes.caption_overlay_state"].auth_required is False
     assert manifest["caption_routes.caption_status"].auth_required is True
+    assert manifest["caption_routes.caption_audio_devices"].auth_required is True
     assert manifest["caption_routes.ingest_caption_segment"].auth_required is True
 
 
@@ -41,3 +42,5 @@ def test_weather_and_social_roadmap_requirements_are_retained() -> None:
     assert "6.9 Social Publishing Engine" in roadmap
     assert "player headshots" in roadmap
     assert "weather delays" in roadmap
+
+

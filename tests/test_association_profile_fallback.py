@@ -66,3 +66,5 @@ def test_official_name_mapping_can_supply_broadcast_name_fallback() -> None:
     )
     assert normalized["official_name"] == "North High School"
     assert normalized["broadcast_name"] == "North High School"
+
+

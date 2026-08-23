@@ -4,6 +4,7 @@ import copy
 from pathlib import Path
 from typing import Any
 
+from canonical_state_service import CanonicalStateFoundation
 from event_service import EventService
 
 
@@ -121,6 +122,13 @@ def build_service(state: dict[str, Any] | None = None):
         now=lambda: 1000.25,
     )
     return service, store, calls, lock
+
+
+def pending_try_state(team: str, score: int = 6) -> dict[str, Any]:
+    state = base_state()
+    state[f"{team}_score"] = score
+    CanonicalStateFoundation.enter_pending_try(state, team)
+    return state
 
 
 def test_source_allowed_uses_active_authority() -> None:
@@ -304,7 +312,7 @@ def test_undo_falls_back_to_history_snapshot() -> None:
 
 
 def test_extra_point_no_good_records_event_without_score_change() -> None:
-    service, store, _, _ = build_service()
+    service, store, _, _ = build_service(pending_try_state("home", 6))
     result = service.trigger({
         "team": "home",
         "event": "XP",
@@ -312,7 +320,7 @@ def test_extra_point_no_good_records_event_without_score_change() -> None:
         "conversion_outcome": "no_good",
     })
     assert result.ok
-    assert store["home_score"] == 0
+    assert store["home_score"] == 6
     event = store["events"][0]
     assert event["score_delta"] == 0
     assert event["conversion_outcome"] == "no_good"
@@ -321,7 +329,7 @@ def test_extra_point_no_good_records_event_without_score_change() -> None:
 
 
 def test_two_point_failed_records_event_without_score_change() -> None:
-    service, store, _, _ = build_service()
+    service, store, _, _ = build_service(pending_try_state("visitor", 6))
     result = service.trigger({
         "team": "visitor",
         "event": "2PT",
@@ -330,7 +338,7 @@ def test_two_point_failed_records_event_without_score_change() -> None:
         "conversion_outcome": "failed",
     })
     assert result.ok
-    assert store["visitor_score"] == 0
+    assert store["visitor_score"] == 6
     event = store["events"][0]
     assert event["score_delta"] == 0
     assert event["conversion_outcome"] == "failed"
@@ -338,15 +346,19 @@ def test_two_point_failed_records_event_without_score_change() -> None:
 
 
 def test_successful_conversion_outcomes_award_points() -> None:
-    service, store, _, _ = build_service()
+    service, store, _, _ = build_service(pending_try_state("home", 6))
     assert service.trigger({"team": "home", "event": "XP", "conversion_outcome": "good"}).ok
-    assert store["home_score"] == 1
+    assert store["home_score"] == 7
+
+    service, store, _, _ = build_service(pending_try_state("visitor", 6))
     assert service.trigger({"team": "visitor", "event": "2PT", "conversion_outcome": "good"}).ok
-    assert store["visitor_score"] == 2
+    assert store["visitor_score"] == 8
 
 
 def test_invalid_conversion_outcome_is_rejected() -> None:
-    service, store, _, _ = build_service()
+    service, store, _, _ = build_service(pending_try_state("home", 6))
     result = service.trigger({"team": "home", "event": "XP", "conversion_outcome": "failed"})
     assert result.code == "INVALID_CONVERSION_OUTCOME"
-    assert store["home_score"] == 0
+    assert store["home_score"] == 6
+
+

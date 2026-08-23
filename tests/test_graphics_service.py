@@ -636,3 +636,5 @@ def test_automation_player_builds_timed_primary_graphic() -> None:
     assert graphic["expires_at"] == 1008
     assert result.data["state"]["lower_third"]["visible"] is False
     assert result.data["state"]["primary_graphic_channel"] == "player"
+
+

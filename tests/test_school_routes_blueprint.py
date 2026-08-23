@@ -237,3 +237,5 @@ def test_duplicate_check_delegates_exclusion(school_client) -> None:
     assert response.status_code == 200
     assert response.get_json() == {"matches": [{"id": "similar-school"}]}
     assert service.duplicate_calls == [(payload, "caledonia")]
+
+

@@ -143,3 +143,5 @@ def test_support_bundle_redacts_facebook_secrets() -> None:
     assert "facebook_credentials.dat" in source
     assert "page_access_token" in source
     assert "_redact_log_text" in source
+
+

@@ -52,3 +52,5 @@ def test_transform_is_idempotent() -> None:
 def test_transform_rejects_missing_anchor() -> None:
     with pytest.raises(RuntimeError):
         module.transform("from __future__ import annotations\n")
+
+

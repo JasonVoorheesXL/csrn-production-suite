@@ -61,3 +61,5 @@ def test_social_publishing_requirement_remains_phase_6_9() -> None:
     phase = (ROOT / "docs" / "PHASE_6_7_INSTALLER_UPDATES_LICENSING.md").read_text(encoding="utf-8")
     assert "### 6.9 Social Publishing Engine" in roadmap
     assert "Phase 6.9 remains the Social Publishing Engine" in phase
+
+

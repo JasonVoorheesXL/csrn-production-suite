@@ -128,3 +128,5 @@ def test_facebook_delete_uses_graph_endpoint() -> None:
     assert result.code == "DELETED"
     assert calls[0][0] == "DELETE"
     assert calls[0][1].endswith("/v25.0/post-1")
+
+

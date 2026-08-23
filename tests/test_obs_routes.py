@@ -164,3 +164,5 @@ def test_command_scorebug_visibility_preserves_legacy_exception(obs_client) -> N
     )
     with pytest.raises(app_module.OBSConnectionError, match="OBS unavailable"):
         app_module.command_scorebug_visibility(True)
+
+

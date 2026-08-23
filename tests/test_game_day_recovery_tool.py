@@ -117,3 +117,5 @@ def get_recovery_service():
 
     assert completed.returncode == 0, completed.stderr
     assert '"direct": true' in completed.stdout.lower()
+
+

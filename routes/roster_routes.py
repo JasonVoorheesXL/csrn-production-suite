@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -110,5 +110,21 @@ def create_roster_blueprint(
         if result.code == "ROSTER_NOT_FOUND":
             return jsonify({"error": result.code}), 404
         return jsonify(result.data)
+
+    @routes.post("/api/rosters/pronunciation")
+    @dependencies.require_auth
+    def generate_roster_pronunciation():
+        incoming = request.get_json(force=True) or {}
+        first_name = str(incoming.get("first_name", "")).strip()
+        last_name = str(incoming.get("last_name", "")).strip()
+        pronunciation = dependencies.get_roster_service().pronunciation_for_player_name(
+            first_name,
+            last_name,
+        )
+        return jsonify({
+            "first_name": first_name,
+            "last_name": last_name,
+            "pronunciation": pronunciation,
+        })
 
     return routes

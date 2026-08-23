@@ -43,3 +43,5 @@ def test_canonical_identity_is_synchronized() -> None:
 
     app_text = (ROOT / "app.py").read_text(encoding="utf-8")
     assert f"Version {VERSION} — {TITLE}" in app_text
+
+

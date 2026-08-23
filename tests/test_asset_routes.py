@@ -297,3 +297,5 @@ def test_upload_duplicate_replace_preserves_existing_filename(asset_client) -> N
     assert response.get_json()["file_url"] == "/asset-files/existing.png"
     assert (directory / "existing.png").read_bytes() == b"replacement"
     assert any(call[0] == "replace_duplicate" for call in service.calls)
+
+

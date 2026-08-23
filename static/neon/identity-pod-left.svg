@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 260">
+<path fill="white" fill-rule="evenodd" d="M24 18H664l58 38 48 74-48 74-58 38H24L0 218V42L24 18Zm28 24L28 58v144l14 14h604l46-30 36-56-36-56-46-30H52Z"/>
+<path fill="white" opacity=".85" d="M66 48h530l42 14H94L66 48Zm28 150h544l-42 14H66l28-14Z"/>
+<path fill="white" opacity=".42" d="M88 76h410l-34 12H62l26-12Zm-26 96h402l34 12H88l-26-12Z"/>
+<path fill="white" opacity=".68" d="M18 72h10v116H18zM690 82l18 28-12 20 12 20-18 28-10-8 14-20-12-20 12-20-14-20z"/>
+</svg>

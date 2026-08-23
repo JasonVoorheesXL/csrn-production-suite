@@ -73,3 +73,5 @@ def test_cache_invalidates_when_file_changes(tmp_path: Path) -> None:
     assert repository.load()[0]["id"] == "first"
     path.write_text('[{"id":"second","players":[]}]', encoding="utf-8")
     assert repository.load()[0]["id"] == "second"
+
+

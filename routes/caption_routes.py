@@ -5,6 +5,8 @@ from typing import Any, Callable
 
 from flask import Blueprint, Response, jsonify, render_template, request
 
+from caption_worker import available_audio_input_devices
+
 
 RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
 
@@ -13,6 +15,7 @@ RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
 class CaptionRoutesDependencies:
     require_auth: RouteDecorator
     get_caption_service: Callable[[], Any]
+    get_caption_runtime: Callable[[], Any] | None = None
 
 
 def create_caption_blueprint(dependencies: CaptionRoutesDependencies) -> Blueprint:
@@ -31,7 +34,29 @@ def create_caption_blueprint(dependencies: CaptionRoutesDependencies) -> Bluepri
     @dependencies.require_auth
     def caption_status():
         result = dependencies.get_caption_service().status()
-        return jsonify(result.data)
+        data = dict(result.data)
+        if dependencies.get_caption_runtime:
+            data["runtime"] = dependencies.get_caption_runtime().status()
+        return jsonify(data)
+
+    @routes.get("/api/captions/audio-devices")
+    @dependencies.require_auth
+    def caption_audio_devices():
+        return jsonify(available_audio_input_devices())
+
+    @routes.post("/api/captions/live/start")
+    @dependencies.require_auth
+    def start_live_captions():
+        if dependencies.get_caption_runtime is None:
+            return jsonify({"error": "CAPTION_RUNTIME_UNAVAILABLE"}), 503
+        return jsonify({"runtime": dependencies.get_caption_runtime().start()})
+
+    @routes.post("/api/captions/live/stop")
+    @dependencies.require_auth
+    def stop_live_captions():
+        if dependencies.get_caption_runtime is None:
+            return jsonify({"error": "CAPTION_RUNTIME_UNAVAILABLE"}), 503
+        return jsonify({"runtime": dependencies.get_caption_runtime().stop()})
 
     @routes.put("/api/captions/profile")
     @dependencies.require_auth

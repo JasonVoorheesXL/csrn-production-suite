@@ -180,3 +180,5 @@ def test_delete_roster_route_preserves_contract_and_not_found(
     assert missing.status_code == 404
     assert missing.get_json() == {"error": "ROSTER_NOT_FOUND"}
     assert service.calls == [("delete", "missing")]
+
+

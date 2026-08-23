@@ -162,3 +162,5 @@ def test_read_rejects_filename_profile_id_mismatch(tmp_path: Path) -> None:
     result = service.read("outside-profile")
 
     assert result.code == "PROFILE_FILENAME_MISMATCH"
+
+

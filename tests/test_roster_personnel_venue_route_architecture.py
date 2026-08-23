@@ -93,3 +93,5 @@ def test_phase_5_4_route_modules_do_not_import_application_root() -> None:
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported_roots.add(node.module.split(".", 1)[0])
         assert "app" not in imported_roots
+
+

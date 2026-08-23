@@ -26,3 +26,5 @@ def test_meta_setup_requires_https_callback_and_ui_does_not_restore_http_loopbac
     assert 'id="metaRedirectUri" readonly' not in html
     assert "https://temporary-host.example/api/social/facebook/callback" in html
     assert "selection_id:facebookSelectionId" in html
+
+

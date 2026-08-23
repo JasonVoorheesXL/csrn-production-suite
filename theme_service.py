@@ -61,6 +61,7 @@ class GraphicsThemeService:
 
     PRESETS: dict[str, dict[str, Any]] = {
         "classic_1980s": {
+            "layouts": {"scorebug": "classic"},
             "name": "Classic 1980s Broadcast",
             "description": "Bold bars, squared geometry, restrained motion, and high-contrast analog-era structure.",
             "category": "retro",
@@ -82,8 +83,9 @@ class GraphicsThemeService:
             },
         },
         "early_cable": {
-            "name": "Early Cable Sports",
-            "description": "Layered gradients, beveled edges, energetic accents, and compact cable-era information density.",
+            "layouts": {"scorebug": "pixel"},
+            "name": "8-Bit Gameday",
+            "description": "Pixel-grid sports graphics, arcade HUD geometry, instant updates, and a limited late-1980s console palette.",
             "category": "retro",
             "tokens": {
                 "font_key": "system_sans",
@@ -103,6 +105,7 @@ class GraphicsThemeService:
             },
         },
         "modern_network": {
+            "layouts": {"scorebug": "modern"},
             "name": "Modern Network",
             "description": "Clean modular panels, confident typography, subtle depth, and balanced motion.",
             "category": "modern",
@@ -124,6 +127,7 @@ class GraphicsThemeService:
             },
         },
         "minimal_radio": {
+            "layouts": {"scorebug": "minimal"},
             "name": "Minimal Radio",
             "description": "Low-clutter geometry, flat surfaces, compact typography, and minimal animation for audio-first productions.",
             "category": "minimal",
@@ -145,8 +149,9 @@ class GraphicsThemeService:
             },
         },
         "heritage_press_box": {
-            "name": "Heritage Press Box",
-            "description": "Warm paper tones, serif typography, restrained brass accents, and archival scorebook character.",
+            "layouts": {"scorebug": "press"},
+            "name": "Heritage Press",
+            "description": "Black-ink sports-page typography, halftone paper texture, engraved rules, and restrained sepia newspaper character.",
             "category": "heritage",
             "tokens": {
                 "font_key": "serif",
@@ -166,6 +171,7 @@ class GraphicsThemeService:
             },
         },
         "friday_night_stadium": {
+            "layouts": {"scorebug": "stadium"},
             "name": "Friday Night Stadium",
             "description": "Dark stadium surfaces, bright field-light highlights, strong team-color energy, and dramatic depth.",
             "category": "event",
@@ -187,6 +193,7 @@ class GraphicsThemeService:
             },
         },
         "digital_neon": {
+            "layouts": {"scorebug": "neon"},
             "name": "Digital Neon",
             "description": "Electric edge lighting, compact digital typography, angular framing, and controlled neon glow.",
             "category": "digital",
@@ -208,6 +215,7 @@ class GraphicsThemeService:
             },
         },
         "collegiate_traditional": {
+            "layouts": {"scorebug": "collegiate"},
             "name": "Collegiate Traditional",
             "description": "Structured school-color panels, slab typography, formal borders, and traditional athletics presentation.",
             "category": "traditional",
@@ -290,6 +298,7 @@ class GraphicsThemeService:
                     "name": preset["name"],
                     "description": preset["description"],
                     "category": preset["category"],
+                    "layouts": copy.deepcopy(preset.get("layouts", {"scorebug": "modern"})),
                     "tokens": copy.deepcopy(preset["tokens"]),
                 }
             )
@@ -412,6 +421,7 @@ class GraphicsThemeService:
             "name": preset["name"],
             "description": preset["description"],
             "category": preset["category"],
+            "layouts": copy.deepcopy(preset.get("layouts", {"scorebug": "modern"})),
             "tokens": tokens,
             "school_colors": colors,
         }
@@ -570,7 +580,6 @@ class GraphicsThemeService:
                 "updated_at": status["updated_at"],
             },
         )
-
     @staticmethod
     def _css_for(resolved: dict[str, Any]) -> str:
         tokens = resolved["tokens"]

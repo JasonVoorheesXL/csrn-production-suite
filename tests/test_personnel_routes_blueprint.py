@@ -206,3 +206,5 @@ def test_validate_social_delegates_payload(personnel_client) -> None:
     assert response.status_code == 200
     assert response.get_json() == {"normalized": "https://example.com"}
     assert service.calls[-1] == ("social", ("website", "example.com"))
+
+

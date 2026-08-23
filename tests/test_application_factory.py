@@ -137,3 +137,5 @@ def test_factory_publishes_serializable_route_metadata() -> None:
     assert isinstance(manifest, tuple)
     assert any(row["endpoint"] == "example.public_route" for row in manifest)
     assert application.extensions["csrn_blueprints"] == ("example",)
+
+

@@ -130,3 +130,5 @@ def test_slugify_normalizes_branch_names() -> None:
     assert slugify(" Broadcast Package Service ") == (
         "Broadcast-Package-Service"
     )
+
+

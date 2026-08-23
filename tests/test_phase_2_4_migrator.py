@@ -66,3 +66,5 @@ def test_migration_is_idempotent() -> None:
     once = migrate(MINIMAL_APP)
     twice = migrate(once)
     assert twice == once
+
+

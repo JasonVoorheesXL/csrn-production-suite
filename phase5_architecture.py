@@ -63,6 +63,7 @@ PUBLIC_ENDPOINTS = {
     "sponsor_routes.sponsor_logo_file",
     "support_routes.roster_headshot_file",
     "system_routes.get_state",
+    "system_routes.get_runtime_state",
     "theme_routes.current_theme_css",
     "theme_routes.public_theme_state",
     "weather_routes.weather_overlay",

@@ -105,3 +105,5 @@ def test_player_event_visual_contract_is_independent_and_contained() -> None:
     assert "setScorebugLogo('visitorLogo',vi.logo,s.visitor_team||'VISITOR')" in overlay
     assert "logo.dataset.mediaState='fallback'" in overlay
     assert '.team-logo[data-media-state="invalid"]' in overlay
+
+

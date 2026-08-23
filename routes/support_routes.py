@@ -29,7 +29,13 @@ def create_support_blueprint(
 
     @routes.get("/roster-headshots/<filename>")
     def roster_headshot_file(filename: str):
-        return send_from_directory(dependencies.get_headshots_dir(), filename)
+        response = send_from_directory(dependencies.get_headshots_dir(), filename)
+        # Player headshots can be replaced in place. Prevent browsers and OBS
+        # browser sources from holding onto an older image at the same URL.
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
     @routes.post("/api/rosters/<roster_id>/players/<player_id>/headshot")
     @dependencies.require_auth

@@ -191,3 +191,5 @@ def test_delete_broadcast_maps_not_found(broadcast_client) -> None:
     service.delete_result = StubResult("NOT_FOUND", {})
     missing = client.delete("/api/broadcasts/missing", headers=auth_headers())
     assert missing.status_code == 404
+
+

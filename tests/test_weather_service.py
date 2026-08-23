@@ -313,3 +313,5 @@ def test_history_records_weather_operations(tmp_path: Path) -> None:
     actions = [item["action"] for item in service.status().data["weather"]["history"]]
     assert "weather_refreshed" in actions
     assert "lightning_observed" in actions
+
+

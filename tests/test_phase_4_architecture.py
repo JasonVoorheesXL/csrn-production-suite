@@ -103,3 +103,5 @@ def test_architecture_audit_cli_succeeds() -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert '"ok": true' in result.stdout
     assert '"services_checked": 27' in result.stdout
+
+

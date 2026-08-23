@@ -294,3 +294,4 @@ def test_saving_empty_index_remains_allowed(
     repository.save([])
 
     assert repository.load() == []
+

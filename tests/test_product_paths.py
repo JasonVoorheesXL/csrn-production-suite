@@ -95,3 +95,5 @@ def test_legacy_migration_is_one_time(tmp_path: Path) -> None:
     second = migrate_legacy_runtime(paths, confirmation="MIGRATE LEGACY CSRN DATA")
     assert first["status"] == "MIGRATED"
     assert second["status"] == "ALREADY_MIGRATED"
+
+

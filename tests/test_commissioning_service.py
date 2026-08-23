@@ -198,3 +198,5 @@ def test_duplicate_enabled_speakers_block_readiness(tmp_path: Path) -> None:
     )
     assert assignment["passed"] is False
     assert result.code == "COMMISSIONING_INCOMPLETE"
+
+

@@ -4,6 +4,18 @@ import copy
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
+from period_service import PeriodService
+from live_command_service import (
+    assign_next_revision,
+    attach_metadata,
+    command_result_state,
+    command_id_from,
+    command_metadata,
+    current_revision,
+    duplicate_result,
+    remember_command,
+)
+
 
 @dataclass(frozen=True)
 class GameOperationsResult:
@@ -31,6 +43,7 @@ class GameOperationsService:
         "ticker_visible",
         "ticker_speed",
         "ticker_pause",
+        "ball_spot_visible",
     }
     GAME_DATA_FIELDS = {"quarter", "down", "distance", "possession"}
     RESET_PRESERVED_FIELDS = (
@@ -106,42 +119,86 @@ class GameOperationsService:
 
         with self._transaction_lock:
             state = copy.deepcopy(dict(self._load_state()))
+            command_id = command_id_from(incoming)
+            duplicate = duplicate_result(state, command_id)
+            if duplicate is not None:
+                return GameOperationsResult("OK", duplicate)
             source = str(
                 incoming.get("source", "broadcaster") or "broadcaster"
             ).lower()
-            if not self._source_allowed(state, source):
+            broadcaster_override = (
+                source == "broadcaster"
+                and bool(incoming.get("override", False))
+            )
+            if not broadcaster_override and not self._source_allowed(state, source):
                 return GameOperationsResult(
                     "CONTROL_SOURCE_LOCKED",
                     copy.deepcopy(dict(self._locked_payload(state))),
                 )
 
+            ledger = state.pop("recent_commands", None)
             self._push_history(state)
+            if isinstance(state.get("history"), list):
+                state["history"] = state["history"][-50:]
+            if ledger is not None:
+                state["recent_commands"] = ledger
             key = "home_score" if team == "home" else "visitor_score"
             try:
                 current_score = int(state.get(key, 0) or 0)
             except (TypeError, ValueError):
                 current_score = 0
-            state[key] = max(0, current_score + delta)
+            new_score = max(0, current_score + delta)
+            state[key] = new_score
             if state.get("broadcast_phase") == "pregame":
                 state["broadcast_phase"] = "live"
-            self._save_state(state)
-
             broadcast_id = str(state.get("broadcast_id", "") or "")
+            linked_status_update = False
             if broadcast_id and state.get("status") != "live":
                 state["status"] = "live"
-                self._save_state(state)
+                linked_status_update = True
+            revision = assign_next_revision(state)
+            metadata = command_metadata(
+                incoming,
+                action="direct_score_adjustment",
+                state_revision=revision,
+            )
+            correction = {
+                "type": "direct_score_adjustment",
+                "team": team,
+                "delta": delta,
+                "old_score": current_score,
+                "new_score": new_score,
+                "source": source,
+                "reason": str(incoming.get("reason", incoming.get("note", "")) or "")[:200],
+                "command_id": command_id,
+                "client_id": str(incoming.get("client_id", "") or ""),
+                "state_revision": revision,
+                "timestamp": metadata["committed_at"],
+            }
+            log = state.get("correction_log")
+            if not isinstance(log, list):
+                log = []
+            state["correction_log"] = (log + [correction])[-200:]
+            result_data = attach_metadata({"state": command_result_state(state)}, metadata)
+            remember_command(
+                state,
+                command_id,
+                metadata=metadata,
+                result=result_data,
+            )
+            self._save_state(state)
+
+            if linked_status_update:
                 self._update_linked_status(broadcast_id, "live")
 
-            return GameOperationsResult(
-                "OK",
-                {"state": copy.deepcopy(state)},
-            )
+            return GameOperationsResult("OK", result_data)
 
     def set_values(
         self,
         payload: Mapping[str, Any] | None,
     ) -> GameOperationsResult:
         incoming = dict(payload or {})
+        command_id = command_id_from(incoming)
         changes = {
             key: copy.deepcopy(value)
             for key, value in incoming.items()
@@ -150,10 +207,14 @@ class GameOperationsService:
 
         with self._transaction_lock:
             state = copy.deepcopy(dict(self._load_state()))
+            duplicate = duplicate_result(state, command_id)
+            if duplicate is not None:
+                return GameOperationsResult("OK", duplicate)
             source = str(
                 incoming.get("source", "broadcaster") or "broadcaster"
             ).lower()
-            if self.GAME_DATA_FIELDS.intersection(changes) and not self._source_allowed(
+            period_action = str(incoming.get("period_action", "") or "").strip().lower()
+            if (self.GAME_DATA_FIELDS.intersection(changes) or period_action) and not self._source_allowed(
                 state,
                 source,
             ):
@@ -162,20 +223,84 @@ class GameOperationsService:
                     copy.deepcopy(dict(self._locked_payload(state))),
                 )
 
+            if period_action:
+                transition = PeriodService.transition(
+                    state,
+                    period_action,
+                    second_half_receiving_team=incoming.get("second_half_receiving_team", ""),
+                    overtime_possession=incoming.get("overtime_possession", ""),
+                    overtime_spot=incoming.get("overtime_spot", ""),
+                )
+                if transition.code in {
+                    "INVALID_PERIOD_ACTION",
+                    "SECOND_HALF_RECEIVER_REQUIRED",
+                    "OVERTIME_SETUP_REQUIRED",
+                }:
+                    response_state = copy.deepcopy(state)
+                    response_state["period_action_code"] = transition.code
+                    response_state["period_action_error"] = str(transition.data.get("message", "Period action could not be completed."))
+                    return GameOperationsResult("OK", {"state": response_state, "changes": {}})
+
+                self._push_history(state)
+                state = copy.deepcopy(transition.state)
+                state.pop("period_action_code", None)
+                state.pop("period_action_error", None)
+                revision = assign_next_revision(state)
+                metadata = command_metadata(
+                    incoming,
+                    action=f"set_values:period:{period_action}",
+                    state_revision=revision,
+                )
+                result_data = attach_metadata(
+                    {
+                        "state": copy.deepcopy(state),
+                        "changes": {"period_action": period_action},
+                        "period": copy.deepcopy(transition.data),
+                    },
+                    metadata,
+                )
+                remember_command(state, command_id, metadata=metadata, result=result_data)
+                self._save_state(state)
+                if period_action == "final_game":
+                    broadcast_id = str(state.get("broadcast_id", "") or "")
+                    if broadcast_id:
+                        self._update_linked_status(
+                            broadcast_id,
+                            "completed",
+                            {
+                                "final_home_score": state.get("home_score", 0),
+                                "final_visitor_score": state.get("visitor_score", 0),
+                            },
+                        )
+                return GameOperationsResult("OK", result_data)
+
             self._push_history(state)
             state.update(changes)
-            self._save_state(state)
-            return GameOperationsResult(
-                "OK",
+            revision = assign_next_revision(state)
+            metadata = command_metadata(
+                incoming,
+                action="set_values",
+                state_revision=revision,
+            )
+            result_data = attach_metadata(
                 {
                     "state": copy.deepcopy(state),
                     "changes": copy.deepcopy(changes),
                 },
+                metadata,
             )
+            remember_command(state, command_id, metadata=metadata, result=result_data)
+            self._save_state(state)
+            return GameOperationsResult("OK", result_data)
 
-    def toggle_scorebug(self) -> GameOperationsResult:
+    def toggle_scorebug(self, payload: Mapping[str, Any] | None = None) -> GameOperationsResult:
+        incoming = dict(payload or {})
+        command_id = command_id_from(incoming)
         with self._transaction_lock:
             state = copy.deepcopy(dict(self._load_state()))
+            duplicate = duplicate_result(state, command_id)
+            if duplicate is not None:
+                return GameOperationsResult("OK", duplicate)
             active_broadcast_id = state.get("broadcast_id", "")
             next_visible = not bool(state.get("scorebug_visible"))
             config = dict(self._load_config() or {})
@@ -193,41 +318,85 @@ class GameOperationsService:
             state["scorebug_visible"] = next_visible
             # Visibility must never change the selected broadcast.
             state["broadcast_id"] = active_broadcast_id
-            self._save_state(state)
-            return GameOperationsResult(
-                "OK",
-                {"state": copy.deepcopy(state)},
+            revision = assign_next_revision(state)
+            metadata = command_metadata(
+                incoming,
+                action="toggle_scorebug",
+                state_revision=revision,
             )
+            result_data = attach_metadata({"state": copy.deepcopy(state)}, metadata)
+            remember_command(state, command_id, metadata=metadata, result=result_data)
+            self._save_state(state)
+            return GameOperationsResult("OK", result_data)
 
-    def toggle_halftime(self) -> GameOperationsResult:
+    def toggle_halftime(self, payload: Mapping[str, Any] | None = None) -> GameOperationsResult:
+        incoming = dict(payload or {})
+        command_id = command_id_from(incoming)
         with self._transaction_lock:
             state = copy.deepcopy(dict(self._load_state()))
+            duplicate = duplicate_result(state, command_id)
+            if duplicate is not None:
+                return GameOperationsResult("OK", duplicate)
             self._push_history(state)
             if state.get("broadcast_phase") == "halftime":
-                state["broadcast_phase"] = "live"
-                state["quarter"] = "3"
-                state["down"] = "1st"
-                state["distance"] = "10"
-                state["scorebug_visible"] = True
+                transition = PeriodService.transition(state, "start_second_half")
+                if transition.code == "SECOND_HALF_RECEIVER_REQUIRED":
+                    state["quarter"] = "3"
+                    state["broadcast_phase"] = "live"
+                    state["period_state"] = "quarter"
+                    state["halftime_pending"] = False
+                    state["down"] = "1st"
+                    state["distance"] = "10"
+                    state["clock_running"] = False
+                    state["clock_seconds"] = 720
+                    state["scorebug_visible"] = True
+                elif transition.code != "OK":
+                    return GameOperationsResult(
+                        transition.code,
+                        {
+                            "state": copy.deepcopy(state),
+                            "message": str(transition.data.get("message", "Second half could not be started.")),
+                        },
+                    )
+                else:
+                    state = copy.deepcopy(transition.state)
             else:
                 state["broadcast_phase"] = "halftime"
                 # Halftime remains an on-air game state. Keep the scorebug
                 # visible; the overlay replaces quarter/clock/down content with
                 # a dedicated HALFTIME presentation.
                 state["scorebug_visible"] = True
-            self._save_state(state)
-            return GameOperationsResult(
-                "OK",
-                {"state": copy.deepcopy(state)},
+            revision = assign_next_revision(state)
+            metadata = command_metadata(
+                incoming,
+                action="toggle_halftime",
+                state_revision=revision,
             )
+            result_data = attach_metadata({"state": copy.deepcopy(state)}, metadata)
+            remember_command(state, command_id, metadata=metadata, result=result_data)
+            self._save_state(state)
+            return GameOperationsResult("OK", result_data)
 
-    def end_game(self) -> GameOperationsResult:
+    def end_game(self, payload: Mapping[str, Any] | None = None) -> GameOperationsResult:
+        incoming = dict(payload or {})
+        command_id = command_id_from(incoming)
         with self._transaction_lock:
             state = copy.deepcopy(dict(self._load_state()))
+            duplicate = duplicate_result(state, command_id)
+            if duplicate is not None:
+                return GameOperationsResult("OK", duplicate)
             self._push_history(state)
             state["broadcast_phase"] = "final"
             state["scorebug_visible"] = False
             state["status"] = "completed"
+            revision = assign_next_revision(state)
+            metadata = command_metadata(
+                incoming,
+                action="end_game",
+                state_revision=revision,
+            )
+            result_data = attach_metadata({"state": copy.deepcopy(state)}, metadata)
+            remember_command(state, command_id, metadata=metadata, result=result_data)
             self._save_state(state)
             self._update_linked_status(
                 state.get("broadcast_id", ""),
@@ -237,14 +406,16 @@ class GameOperationsService:
                     "final_visitor_score": state.get("visitor_score", 0),
                 },
             )
-            return GameOperationsResult(
-                "OK",
-                {"state": copy.deepcopy(state)},
-            )
+            return GameOperationsResult("OK", result_data)
 
-    def reset_data(self) -> GameOperationsResult:
+    def reset_data(self, payload: Mapping[str, Any] | None = None) -> GameOperationsResult:
+        incoming = dict(payload or {})
+        command_id = command_id_from(incoming)
         with self._transaction_lock:
             current = copy.deepcopy(dict(self._load_state()))
+            duplicate = duplicate_result(current, command_id)
+            if duplicate is not None:
+                return GameOperationsResult("OK", duplicate)
             reset = copy.deepcopy(dict(self._default_state()))
             for field in self.RESET_PRESERVED_FIELDS:
                 if field in current:
@@ -256,17 +427,36 @@ class GameOperationsService:
             reset["broadcast_phase"] = "final" if completed else "pregame"
             reset["review_mode"] = completed
             reset["scorebug_visible"] = False
+            reset["state_revision"] = current_revision(current)
+            revision = assign_next_revision(reset)
+            metadata = command_metadata(
+                incoming,
+                action="reset_data",
+                state_revision=revision,
+            )
+            result_data = attach_metadata({"state": copy.deepcopy(reset)}, metadata)
+            remember_command(reset, command_id, metadata=metadata, result=result_data)
             self._save_state(reset)
-            return GameOperationsResult(
-                "OK",
-                {"state": copy.deepcopy(reset)},
-            )
+            return GameOperationsResult("OK", result_data)
 
-    def new_broadcast(self) -> GameOperationsResult:
+    def new_broadcast(self, payload: Mapping[str, Any] | None = None) -> GameOperationsResult:
+        incoming = dict(payload or {})
+        command_id = command_id_from(incoming)
         with self._transaction_lock:
+            current = copy.deepcopy(dict(self._load_state()))
+            duplicate = duplicate_result(current, command_id)
+            if duplicate is not None:
+                return GameOperationsResult("OK", duplicate)
             state = copy.deepcopy(dict(self._default_state()))
-            self._save_state(state)
-            return GameOperationsResult(
-                "OK",
-                {"state": copy.deepcopy(state)},
+            state["state_revision"] = current_revision(current)
+            revision = assign_next_revision(state)
+            metadata = command_metadata(
+                incoming,
+                action="new_broadcast",
+                state_revision=revision,
             )
+            result_data = attach_metadata({"state": copy.deepcopy(state)}, metadata)
+            remember_command(state, command_id, metadata=metadata, result=result_data)
+            self._save_state(state)
+            return GameOperationsResult("OK", result_data)
+

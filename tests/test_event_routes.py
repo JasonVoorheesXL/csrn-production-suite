@@ -142,3 +142,4 @@ def test_undo_route_delegates(event_client) -> None:
     assert response.status_code == 200
     assert response.get_json() == {"home_score": 0}
     assert service.calls == [("undo", None)]
+

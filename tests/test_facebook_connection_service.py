@@ -230,3 +230,5 @@ def test_existing_secret_can_be_retained_when_only_https_callback_changes(tmp_pa
         }
     )
     assert changed_app.code == "FACEBOOK_APP_SECRET_INVALID"
+
+

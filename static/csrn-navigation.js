@@ -1,6 +1,7 @@
 (function () {
   const groups = [
     ['Game Day', [
+      ['pregame', 'Pre-Game Setup'],
       ['command', 'Command Center'],
       ['statistician', 'Statistician'],
       ['statistics', 'Statistics'],
@@ -14,6 +15,8 @@
     ]],
     ['Production', [
       ['graphics', 'Graphics'],
+
+      ['themes', 'Theme Manager', '/themes'],
       ['assets', 'Assets'],
       ['sponsors', 'Sponsors'],
       ['packages', 'Broadcast Packages'],

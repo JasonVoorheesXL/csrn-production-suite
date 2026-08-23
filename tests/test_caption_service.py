@@ -62,11 +62,93 @@ def test_profile_speaker_names_are_user_assignable(tmp_path: Path) -> None:
     assert result.data["segment"]["speaker"] == "Morgan"
 
 
+def test_legacy_profile_migrates_without_resetting_channels(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    service.profile_file.parent.mkdir(parents=True, exist_ok=True)
+    service.profile_file.write_text(
+        json.dumps(
+            {
+                "enabled": True,
+                "overlay_visible": True,
+                "minimum_confidence": 0.72,
+                "display_delay_ms": 1200,
+                "display_duration_ms": 6500,
+                "max_lines": 2,
+                "max_characters": 96,
+                "profanity_policy": "mask",
+                "profanity_words": [],
+                "theme": "standard",
+                "channels": [
+                    {"channel": 1, "speaker": "Legacy Announcer", "enabled": True},
+                    {"channel": 2, "speaker": "Spotter", "enabled": False},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    profile = service.status().data["profile"]
+
+    assert profile["channels"][0]["speaker"] == "Legacy Announcer"
+    assert profile["channels"][0]["device_channel"] == 1
+    assert profile["source_type"] == "manual"
+    assert profile["audio_capture_dtype"] == "float32"
+    assert profile["speech_threshold"] == 0.00075
+
+
 def test_profile_update_enables_overlay(tmp_path: Path) -> None:
     service = make_service(tmp_path)
     result = service.update_profile({"enabled": True, "overlay_visible": True})
     assert result.ok
     assert result.data["state"]["visible"] is True
+
+
+def test_profile_persists_user_selectable_caption_source(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    result = service.update_profile(
+        {
+            "source_type": "audio_device",
+            "audio_device": "3",
+            "audio_device_name": "Line (ZOOM P4next)",
+            "audio_capture_dtype": "int16",
+            "caption_model": "medium.en",
+            "channel_mode": "speaker_labeled",
+            "speech_threshold": 0.00025,
+        }
+    )
+    assert result.ok
+    profile = result.data["profile"]
+    assert profile["source_type"] == "audio_device"
+    assert profile["audio_device"] == "3"
+    assert profile["audio_device_name"] == "Line (ZOOM P4next)"
+    assert profile["audio_capture_dtype"] == "int16"
+    assert profile["caption_model"] == "medium.en"
+    assert profile["channel_mode"] == "speaker_labeled"
+    assert profile["speech_threshold"] == 0.00025
+
+
+def test_profile_rejects_invalid_audio_capture_dtype(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    result = service.update_profile({"audio_capture_dtype": "pcm24"})
+    assert result.code == "INVALID_PROFILE"
+
+
+def test_profile_rejects_invalid_caption_model(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    result = service.update_profile({"caption_model": "made-up-whisper"})
+    assert result.code == "INVALID_PROFILE"
+
+
+def test_profile_rejects_unknown_caption_source_type(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    result = service.update_profile({"source_type": "p4next_only"})
+    assert result.code == "INVALID_PROFILE"
+
+
+def test_profile_rejects_invalid_speech_threshold(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    result = service.update_profile({"speech_threshold": 1})
+    assert result.code == "INVALID_PROFILE"
 
 
 def test_profile_rejects_invalid_confidence(tmp_path: Path) -> None:
@@ -124,6 +206,29 @@ def test_ingest_persists_transcript(tmp_path: Path) -> None:
     assert service.ingest_segment(segment()).ok
     saved = json.loads((service.transcripts_dir / "game-1.json").read_text(encoding="utf-8"))
     assert saved[0]["text"] == "Touchdown Caledonia"
+
+
+def test_ingest_keeps_overlay_when_transcript_is_locked(tmp_path: Path, monkeypatch) -> None:
+    service = make_service(tmp_path)
+    enable(service)
+    original_write = CaptionService._write_json
+    locked = {"enabled": True}
+
+    def locked_transcript(path: Path, data) -> None:
+        if locked["enabled"] and path.name == "game-1.json":
+            raise PermissionError("simulated Google Drive lock")
+        original_write(path, data)
+
+    monkeypatch.setattr(CaptionService, "_write_json", staticmethod(locked_transcript))
+    result = service.ingest_segment(segment())
+    assert result.ok
+    assert "transcript_warning" in result.data
+    assert service.public_state().data["segments"][0]["text"] == "Touchdown Caledonia"
+
+    locked["enabled"] = False
+    assert service.ingest_segment(segment(id="seg-2", text="Second caption")).ok
+    saved = json.loads((service.transcripts_dir / "game-1.json").read_text(encoding="utf-8"))
+    assert [item["id"] for item in saved] == ["seg-1", "seg-2"]
 
 
 def test_public_state_honors_delay(tmp_path: Path) -> None:
@@ -227,3 +332,5 @@ def test_broadcast_identifier_is_sanitized(tmp_path: Path) -> None:
     enable(service)
     service.ingest_segment(segment(broadcast_id="../../game one"))
     assert (service.transcripts_dir / "game-one.json").exists()
+
+

@@ -70,3 +70,5 @@ def test_security_upgrade_routes_module_does_not_import_application_root() -> No
         elif isinstance(node, ast.ImportFrom) and node.module:
             imported_roots.add(node.module.split(".", 1)[0])
     assert "app" not in imported_roots
+
+

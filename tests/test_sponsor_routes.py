@@ -215,3 +215,5 @@ def test_link_asset_route_preserves_success_and_error_contracts(
     )
     assert missing.status_code == 404
     assert missing.get_json() == {"error": "Sponsor not found."}
+
+

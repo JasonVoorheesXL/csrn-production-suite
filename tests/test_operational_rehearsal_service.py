@@ -339,3 +339,5 @@ def test_gate_loader_exception_is_reported_as_blocking_gate(tmp_path: Path) -> N
     readiness = service.readiness().data["readiness"]
     assert readiness["conditions"]["system_gates"] is False
     assert readiness["system_gates"][0]["key"] == "system_gate_loader"
+
+

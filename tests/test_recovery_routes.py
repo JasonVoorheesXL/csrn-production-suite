@@ -152,3 +152,5 @@ def test_clear_unclean_shutdown(recovery_client) -> None:
     response = client.delete("/api/game-day/recovery/unclean-shutdown")
     assert response.status_code == 200
     assert service.calls[-1][0] == "clear"
+
+

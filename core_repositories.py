@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import threading
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -176,6 +177,102 @@ class StateRepository(JsonObjectRepository):
     def update(self, patch: Mapping[str, Any]) -> dict[str, Any]:
         current = self.load()
         return self.save(_deep_merge(current, patch))
+
+
+class LocalMirroredStateRepository:
+    """Local game-day state authority with an asynchronous project mirror."""
+
+    def __init__(
+        self,
+        engine: JsonPersistenceEngine,
+        *,
+        authority_path: Path,
+        mirror_path: Path,
+        defaults: Mapping[str, Any],
+    ) -> None:
+        self.engine = engine
+        self.path = Path(authority_path)
+        self.mirror_path = Path(mirror_path)
+        self.defaults = copy.deepcopy(dict(defaults))
+        self._authority = StateRepository(engine, self.path, defaults)
+        self._mirror = StateRepository(engine, self.mirror_path, defaults)
+        self._mirror_lock = threading.Lock()
+        self._mirror_pending: dict[str, Any] | None = None
+        self._mirror_worker: threading.Thread | None = None
+        self._recover_authority()
+
+    @staticmethod
+    def _revision(state: Mapping[str, Any] | None) -> int:
+        if not isinstance(state, Mapping):
+            return 0
+        try:
+            return int(state.get("state_revision", 0) or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    def _load_existing(self, repository: StateRepository) -> dict[str, Any] | None:
+        if not repository.path.exists():
+            return None
+        try:
+            return repository.load()
+        except Exception:
+            return None
+
+    def _recover_authority(self) -> None:
+        local = self._load_existing(self._authority)
+        mirror = self._load_existing(self._mirror)
+        local_revision = self._revision(local)
+        mirror_revision = self._revision(mirror)
+        if local is None and mirror is None:
+            self._authority.replace(self.defaults)
+            self._queue_mirror(self.defaults)
+            return
+        if mirror is not None and mirror_revision > local_revision:
+            self._authority.replace(mirror)
+            return
+        if local is not None:
+            self._queue_mirror(local)
+
+    def load(self) -> dict[str, Any]:
+        return self._authority.load()
+
+    def replace(self, state: Mapping[str, Any]) -> dict[str, Any]:
+        stored = self._authority.replace(state)
+        self._queue_mirror(stored)
+        return stored
+
+    def update(self, patch: Mapping[str, Any]) -> dict[str, Any]:
+        current = self.load()
+        return self.replace(_deep_merge(current, patch))
+
+    def _queue_mirror(self, state: Mapping[str, Any]) -> None:
+        snapshot = copy.deepcopy(dict(state))
+        with self._mirror_lock:
+            self._mirror_pending = snapshot
+            if self._mirror_worker is not None:
+                return
+            self._mirror_worker = threading.Thread(
+                target=self._mirror_loop,
+                name="csrn-state-drive-mirror",
+                daemon=True,
+            )
+            self._mirror_worker.start()
+
+    def _mirror_loop(self) -> None:
+        while True:
+            with self._mirror_lock:
+                snapshot = self._mirror_pending
+                self._mirror_pending = None
+            if snapshot is None:
+                with self._mirror_lock:
+                    if self._mirror_pending is None:
+                        self._mirror_worker = None
+                        return
+                continue
+            try:
+                self._mirror.replace(snapshot)
+            except Exception:
+                pass
 
 
 class SecurityRepository(JsonObjectRepository):

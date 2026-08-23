@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CSRN Broadcast Layout Lab</title>
+<link rel="stylesheet" href="csrn-broadcast-layout-engine.css?v=11">
+<link rel="stylesheet" href="csrn-neon-r2-engine.css?v=15.1-r40">
+<link rel="stylesheet" href="csrn-neon-softball-r42-driver.css?v=15.3-r42a">
+<link rel="stylesheet" href="csrn-neon-baseball-r43-driver.css?v=15.3-r43a">
+<link rel="stylesheet" href="csrn-heritage-press-engine.css?v=14.1">
+<link rel="stylesheet" href="csrn-friday-night-stadium-engine.css?v=12.6">
+<link rel="stylesheet" href="csrn-eight-bit-gameday-engine.css?v=13.7">
+<style>
+html,body{margin:0;background:#0b0f15;color:#eef3f8;font-family:Arial,Helvetica,sans-serif}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;background:#141b25;border-bottom:1px solid #334052}
+header h1{font-size:20px;margin:0 18px 0 0}
+label{font-size:12px;font-weight:900;text-transform:uppercase}
+select,button{background:#202a38;color:#fff;border:1px solid #53647a;border-radius:6px;padding:8px 10px;font-weight:800}
+button{cursor:pointer}
+#status{margin-left:auto;font-size:13px;color:#7ef0aa}.state-controls{display:flex;align-items:center;gap:10px;padding:7px 18px;background:#0f151e;border-bottom:1px solid #263344}.state-controls[hidden]{display:none}.state-controls input[type="text"]{width:150px;background:#202a38;color:#fff;border:1px solid #53647a;border-radius:6px;padding:7px 9px;font-weight:700}
+.viewport{width:min(100vw,1600px);aspect-ratio:16/9;margin:20px auto;background:radial-gradient(circle at 50% 40%,#364152,#151922 55%,#080a0e);overflow:hidden;border:2px solid #475366;position:relative}
+.scaler{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0}
+.instructions{max-width:1200px;margin:0 auto 30px;padding:0 20px;color:#b9c4d0}
+code{color:#ffe26d}
+.workspace{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:12px;align-items:start}.workspace:not(.editing){grid-template-columns:1fr}
+#inspector{margin:20px 12px 0 0;padding:16px;background:#141b25;border:1px solid #475366;border-radius:8px}#inspector h2{margin-top:0;font-size:18px}#inspector label{display:grid;grid-template-columns:80px 1fr;align-items:center;margin:10px 0}#inspector input,#inspector select{width:100%;background:#0d131c;color:#fff;border:1px solid #53647a;border-radius:5px;padding:7px}.hint{font-size:12px;color:#9eadbc;line-height:1.4}
+</style>
+</head>
+<body>
+<header>
+  <h1>Broadcast Layout Lab</h1>
+  <label>Package <select id="package"></select></label>
+  <label>Sport <select id="sport"></select></label>
+  <label>Scenario <select id="scenario"></select></label>
+  <label><input id="diagnostics" type="checkbox" checked> Diagnostics</label>
+  <button id="rerender">Render</button>
+  <button id="editMode">Edit Layout</button>
+  <button id="resetDraft">Reset Draft</button>
+  <button id="exportDraft">Export Profile</button>
+  <span id="status">INITIALIZING</span>
+</header>
+<div id="stateControls" class="state-controls">
+  <label id="possessionControl">Possession <select id="possession"><option value="home">Home</option><option value="visitor">Visitor</option><option value="none">None</option></select></label>
+  <label id="inningControl" hidden>Half <select id="inningHalf"><option value="TOP">Top</option><option value="BOTTOM">Bottom</option></select></label>
+  <label id="inningNumberControl" hidden>Inning <input id="inningNumber" type="number" min="1" max="20" value="5"></label>
+  <label>Suite teams <button id="loadSuiteTeams" type="button">Load</button></label>
+  <button id="swapTeams" type="button">Swap Teams</button>
+  <label>Home color <input id="homeColor" type="color" value="#0A72D8"></label>
+  <label>Visitor color <input id="visitorColor" type="color" value="#06A85A"></label>
+  <label>Home secondary <input id="homeSecondaryColor" type="color" value="#F5F5F5"></label>
+  <label>Visitor secondary <input id="visitorSecondaryColor" type="color" value="#F5F5F5"></label>
+  <label>Color test
+    <select id="colorPreset">
+      <option value="custom">Custom</option>
+      <option value="#B5121B|#E6B800">Scarlet / Gold</option>
+      <option value="#6D28D9|#F4D03F">Purple / Yellow</option>
+      <option value="#F97316|#111111">Orange / Black</option>
+      <option value="#7F1D1D|#9CA3AF">Maroon / Gray</option>
+      <option value="#0F2A5F|#F5F5F5">Navy / White</option>
+    </select>
+  </label>
+  <label>Home logo <input id="homeLogo" type="text" placeholder="auto / URL"></label>
+  <label>Visitor logo <input id="visitorLogo" type="text" placeholder="auto / URL"></label>
+  <span id="teamLoadStatus"></span>
+</div>
+<div class="workspace">
+  <div class="viewport" id="viewport"><div id="scaler" class="scaler"><div id="layout"></div></div></div>
+  <aside id="inspector" hidden>
+    <h2>Scorebug Composer</h2>
+    <p id="selectionName">Select a scorebug module.</p>
+    <label>Module <select id="moduleSelect"><option value="">Choose module...</option></select></label>
+    <label>X <input id="moduleX" type="number" value="0"></label>
+    <label>Y <input id="moduleY" type="number" value="0"></label>
+    <label>Width <input id="moduleW" type="number" min="20" placeholder="auto"></label>
+    <label>Height <input id="moduleH" type="number" min="20" placeholder="auto"></label>
+    <label>Stress case <select id="stressCase"><option value="normal">Normal names</option><option value="long">Long names</option><option value="nologo">No logos</option></select></label>
+    <button id="applyModule">Apply Module</button>
+    <button id="saveDraft">Save Draft</button>
+    <p class="hint">Drag highlighted modules directly. Drafts are isolated in this browser and do not alter production.</p>
+  </aside>
+</div>
+<div class="instructions">
+  <p>This lab runs independently from the production overlay. It validates theme-owned structures, sport profiles, component positioning, safe zones, and collision fallbacks before production migration.</p>
+  <p>Runtime marker: <code id="marker">PENDING</code></p>
+</div>
+<script src="csrn-broadcast-layout-engine.js?v=11"></script>
+<script src="csrn-neon-r2-engine.js?v=15.1-r40"></script>
+<script src="csrn-neon-softball-r42-driver.js?v=15.3-r42a"></script>
+<script src="csrn-neon-baseball-r43-driver.js?v=15.3-r43a"></script>
+<script src="csrn-heritage-press-engine.js?v=14.1"></script>
+<script src="csrn-friday-night-stadium-engine.js?v=12.6"></script>
+<script src="csrn-eight-bit-gameday-engine.js?v=13.7"></script>
+<script>
+(() => {
+  const status=document.getElementById("status");
+  const marker=document.getElementById("marker");
+  try{
+    const engine=window.CSRNBroadcastLayoutEngine;
+    if(!engine)throw new Error("Broadcast Layout Engine failed to load.");
+    const stadiumEngine=window.CSRNFridayNightStadiumEngine;
+    if(!stadiumEngine)throw new Error("Friday Night Stadium Engine failed to load.");
+    const pixelEngine=window.CSRNEightBitGamedayEngine;
+    if(!pixelEngine)throw new Error("8-Bit Gameday Engine failed to load.");
+    const heritageEngine=window.CSRNHeritagePressEngine;
+    const neonR2Engine=window.CSRNNeonR2Engine;
+    if(!heritageEngine)throw new Error("Heritage Press Engine failed to load.");
+    if(!neonR2Engine)throw new Error("Neon R2 Engine failed to load.");
+    const rendererFor=(packageId)=>packageId===neonR2Engine.packageId?neonR2Engine:packageId===heritageEngine.packageId?heritageEngine:packageId===pixelEngine.packageId?pixelEngine:packageId===stadiumEngine.packageId?stadiumEngine:engine;
+    const errors=[...engine.validateManifests(),...stadiumEngine.validateManifests(),...pixelEngine.validateManifests(),...heritageEngine.validateManifests(),...neonR2Engine.validateManifests()];
+    if(errors.length)throw new Error(errors.join(" | "));
+
+    const packageSelect=document.getElementById("package");
+    const sportSelect=document.getElementById("sport");
+    const scenarioSelect=document.getElementById("scenario");
+    Object.values(engine.manifests).forEach(item=>{
+      const approved=item.id===neonR2Engine.packageId?neonR2Engine.manifests[neonR2Engine.packageId]:item.id===heritageEngine.packageId?heritageEngine.manifests[heritageEngine.packageId]:item.id===pixelEngine.packageId?pixelEngine.manifests[pixelEngine.packageId]:item.id===stadiumEngine.packageId?stadiumEngine.manifests[stadiumEngine.packageId]:item;
+      packageSelect.add(new Option(approved.name,approved.id));
+    });
+    Object.keys(engine.sports).forEach(item=>sportSelect.add(new Option(item,item)));
+    Object.keys(engine.scenarios).forEach(item=>scenarioSelect.add(new Option(item,item)));
+    packageSelect.value="pixel_gameday";
+    sportSelect.value="football";
+    scenarioSelect.value="baseline";
+    const possessionSelect=document.getElementById("possession");
+    const inningHalfSelect=document.getElementById("inningHalf");
+    const inningNumberInput=document.getElementById("inningNumber");
+    const homeLogoInput=document.getElementById("homeLogo");
+    const visitorLogoInput=document.getElementById("visitorLogo");
+    const homeColorInput=document.getElementById("homeColor");
+    const visitorColorInput=document.getElementById("visitorColor");
+    const colorPresetSelect=document.getElementById("colorPreset");
+    const homeSecondaryColorInput=document.getElementById("homeSecondaryColor");
+    const visitorSecondaryColorInput=document.getElementById("visitorSecondaryColor");
+    let suiteTeamState=null;
+    let teamOrderSwapped=false;
+
+    function normalizeSuiteState(payload){
+      const roots=[payload,payload&&payload.state,payload&&payload.game,payload&&payload.currentGame,payload&&payload.broadcast];
+      for(const item of roots){
+        if(!item||typeof item!=="object")continue;
+        const home=item.home||item.homeTeam||item.teams?.home;
+        const visitor=item.visitor||item.away||item.visitorTeam||item.awayTeam||item.teams?.visitor||item.teams?.away;
+        if(!home||!visitor)continue;
+        const team=(value)=>({
+          name:value.name||value.schoolName||value.teamName||value.shortName,
+          shortName:value.shortName||value.abbreviation||value.name||value.teamName,
+          mascot:value.mascot||value.nickname||"",
+          record:value.record||"",
+          score:value.score,
+          primary:value.primary||value.primaryColor||value.color,
+          secondary:value.secondary||value.secondaryColor,
+          logo:value.logo||value.logoUrl||value.logo_url||value.image||""
+        });
+        return {home:team(home),visitor:team(visitor)};
+      }
+      return null;
+    }
+    async function loadSuiteTeams(){
+      const label=document.getElementById("teamLoadStatus");
+      label.textContent="Loading...";
+      const endpoints=["/api/broadcast/state","/api/game-state","/api/current-game","/api/state"];
+      for(const endpoint of endpoints){
+        try{
+          const response=await fetch(endpoint,{headers:{Accept:"application/json"},cache:"no-store"});
+          if(!response.ok)continue;
+          const parsed=normalizeSuiteState(await response.json());
+          if(parsed){suiteTeamState=parsed;homeLogoInput.value=parsed.home.logo||"";visitorLogoInput.value=parsed.visitor.logo||"";label.textContent=`Loaded ${endpoint}`;render();return true;}
+        }catch(_error){}
+      }
+      label.textContent="No active suite game found - initials retained";
+      return false;
+    }
+    function applyLabState(state){
+      state.game.possession=possessionSelect.value;
+      state.game.inningHalf=inningHalfSelect.value;
+      state.game.inning=String(inningNumberInput.value||"5");
+      if(suiteTeamState){state.home={...state.home,...suiteTeamState.home};state.visitor={...state.visitor,...suiteTeamState.visitor};}
+      if(homeLogoInput.value.trim())state.home.logo=homeLogoInput.value.trim();
+      if(visitorLogoInput.value.trim())state.visitor.logo=visitorLogoInput.value.trim();
+      state.home.primary=homeColorInput.value;
+      state.visitor.primary=visitorColorInput.value;
+      state.home.secondary=homeSecondaryColorInput.value;
+      state.visitor.secondary=visitorSecondaryColorInput.value;
+      if(teamOrderSwapped){
+        [state.home,state.visitor]=[state.visitor,state.home];
+        if(state.game&&state.game.lineScore){
+          [state.game.lineScore.home,state.game.lineScore.visitor]=[state.game.lineScore.visitor,state.game.lineScore.home];
+        }
+        for(const pair of [["homeHits","visitorHits"],["homeErrors","visitorErrors"],["homeFouls","visitorFouls"],["homeBonus","visitorBonus"]]){
+          [state.game[pair[0]],state.game[pair[1]]]=[state.game[pair[1]],state.game[pair[0]]];
+        }
+      }
+      return state;
+    }
+    function sportFixture(sport){
+      const state=engine.defaultState();
+      state.sport=sport;
+      state.scheduledDate="2026-08-30";state.contestType="official";state.specialGameDesignations=["RIVALRY"];
+      if(sport==="football"){
+        state.home.score=11;state.visitor.score=13;
+        state.game.period="2ND";state.game.clock="07:42";state.game.downDistance="3RD & 7";state.game.playClock="25";state.game.ballOn="N 38";state.game.ballOnTeam="NORTHWOOD";state.game.fieldDirection="right";
+        state.player.position="QB";state.player.detail="18/24 - 247 YDS - 3 TD";
+        state.highlight.title="TOUCHDOWN";state.highlight.detail="47-yard touchdown run";
+        state.heritageDispatch={phase:"live",eventType:"touchdown_run",livelyLineId:"shimmied-shook-cooked",facts:{teamSide:"visitor",playerName:"JUAN CARTER",playType:"run",yards:47,down:3,distance:6,period:"2ND",clock:"07:42",scoreAfter:{home:11,visitor:13},conversion:{result:"good",playerName:"JIMMY TWOTOES"}}};
+        state.captions.speaker="PLAY-BY-PLAY";state.captions.text="Third down and six, and Carter breaks into the clear.";
+        state.ticker.text="CARTER 47-YARD TD RUN GIVES PINE VALLEY THE LEAD - NORTHWOOD ANSWERS NEXT";
+      }else if(sport==="basketball"){
+        state.home.score=42;state.visitor.score=38;
+        state.game.period="2ND";state.game.clock="07:42";state.game.shotClock="25";state.game.homeFouls="5";state.game.visitorFouls="7";state.game.homeBonus=false;state.game.visitorBonus=true;state.game.possession="home";
+        state.player.position="G";state.player.detail="24 PTS - 8 REB - 6 AST";
+        state.highlight.title="THREE-POINT RUN";state.highlight.detail="Three-pointer from the right wing";
+        state.heritageDispatch={phase:"live",eventType:"three_pointer",livelyLineId:"rafters-hardwood",facts:{teamSide:"home",playerName:"ERIC WALTER",location:"the right wing",runSize:8,period:"2ND",clock:"07:42",scoreAfter:{home:42,visitor:38}}};
+        state.captions.speaker="COURTSIDE";state.captions.text="Walter connects from deep to finish an eight-oh run.";
+        state.ticker.text="WALTER THREE CAPS 8-0 NORTHWOOD RUN - KNIGHTS LEAD 42-38";
+      }else if(sport==="baseball"){
+        state.home.score=3;state.visitor.score=5;
+        state.game.inning="5";state.game.inningHalf="TOP";state.game.balls="2";state.game.strikes="1";state.game.outs="1";state.game.bases=[true,false,true];
+        state.game.homeHits="6";state.game.visitorHits="8";state.game.homeErrors="0";state.game.visitorErrors="1";state.game.lineScore={home:[0,0,1,2,0],visitor:[1,0,0,3,1]};
+        state.game.batterDetail="3 FOR 4 - 2 RBI";state.game.pitcherDetail="4.1 IP - 6 K";
+        state.player.position="SS";state.player.detail="3 FOR 4 - 2 RBI - 1 HR";
+        state.highlight.title="EXTRA BASE HIT";state.highlight.detail="Two-run double into the right-center gap";
+        state.heritageDispatch={phase:"live",eventType:"double",livelyLineId:"telegram-urgent",facts:{teamSide:"visitor",playerName:"TOMMY GUNNS",hitType:"double",location:"the right-center gap",rbi:2,inningHalf:"TOP",inning:5,scoreAfter:{home:3,visitor:5}}};
+        state.captions.speaker="BOOTH";state.captions.text="Gunns drives two home with a double into the gap.";
+        state.ticker.text="TOP 5 - PINE VALLEY LEADS 4-2 - ONE OUT";
+      }else{
+        state.home.score=2;state.visitor.score=4;
+        state.game.inning="5";state.game.inningHalf="TOP";state.game.balls="2";state.game.strikes="1";state.game.outs="1";state.game.bases=[true,false,true];
+        state.game.pitcherName="EMMA DAVIS";state.game.pitcherPosition="RHP";state.game.pitcherDetail="6 K - 1 ER";state.game.batterName="LILY MORGAN";state.game.batterPosition="SS";state.game.batterDetail="2 FOR 3 - 1 RBI";
+        state.game.homeHits="5";state.game.visitorHits="7";state.game.homeErrors="0";state.game.visitorErrors="1";state.game.lineScore={home:[0,1,0,1,0],visitor:[1,0,0,3,0]};
+        state.player.position="CF";state.player.detail="3 FOR 4 - 3 RBI - 1 SB";
+        state.highlight.title="STRIKEOUT";state.highlight.detail="Davis works out of trouble with runners aboard";
+        state.heritageDispatch={phase:"live",eventType:"strikeout",livelyLineId:"swinging-shadows",facts:{teamSide:"home",playerName:"EMMA DAVIS",inningHalf:"TOP",inning:5,outsRecorded:2,scoreAfter:{home:2,visitor:4}}};
+        state.captions.speaker="BOOTH";state.captions.text="Davis records the strikeout and leaves two runners aboard.";
+        state.ticker.text="DAVIS ESCAPES THE JAM - PINE VALLEY STILL LEADS 4-2 IN THE FIFTH";
+      }
+      state.sponsor.name="NEXT LEVEL PERFORMANCE";
+      state.sponsor.line="Official performance partner";
+      return state;
+    }
+    function syncSportControls(){
+      const diamond=sportSelect.value==="baseball"||sportSelect.value==="softball";
+      document.getElementById("possessionControl").hidden=sportSelect.value!=="football";
+      document.getElementById("inningControl").hidden=!diamond;
+      document.getElementById("inningNumberControl").hidden=!diamond;
+    }
+
+    function runMatrix(){
+      const sandbox=document.createElement("div");
+      sandbox.style.cssText="position:fixed;left:-10000px;top:0;width:1920px;height:1080px;visibility:hidden";
+      document.body.appendChild(sandbox);
+      let cases=0;
+      for(const manifest of Object.values(engine.manifests)){
+        for(const sport of Object.keys(engine.sports)){
+          if(!manifest.sports[sport])continue;
+          for(const [scenario,activeComponents] of Object.entries(engine.scenarios)){
+            const targetEngine=rendererFor(manifest.id);
+            const result=targetEngine.renderPackage(
+              sandbox,
+              manifest.id,
+              sport,
+              sportFixture(sport),
+              {diagnostics:false,activeComponents}
+            );
+            if(result.packageId!==manifest.id||result.sport!==sport||!result.components.includes("scorebug")){
+              throw new Error(`Matrix failure: ${manifest.id}/${sport}/${scenario}`);
+            }
+            if(Object.values(result.placements).some((item)=>item.colliding)){
+              throw new Error(`Collision failure: ${manifest.id}/${sport}/${scenario}`);
+            }
+            if(scenario==="baseline"){
+              const audit=targetEngine.auditRenderedScorebug(sandbox);
+              if(audit.length)throw new Error(`Scorebug audit failure: ${manifest.id}/${sport}: ${audit.join(", ")}`);
+            }
+            cases+=1;
+          }
+        }
+      }
+      sandbox.remove();
+      document.body.dataset.layoutMatrixCases=String(cases);
+      return cases;
+    }
+    function scale(){
+      const viewport=document.getElementById("viewport");
+      document.getElementById("scaler").style.transform=`scale(${viewport.clientWidth/1920})`;
+    }
+    function render(){
+      const targetEngine=rendererFor(packageSelect.value);
+      const result=targetEngine.renderPackage(
+        document.getElementById("layout"),
+        packageSelect.value,
+        sportSelect.value,
+        sportFixture(sportSelect.value),
+        {
+          diagnostics:document.getElementById("diagnostics").checked,
+          activeComponents:engine.scenarios[scenarioSelect.value]
+        }
+      );
+      status.textContent=`READY | ${result.packageId} | ${result.sport} | ${result.components.length} COMPONENTS`;
+      marker.textContent="CSRN_LAYOUT_ENGINE_READY";
+      document.body.dataset.layoutEngineReady="true";
+    }
+    let editing=false;
+    let selectedModule=null;
+    let dragState=null;
+    const workspace=document.querySelector(".workspace");
+    const inspector=document.getElementById("inspector");
+    const editButton=document.getElementById("editMode");
+    const moduleSelect=document.getElementById("moduleSelect");
+    const key=()=>`csrn-layout-draft:${packageSelect.value}:${sportSelect.value}`;
+    const stressState=()=>{
+      const state=sportFixture(sportSelect.value);
+      const mode=document.getElementById("stressCase").value;
+      if(mode==="long"){
+        state.home.name="NORTHWESTERN CONSOLIDATED";state.home.shortName=state.home.name;
+        state.visitor.name="ST. JOHN PAUL II CATHOLIC";state.visitor.shortName=state.visitor.name;
+      }
+      if(mode==="nologo"){state.home.logo="";state.visitor.logo="";}
+      return applyLabState(state);
+    };
+    const draft=()=>{try{return JSON.parse(localStorage.getItem(key())||"{}")}catch{return {}}};
+    function moduleValues(node){
+      const d=draft()[node.dataset.module]||{};
+      return {x:Number(d.x||0),y:Number(d.y||0),w:d.w||"",h:d.h||""};
+    }
+    function applyDraft(){
+      const values=draft();
+      document.querySelectorAll("#layout [data-module]").forEach(node=>{
+        const d=values[node.dataset.module];if(!d)return;
+        node.style.setProperty("--composer-x",`${Number(d.x||0)}px`);
+        node.style.setProperty("--composer-y",`${Number(d.y||0)}px`);
+        node.style.setProperty("--composer-w",d.w?`${Number(d.w)}px`:"auto");
+        node.style.setProperty("--composer-h",d.h?`${Number(d.h)}px`:"auto");
+      });
+    }
+    function selectModule(node){
+      document.querySelectorAll(".composer-selected").forEach(n=>n.classList.remove("composer-selected"));
+      selectedModule=node||null;
+      if(!node){
+        document.getElementById("selectionName").textContent="Select a scorebug module.";
+        moduleSelect.value="";
+        return;
+      }
+      node.classList.add("composer-selected");
+      document.getElementById("selectionName").textContent=node.dataset.module;
+      moduleSelect.value=node.dataset.module;
+      const d=moduleValues(node);moduleX.value=d.x;moduleY.value=d.y;moduleW.value=d.w;moduleH.value=d.h;
+    }
+    function saveSelected(){
+      if(!selectedModule)return;
+      const all=draft();all[selectedModule.dataset.module]={x:Number(moduleX.value||0),y:Number(moduleY.value||0),w:moduleW.value?Number(moduleW.value):"",h:moduleH.value?Number(moduleH.value):""};
+      localStorage.setItem(key(),JSON.stringify(all));applyDraft();
+    }
+    function wireComposer(){
+      const modules=[...document.querySelectorAll("#layout .bl-scorebug [data-module]")];
+      const current=moduleSelect.value;
+      moduleSelect.replaceChildren(new Option("Choose module...",""));
+      [...new Set(modules.map(node=>node.dataset.module))].sort().forEach(name=>moduleSelect.add(new Option(name,name)));
+      if(current&&modules.some(node=>node.dataset.module===current))moduleSelect.value=current;
+      modules.forEach(node=>{
+        node.onpointerdown=(event)=>{
+          if(!editing)return;event.preventDefault();selectModule(node);node.setPointerCapture(event.pointerId);
+          const d=moduleValues(node);dragState={node,startX:event.clientX,startY:event.clientY,x:d.x,y:d.y};
+        };
+        node.onpointermove=(event)=>{
+          if(!dragState||dragState.node!==node)return;
+          const scale=document.getElementById("viewport").clientWidth/1920;
+          const x=Math.round(dragState.x+(event.clientX-dragState.startX)/scale);const y=Math.round(dragState.y+(event.clientY-dragState.startY)/scale);
+          moduleX.value=x;moduleY.value=y;node.style.setProperty("--composer-x",`${x}px`);node.style.setProperty("--composer-y",`${y}px`);
+        };
+        node.onpointerup=()=>{if(dragState){saveSelected();dragState=null;}};
+      });
+    }
+    const baseRender=render;
+    render=function(){
+      const targetEngine=rendererFor(packageSelect.value);
+      const result=targetEngine.renderPackage(document.getElementById("layout"),packageSelect.value,sportSelect.value,stressState(),{diagnostics:document.getElementById("diagnostics").checked,activeComponents:engine.scenarios[scenarioSelect.value]});
+      document.getElementById("layout").classList.toggle("composer-active",editing);applyDraft();wireComposer();
+      status.textContent=`READY | ${result.packageId} | ${result.sport} | ${result.components.length} COMPONENTS`;
+      marker.textContent="CSRN_LAYOUT_ENGINE_READY";document.body.dataset.layoutEngineReady="true";
+    };
+    editButton.onclick=()=>{editing=!editing;workspace.classList.toggle("editing",editing);inspector.hidden=!editing;editButton.textContent=editing?"Exit Edit":"Edit Layout";render();};
+    moduleSelect.onchange=()=>selectModule(document.querySelector(`#layout .bl-scorebug [data-module="${CSS.escape(moduleSelect.value)}"]`));
+    document.getElementById("applyModule").onclick=saveSelected;
+    document.getElementById("saveDraft").onclick=()=>{saveSelected();status.textContent="DRAFT SAVED | "+key();};
+    document.getElementById("resetDraft").onclick=()=>{localStorage.removeItem(key());selectModule(null);render();};
+    document.getElementById("stressCase").onchange=render;
+    document.getElementById("exportDraft").onclick=()=>{
+      const payload={schema:"csrn.scorebug-layout-profile.v1",packageId:packageSelect.value,sport:sportSelect.value,modules:draft()};
+      const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${packageSelect.value}-${sportSelect.value}-layout.json`;a.click();URL.revokeObjectURL(a.href);
+    };
+    packageSelect.onchange=()=>{selectModule(null);render();};
+    sportSelect.onchange=()=>{selectModule(null);syncSportControls();render();};
+    possessionSelect.onchange=render;
+    inningHalfSelect.onchange=render;
+    inningNumberInput.oninput=render;
+    homeLogoInput.onchange=render;
+    visitorLogoInput.onchange=render;
+    document.getElementById("loadSuiteTeams").onclick=loadSuiteTeams;
+    document.getElementById("swapTeams").onclick=()=>{
+      teamOrderSwapped=!teamOrderSwapped;
+      document.getElementById("swapTeams").textContent=teamOrderSwapped?"Restore Teams":"Swap Teams";
+      render();
+    };
+    homeColorInput.oninput=render;
+    visitorColorInput.oninput=render;
+    homeSecondaryColorInput.oninput=render;
+    visitorSecondaryColorInput.oninput=render;
+    colorPresetSelect.onchange=()=>{
+      if(colorPresetSelect.value!=="custom"){
+        const [homeColor,visitorColor]=colorPresetSelect.value.split("|");
+        homeColorInput.value=homeColor;
+        visitorColorInput.value=visitorColor;
+      }
+      render();
+    };
+    scenarioSelect.onchange=render;
+    document.getElementById("diagnostics").onchange=render;
+    document.getElementById("rerender").onclick=render;
+    window.addEventListener("resize",scale);
+    const matrixCases=runMatrix();
+    syncSportControls();scale();render();loadSuiteTeams();
+    document.body.dataset.layoutMatrixReady="true";
+    status.textContent += ` | ${matrixCases} MATRIX CASES`;
+  }catch(error){
+    status.textContent=`ERROR | ${error.message}`;
+    marker.textContent=`CSRN_LAYOUT_ENGINE_ERROR:${error.message}`;
+    document.body.dataset.layoutEngineReady="false";
+    throw error;
+  }
+})();
+</script>
+</body>
+</html>

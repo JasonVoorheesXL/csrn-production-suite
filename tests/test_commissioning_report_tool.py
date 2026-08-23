@@ -75,3 +75,5 @@ def test_obs_test_refreshes_contract(capsys) -> None:
     assert main(["--obs-test"], service) == 0
     assert service.obs_calls == 1
     assert "OBS contract check: ready" in capsys.readouterr().out
+
+

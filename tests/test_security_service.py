@@ -87,3 +87,5 @@ def test_third_failure_locks_authentication(tmp_path: Path) -> None:
     stored = repository.load()
     assert stored["failed_attempts"] == 0
     assert stored["locked_until"] == 1060
+
+

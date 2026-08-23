@@ -118,3 +118,5 @@ def test_broken_scorebug_logo_is_not_retried_on_every_state_poll() -> None:
     assert "logo.dataset.mediaState==='fallback'&&logo.dataset.fallbackName===normalizedName" in overlay
     assert "for(const [id,url] of [['homeLogo',hi.logo],['visitorLogo',vi.logo]])" not in overlay
     assert "logo.style.display='none'" not in overlay
+
+

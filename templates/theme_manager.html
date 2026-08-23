@@ -5,159 +5,215 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Graphics Themes</title>
   <style>
-    :root { color-scheme: dark; font-family: Arial, Helvetica, sans-serif; }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: #0c0f14; color: #f4f6f8; }
-    header { padding: 24px 30px; border-bottom: 1px solid #343a44; background: #121720; }
-    h1 { margin: 0 0 6px; font-size: 28px; }
-    header p { margin: 0; color: #aeb7c2; }
-    main { padding: 24px 30px 40px; }
-    .status { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 22px; }
-    .pill { padding: 8px 12px; border: 1px solid #49515e; border-radius: 999px; background: #171d27; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 18px; }
-    .card { overflow: hidden; border: 1px solid #3a424e; border-radius: 14px; background: #141922; box-shadow: 0 12px 24px rgba(0,0,0,.25); }
-    .preview { height: 120px; display: grid; align-content: end; padding: 14px; }
-    .preview-bar { display: grid; grid-template-columns: 1fr 86px 1fr; min-height: 58px; border: 2px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); font-family: var(--font); }
-    .preview-team { display: flex; align-items: center; padding: 0 12px; background: linear-gradient(115deg,var(--primary),var(--surface)); font-weight: 900; }
-    .preview-center { display: grid; place-items: center; background: linear-gradient(180deg,var(--primary),var(--secondary)); font-weight: 900; }
-    .preview-away { justify-content: flex-end; background: linear-gradient(245deg,var(--secondary),var(--surface)); }
-    .copy { padding: 16px; }
-    .copy h2 { margin: 0 0 7px; font-size: 20px; }
-    .copy p { margin: 0; min-height: 58px; color: #b8c1cd; line-height: 1.35; }
-    .meta { margin-top: 10px; color: #8792a1; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
-    .actions { display: flex; gap: 8px; padding: 0 16px 16px; }
-    button { border: 1px solid #657184; border-radius: 8px; padding: 9px 13px; background: #242c39; color: white; cursor: pointer; font-weight: 800; }
-    button.primary { background: #b5121b; border-color: #e03e46; }
-    button:disabled { opacity: .45; cursor: not-allowed; }
-    .panel { margin-top: 24px; padding: 18px; border: 1px solid #3a424e; border-radius: 14px; background: #141922; }
-    .panel h2 { margin-top: 0; }
-    .form-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
-    label { display: grid; gap: 5px; color: #b8c1cd; font-size: 13px; }
-    input,select { min-width: 170px; padding: 9px 10px; border: 1px solid #4c5665; border-radius: 7px; background: #0d1118; color: white; }
-    #message { margin-top: 14px; min-height: 22px; color: #f3d27a; }
-  </style>
+    :root{color-scheme:dark;font-family:Arial,Helvetica,sans-serif;--bg:#0c0f14;--panel:#141922;--line:#3a424e;--muted:#aeb7c2;--accent:#b5121b}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:#f4f6f8}
+    button,input,select{font:inherit} button{border:1px solid #657184;border-radius:8px;padding:9px 13px;background:#242c39;color:#fff;cursor:pointer;font-weight:800}
+    button.primary{background:var(--accent);border-color:#e03e46} button:disabled{opacity:.45;cursor:not-allowed}
+    header{padding:22px 30px;border-bottom:1px solid #343a44;background:#121720;display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    h1,h2,h3,p{margin-top:0} h1{margin-bottom:6px;font-size:28px} header p{margin-bottom:0;color:var(--muted)}
+    main{padding:22px 30px 40px;display:grid;gap:20px}
+    .status{display:flex;flex-wrap:wrap;gap:10px}.pill{padding:8px 12px;border:1px solid #49515e;border-radius:999px;background:#171d27;color:#f4f6f8;text-decoration:none}
+    .workspace{display:grid;grid-template-columns:minmax(320px,440px) minmax(0,1fr);gap:20px;align-items:start}
+    .panel{padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 12px 24px rgba(0,0,0,.22)}
+    .catalog-tools{display:grid;grid-template-columns:1fr 150px;gap:10px;margin-bottom:14px}
+    input,select{width:100%;padding:10px;border:1px solid #4c5665;border-radius:7px;background:#0d1118;color:#fff}
+    .grid{display:grid;gap:12px;max-height:68vh;overflow:auto;padding-right:4px}
+    .card{border:1px solid var(--line);border-radius:12px;background:#10151d;overflow:hidden}
+    .card.selected{border-color:#ff5968;box-shadow:0 0 0 2px rgba(255,89,104,.2)}
+    .mini-preview{height:86px;padding:11px;display:grid;align-content:end}
+    .mini-scorebug{display:grid;grid-template-columns:1fr 58px 1fr;min-height:44px;border:2px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);font-family:var(--font)}
+    .mini-team{display:flex;align-items:center;padding:0 8px;background:linear-gradient(115deg,var(--primary),var(--surface));font-weight:900;font-size:12px}
+    .mini-center{display:grid;place-items:center;background:linear-gradient(180deg,var(--primary),var(--secondary));font-weight:900;font-size:12px}
+    .mini-away{justify-content:flex-end;background:linear-gradient(245deg,var(--secondary),var(--surface))}
+    .copy{padding:12px}.copy h3{margin:0 0 5px;font-size:17px}.copy p{margin:0;color:#b8c1cd;font-size:13px;line-height:1.35}
+    .meta{margin-top:8px;color:#8792a1;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+    .actions{display:flex;gap:8px;padding:0 12px 12px}.actions button{flex:1}
+    .preview-heading{display:flex;justify-content:space-between;gap:12px;align-items:start;flex-wrap:wrap}
+    .preview-heading p{color:var(--muted);margin-bottom:0}.preview-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .tabs{display:flex;gap:7px;flex-wrap:wrap;margin:16px 0 12px}.tabs button.active{background:#fff;color:#111;border-color:#fff}
+    .stage-shell{border:1px solid #48515e;border-radius:14px;background:#06080c;overflow:auto}
+    .stage{position:relative;width:100%;aspect-ratio:16/9;min-width:720px;overflow:hidden;background:radial-gradient(circle at 50% 35%,#243143,#080b10 68%);font-family:var(--csrn-theme-font,Arial,sans-serif)}
+    .stage-label{position:absolute;top:14px;left:16px;color:#8f9bab;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+    .demo{display:none!important}.demo.active{display:block!important}
+    .demo-scorebug{position:absolute;left:7%;right:7%;bottom:7%;height:22%;display:grid;grid-template-columns:1fr 16% 1fr;color:var(--csrn-theme-text,#fff)}
+    .demo-team{display:grid;grid-template-columns:20% 1fr 22%;align-items:center;padding:0 4%;border:var(--csrn-theme-border-width,2px) solid var(--csrn-theme-border,#fff);background:linear-gradient(115deg,var(--csrn-theme-primary,#b5121b),var(--csrn-theme-surface,#101318));box-shadow:var(--csrn-theme-shadow);border-radius:var(--csrn-theme-radius) 0 0 var(--csrn-theme-radius)}
+    .demo-team.away{grid-template-columns:22% 1fr 20%;border-radius:0 var(--csrn-theme-radius) var(--csrn-theme-radius) 0;background:linear-gradient(245deg,var(--csrn-theme-secondary,#111),var(--csrn-theme-surface,#101318))}
+    .demo-name{font-weight:900;font-size:clamp(18px,2vw,34px)}.demo-sub{font-size:clamp(10px,1vw,16px);color:var(--csrn-theme-muted,#ccc)}.demo-score{font-weight:900;font-size:clamp(28px,4vw,64px);text-align:center}
+    .demo-logo{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:#fff;color:#111;font-weight:900}.demo-center{display:grid;place-items:center;text-align:center;background:linear-gradient(180deg,var(--csrn-theme-primary,#b5121b),var(--csrn-theme-secondary,#111));border-block:var(--csrn-theme-border-width,2px) solid var(--csrn-theme-border,#fff);font-weight:900}
+    .demo-lower{position:absolute;left:7%;bottom:11%;width:58%;min-height:23%;display:grid;grid-template-columns:10px 18% 1fr;border:var(--csrn-theme-border-width,2px) solid var(--csrn-theme-border,#fff);border-radius:var(--csrn-theme-radius);overflow:hidden;background:linear-gradient(115deg,var(--csrn-theme-surface,#101318),var(--csrn-theme-surface-alt,#242a33));box-shadow:var(--csrn-theme-shadow)}
+    .demo-accent{background:var(--csrn-theme-primary,#b5121b)}.demo-mark{display:grid;place-items:center;font-size:30px;font-weight:900;background:rgba(255,255,255,.08)}.demo-copy{padding:20px}.eyebrow{color:var(--csrn-theme-accent,#fff);font-weight:900;font-size:13px;letter-spacing:.12em}.headline{font-size:clamp(25px,3vw,46px);font-weight:900}.secondary{color:var(--csrn-theme-muted,#ccc);font-size:17px}
+    .demo-player{position:absolute;left:12%;right:12%;top:16%;bottom:12%;display:grid;grid-template-columns:38% 1fr;border:var(--csrn-theme-border-width,2px) solid var(--csrn-theme-border,#fff);border-radius:var(--csrn-theme-radius);overflow:hidden;background:linear-gradient(120deg,var(--csrn-theme-surface,#101318),var(--csrn-theme-surface-alt,#242a33));box-shadow:var(--csrn-theme-shadow)}
+    .portrait{display:grid;place-items:center;background:linear-gradient(160deg,var(--csrn-theme-primary,#b5121b),#090b10);font-size:92px;font-weight:900}.player-copy{padding:8%}.player-copy .headline{font-size:clamp(30px,4vw,66px)}
+    .demo-sponsor,.demo-weather,.demo-caption{position:absolute;border:var(--csrn-theme-border-width,2px) solid var(--csrn-theme-border,#fff);border-radius:var(--csrn-theme-radius);background:linear-gradient(115deg,var(--csrn-theme-surface,#101318),var(--csrn-theme-surface-alt,#242a33));box-shadow:var(--csrn-theme-shadow)}
+    .demo-sponsor{left:12%;right:12%;top:22%;bottom:18%;display:grid;grid-template-columns:35% 1fr;overflow:hidden}.sponsor-art{display:grid;place-items:center;background:#fff;color:#111;font-size:38px;font-weight:900}.sponsor-copy{padding:8%}
+    .demo-weather{left:18%;right:18%;top:27%;padding:4%;display:grid;grid-template-columns:1fr auto;align-items:center}.temp{font-size:70px;font-weight:900}
+    .demo-caption{left:14%;right:14%;bottom:9%;padding:18px 24px;font-size:24px}.speaker{color:var(--csrn-theme-primary,#b5121b);font-weight:900}
+    .validation{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:14px}.check{padding:10px;border:1px solid #385946;border-radius:8px;background:#102018;color:#bce7c8;font-size:13px}.check::before{content:"✓ ";font-weight:900}
+    details{margin-top:20px}.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;align-items:end}label{display:grid;gap:5px;color:#b8c1cd;font-size:13px}
+    #message{min-height:24px;color:#f3d27a;margin-top:12px}.active-banner{color:#bce7c8}.preview-banner{color:#f3d27a}
+    @media(max-width:980px){header,main{padding-left:16px;padding-right:16px}.workspace{grid-template-columns:1fr}.grid{max-height:none}.stage-shell{overflow-x:auto}}
+    .demo-caption.active{display:block!important}</style>
+<style id="previewThemeCss"></style>
+<link rel="stylesheet" href="/static/csrn-scorebug-engine.css?v=3">
+<link rel="stylesheet" href="/static/csrn-production-template-menu.css?v=16.4-r1">
 </head>
 <body>
 <header>
-  <h1>Graphics Theme Engine</h1>
-  <p>Choose an original preset, preview it, apply school colors, save a variant, and lock the season design.</p>
+  <div><h1>Graphics Theme Manager</h1><p>Browse, inspect, preview, validate, and activate the broadcast package without changing live graphics until activation.</p></div>
+  <a class="pill" href="/">Return to Command Center</a>
 </header>
 <main>
   <section class="status">
     <div id="active" class="pill">Active theme: loading…</div>
     <div id="lockState" class="pill">Season lock: loading…</div>
-    <a class="pill" href="/overlay" target="_blank" rel="noopener">Open scorebug overlay</a>
-    <a class="pill" href="/captions" target="_blank" rel="noopener">Open caption overlay</a>
-    <a class="pill" href="/weather-overlay" target="_blank" rel="noopener">Open weather overlay</a>
-  </section>
-  <section id="catalog" class="grid"></section>
-
-  <section class="panel">
-    <h2>Controlled Overrides</h2>
-    <div class="form-row">
-      <label>Primary color<input id="primaryColor" type="color" value="#B5121B"></label>
-      <label>Secondary color<input id="secondaryColor" type="color" value="#111111"></label>
-      <label>Accent color<input id="accentColor" type="color" value="#FFFFFF"></label>
-      <label>Typography<select id="fontKey"><option value="system_sans">System Sans</option><option value="condensed_sans">Condensed Sans</option><option value="serif">Serif</option><option value="slab">Slab</option><option value="mono">Monospace</option></select></label>
-      <label>Corner radius<input id="radius" type="number" min="0" max="28" value="14"></label>
-      <label>Panel opacity<input id="opacity" type="number" min="0.65" max="1" step="0.01" value="0.94"></label>
-    </div>
+    <a class="pill" href="/overlay" target="_blank" rel="noopener">Open production overlay</a>
+    <a class="pill" href="/captions" target="_blank" rel="noopener">Open captions</a>
+    <a class="pill" href="/weather-overlay" target="_blank" rel="noopener">Open weather</a>
   </section>
 
-  <section class="panel">
-    <h2>Variants and Season Lock</h2>
-    <div class="form-row">
-      <label>Variant name<input id="variantName" maxlength="48" placeholder="Home Broadcast"></label>
-      <button id="saveVariant">Save Current Variant</button>
-      <button id="lockButton">Lock Season Theme</button>
-      <button id="unlockButton">Unlock Season Theme</button>
-    </div>
-    <div id="message"></div>
+  <section class="workspace">
+    <aside class="panel">
+      <h2>Theme Catalog</h2>
+      <div class="catalog-tools">
+        <input id="themeSearch" type="search" placeholder="Search name or description">
+        <select id="categoryFilter"><option value="">All categories</option></select>
+      </div>
+      <div id="catalog" class="grid"></div>
+    </aside>
+
+    <section class="panel">
+      <div class="preview-heading">
+        <div>
+          <h2 id="previewName">Select a theme</h2>
+          <p id="previewDescription">Preview representative production graphics before activation.</p>
+          <div id="previewState" class="meta">No preview selected</div>
+        </div>
+        <div class="preview-actions">
+          <button id="activateDefault">Restore CSRN Default</button><button id="previewSelected">Preview Selected</button>
+          <button id="activateSelected" class="primary">Activate Selected</button>
+        </div>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Theme preview graphic">
+        <button class="active" data-demo="scorebug">Scorebug</button>
+        <button data-demo="lower">Lower Third</button>
+        <button data-demo="player">Player</button>
+        <button data-demo="sponsor">Sponsor</button>
+        <button data-demo="weather">Weather</button>
+        <button data-demo="caption">Captions</button>
+      </div>
+
+      <div class="stage-shell">
+        <div id="previewStage" class="stage">
+          <div class="stage-label">Representative 16:9 production preview — not on air</div>
+          <div class="demo active scorebug-preview-viewport" data-demo-panel="scorebug">
+            <div id="previewScorebug" class="csrn-scorebug"></div><div id="scorebugPreviewError" class="scorebug-preview-error" role="alert"></div>
+          </div>
+          <div class="demo demo-lower" data-demo-panel="lower"><div class="demo-accent"></div><div class="demo-mark">C</div><div class="demo-copy"><div class="eyebrow">CSRN BROADCAST</div><div class="headline">ALEX CARTER</div><div class="secondary">Play-by-Play Announcer</div></div></div>
+          <div class="demo demo-player" data-demo-panel="player"><div class="portrait">12</div><div class="player-copy"><div class="eyebrow">PLAYER SPOTLIGHT</div><div class="headline">ALEXANDER MONTGOMERY</div><div class="secondary">Quarterback · Senior · Home Team Wildcats</div></div></div>
+          <div class="demo demo-sponsor" data-demo-panel="sponsor"><div class="sponsor-art">LOGO</div><div class="sponsor-copy"><div class="eyebrow">SPONSOR SPOTLIGHT</div><div class="headline">COMMUNITY PARTNER</div><div class="secondary">Proud supporter of local high school athletics.</div></div></div>
+          <div class="demo demo-weather" data-demo-panel="weather"><div><div class="eyebrow">GAME NIGHT WEATHER</div><div class="headline">HOME TEAM, MISSISSIPPI</div><div class="secondary">Clear skies · Wind 4 mph · No active alerts</div></div><div class="temp">72°</div></div>
+          <div class="demo demo-caption" data-demo-panel="caption"><span class="speaker">JASON:</span> The Cavaliers take over at midfield after the turnover.</div>
+        </div>
+      </div>
+
+      <div class="validation" aria-label="Theme production coverage">
+        <div class="check">Scorebug tokens</div><div class="check">Lower-third tokens</div><div class="check">Player graphics</div>
+        <div class="check">Sponsor stage</div><div class="check">Weather overlay</div><div class="check">Caption overlay</div>
+        <div class="check">16:9 safe area</div><div class="check">Controlled overrides</div>
+      </div>
+
+      <details class="panel">
+        <summary><strong>Advanced controlled overrides</strong> — optional school/season customization</summary>
+        <div class="form-row" style="margin-top:14px">
+          <label>Primary color<input id="primaryColor" type="color" value="#B5121B"></label>
+          <label>Secondary color<input id="secondaryColor" type="color" value="#111111"></label>
+          <label>Accent color<input id="accentColor" type="color" value="#FFFFFF"></label>
+          <label>Typography<select id="fontKey"><option value="system_sans">System Sans</option><option value="condensed_sans">Condensed Sans</option><option value="serif">Serif</option><option value="slab">Slab</option><option value="mono">Monospace</option></select></label>
+          <label>Corner radius<input id="radius" type="number" min="0" max="28" value="14"></label>
+          <label>Panel opacity<input id="opacity" type="number" min="0.65" max="1" step="0.01" value="0.94"></label>
+        </div>
+      </details>
+
+      <details class="panel">
+        <summary><strong>Variants and season lock</strong></summary>
+        <div class="form-row" style="margin-top:14px">
+          <label>Variant name<input id="variantName" maxlength="48" placeholder="Home Broadcast"></label>
+          <button id="saveVariant">Save Current Variant</button>
+          <button id="lockButton">Lock Season Theme</button>
+          <button id="unlockButton">Unlock Season Theme</button>
+        </div>
+      </details>
+      <div id="message"></div>
+    </section>
   </section>
 </main>
+<script src="/static/csrn-scorebug-engine.js"></script>
 <script>
-let catalog = [];
-let activePreset = 'modern_network';
-let locked = false;
-
-const overrides = () => ({
-  primary_color: document.getElementById('primaryColor').value,
-  secondary_color: document.getElementById('secondaryColor').value,
-  accent_color: document.getElementById('accentColor').value,
-  font_key: document.getElementById('fontKey').value,
-  radius_px: Number(document.getElementById('radius').value),
-  panel_opacity: Number(document.getElementById('opacity').value)
-});
-
-function message(text) { document.getElementById('message').textContent = text || ''; }
-async function api(url, options={}) {
-  const response = await fetch(url, {cache:'no-store', headers:{'Content-Type':'application/json'}, ...options});
-  const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
-  return payload;
+let catalog=[],activePreset='modern_network',selectedPreset='',locked=false,previewedPreset='';
+const byId=id=>document.getElementById(id);
+const overrides=()=>({primary_color:byId('primaryColor').value,secondary_color:byId('secondaryColor').value,accent_color:byId('accentColor').value,font_key:byId('fontKey').value,radius_px:Number(byId('radius').value),panel_opacity:Number(byId('opacity').value)});
+function message(text){byId('message').textContent=text||''}
+function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
+async function api(url,options={}){const response=await fetch(url,{cache:'no-store',headers:{'Content-Type':'application/json'},...options});const payload=await response.json();if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);return payload}
+function previewStyle(preset){const t=preset.tokens;return `--primary:#B5121B;--secondary:#111;--surface:${t.surface};--border:${t.border};--radius:${t.radius_px}px;--shadow:${t.shadow};--font:${t.font_key==='serif'?'Georgia,serif':t.font_key==='mono'?'Consolas,monospace':'Arial,sans-serif'}`}
+function card(preset){
+ const article=document.createElement('article');article.className='card';article.dataset.id=preset.id;article.dataset.category=preset.category;
+ article.innerHTML=`<div class="mini-preview" style="${previewStyle(preset)}"><div class="mini-scorebug"><div class="mini-team">HOME 14</div><div class="mini-center">Q3</div><div class="mini-team mini-away">10 AWAY</div></div></div><div class="copy"><h3>${escapeHtml(preset.name)}</h3><p>${escapeHtml(preset.description)}</p><div class="meta">${escapeHtml(preset.category)}</div></div><div class="actions"><button data-select="${preset.id}">Select</button><button class="primary" data-preview="${preset.id}">Preview</button></div>`;
+ article.querySelector('[data-select]').onclick=()=>selectPreset(preset.id,false);
+ article.querySelector('[data-preview]').onclick=()=>{selectPreset(preset.id,false);previewSelected()};
+ return article
 }
-
-function card(preset) {
-  const t = preset.tokens;
-  const article = document.createElement('article');
-  article.className = 'card';
-  article.innerHTML = `<div class="preview" style="--primary:#B5121B;--secondary:#111;--surface:${t.surface};--border:${t.border};--radius:${t.radius_px}px;--shadow:${t.shadow};--font:${t.font_key === 'serif' ? 'Georgia,serif' : t.font_key === 'mono' ? 'Consolas,monospace' : 'Arial,sans-serif'}"><div class="preview-bar"><div class="preview-team">HOME 14</div><div class="preview-center">Q3</div><div class="preview-team preview-away">10 AWAY</div></div></div><div class="copy"><h2>${preset.name}</h2><p>${preset.description}</p><div class="meta">${preset.category}</div></div><div class="actions"><button data-preview="${preset.id}">Preview</button><button class="primary" data-activate="${preset.id}">Activate</button></div>`;
-  article.querySelector('[data-preview]').onclick = async () => {
-    try { const result = await api('/api/themes/preview',{method:'POST',body:JSON.stringify({preset_id:preset.id,overrides:overrides()})}); message(`Preview ready: ${result.preview.name}. No live graphics were changed.`); }
-    catch (error) { message(error.message); }
-  };
-  article.querySelector('[data-activate]').onclick = async () => {
-    try {
-      const confirmation = locked ? prompt('Type CHANGE LOCKED SEASON THEME to continue:') : '';
-      await api('/api/themes/activate',{method:'POST',body:JSON.stringify({preset_id:preset.id,overrides:overrides(),confirmation})});
-      activePreset = preset.id; await loadStatus(); message(`${preset.name} activated.`);
-    } catch (error) { message(error.message); }
-  };
-  return article;
+function selectPreset(id,scroll=true){const preset=catalog.find(item=>item.id===id);if(!preset)return;selectedPreset=id;document.querySelectorAll('.card').forEach(card=>card.classList.toggle('selected',card.dataset.id===id));byId('previewName').textContent=preset.name;byId('previewDescription').textContent=preset.description;byId('previewState').textContent=id===activePreset?'Currently active — preview before changing overrides':'Selected — live graphics unchanged';if(scroll)byId('previewStage').scrollIntoView({behavior:'smooth',block:'nearest'})}
+function renderCatalog(){const query=byId('themeSearch').value.trim().toLowerCase(),category=byId('categoryFilter').value;const filtered=catalog.filter(item=>(!category||item.category===category)&&(!query||`${item.name} ${item.description} ${item.category}`.toLowerCase().includes(query)));byId('catalog').replaceChildren(...filtered.map(card));if(selectedPreset)document.querySelectorAll('.card').forEach(card=>card.classList.toggle('selected',card.dataset.id===selectedPreset))}
+function fitScorebugPreview(){
+  const stage=byId('previewStage'),root=byId('previewScorebug');
+  if(!stage||!root)return;
+  const width=root.classList.contains('graphic-mode')?1724:1142;
+  const height=root.classList.contains('graphic-mode')?224:112;
+  const scale=Math.min((stage.clientWidth-80)/width,(stage.clientHeight-80)/height,1);
+  root.style.setProperty('--preview-scale',String(Math.max(.25,scale)));
 }
+window.addEventListener('resize',fitScorebugPreview);
 
-async function loadStatus() {
-  const result = await api('/api/themes/status');
-  const theme = result.theme;
-  activePreset = theme.active.id;
-  locked = Boolean(theme.locked);
-  document.getElementById('active').textContent = `Active theme: ${theme.active.name}`;
-  document.getElementById('lockState').textContent = `Season lock: ${locked ? 'Locked' : 'Unlocked'}`;
-  const o = theme.overrides || {};
-  if (o.primary_color) document.getElementById('primaryColor').value = o.primary_color;
-  if (o.secondary_color) document.getElementById('secondaryColor').value = o.secondary_color;
-  if (o.accent_color) document.getElementById('accentColor').value = o.accent_color;
-  if (o.font_key) document.getElementById('fontKey').value = o.font_key;
-  if (o.radius_px !== undefined) document.getElementById('radius').value = o.radius_px;
-  if (o.panel_opacity !== undefined) document.getElementById('opacity').value = o.panel_opacity;
+async function previewSelected(){
+  if(!selectedPreset)return message('Select a theme first.');
+  const errorBox=byId('scorebugPreviewError');
+  errorBox.classList.remove('visible');errorBox.textContent='';
+  try{
+    const result=await api('/api/themes/preview',{method:'POST',body:JSON.stringify({preset_id:selectedPreset,overrides:overrides()})});
+    byId('previewThemeCss').textContent=result.css||'';
+    if(!window.CSRNScorebugEngine)throw new Error('Scorebug renderer failed to load.');
+    const layout=result.preview?.layouts?.scorebug||window.CSRNScorebugEngine.presetLayouts[result.preview?.id]||'modern';
+    window.CSRNScorebugEngine.render(byId('previewScorebug'),layout,window.CSRNScorebugEngine.sample());
+    requestAnimationFrame(()=>{fitScorebugPreview();requestAnimationFrame(fitScorebugPreview)});
+    previewedPreset=selectedPreset;
+    byId('previewState').textContent=`Preview ready: ${result.preview.name} · ${layout} renderer · Live graphics unchanged.`;
+    byId('previewState').className='meta preview-banner';
+    message('Production scorebug renderer previewed with sample data.');
+  }catch(error){
+    errorBox.textContent=`Preview failed: ${error.message}`;errorBox.classList.add('visible');message(error.message);
+  }
 }
-
-async function load() {
-  try {
-    const result = await api('/api/themes/catalog'); catalog = result.presets;
-    const grid = document.getElementById('catalog'); grid.replaceChildren(...catalog.map(card));
-    await loadStatus();
-  } catch (error) { message(error.message); }
-}
-
-document.getElementById('saveVariant').onclick = async () => {
-  try {
-    const name = document.getElementById('variantName').value;
-    await api('/api/themes/variants',{method:'POST',body:JSON.stringify({name,preset_id:activePreset,overrides:overrides()})});
-    message(`Variant saved: ${name}`);
-  } catch (error) { message(error.message); }
-};
-document.getElementById('lockButton').onclick = async () => {
-  try { await api('/api/themes/lock',{method:'POST',body:JSON.stringify({locked:true,confirmation:'LOCK SEASON THEME'})}); await loadStatus(); message('Season theme locked.'); }
-  catch (error) { message(error.message); }
-};
-document.getElementById('unlockButton').onclick = async () => {
-  try {
-    const confirmation = prompt('Type UNLOCK SEASON THEME to continue:');
-    await api('/api/themes/lock',{method:'POST',body:JSON.stringify({locked:false,confirmation})}); await loadStatus(); message('Season theme unlocked.');
-  } catch (error) { message(error.message); }
-};
+async function activateDefaultTheme(){
+  try{
+    const confirmation=locked?prompt('Type CHANGE LOCKED SEASON THEME to continue:'):'';
+    await api('/api/themes/activate',{method:'POST',body:JSON.stringify({preset_id:'modern_network',overrides:{},confirmation})});
+    activePreset='modern_network';selectedPreset='modern_network';previewedPreset='';
+    await loadStatus();selectPreset('modern_network',false);await previewSelected();
+    localStorage.setItem('csrn-theme-revision',String(Date.now()));message('CSRN Default restored. Production overlays are refreshing.');
+  }catch(error){message(error.message)}
+}async function activateSelected(){if(!selectedPreset)return message('Select and preview a theme first.');if(previewedPreset!==selectedPreset&&!confirm('This theme has not been previewed with the current overrides. Activate anyway?'))return;try{const confirmation=locked?prompt('Type CHANGE LOCKED SEASON THEME to continue:'):'';await api('/api/themes/activate',{method:'POST',body:JSON.stringify({preset_id:selectedPreset,overrides:overrides(),confirmation})});activePreset=selectedPreset;await loadStatus();selectPreset(selectedPreset,false);localStorage.setItem('csrn-theme-revision',String(Date.now()));message('Live theme activated. Production overlays are refreshing.')}catch(error){message(error.message)}}
+async function loadStatus(){const result=await api('/api/themes/status'),theme=result.theme;activePreset=theme.active.id;locked=Boolean(theme.locked);byId('active').textContent=`Active theme: ${theme.active.name}`;byId('active').className='pill active-banner';byId('lockState').textContent=`Season lock: ${locked?'Locked':'Unlocked'}`;const o=theme.overrides||{};if(o.primary_color)byId('primaryColor').value=o.primary_color;if(o.secondary_color)byId('secondaryColor').value=o.secondary_color;if(o.accent_color)byId('accentColor').value=o.accent_color;if(o.font_key)byId('fontKey').value=o.font_key;if(o.radius_px!==undefined)byId('radius').value=o.radius_px;if(o.panel_opacity!==undefined)byId('opacity').value=o.panel_opacity}
+async function load(){try{const result=await api('/api/themes/catalog');catalog=result.presets;const categories=[...new Set(catalog.map(item=>item.category))].sort();byId('categoryFilter').replaceChildren(new Option('All categories',''),...categories.map(value=>new Option(value.replaceAll('_',' '),value)));renderCatalog();await loadStatus();selectPreset(activePreset,false);await previewSelected()}catch(error){message(error.message)}}
+document.querySelectorAll('[data-demo]').forEach(button=>button.onclick=()=>{document.querySelectorAll('[data-demo]').forEach(item=>item.classList.toggle('active',item===button));document.querySelectorAll('[data-demo-panel]').forEach(panel=>panel.classList.toggle('active',panel.dataset.demoPanel===button.dataset.demo))});
+byId('themeSearch').oninput=renderCatalog;byId('categoryFilter').onchange=renderCatalog;byId('activateDefault').onclick=activateDefaultTheme;byId('previewSelected').onclick=previewSelected;byId('activateSelected').onclick=activateSelected;
+['primaryColor','secondaryColor','accentColor','fontKey','radius','opacity'].forEach(id=>byId(id).oninput=()=>{previewedPreset='';byId('previewState').textContent='Overrides changed — preview again before activation.'});
+byId('saveVariant').onclick=async()=>{try{const name=byId('variantName').value;await api('/api/themes/variants',{method:'POST',body:JSON.stringify({name,preset_id:selectedPreset||activePreset,overrides:overrides()})});message(`Variant saved: ${name}`)}catch(error){message(error.message)}};
+byId('lockButton').onclick=async()=>{try{await api('/api/themes/lock',{method:'POST',body:JSON.stringify({locked:true,confirmation:'LOCK SEASON THEME'})});await loadStatus();message('Season theme locked.')}catch(error){message(error.message)}};
+byId('unlockButton').onclick=async()=>{try{const confirmation=prompt('Type UNLOCK SEASON THEME to continue:');await api('/api/themes/lock',{method:'POST',body:JSON.stringify({locked:false,confirmation})});await loadStatus();message('Season theme unlocked.')}catch(error){message(error.message)}};
 load();
 </script>
+<script src="/static/csrn-production-template-menu.js?v=16.4-r1"></script>
 </body>
 </html>

@@ -10,6 +10,7 @@ import secrets
 import signal
 import time
 import shutil
+import tempfile
 from functools import wraps
 from pathlib import Path
 from datetime import date
@@ -29,7 +30,12 @@ from obs_client import (
 )
 from upgrade_manager import inspect_candidate, migrate
 from persistence_engine import JsonPersistenceEngine
-from core_repositories import ConfigurationRepository, StateRepository, SecurityRepository
+from core_repositories import (
+    ConfigurationRepository,
+    LocalMirroredStateRepository,
+    StateRepository,
+    SecurityRepository,
+)
 from security_service import SecurityService
 from broadcast_package_service import BroadcastPackageService
 from school_service import SchoolService
@@ -37,6 +43,7 @@ from roster_service import RosterService
 from sponsor_service import SponsorService
 from venue_service import VenueService
 from broadcast_service import BroadcastService
+from broadcaster_print_service import BroadcasterPrintService
 from personnel_service import PersonnelService
 from asset_service import AssetService
 from graphics_service import GraphicsService
@@ -47,6 +54,7 @@ from state_service import StateService
 from diagnostics_service import DiagnosticsService
 from upgrade_service import UpgradeService
 from event_service import EventService
+from penalty_service import PenaltyService
 from rules_service import RulesService
 from statistics_service import StatisticsService
 from game_operations_service import GameOperationsService
@@ -55,6 +63,7 @@ from game_day_safety_service import GameDaySafetyService
 from recovery_service import RecoveryService
 from commissioning_service import HardwareOBSCommissioningService
 from caption_service import CaptionService
+from caption_worker import CaptionRuntime
 from weather_service import VenueWeatherService
 from operational_rehearsal_service import OperationalRehearsalService
 from product_paths import resolve_product_paths
@@ -75,6 +84,7 @@ from routes.system_routes import (
     SystemRoutesDependencies,
     create_system_blueprint,
 )
+from routes.coin_toss_routes import create_coin_toss_blueprint
 from routes.security_upgrade_routes import (
     SecurityUpgradeRoutesDependencies,
     create_security_upgrade_blueprint,
@@ -87,6 +97,7 @@ from routes.association_routes import (
     AssociationRoutesDependencies,
     create_association_blueprint,
 )
+from routes.mhsaa_division_routes import create_mhsaa_division_blueprint
 from routes.personnel_routes import (
     PersonnelRoutesDependencies,
     create_personnel_blueprint,
@@ -102,6 +113,7 @@ from routes.venue_routes import (
 from routes.asset_routes import (
     AssetRoutesDependencies,
     create_asset_blueprint,
+    start_isolated_media_server,
 )
 from routes.logo_routes import (
     LogoRoutesDependencies,
@@ -187,6 +199,8 @@ from association_import_service import AssociationImportService
 from association_supplement_service import AssociationSupplementService
 from association_profile_service import AssociationProfileService
 from association_source_service import AssociationSourceService
+from dragonfly_service import DragonFlyService
+from dragonfly_sync_service import DragonFlySyncService
 from association_workflow_service import AssociationWorkflowService
 from school_repository import SchoolRepository
 from roster_repository import RosterRepository
@@ -300,6 +314,8 @@ DEFAULT_STATE: dict[str, Any] = {
     "home_direction": "right",
     "visitor_direction": "left",
     "possession": "home",
+    "coin_toss": {"recorded": False},
+    "second_half_receiving_team": "",
     "scorebug_visible": False,
     "visual_mode": "graphic",
     "broadcast_phase": "pregame",
@@ -329,6 +345,7 @@ DEFAULT_STATE: dict[str, Any] = {
     "last_event": {},
     "next_play_number": 1,
     "ball_spot": "",
+    "ball_spot_visible": True,
     "correction_log": [],
     "game_data_authority": "broadcaster",
     "statistician_enabled": False,
@@ -551,7 +568,41 @@ CONFIG_REPOSITORY = ConfigurationRepository(
     "build": RUNTIME_BUILD,
 },
 )
-STATE_REPOSITORY = StateRepository(CORE_PERSISTENCE, STATE_FILE, DEFAULT_STATE)
+
+def _local_state_authority_path() -> Path:
+    explicit = os.environ.get("CSRN_STATE_AUTHORITY_FILE", "").strip()
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    root = os.environ.get("LOCALAPPDATA", "").strip()
+    base = Path(root).expanduser() if root else Path.home() / ".possumfrog"
+    candidate = base / "PossumFrog" / "CSRN Production Suite" / "GameDay" / "state.json"
+    try:
+        candidate.parent.mkdir(parents=True, exist_ok=True)
+        return candidate
+    except OSError:
+        return Path(tempfile.gettempdir()) / "CSRN" / "GameDay" / "state.json"
+
+
+def _drive_backed_game_day_state() -> bool:
+    explicit = os.environ.get("CSRN_GAME_DAY_LOCAL_STATE", "").strip().lower()
+    if explicit in {"0", "false", "no", "off"}:
+        return False
+    if explicit in {"1", "true", "yes", "on"}:
+        return True
+    return any(part.lower() in {"my drive", "google drive"} for part in STATE_FILE.parts)
+
+STATE_AUTHORITY_PATH = _local_state_authority_path()
+DRIVE_BACKED_GAME_DAY_STATE = _drive_backed_game_day_state()
+STATE_REPOSITORY = (
+    LocalMirroredStateRepository(
+        CORE_PERSISTENCE,
+        authority_path=STATE_AUTHORITY_PATH,
+        mirror_path=STATE_FILE,
+        defaults=DEFAULT_STATE,
+    )
+    if DRIVE_BACKED_GAME_DAY_STATE
+    else StateRepository(CORE_PERSISTENCE, STATE_FILE, DEFAULT_STATE)
+)
 SECURITY_REPOSITORY = SecurityRepository(CORE_PERSISTENCE, SECURITY_FILE, DEFAULT_SECURITY)
 SECURITY_SERVICE = SecurityService(
     SECURITY_REPOSITORY,
@@ -896,6 +947,35 @@ def get_association_source_service() -> AssociationSourceService:
     return ASSOCIATION_SOURCE_SERVICE
 
 
+DRAGONFLY_SERVICE: DragonFlyService | None = None
+
+
+def get_dragonfly_service() -> DragonFlyService:
+    global DRAGONFLY_SERVICE
+
+    if DRAGONFLY_SERVICE is None:
+        DRAGONFLY_SERVICE = DragonFlyService()
+
+    return DRAGONFLY_SERVICE
+
+
+DRAGONFLY_SYNC_SERVICE: DragonFlySyncService | None = None
+
+
+def get_dragonfly_sync_service() -> DragonFlySyncService:
+    global DRAGONFLY_SYNC_SERVICE
+
+    if DRAGONFLY_SYNC_SERVICE is None:
+        DRAGONFLY_SYNC_SERVICE = DragonFlySyncService(
+            dragonfly_service=get_dragonfly_service(),
+            load_schools=load_schools,
+            load_rosters=load_rosters,
+            save_rosters=save_rosters,
+        )
+
+    return DRAGONFLY_SYNC_SERVICE
+
+
 ASSOCIATION_WORKFLOW_SERVICE: AssociationWorkflowService | None = None
 
 
@@ -1139,6 +1219,23 @@ def get_broadcast_service() -> BroadcastService:
     return BROADCAST_SERVICE
 
 
+
+BROADCASTER_PRINT_SERVICE: BroadcasterPrintService | None = None
+
+
+def get_broadcaster_print_service() -> BroadcasterPrintService:
+    global BROADCASTER_PRINT_SERVICE
+
+    if BROADCASTER_PRINT_SERVICE is None:
+        BROADCASTER_PRINT_SERVICE = BroadcasterPrintService(
+            load_broadcasts=load_broadcasts,
+            load_rosters=load_rosters,
+            load_packages=load_packages,
+            get_school_logo_file=lambda school_id, filename: DATA_DIR / "Logos" / normalize_school_id(school_id) / filename,
+        )
+
+    return BROADCASTER_PRINT_SERVICE
+
 def normalize_roster_id(value: str) -> str:
     return normalize_school_id(value)
 
@@ -1285,6 +1382,7 @@ def get_roster_service() -> RosterService:
             load_rosters=load_rosters,
             save_rosters=save_rosters,
             load_schools=load_schools,
+            pronunciation_dictionary_path=DATA_DIR / "Rosters" / "pronunciation_dictionary.json",
         )
 
     return ROSTER_SERVICE
@@ -1620,6 +1718,8 @@ def get_state_service() -> StateService:
             replace_raw=STATE_REPOSITORY.replace,
             default_state=lambda: copy.deepcopy(DEFAULT_STATE),
             persist_linked_snapshot=persist_linked_state_snapshot,
+            async_linked_snapshot=True,
+            cache_committed_state=True,
             resolve_player=resolve_game_roster_player,
             canonical_team_key=canonical_team_key,
             canonical_team_name=canonical_team_name,
@@ -1633,6 +1733,14 @@ def load_state() -> dict[str, Any]:
 
 def save_state(state: dict[str, Any]) -> None:
     get_state_service().save(state)
+    try:
+        from state_read_cache import invalidate_state_read_cache
+        from runtime_state_cache import invalidate_runtime_state_cache
+
+        invalidate_state_read_cache()
+        invalidate_runtime_state_cache()
+    except Exception:
+        pass
 
 
 def load_reconciled_state() -> dict[str, Any]:
@@ -1645,8 +1753,23 @@ def load_reconciled_state() -> dict[str, Any]:
         return reconciled
 
 
+def _merge_opening_setup_state(result: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
+    for key in ("coin_toss", "second_half_receiving_team", "special_game_phase", "kicking_team", "receiving_team"):
+        if key in state:
+            result[key] = copy.deepcopy(state.get(key))
+    return result
+
+
 def public_state(state: dict[str, Any]) -> dict[str, Any]:
     result = get_state_service().public(state).data["state"]
+    _merge_opening_setup_state(result, state)
+    result["overlay_revision"] = OVERLAY_SCHEMA_REVISION
+    return result
+
+
+def runtime_state(state: dict[str, Any]) -> dict[str, Any]:
+    result = get_state_service().runtime_view(state).data["state"]
+    _merge_opening_setup_state(result, state)
     result["overlay_revision"] = OVERLAY_SCHEMA_REVISION
     return result
 
@@ -1822,6 +1945,9 @@ ASSOCIATION_ROUTES_BLUEPRINT = create_association_blueprint(
         get_workflow_service=get_association_workflow_service,
         get_import_service=get_association_import_service,
         get_supplement_service=get_association_supplement_service,
+        get_dragonfly_service=get_dragonfly_service,
+        get_dragonfly_sync_service=get_dragonfly_sync_service,
+        get_school_service=get_school_service,
         load_mhsaa_profile=lambda: load_json(MHSAA_5A_PROFILE_FILE, {}),
         load_mhsaa_manifest=lambda: load_json(
             MHSAA_5A_FILE,
@@ -1838,6 +1964,13 @@ ASSOCIATION_ROUTES_BLUEPRINT = create_association_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(ASSOCIATION_ROUTES_BLUEPRINT)
+
+MHSAA_DIVISION_ROUTES_BLUEPRINT = create_mhsaa_division_blueprint(
+    require_auth=require_auth,
+    get_import_service=get_association_import_service,
+    imports_dir=IMPORTS_DIR,
+)
+APPLICATION_BLUEPRINTS.append(MHSAA_DIVISION_ROUTES_BLUEPRINT)
 
 
 def _hex(rgb: tuple[int, int, int]) -> str:
@@ -1945,12 +2078,24 @@ SYSTEM_ROUTES_BLUEPRINT = create_system_blueprint(
         get_configuration_service=get_configuration_service,
         diagnostic_status=diagnostic_status,
         load_state=load_reconciled_state,
+        load_runtime_state=load_state,
         public_state=public_state,
+        runtime_state=runtime_state,
         readiness_payload=readiness_payload,
         load_build_journal=load_build_journal,
     )
 )
 APPLICATION_BLUEPRINTS.append(SYSTEM_ROUTES_BLUEPRINT)
+
+COIN_TOSS_ROUTES_BLUEPRINT = create_coin_toss_blueprint(
+    require_auth=require_auth,
+    load_state=load_state,
+    save_state=save_state,
+    public_state=public_state,
+    transaction_lock=lock,
+    clock=time.time,
+)
+APPLICATION_BLUEPRINTS.append(COIN_TOSS_ROUTES_BLUEPRINT)
 
 
 BROADCAST_LIFECYCLE_SERVICE: BroadcastLifecycleService | None = None
@@ -1991,6 +2136,7 @@ BROADCAST_ROUTES_BLUEPRINT = create_broadcast_blueprint(
     BroadcastRoutesDependencies(
         require_auth=require_auth,
         get_broadcast_service=get_broadcast_service,
+        get_broadcaster_print_service=get_broadcaster_print_service,
     )
 )
 APPLICATION_BLUEPRINTS.append(BROADCAST_ROUTES_BLUEPRINT)
@@ -2113,6 +2259,7 @@ APPLICATION_BLUEPRINTS.append(COMMISSIONING_ROUTES_BLUEPRINT)
 
 
 CAPTION_SERVICE: CaptionService | None = None
+CAPTION_RUNTIME: CaptionRuntime | None = None
 
 
 def get_caption_service() -> CaptionService:
@@ -2127,10 +2274,149 @@ def get_caption_service() -> CaptionService:
     return CAPTION_SERVICE
 
 
+def current_caption_broadcast_id() -> str:
+    return str(load_state().get("broadcast_id") or "unscheduled")
+
+
+def _caption_active_rosters(state: dict[str, Any]) -> list[dict[str, Any]]:
+    sport = str(state.get("sport") or "Football").strip().casefold()
+    level = str(state.get("level") or "Varsity").strip().casefold()
+    linked_ids = {str(value) for value in (state.get("package_roster_ids") or []) if str(value).strip()}
+    school_ids = {
+        str(state.get("home_school_id") or "").strip(),
+        str(state.get("visitor_school_id") or "").strip(),
+    }
+    school_ids.discard("")
+    team_names = {
+        str(state.get("home_team") or "").strip().casefold(),
+        str(state.get("visitor_team") or "").strip().casefold(),
+    }
+    team_names.discard("")
+
+    def roster_school_name(roster: dict[str, Any]) -> str:
+        school = get_school(str(roster.get("school_id", "") or ""))
+        return str(
+            (school or {}).get("broadcast_name")
+            or (school or {}).get("official_name")
+            or roster.get("school_id", "")
+        ).strip().casefold()
+
+    def is_candidate(roster: dict[str, Any]) -> bool:
+        roster_id = str(roster.get("id", "") or "")
+        if linked_ids and roster_id in linked_ids:
+            return True
+        roster_school_id = str(roster.get("school_id", "") or "").strip()
+        school_match = roster_school_id in school_ids or roster_school_name(roster) in team_names
+        sport_match = not roster.get("sport") or str(roster.get("sport", "")).strip().casefold() == sport
+        return school_match and sport_match
+
+    rosters = [roster for roster in load_rosters() if isinstance(roster, dict) and is_candidate(roster)]
+    preferred = [
+        roster
+        for roster in rosters
+        if str(roster.get("level", "") or "").strip().casefold() in {"", level, "varsity"}
+    ]
+    return preferred or rosters
+
+
+def _caption_name_terms_from_rosters(state: dict[str, Any]) -> list[str]:
+    terms: list[str] = []
+    for roster in _caption_active_rosters(state):
+        for player in roster.get("players", []) if isinstance(roster.get("players"), list) else []:
+            if not isinstance(player, dict):
+                continue
+            if str(player.get("status", "active") or "active").strip().casefold() == "inactive":
+                continue
+            first = str(player.get("first_name") or "").strip()
+            last = str(player.get("last_name") or "").strip()
+            preferred = str(player.get("preferred_name") or "").strip()
+            pronunciation = str(player.get("pronunciation") or "").strip()
+            number = str(player.get("number") or "").strip()
+            full_name = " ".join(part for part in (first, last) if part)
+            display_name = " ".join(part for part in (preferred or first, last) if part)
+            for value in (full_name, display_name, preferred, last, pronunciation):
+                if value:
+                    terms.append(value)
+            if number and full_name:
+                terms.append(f"number {number} {full_name}")
+            if number and display_name and display_name != full_name:
+                terms.append(f"number {number} {display_name}")
+    return terms
+
+
+def _caption_name_terms_from_personnel(state: dict[str, Any]) -> list[str]:
+    school_ids = {
+        str(state.get("home_school_id") or "").strip(),
+        str(state.get("visitor_school_id") or "").strip(),
+        "",
+    }
+    terms: list[str] = []
+    for person in load_broadcasters():
+        if not isinstance(person, dict):
+            continue
+        if str(person.get("status", "active") or "active").strip().casefold() == "inactive":
+            continue
+        school_id = str(person.get("school_id") or "").strip()
+        category = str(person.get("category") or "").strip().casefold()
+        role = str(person.get("role") or person.get("primary_role") or person.get("title") or "").strip().casefold()
+        if school_id and school_id not in school_ids:
+            continue
+        if school_id or category in {"coach", "broadcast talent"} or "coach" in role or "play-by-play" in role or "analyst" in role:
+            for key in ("full_name", "name", "preferred_name", "pronunciation"):
+                value = str(person.get(key) or "").strip()
+                if value:
+                    terms.append(value)
+            title = str(person.get("title") or person.get("role") or "").strip()
+            name = str(person.get("full_name") or person.get("name") or "").strip()
+            if title and name:
+                terms.append(f"{title} {name}")
+    return terms
+
+
+def current_caption_prompt_terms() -> list[str]:
+    state = load_state()
+    terms: list[str] = []
+    for side in ("home", "visitor"):
+        terms.extend(
+            [
+                state.get(f"{side}_team", ""),
+                state.get(f"{side}_identity", {}).get("broadcast_name", ""),
+                state.get(f"{side}_identity", {}).get("official_name", ""),
+                state.get(f"{side}_identity", {}).get("preferred_scorebug_name", ""),
+                state.get(f"{side}_identity", {}).get("mascot", ""),
+            ]
+        )
+    terms.extend(["Cavaliers", "first and ten", "yard line"])
+    terms.extend(_caption_name_terms_from_rosters(state))
+    terms.extend(_caption_name_terms_from_personnel(state))
+    seen: set[str] = set()
+    cleaned: list[str] = []
+    for term in terms:
+        value = " ".join(str(term or "").split())
+        key = value.casefold()
+        if value and key not in seen:
+            seen.add(key)
+            cleaned.append(value)
+    return cleaned
+
+
+def get_caption_runtime() -> CaptionRuntime:
+    global CAPTION_RUNTIME
+    if CAPTION_RUNTIME is None:
+        CAPTION_RUNTIME = CaptionRuntime(
+            caption_service=get_caption_service(),
+            load_broadcast_id=current_caption_broadcast_id,
+            build_prompt_terms=current_caption_prompt_terms,
+            clock=time.time,
+        )
+    return CAPTION_RUNTIME
+
+
 CAPTION_ROUTES_BLUEPRINT = create_caption_blueprint(
     CaptionRoutesDependencies(
         require_auth=require_auth,
         get_caption_service=lambda: get_caption_service(),
+        get_caption_runtime=lambda: get_caption_runtime(),
     )
 )
 APPLICATION_BLUEPRINTS.append(CAPTION_ROUTES_BLUEPRINT)
@@ -2670,29 +2956,31 @@ def append_correction(state: dict[str, Any], entry: dict[str, Any]) -> None:
     state["correction_log"] = rows[-500:]
 
 def apply_penalty_enforcement(state: dict[str, Any], category: str, name: str, yards: int, outcome: str) -> dict[str, Any]:
-    result = {"applied": False, "rule": {}, "down": state.get("down", "1st"), "distance": state.get("distance", "10")}
-    if outcome != "accepted":
-        return result
-    rule = copy.deepcopy(PENALTY_RULES.get((category, name), {}))
-    if not rule:
-        rule = {"yards": yards}
-        if category == "Offensive": rule["replay_down"] = True
-        if category == "Defensive" and yards >= 15: rule["automatic_first_down"] = True
-    enforced_yards = max(0, yards if yards is not None else int(rule.get("yards", 0)))
-    if rule.get("automatic_first_down"):
-        state["down"] = "1st"; state["distance"] = "10"
-    elif category == "Offensive":
-        state["distance"] = str(min(99, int_distance(state.get("distance"), 10) + enforced_yards))
-        if rule.get("loss_of_down"):
-            state["down"] = advance_down(str(state.get("down", "1st")))
-    elif category == "Defensive":
-        remaining = int_distance(state.get("distance"), 10) - enforced_yards
-        if remaining <= 0:
-            state["down"] = "1st"; state["distance"] = "10"
-        else:
-            state["distance"] = str(remaining)
-    result.update({"applied": True, "rule": rule, "down": state.get("down"), "distance": state.get("distance"), "yards": enforced_yards})
-    return result
+    options = copy.deepcopy(state.get("_pending_penalty_options") or {})
+    possession = str(state.get("possession", "home") or "home").lower()
+    if category == "Defensive":
+        default_selected_team = "visitor" if possession == "home" else "home"
+    else:
+        default_selected_team = possession
+    selected_team = str(options.get("selected_team") or default_selected_team)
+    requested_unit = str(options.get("requested_unit") or category)
+    return PenaltyService.enforce(
+        state,
+        selected_team=selected_team,
+        requested_unit=requested_unit,
+        name=name,
+        yards=yards,
+        outcome=outcome,
+        spot_to_coord=spot_to_coord,
+        coord_to_spot=coord_to_spot,
+        team_direction=team_direction,
+        enforcement_spot=options.get("enforcement_spot", ""),
+        half_distance=bool(options.get("half_distance")),
+        automatic_first_down=bool(options.get("automatic_first_down")),
+        loss_of_down=bool(options.get("loss_of_down")),
+        untimed_down=bool(options.get("untimed_down")),
+        retry_down=bool(options.get("retry_down")),
+    )
 
 def local_addresses() -> list[str]:
     return get_support_media_service().local_addresses()
@@ -2721,6 +3009,7 @@ def get_event_service() -> EventService:
             default_player_graphic=lambda: copy.deepcopy(
                 DEFAULT_STATE["player_graphic"]
             ),
+            resolve_player=resolve_game_roster_player,
             on_event=lambda event: get_social_service().queue_event(event),
             transaction_lock=lock,
         )
@@ -2796,6 +3085,19 @@ def create_app(
 app = create_app()
 
 
+
+# Gate 18.4 R11.7 - coalesce expensive public-state reads across concurrent clients.
+from state_read_cache import install_state_read_cache
+install_state_read_cache(app)
+from runtime_state_cache import install_runtime_state_cache
+install_runtime_state_cache(app)
+from theme_public_state_cache import install_theme_public_state_cache
+install_theme_public_state_cache(app)
+
+# CSRN UNIVERSAL PREGAME DELAY R14
+from pregame_presentation import install_pregame_presentation
+install_pregame_presentation(app)
+
 def _record_clean_shutdown_and_stop(signum, frame):
     """Handle a deliberate SIGINT/SIGTERM (e.g. Ctrl+C) by writing the clean
     shutdown marker before the process exits.
@@ -2829,9 +3131,31 @@ if __name__ == "__main__":
         signal.signal(signal.SIGTERM, _record_clean_shutdown_and_stop)
 
     ip = local_ip()
+    media_directory = ASSET_UPLOAD_DIR.parent / "SponsorAdvertisements"
+    try:
+        media_port = start_isolated_media_server(media_directory, ASSET_UPLOAD_DIR)
+    except OSError as exc:
+        print(f"[FAIL] Isolated media server could not start on port 5051: {exc}")
+        print("CSRN will not start in an unsafe mode that serves local video/audio media through Waitress.")
+        raise SystemExit(1) from exc
+
     print("\nCSRN Production Suite — Command Center is running.")
+    print(f"State authority: drive_backed={DRIVE_BACKED_GAME_DAY_STATE} mirror={STATE_FILE} authority={STATE_AUTHORITY_PATH}")
     print("Laptop: http://127.0.0.1:5050")
     print(f"Phone/iPad: http://{ip}:5050")
     print("OBS overlay: http://127.0.0.1:5050/overlay")
-    print("Server: Waitress production server\n")
-    serve(app, host="0.0.0.0", port=5050, threads=8)
+    print(f"Media server: http://127.0.0.1:{media_port} — READY")
+    print("Server: Waitress production server — READY\n")
+    serve(app, host="0.0.0.0", port=5050, threads=16)
+
+
+
+
+
+
+
+
+
+
+
+

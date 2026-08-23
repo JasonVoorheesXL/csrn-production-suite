@@ -27,6 +27,10 @@ class GameDaySafetyResult:
         }
 
 
+class SnapshotPublicationError(OSError):
+    """Raised when a staged game-day snapshot cannot be published."""
+
+
 class GameDaySafetyService:
     """Flask-independent preflight and recoverable snapshot behavior."""
 
@@ -47,6 +51,8 @@ class GameDaySafetyService:
         clock: Callable[[], float] = time.time,
         minimum_free_bytes: int = 512 * 1024 * 1024,
         automatic_retention: int = 10,
+        publish_attempts: int = 4,
+        publish_retry_delay: float = 0.05,
     ) -> None:
         self._base_dir = Path(base_dir)
         self._data_dir = Path(data_dir)
@@ -58,6 +64,8 @@ class GameDaySafetyService:
         self._clock = clock
         self._minimum_free_bytes = max(0, int(minimum_free_bytes))
         self._automatic_retention = max(1, int(automatic_retention))
+        self._publish_attempts = max(1, int(publish_attempts))
+        self._publish_retry_delay = max(0.0, float(publish_retry_delay))
 
     @staticmethod
     def _hash_file(path: Path) -> str:
@@ -275,6 +283,38 @@ class GameDaySafetyService:
             )
         return files
 
+    def _replace_snapshot_directory(self, temporary_path: Path, final_path: Path) -> None:
+        temporary_path.replace(final_path)
+
+    def _publish_snapshot_directory(
+        self,
+        temporary_path: Path,
+        final_path: Path,
+    ) -> None:
+        errors: list[str] = []
+        for attempt in range(self._publish_attempts):
+            try:
+                self._replace_snapshot_directory(temporary_path, final_path)
+                if not final_path.is_dir():
+                    raise OSError(f"Published snapshot path is missing: {final_path}")
+                return
+            except OSError as exc:
+                errors.append(str(exc))
+                if (
+                    final_path.is_dir()
+                    and (final_path / "manifest.json").is_file()
+                    and not temporary_path.exists()
+                ):
+                    return
+                if attempt == self._publish_attempts - 1:
+                    break
+                if self._publish_retry_delay:
+                    time.sleep(self._publish_retry_delay * (2**attempt))
+        raise SnapshotPublicationError(
+            "Snapshot publication failed after "
+            f"{self._publish_attempts} attempts: {'; '.join(errors)}"
+        )
+
     def create_snapshot(
         self,
         *,
@@ -331,7 +371,7 @@ class GameDaySafetyService:
                 json.dumps(manifest, indent=2),
                 encoding="utf-8",
             )
-            temporary_path.replace(final_path)
+            self._publish_snapshot_directory(temporary_path, final_path)
             self._prune_automatic_snapshots()
         except Exception as exc:
             shutil.rmtree(temporary_path, ignore_errors=True)

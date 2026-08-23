@@ -174,3 +174,5 @@ def test_all_management_routes_are_marked_authenticated() -> None:
             assert not getattr(app.view_functions[endpoint], "_csrn_requires_auth", False)
         else:
             assert getattr(app.view_functions[endpoint], "_csrn_requires_auth", False)
+
+

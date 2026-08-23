@@ -563,3 +563,5 @@ def test_discarded_or_archived_event_can_create_a_fresh_draft(tmp_path: Path) ->
     assert second.code == "DRAFT_CREATED"
     assert second.data["draft"]["id"] != first["id"]
 
+
+

@@ -1,7 +1,112 @@
 {
-  "visible": false,
-  "current": [],
-  "last_segment_id": "",
-  "updated_at": 0,
-  "cleared_at": 0
+  "visible": true,
+  "current": [
+    {
+      "id": "fa13b693-5b21-4fe0-9484-9f3017c8ab92",
+      "broadcast_id": "FB-2026-TEST-W01-001",
+      "channel": 1,
+      "speaker": "Jason Chrest",
+      "text": "That's not something that we're implementing just yet, but that's official.",
+      "raw_text": "That's not something that we're implementing just yet, but that's official.",
+      "confidence": 0.8211,
+      "start_ms": 284400,
+      "end_ms": 289400,
+      "created_at_ms": 1786750285748,
+      "corrected": false
+    },
+    {
+      "id": "a1192d65-a813-4fd3-b119-36120771d43b",
+      "broadcast_id": "FB-2026-TEST-W01-001",
+      "channel": 1,
+      "speaker": "Jason Chrest",
+      "text": "Just yet but that's a feature that will be available in their future so I'm gonna",
+      "raw_text": "Just yet but that's a feature that will be available in their future so I'm gonna",
+      "confidence": 0.7906,
+      "start_ms": 288000,
+      "end_ms": 293000,
+      "created_at_ms": 1786750289265,
+      "corrected": false
+    },
+    {
+      "id": "a37c6cbb-e980-41e4-9f3d-c97bfce18b86",
+      "broadcast_id": "FB-2026-TEST-W01-001",
+      "channel": 1,
+      "speaker": "Jason Chrest",
+      "text": "So I'm going to get this live. I've got to get back.",
+      "raw_text": "So I'm going to get this live. I've got to get back.",
+      "confidence": 0.6774,
+      "start_ms": 291600,
+      "end_ms": 296600,
+      "created_at_ms": 1786750292675,
+      "corrected": false
+    },
+    {
+      "id": "e2981ce7-7e64-42c1-8aa3-c3445b03d8bf",
+      "broadcast_id": "FB-2026-TEST-W01-001",
+      "channel": 1,
+      "speaker": "Jason Chrest",
+      "text": "I've got to get back to work it may be another late night for me trying to get this.",
+      "raw_text": "I've got to get back to work it may be another late night for me trying to get this.",
+      "confidence": 0.8795,
+      "start_ms": 295200,
+      "end_ms": 300200,
+      "created_at_ms": 1786750296394,
+      "corrected": false
+    },
+    {
+      "id": "68796f8a-a97a-4328-aa49-8e684b690de9",
+      "broadcast_id": "FB-2026-TEST-W01-001",
+      "channel": 1,
+      "speaker": "Jason Chrest",
+      "text": "I'm trying to get this fixed so y'all have a great evening.",
+      "raw_text": "I'm trying to get this fixed so y'all have a great evening.",
+      "confidence": 0.8731,
+      "start_ms": 298800,
+      "end_ms": 303800,
+      "created_at_ms": 1786750299936,
+      "corrected": false
+    },
+    {
+      "id": "a8853b35-4dbb-4936-b178-d551dde24f93",
+      "broadcast_id": "FB-2026-TEST-W01-001",
+      "channel": 1,
+      "speaker": "Jason Chrest",
+      "text": "Great evening and we'll see you on game day.",
+      "raw_text": "Great evening and we'll see you on game day.",
+      "confidence": 0.8092,
+      "start_ms": 302400,
+      "end_ms": 307400,
+      "created_at_ms": 1786750303556,
+      "corrected": false
+    },
+    {
+      "id": "13006e62-ce71-4afb-b959-0a6cedf4f97a",
+      "broadcast_id": "FB-2026-TEST-W01-001",
+      "channel": 1,
+      "speaker": "Jason Chrest",
+      "text": "I actually probably do another couple live test videos.",
+      "raw_text": "I actually probably do another couple live test videos.",
+      "confidence": 0.6747,
+      "start_ms": 306000,
+      "end_ms": 311000,
+      "created_at_ms": 1786750306953,
+      "corrected": false
+    },
+    {
+      "id": "f8d7ef23-b6f4-4573-be03-45e363e19149",
+      "broadcast_id": "FB-2026-TEST-W01-001",
+      "channel": 1,
+      "speaker": "Jason Chrest",
+      "text": "A live test video",
+      "raw_text": "A live test video",
+      "confidence": 0.4925,
+      "start_ms": 309600,
+      "end_ms": 314600,
+      "created_at_ms": 1786750310662,
+      "corrected": false
+    }
+  ],
+  "last_segment_id": "f8d7ef23-b6f4-4573-be03-45e363e19149",
+  "updated_at": 1787357050,
+  "cleared_at": 1786675519
 }

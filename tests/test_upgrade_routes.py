@@ -122,3 +122,5 @@ def test_upgrade_migration_passes_security_choice(upgrade_client) -> None:
 
     assert response.status_code == 200
     assert service.calls == [("run", False)]
+
+

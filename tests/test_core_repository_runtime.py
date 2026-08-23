@@ -114,3 +114,5 @@ def test_runtime_generates_and_persists_missing_secret_key(
         runtime.security.load()["secret_key"]
         == module.app.secret_key
     )
+
+

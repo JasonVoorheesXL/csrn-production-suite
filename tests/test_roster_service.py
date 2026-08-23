@@ -217,3 +217,5 @@ def test_update_and_delete_report_missing_roster() -> None:
     assert deleted.ok
     assert deleted.data == {"ok": True}
     assert store.rosters == []
+
+

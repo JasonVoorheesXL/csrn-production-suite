@@ -1,0 +1,96 @@
+{
+  "schema": "csrn.template-driver.asset-stack/v1",
+  "asset_id": "neon-softball-jersey-cutout-v1",
+  "display_name": "Neon Softball Jersey Cutout",
+  "source_mask_revision": "V6_EDGE_CORRECTION",
+  "canvas": {
+    "width": 1208,
+    "height": 840,
+    "origin": "top-left"
+  },
+  "color_space": "sRGB",
+  "alpha": "straight",
+  "runtime_color_slots": {
+    "home_primary": {
+      "subject": "batter jersey",
+      "default_reference": "#B5121B",
+      "mask": "runtime/softball-neon-home-batter-jersey-alpha.png",
+      "color_slot": "runtime/softball-neon-home-batter-jersey-color-slot.png"
+    },
+    "visitor_primary": {
+      "subject": "catcher visible jersey fabric",
+      "default_reference": "#1F4FA3",
+      "mask": "runtime/softball-neon-visitor-catcher-jersey-alpha.png",
+      "color_slot": "runtime/softball-neon-visitor-catcher-jersey-color-slot.png"
+    }
+  },
+  "stack_bottom_to_top": [
+    {
+      "order": 1,
+      "id": "home_jersey_color",
+      "asset": "runtime/softball-neon-home-batter-jersey-color-slot.png",
+      "operation": "tint_to_runtime_color",
+      "color_slot": "home_primary",
+      "blend_mode": "normal",
+      "opacity": 1.0
+    },
+    {
+      "order": 2,
+      "id": "visitor_jersey_color",
+      "asset": "runtime/softball-neon-visitor-catcher-jersey-color-slot.png",
+      "operation": "tint_to_runtime_color",
+      "color_slot": "visitor_primary",
+      "blend_mode": "normal",
+      "opacity": 1.0
+    },
+    {
+      "order": 3,
+      "id": "scene_with_jersey_holes",
+      "asset": "runtime/softball-neon-scene-with-jersey-holes.png",
+      "operation": "draw",
+      "blend_mode": "normal",
+      "opacity": 1.0
+    },
+    {
+      "order": 4,
+      "id": "home_jersey_texture",
+      "asset": "runtime/softball-neon-home-batter-jersey-texture-luminosity.png",
+      "operation": "draw",
+      "blend_mode": "luminosity",
+      "opacity": 1.0,
+      "clip_mask": "runtime/softball-neon-home-batter-jersey-alpha.png"
+    },
+    {
+      "order": 5,
+      "id": "visitor_jersey_texture",
+      "asset": "runtime/softball-neon-visitor-catcher-jersey-texture-luminosity.png",
+      "operation": "draw",
+      "blend_mode": "luminosity",
+      "opacity": 1.0,
+      "clip_mask": "runtime/softball-neon-visitor-catcher-jersey-alpha.png"
+    }
+  ],
+  "protected_elements": [
+    "skin",
+    "faces",
+    "hair",
+    "hands",
+    "gloves",
+    "bat",
+    "mitt",
+    "catcher chest protector",
+    "catcher cage and hardware",
+    "pants",
+    "belt",
+    "shoes",
+    "umpire",
+    "softball",
+    "field",
+    "backstop",
+    "lighting",
+    "signage"
+  ],
+  "secondary_color_layers": null,
+  "known_limitation": "User accepted V6 for packaging while noting the batter mask is not mathematically perfect.",
+  "integration_status": "ACCEPTED_FOR_TEMPLATE_DRIVER_PACKAGING"
+}

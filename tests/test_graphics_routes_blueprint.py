@@ -198,3 +198,5 @@ def test_personnel_route_preserves_sponsor_warning(graphics_client) -> None:
         "sponsor_warning": "Sponsor logo is missing.",
     }
     assert saved == [{"marker": "personnel", "private": "hidden"}]
+
+

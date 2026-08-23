@@ -122,3 +122,5 @@ def test_invalid_outgoing_data_is_rejected(tmp_path: Path) -> None:
         engine.save(target, {"not": "a list"}, validator=is_list)
 
     assert not target.exists()
+
+

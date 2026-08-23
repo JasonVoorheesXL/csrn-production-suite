@@ -206,3 +206,4 @@ def test_missing_package_and_broadcast_return_domain_errors() -> None:
         no_broadcast_service.load("pkg-existing").code
         == "BROADCAST_NOT_FOUND"
     )
+

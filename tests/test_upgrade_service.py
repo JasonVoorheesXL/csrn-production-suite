@@ -231,3 +231,5 @@ def test_security_refresh_failure_is_reported_without_exposing_secret(tmp_path: 
     assert "Security session refresh failed" in response["errors"][0]
     assert store["errors"] == []
     assert "secret_key" not in response
+
+

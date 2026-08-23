@@ -287,3 +287,5 @@ def test_player_highlight_route_delegates_and_enforces_media_contract(
     assert rejected.get_json() == {
         "error": "PLAYER_HIGHLIGHT_MEDIA_NOT_APPROVED"
     }
+
+

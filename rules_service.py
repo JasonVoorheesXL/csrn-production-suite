@@ -1,10 +1,25 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import copy
 import re
 import time
+import threading
+from time import perf_counter
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
+
+from canonical_state_service import CanonicalStateFoundation
+from eligibility_service import EligibilityService
+from runtime_diagnostics_service import get_runtime_diagnostics
+from live_command_service import (
+    assign_next_revision,
+    attach_metadata,
+    command_result_state,
+    command_id_from,
+    command_metadata,
+    duplicate_result,
+    remember_command,
+)
 
 
 @dataclass(frozen=True)
@@ -33,6 +48,14 @@ class RulesService:
         "quarter",
         "clock_seconds",
         "clock_running",
+        "clock_visible",
+        "clock_started_at",
+        "home_direction",
+        "visitor_direction",
+        "broadcast_phase",
+        "special_game_phase",
+        "kicking_team",
+        "receiving_team",
         "player_graphic",
     )
 
@@ -136,8 +159,12 @@ class RulesService:
 
     def clock_control(self, payload: Mapping[str, Any] | None) -> RulesResult:
         incoming = dict(payload or {})
+        command_id = command_id_from(incoming)
         with self._transaction_lock:
             state = copy.deepcopy(dict(self._load_state()))
+            duplicate = duplicate_result(state, command_id)
+            if duplicate is not None:
+                return RulesResult("OK", duplicate)
             action = str(incoming.get("action", "")).lower()
             seconds = self._bounded_int(state.get("clock_seconds", 720), 720)
 
@@ -166,11 +193,20 @@ class RulesService:
             state["clock_seconds"] = seconds
             if "visible" in incoming:
                 state["clock_visible"] = bool(incoming.get("visible"))
+            revision = assign_next_revision(state)
+            metadata = command_metadata(
+                incoming,
+                action=f"clock_control:{action or 'noop'}",
+                state_revision=revision,
+            )
+            result_data = attach_metadata({"state": copy.deepcopy(state)}, metadata)
+            remember_command(state, command_id, metadata=metadata, result=result_data)
             self._save_state(state)
-            return RulesResult("OK", {"state": copy.deepcopy(state)})
+            return RulesResult("OK", result_data)
 
     def field_direction(self, payload: Mapping[str, Any] | None) -> RulesResult:
         incoming = dict(payload or {})
+        command_id = command_id_from(incoming)
         team = str(incoming.get("team") or "home").lower()
         direction = str(
             incoming.get("direction")
@@ -182,12 +218,23 @@ class RulesService:
 
         with self._transaction_lock:
             state = copy.deepcopy(dict(self._load_state()))
+            duplicate = duplicate_result(state, command_id)
+            if duplicate is not None:
+                return RulesResult("OK", duplicate)
             state[f"{team}_direction"] = direction
             state[f"{self.opposite(team)}_direction"] = (
                 "left" if direction == "right" else "right"
             )
+            revision = assign_next_revision(state)
+            metadata = command_metadata(
+                incoming,
+                action="field_direction",
+                state_revision=revision,
+            )
+            result_data = attach_metadata({"state": copy.deepcopy(state)}, metadata)
+            remember_command(state, command_id, metadata=metadata, result=result_data)
             self._save_state(state)
-            return RulesResult("OK", {"state": copy.deepcopy(state)})
+            return RulesResult("OK", result_data)
 
     def play(self, payload: Mapping[str, Any] | None) -> RulesResult:
         incoming = dict(payload or {})
@@ -196,17 +243,62 @@ class RulesService:
         if team not in self.VALID_TEAMS or kind not in self.VALID_PLAY_TYPES:
             return RulesResult("INVALID_PLAY", {})
 
-        with self._transaction_lock:
+        lock_started = perf_counter()
+        self._transaction_lock.acquire()
+        lock_wait_ms = round((perf_counter() - lock_started) * 1000, 2)
+        command_id_for_log = command_id_from(incoming)
+        get_runtime_diagnostics().record(
+            "SERVER_RULES_LOCK",
+            command_id=command_id_for_log,
+            client_id=str(incoming.get("client_id", "") or ""),
+            wait_ms=lock_wait_ms,
+            contended=lock_wait_ms > 25,
+            thread=threading.current_thread().name,
+        )
+        try:
             state = copy.deepcopy(dict(self._load_state()))
+            phase = str(state.get("special_game_phase", "") or "").lower()
+            kicking_team = str(state.get("kicking_team", "") or "").lower()
+            if phase == "pending_try":
+                return RulesResult("SPECIAL_PHASE_REQUIRES_RESOLUTION", {"phase": phase})
+            if phase == "kickoff" and (kind != "kickoff" or (kicking_team and team != kicking_team)):
+                return RulesResult("SPECIAL_PHASE_REQUIRES_KICKOFF", {"phase": phase, "kicking_team": kicking_team})
+            if phase == "free_kick" and (kind not in {"kickoff", "punt"} or (kicking_team and team != kicking_team)):
+                return RulesResult("SPECIAL_PHASE_REQUIRES_FREE_KICK", {"phase": phase, "kicking_team": kicking_team})
             if not str(state.get("broadcast_id", "")).strip():
                 return RulesResult("NO_ACTIVE_BROADCAST", {})
+            command_id = command_id_from(incoming)
+            duplicate = duplicate_result(state, command_id)
+            if duplicate is not None:
+                return RulesResult("OK", duplicate)
             if not self._source_allowed(state, "statistician"):
                 return RulesResult(
                     "CONTROL_SOURCE_LOCKED",
                     copy.deepcopy(dict(self._locked_payload(state))),
                 )
 
+            roles = CanonicalStateFoundation.team_roles(state)
+            if kind in {"run", "pass"} and team != roles.offense:
+                return RulesResult(
+                    "TEAM_ROLE_MISMATCH",
+                    {
+                        "message": "Offensive plays must be entered for the team in possession.",
+                        "submitted_team": team,
+                        "offense": roles.offense,
+                        "defense": roles.defense,
+                    },
+                )
+
+            outcome = str(incoming.get("pass_outcome", "") or "").lower()
+            kneel = bool(incoming.get("kneel"))
+
+
+            ledger = state.pop("recent_commands", None)
             self._push_history(state)
+            if isinstance(state.get("history"), list):
+                state["history"] = state["history"][-50:]
+            if ledger is not None:
+                state["recent_commands"] = ledger
             before = {
                 field: copy.deepcopy(state.get(field))
                 for field in self.SNAPSHOT_FIELDS
@@ -233,9 +325,39 @@ class RulesService:
 
             outcome = str(incoming.get("pass_outcome", "")).lower()
             turnover = bool(incoming.get("fumble_lost")) or outcome == "interception"
-            touchdown = (direction == 1 and end == 100) or (
-                direction == -1 and end == 0
+            turnover_type = (
+                "interception" if outcome == "interception"
+                else "fumble_recovery" if bool(incoming.get("fumble_lost"))
+                else ""
             )
+            turnover_team = self.opposite(team) if turnover else ""
+            turnover_spot = end
+            return_end = end
+            turnover_return_yards = 0
+            turnover_touchdown = False
+            if turnover:
+                spot_value = (
+                    incoming.get("turnover_spot")
+                    or incoming.get("interception_spot")
+                    or incoming.get("recovery_spot")
+                    or self.coord_to_spot(end)
+                )
+                turnover_spot = self.spot_to_coord(spot_value)
+                return_value = incoming.get("return_end_spot")
+                return_end = self.spot_to_coord(
+                    return_value if return_value not in (None, "") else self.coord_to_spot(turnover_spot)
+                )
+                gaining_direction = self.team_direction(state, turnover_team)
+                turnover_return_yards = max(0, (return_end - turnover_spot) * gaining_direction)
+                turnover_touchdown = (
+                    (gaining_direction == 1 and return_end == 100)
+                    or (gaining_direction == -1 and return_end == 0)
+                )
+                yards = 0 if outcome == "interception" else (turnover_spot - start) * direction
+                end = return_end
+            touchdown = (not turnover) and ((direction == 1 and end == 100) or (
+                direction == -1 and end == 0
+            ))
             safety = (direction == 1 and end == 0) or (
                 direction == -1 and end == 100
             )
@@ -270,6 +392,58 @@ class RulesService:
                     numbers["returner"],
                 ),
             }
+            # Server-side player/team validation is authoritative. A jersey sent
+            # for an offensive/defensive role must resolve on the canonical team
+            # for that role; browser filtering alone is never trusted.
+            required_roles = []
+            if kind == "run" and numbers["player"]:
+                required_roles.append("player")
+            if kind == "pass":
+                if numbers["passer"]:
+                    required_roles.append("passer")
+                if numbers["receiver"]:
+                    required_roles.append("receiver")
+                if outcome == "sack" and numbers["sacker"]:
+                    required_roles.append("sacker")
+            for role in required_roles:
+                permitted_team = roles.defense if role == "sacker" else roles.offense
+                ref = refs[role]
+                if not EligibilityService.is_eligible(
+                    state,
+                    permitted_team,
+                    player_id=ref.get("player_id", ""),
+                    number=ref.get("number") or numbers[role],
+                    name=ref.get("name", ""),
+                    resolve_player=self._resolve_player,
+                ):
+                    return RulesResult(
+                        "PLAYER_INELIGIBLE",
+                        {
+                            "message": f"Player #{numbers[role]} is unavailable because of a recorded ejection.",
+                            "role": role,
+                            "number": numbers[role],
+                            "team": permitted_team,
+                        },
+                    )
+                if ref.get("resolved"):
+                    continue
+                other_team = roles.offense if role == "sacker" else roles.defense
+                # Preserve the established unresolved-jersey workflow: an unknown
+                # number may still be recorded and surfaced as unresolved. Reject
+                # only when the same submitted jersey definitively resolves on the
+                # non-permitted team.
+                wrong_team_ref = self._resolve(state, other_team, numbers[role])
+                if wrong_team_ref.get("resolved"):
+                    return RulesResult(
+                        "PLAYER_TEAM_MISMATCH",
+                        {
+                            "message": f"Player #{numbers[role]} is not eligible for the requested {role} role.",
+                            "role": role,
+                            "number": numbers[role],
+                            "permitted_team": permitted_team,
+                            "resolved_team": other_team,
+                        },
+                    )
             names = {
                 role: str(refs[role].get("name", "") or incoming.get(f"{role}_name", "")).strip()
                 for role in refs
@@ -282,11 +456,11 @@ class RulesService:
             if kind == "run":
                 kneel = bool(incoming.get("kneel"))
                 label = "Kneel" if kneel else "Run"
-                runner = self._display(numbers["player"], names["player"])
+                runner = self._display(numbers["player"], names["player"]) if numbers["player"] or names["player"] else self._team_fallback(state, team)
                 description = f"{runner} {'kneel' if kneel else 'run'} for {yards} yards"
             elif kind == "pass":
-                passer = self._display(numbers["passer"], names["passer"])
-                receiver = self._display(numbers["receiver"], names["receiver"])
+                passer = self._display(numbers["passer"], names["passer"]) if numbers["passer"] or names["passer"] else self._team_fallback(state, team)
+                receiver = self._display(numbers["receiver"], names["receiver"]) if numbers["receiver"] or names["receiver"] else self._team_fallback(state, team)
                 if outcome in {"incomplete", "spike"}:
                     end = start
                     yards = 0
@@ -294,21 +468,38 @@ class RulesService:
                     description = (
                         f"{passer} spike"
                         if outcome == "spike"
-                        else f"{passer} pass incomplete"
+                        else (
+                            f"{passer} pass incomplete, intended for {receiver}"
+                            if numbers["receiver"] or names["receiver"]
+                            else f"{passer} pass incomplete"
+                        )
                     )
                 elif outcome == "interception":
                     label = "Interception"
                     description = f"{passer} pass intercepted"
                 elif outcome == "sack":
-                    sacker = self._display(numbers["sacker"], names["sacker"])
+                    sacker = self._display(numbers["sacker"], names["sacker"]) if numbers["sacker"] or names["sacker"] else self._team_fallback(state, self.opposite(team))
                     label = "Sack"
                     description = f"{passer} sacked by {sacker} for {yards} yards"
                 else:
                     label = "Pass"
-                    description = f"{passer} complete to {receiver} for {yards} yards"
+                    if numbers["passer"] or names["passer"]:
+                        description = (
+                            f"{passer} complete to {receiver} for {yards} yards"
+                            if numbers["receiver"] or names["receiver"]
+                            else f"{passer} completes a pass for {yards} yards"
+                        )
+                    else:
+                        team_name = self._team_fallback(state, team)
+                        description = (
+                            f"{team_name} complete a pass to {receiver} for {yards} yards"
+                            if numbers["receiver"] or names["receiver"]
+                            else f"{team_name} complete a pass for {yards} yards"
+                        )
             else:
                 receiving = self.opposite(team)
                 state["possession"] = receiving
+                CanonicalStateFoundation.clear_special_phase(state)
                 landing_value = incoming.get("landing_spot")
                 landing = self.spot_to_coord(
                     landing_value if landing_value not in (None, "") else end
@@ -335,9 +526,11 @@ class RulesService:
                     state[f"{receiving}_score"] = (
                         int(state.get(f"{receiving}_score", 0) or 0) + 6
                     )
-                state["ball_spot"] = self.coord_to_spot(end)
-                state["down"] = "1st"
-                state["distance"] = "10"
+                    CanonicalStateFoundation.enter_pending_try(state, receiving)
+                else:
+                    state["ball_spot"] = self.coord_to_spot(end)
+                    state["down"] = "1st"
+                    state["distance"] = "10"
                 self._stop_clock(state)
                 label = "Kickoff" if kind == "kickoff" else "Punt"
                 description = (
@@ -356,11 +549,11 @@ class RulesService:
                 else:
                     description += f", ball at {self.coord_to_spot(end)}"
                 description += (
-                    " — touchback"
+                    " â€” touchback"
                     if touchback
-                    else " — fair catch"
+                    else " â€” fair catch"
                     if fair_catch
-                    else " — blocked"
+                    else " â€” blocked"
                     if blocked
                     else ""
                 )
@@ -382,10 +575,18 @@ class RulesService:
                     )
 
             if kind in {"run", "pass"}:
-                if touchdown:
-                    state[f"{team}_score"] = int(state.get(f"{team}_score", 0)) + 6
+                if turnover:
+                    state["possession"] = turnover_team
                     state["down"] = "1st"
                     state["distance"] = "10"
+                    if turnover_touchdown:
+                        state[f"{turnover_team}_score"] = int(state.get(f"{turnover_team}_score", 0)) + 6
+                        CanonicalStateFoundation.enter_pending_try(state, turnover_team)
+                        touchdown = True
+                    self._stop_clock(state)
+                elif touchdown:
+                    state[f"{team}_score"] = int(state.get(f"{team}_score", 0)) + 6
+                    CanonicalStateFoundation.enter_pending_try(state, team)
                     self._stop_clock(state)
                     td_number = (
                         numbers["receiver"]
@@ -412,12 +613,7 @@ class RulesService:
                 elif safety:
                     other = self.opposite(team)
                     state[f"{other}_score"] = int(state.get(f"{other}_score", 0)) + 2
-                    state["possession"] = other
-                    self._stop_clock(state)
-                elif turnover:
-                    state["possession"] = self.opposite(team)
-                    state["down"] = "1st"
-                    state["distance"] = "10"
+                    CanonicalStateFoundation.enter_free_kick(state, team)
                     self._stop_clock(state)
                 else:
                     first_down = yards >= distance
@@ -433,11 +629,17 @@ class RulesService:
                             state["distance"] = "10"
                             self._stop_clock(state)
                             turnover = True
+                            turnover_type = "downs"
+                            turnover_team = self.opposite(team)
+                            turnover_spot = end
+                            return_end = end
+                            turnover_return_yards = 0
                     if outcome in {"incomplete", "spike"} or bool(
                         incoming.get("out_of_bounds")
                     ):
                         self._stop_clock(state)
-                state["ball_spot"] = self.coord_to_spot(end)
+                if not touchdown and not safety:
+                    state["ball_spot"] = self.coord_to_spot(end)
 
             play_number = self._bounded_int(
                 state.get("next_play_number", 1),
@@ -454,10 +656,24 @@ class RulesService:
             play_id = f"{token}-{play_number:04d}"
             event_id = f"evt-{int(self._now() * 1000)}-{play_number}"
 
+            if turnover_type == "interception":
+                defender = self._display(numbers["returner"], names["returner"]) if numbers["returner"] or names["returner"] else self._team_fallback(state, self.opposite(team))
+                description += f" by {defender} at {self.coord_to_spot(turnover_spot)}"
+                if turnover_return_yards:
+                    description += f", returned {turnover_return_yards} yards to {self.coord_to_spot(return_end)}"
             if bool(incoming.get("fumble")):
                 description += ", fumble" + (
                     " lost" if bool(incoming.get("fumble_lost")) else " recovered"
                 )
+                if bool(incoming.get("fumble_lost")):
+                    recoverer = self._display(numbers["returner"], names["returner"]) if numbers["returner"] or names["returner"] else self._team_fallback(state, self.opposite(team))
+                    description += f", recovered by {recoverer} at {self.coord_to_spot(turnover_spot)}"
+                    if turnover_return_yards:
+                        description += f", returned {turnover_return_yards} yards to {self.coord_to_spot(return_end)}"
+            if turnover_type == "downs":
+                description += ", turnover on downs"
+            if turnover_touchdown:
+                description += ", defensive touchdown"
             if touchdown and kind in {"run", "pass"}:
                 description += ", touchdown"
                 label = "Touchdown Pass" if kind == "pass" else "Touchdown Run"
@@ -465,12 +681,14 @@ class RulesService:
                 description += ", first down"
 
             scoring_team = (
-                self.opposite(team)
-                if touchdown and kind in {"kickoff", "punt"}
+                turnover_team if turnover_touchdown
+                else self.opposite(team) if touchdown and kind in {"kickoff", "punt"}
                 else team
             )
             td_number = (
                 numbers["returner"]
+                if turnover_touchdown
+                else numbers["returner"]
                 if touchdown and kind in {"kickoff", "punt"}
                 else numbers["receiver"]
                 if kind == "pass" and outcome == "complete"
@@ -478,6 +696,8 @@ class RulesService:
             )
             td_name = (
                 names["returner"]
+                if turnover_touchdown
+                else names["returner"]
                 if touchdown and kind in {"kickoff", "punt"}
                 else names["receiver"]
                 if kind == "pass" and outcome == "complete"
@@ -514,6 +734,13 @@ class RulesService:
                     "fumble": bool(incoming.get("fumble")),
                     "fumble_lost": bool(incoming.get("fumble_lost")),
                     "turnover": turnover,
+                    "turnover_type": turnover_type,
+                    "turnover_team": turnover_team,
+                    "turnover_spot": self.coord_to_spot(turnover_spot) if turnover else "",
+                    "return_end_spot": self.coord_to_spot(return_end) if turnover else "",
+                    "return_yards": turnover_return_yards if turnover else (return_yards if kind in {"kickoff", "punt"} else 0),
+                    "turnover_player_number": numbers["returner"] if turnover else "",
+                    "turnover_player_name": names["returner"] if turnover else "",
                     "touchdown": touchdown,
                     "safety": safety,
                     "player_name": (
@@ -533,7 +760,7 @@ class RulesService:
                     "kick_distance": (
                         kick_distance if kind in {"kickoff", "punt"} else 0
                     ),
-                    "return_yards": (
+                    "special_teams_return_yards": (
                         return_yards if kind in {"kickoff", "punt"} else 0
                     ),
                 },
@@ -571,6 +798,13 @@ class RulesService:
                 "first_down": first_down,
                 "touchdown": touchdown,
                 "turnover": turnover,
+                "turnover_type": turnover_type,
+                "turnover_team": turnover_team,
+                "turnover_spot": self.coord_to_spot(turnover_spot) if turnover else "",
+                "return_end_spot": self.coord_to_spot(return_end) if turnover else "",
+                "return_yards": turnover_return_yards if turnover else (return_yards if kind in {"kickoff", "punt"} else 0),
+                "turnover_player_number": numbers["returner"] if turnover else "",
+                "turnover_player_name": names["returner"] if turnover else "",
                 "safety": safety,
                 "notes": str(incoming.get("notes", "")),
                 "created_by": "statistician",
@@ -590,6 +824,8 @@ class RulesService:
                 "passer_name": names["passer"],
                 "receiver_number": numbers["receiver"],
                 "receiver_name": names["receiver"],
+                "intended_receiver_number": numbers["receiver"] if kind == "pass" and outcome == "incomplete" else "",
+                "intended_receiver_name": names["receiver"] if kind == "pass" and outcome == "incomplete" else "",
                 "sacker_number": numbers["sacker"],
                 "sacker_name": names["sacker"],
                 "kicker_number": numbers["kicker"],
@@ -616,14 +852,30 @@ class RulesService:
             state["last_event"] = event
             state["status"] = "live"
             state["broadcast_phase"] = "live"
-            self._save_state(state)
-            return RulesResult(
-                "OK",
+            revision = assign_next_revision(state)
+            metadata = command_metadata(
+                incoming,
+                action=f"rules_play:{kind}",
+                state_revision=revision,
+            )
+            result_data = attach_metadata(
                 {
-                    "state": copy.deepcopy(state),
+                    "state": command_result_state(state),
                     "play": copy.deepcopy(play),
                 },
+                metadata,
             )
+            remember_command(
+                state,
+                command_id,
+                metadata=metadata,
+                result=result_data,
+            )
+            self._save_state(state)
+            return RulesResult("OK", result_data)
+        finally:
+            self._transaction_lock.release()
+
 
     def _resolve(self, state: dict[str, Any], team: str, number: str) -> dict[str, Any]:
         result = self._resolve_player(state, team, number)
@@ -634,6 +886,15 @@ class RulesService:
         if number:
             return f"#{number} {name}".strip()
         return name or "?"
+
+    @staticmethod
+    def _team_fallback(state: Mapping[str, Any], team: str) -> str:
+        identity = state.get(f"{team}_identity", {})
+        if isinstance(identity, Mapping):
+            mascot = str(identity.get("mascot") or identity.get("nickname") or "").strip()
+            if mascot:
+                return mascot
+        return str(state.get(f"{team}_team") or team.title()).strip()
 
     @staticmethod
     def _stop_clock(state: dict[str, Any]) -> None:
@@ -676,3 +937,10 @@ class RulesService:
             eyebrow="TOUCHDOWN",
             play_detail=detail,
         )
+
+
+
+
+
+
+

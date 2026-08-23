@@ -162,3 +162,5 @@ def test_support_bundle_redacts_secrets_from_logs_and_excludes_facebook_vault(tm
     assert "EAABEARER" not in log_text
     assert "supersecret" not in log_text
     assert log_text.count("[REDACTED]") == 3
+
+

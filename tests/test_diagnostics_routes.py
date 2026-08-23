@@ -90,3 +90,5 @@ def test_readiness_endpoint_preserves_payload(diagnostics_client) -> None:
     assert response.status_code == 200
     assert response.get_json() == service.readiness_payload
     assert service.calls == [("readiness", None)]
+
+

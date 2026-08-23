@@ -45,7 +45,9 @@ def system_client():
     calls: dict[str, int] = {
         "diagnostics": 0,
         "state": 0,
+        "runtime_load_state": 0,
         "public_state": 0,
+        "runtime_state": 0,
         "readiness": 0,
         "journal": 0,
     }
@@ -67,9 +69,17 @@ def system_client():
         calls["state"] += 1
         return {"private": "hidden", "home_score": 7}
 
+    def load_runtime_state() -> dict[str, Any]:
+        calls["runtime_load_state"] += 1
+        return {"private": "hidden", "home_score": 9}
+
     def public_state(state: dict[str, Any]) -> dict[str, Any]:
         calls["public_state"] += 1
         return {"home_score": state["home_score"]}
+
+    def runtime_state(state: dict[str, Any]) -> dict[str, Any]:
+        calls["runtime_state"] += 1
+        return {"home_score": state["home_score"], "runtime": True}
 
     def readiness_payload() -> dict[str, Any]:
         calls["readiness"] += 1
@@ -88,7 +98,9 @@ def system_client():
                 get_configuration_service=lambda: configuration,
                 diagnostic_status=diagnostic_status,
                 load_state=load_state,
+                load_runtime_state=load_runtime_state,
                 public_state=public_state,
+                runtime_state=runtime_state,
                 readiness_payload=readiness_payload,
                 load_build_journal=load_build_journal,
             )
@@ -112,6 +124,7 @@ def test_blueprint_registers_preserved_system_urls(system_client) -> None:
     assert ("/api/config", ("POST",)) in rules
     assert ("/api/diagnostics", ("GET",)) in rules
     assert ("/api/state", ("GET",)) in rules
+    assert ("/api/runtime-state", ("GET",)) in rules
     assert ("/api/readiness", ("GET",)) in rules
     assert ("/api/build-journal", ("GET",)) in rules
 
@@ -123,6 +136,16 @@ def test_state_route_remains_public_and_filters_state(system_client) -> None:
     assert response.get_json() == {"home_score": 7}
     assert calls["state"] == 1
     assert calls["public_state"] == 1
+
+
+def test_runtime_state_route_remains_public_and_filters_state(system_client) -> None:
+    client, _, _, calls = system_client
+    response = client.get("/api/runtime-state")
+    assert response.status_code == 200
+    assert response.get_json() == {"home_score": 9, "runtime": True}
+    assert calls["state"] == 0
+    assert calls["runtime_load_state"] == 1
+    assert calls["runtime_state"] == 1
 
 
 def test_protected_system_route_requires_authentication(system_client) -> None:
@@ -207,3 +230,5 @@ def test_build_journal_route_delegates(system_client) -> None:
     assert response.status_code == 200
     assert response.get_json() == [{"build": "V1.13A5A"}]
     assert calls["journal"] == 1
+
+

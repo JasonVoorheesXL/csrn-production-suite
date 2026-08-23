@@ -249,3 +249,5 @@ def test_import_players_skips_invalid_rows_and_parses_flags() -> None:
     assert imported[0]["pronunciation_verified"] is True
     assert imported[0]["status"] == "inactive"
     assert imported[1]["captain"] is False
+
+

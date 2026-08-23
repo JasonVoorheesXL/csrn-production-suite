@@ -321,3 +321,5 @@ def test_asset_upload_duplicate_replace_preserves_existing_filename(asset_client
     name, arguments = service.calls[-1]
     assert name == "replace"
     assert arguments[2]["file_url"] == "/asset-files/existing.png"
+
+

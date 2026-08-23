@@ -184,3 +184,5 @@ def test_delete_requires_exact_confirmation(tmp_path: Path) -> None:
     recap_id = svc.generate().data["recap"]["id"]
     assert svc.delete(recap_id, "delete").code == "RECAP_DELETE_CONFIRMATION_REQUIRED"
     assert svc.delete(recap_id, "DELETE GAME RECAP").code == "RECAP_DELETED"
+
+

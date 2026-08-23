@@ -307,3 +307,5 @@ def test_apply_enrichment_counts_missing_source_fields_and_missing_school() -> N
     assert result.data["missing_mascot"] == 1
     assert result.data["missing_address"] == 1
     assert result.data["missing_website"] == 1
+
+

@@ -184,3 +184,4 @@ def test_connection_qr_route_returns_svg(support_client) -> None:
     assert response.data == b"<svg>qr</svg>"
     assert response.headers["Cache-Control"] == "no-store"
     assert service.calls == [("qr", "http://192.168.1.25:5050")]
+

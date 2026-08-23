@@ -159,3 +159,5 @@ def test_command_scorebug_visibility_raises_on_block():
         assert str(exc) == "Controlled OBS commands are disabled in Settings."
     else:
         raise AssertionError("Expected RuntimeError")
+
+

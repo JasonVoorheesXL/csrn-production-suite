@@ -64,3 +64,5 @@ def test_release_freeze_document_uses_manual_x_boundary() -> None:
     assert "assisted-manual X packages" in source
     assert "X does not use OAuth" in source
     assert "Facebook and X publishing" not in source
+
+

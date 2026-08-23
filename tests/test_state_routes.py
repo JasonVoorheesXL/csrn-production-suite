@@ -33,6 +33,10 @@ class StubStateService:
         self.calls.append(("public", state))
         return StateResult("OK", {"state": {**state, "public": True}})
 
+    def runtime_view(self, state: dict[str, Any]) -> StateResult:
+        self.calls.append(("runtime_view", state))
+        return StateResult("OK", {"state": {**state, "runtime": True}})
+
     def apply_change(self, changes, *, save_undo=True) -> StateResult:
         self.calls.append(("apply_change", (changes, save_undo)))
         return StateResult("OK", {"state": {**self.state, **changes}})
@@ -87,3 +91,27 @@ def test_state_endpoint_returns_public_service_state(state_client) -> None:
             },
         ),
     ]
+
+
+def test_runtime_state_endpoint_returns_runtime_service_state(state_client) -> None:
+    client, service = state_client
+    response = client.get("/api/runtime-state")
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "broadcast_id": "B1",
+        "home_score": 6,
+        "overlay_revision": "gate6-logo-fallback-v1",
+        "runtime": True,
+    }
+    assert service.calls == [
+        ("load", None),
+        (
+            "runtime_view",
+            {
+                "broadcast_id": "B1",
+                "home_score": 6,
+            },
+        ),
+    ]
+
+

@@ -1,0 +1,18 @@
+#csrnProductionThemeHost{
+  position:absolute;
+  inset:0;
+  overflow:hidden;
+  pointer-events:none;
+  background:transparent;
+  z-index:40;
+}
+#csrnProductionThemeHost[hidden]{
+  display:none!important;
+}
+#csrnProductionThemeHost .csrn-production-theme-status{
+  position:absolute;
+  left:-10000px;
+  width:1px;
+  height:1px;
+  overflow:hidden;
+}

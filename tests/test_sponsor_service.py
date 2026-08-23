@@ -265,3 +265,5 @@ def test_apply_to_graphic_handles_linked_stale_and_manual_sponsors() -> None:
     assert stale.data["graphic"]["sponsor_name"] == ""
     assert manual.data["graphic"]["sponsor_id"] == ""
     assert manual.data["graphic"]["sponsor_name"] == "Manual Sponsor"
+
+

@@ -85,10 +85,38 @@
   <main id="captions" aria-live="polite" aria-atomic="true"></main>
   <script>
     const root = document.getElementById('captions');
+    const CAPTION_STICKY_MS = 2800;
     let lastRendered = '';
+    let lastCaptionSnapshot = null;
+
+    function activeSegments(payload) {
+      if (!payload || payload.visible !== true) {
+        lastCaptionSnapshot = null;
+        return [];
+      }
+      const segments = Array.isArray(payload.segments) ? payload.segments : [];
+      const updatedAt = Number(payload.updated_at || 0);
+      if (segments.length) {
+        lastCaptionSnapshot = {
+          segments,
+          updatedAt,
+          capturedAt: Date.now()
+        };
+        return segments;
+      }
+      if (
+        lastCaptionSnapshot &&
+        lastCaptionSnapshot.updatedAt === updatedAt &&
+        Date.now() - lastCaptionSnapshot.capturedAt <= CAPTION_STICKY_MS
+      ) {
+        return lastCaptionSnapshot.segments;
+      }
+      lastCaptionSnapshot = null;
+      return [];
+    }
 
     function render(payload) {
-      const segments = Array.isArray(payload.segments) ? payload.segments : [];
+      const segments = activeSegments(payload);
       const signature = JSON.stringify({
         visible: Boolean(payload.visible),
         theme: payload.theme || 'standard',
