@@ -14,6 +14,8 @@ def test_collegiate_is_approved_for_production_template_host():
     assert "collegiate_traditional" in service.APPROVED_PACKAGE_IDS
     assert '"collegiate_traditional"' in read("static/csrn-production-theme-adapter.js")
     assert "collegiate_traditional: Object.freeze" in read("static/csrn-production-theme-runtime.js")
+    assert '<option value="collegiate_traditional">Collegiate Tech</option>' in read("templates/index.html")
+    assert 'collegiate_traditional: "Collegiate Tech"' in read("static/csrn-pregame-theme-selector.js")
 
 
 def test_collegiate_football_uses_field_position_panel_not_legacy_down_box():

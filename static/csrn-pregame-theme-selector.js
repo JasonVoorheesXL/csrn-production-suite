@@ -13,7 +13,8 @@
     friday_night_stadium: "Friday Night Stadium",
     eight_bit_gameday: "8-Bit Gameday",
     heritage_press: "Heritage Press",
-    digital_neon: "Neon"
+    digital_neon: "Neon",
+    collegiate_traditional: "Collegiate Tech"
   });
 
   const APPROVED = new Set(Object.keys(LABELS));
