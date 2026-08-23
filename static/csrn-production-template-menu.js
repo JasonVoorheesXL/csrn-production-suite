@@ -10,7 +10,8 @@ const OPTIONS = Object.freeze([
   Object.freeze({id:"friday_night_stadium", label:"Friday Night Stadium"}),
   Object.freeze({id:"eight_bit_gameday", label:"8-Bit Gameday"}),
   Object.freeze({id:"heritage_press", label:"Heritage Press"}),
-  Object.freeze({id:"digital_neon", label:"Neon"})
+  Object.freeze({id:"digital_neon", label:"Neon"}),
+  Object.freeze({id:"collegiate_traditional", label:"Collegiate"})
 ]);
 
 function valid(value) {

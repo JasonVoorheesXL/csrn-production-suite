@@ -13,7 +13,8 @@ const APPROVED_PACKAGES = new Set([
   "friday_night_stadium",
   "eight_bit_gameday",
   "digital_neon",
-  "heritage_press"
+  "heritage_press",
+  "collegiate_traditional"
 ]);
 
 function text(value, fallback = "") {

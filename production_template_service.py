@@ -17,6 +17,7 @@ APPROVED_PACKAGE_IDS = frozenset(
         "eight_bit_gameday",
         "heritage_press",
         "digital_neon",
+        "collegiate_traditional",
     }
 )
 _LOCK = threading.RLock()

@@ -21,6 +21,11 @@ const EXPECTED = Object.freeze([
     packageId: "heritage_press",
     globalName: "CSRNHeritagePressEngine",
     renderCandidates: ["renderPackage", "render", "mount"]
+  }),
+  Object.freeze({
+    packageId: "collegiate_traditional",
+    globalName: "CSRNBroadcastLayoutEngine",
+    renderCandidates: ["renderPackage", "render", "mount"]
   })
 ]);
 

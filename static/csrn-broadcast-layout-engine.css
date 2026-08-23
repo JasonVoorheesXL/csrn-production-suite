@@ -86,6 +86,45 @@
 .bl-college-team.bl-visitor{flex-direction:row-reverse;text-align:right}
 .bl-collegiate .bl-team-name{font-size:28px}.bl-collegiate .bl-score{background:repeating-linear-gradient(90deg,#222 0 16px,#2e2e2e 16px 21px)}
 .bl-college-state{border-inline:4px solid #fff}
+.bl-collegiate-tech{position:relative;width:100%;height:100%;box-sizing:border-box;display:grid;grid-template-columns:minmax(330px,.74fr) minmax(680px,1.25fr) minmax(330px,.74fr);gap:14px;align-items:stretch;padding:42px 14px 12px;border:1px solid rgba(191,201,212,.72);border-radius:8px;background:linear-gradient(180deg,rgba(18,28,39,.98),rgba(7,12,18,.98));box-shadow:0 18px 38px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.16);font-family:Inter,Roboto,Arial,sans-serif;color:#f8fbff;overflow:hidden}
+.bl-collegiate-tech::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,color-mix(in srgb,var(--home-primary,#0A2342) 36%,transparent),transparent 31%,transparent 69%,color-mix(in srgb,var(--visitor-primary,#064624) 36%,transparent))}
+.bl-collegiate-tech .bl-college-frame-rail{position:absolute;left:18px;right:18px;top:8px;height:3px;background:linear-gradient(90deg,var(--visitor-primary,#064624),rgba(255,255,255,.68),var(--home-primary,#0A2342));opacity:.9}
+.bl-college-live-strip{position:absolute;z-index:3;left:20px;right:20px;top:14px;height:22px;display:grid;grid-template-columns:92px minmax(0,1fr) 72px;align-items:center;gap:12px;overflow:hidden;color:#dbe7f5;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.bl-college-live-strip b,.bl-college-live-strip em{height:20px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.35);border-radius:999px;background:rgba(0,0,0,.34);font-style:normal}
+.bl-college-live-strip b{color:#ff3657}
+.bl-college-ticker-copy{min-width:0;white-space:nowrap;overflow:hidden;color:#f4f8ff}
+.bl-collegiate-tech .bl-college-team{position:relative;z-index:1;display:grid;grid-template-columns:86px minmax(0,1fr) 96px;gap:14px;align-items:center;min-width:0;padding:12px 14px;border:1px solid rgba(255,255,255,.16);border-radius:6px;background:linear-gradient(135deg,rgba(255,255,255,.10),rgba(255,255,255,.03));box-shadow:inset 0 1px 0 rgba(255,255,255,.18)}
+.bl-collegiate-tech .bl-college-team.bl-visitor{grid-template-columns:86px minmax(0,1fr) 96px;text-align:left;flex-direction:initial}
+.bl-college-clean-logo{width:84px;height:84px;display:grid;place-items:center;border-radius:6px;background:rgba(0,0,0,.34);border:1px solid rgba(255,255,255,.16);overflow:hidden}
+.bl-college-clean-logo img{width:76px;height:76px;object-fit:contain;display:block}
+.bl-college-clean-logo span{font-weight:1000;font-size:26px;color:#fff}
+.bl-college-identity{min-width:0;display:grid;gap:5px;text-transform:uppercase}
+.bl-college-identity span{font-size:28px;line-height:1;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bl-college-identity small{font-size:13px;line-height:1;color:#b9c7d8;font-weight:850;letter-spacing:.12em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bl-college-score{font-size:62px;line-height:1;font-weight:950;text-align:center;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.38)}
+.bl-college-core{position:relative;z-index:1;display:grid;grid-template-rows:52px minmax(0,1fr);gap:10px;min-width:0}
+.bl-college-clock-row{display:grid;grid-template-columns:110px minmax(0,1fr);align-items:center;border:1px solid rgba(255,255,255,.15);border-radius:6px;background:rgba(0,0,0,.34);overflow:hidden}
+.bl-college-clock-row span{height:100%;display:grid;place-items:center;font-size:18px;font-weight:950;color:#cfe0f6;background:rgba(255,255,255,.08)}
+.bl-college-clock-row strong{font-size:42px;line-height:1;font-weight:950;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:0;color:#fff}
+.bl-college-field{--ball-x:50%;--drive-x:50%;--first-x:60%;position:relative;display:grid;grid-template-rows:minmax(76px,1fr) 34px;gap:8px;min-width:0;padding:8px;border:1px solid rgba(255,255,255,.16);border-radius:6px;background:linear-gradient(180deg,rgba(13,48,34,.95),rgba(8,29,23,.96));box-shadow:inset 0 0 0 1px rgba(0,0,0,.42)}
+.bl-college-field-grid{position:relative;overflow:hidden;border-radius:4px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.18) 0 1px,transparent 1px 10%),linear-gradient(90deg,#09391f,#126134 50%,#09391f)}
+.bl-college-field-grid::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 2px),rgba(255,255,255,.44) calc(10% - 2px) 10%),linear-gradient(0deg,transparent 0 45%,rgba(255,255,255,.32) 45% 47%,transparent 47% 53%,rgba(255,255,255,.32) 53% 55%,transparent 55%)}
+.bl-college-yard-numbers{position:absolute;left:5%;right:5%;top:8px;display:grid;grid-template-columns:repeat(9,1fr);font-size:13px;font-weight:900;color:rgba(255,255,255,.68);text-align:center;pointer-events:none}
+.bl-college-drive-start,.bl-college-first-down,.bl-college-ball-marker{position:absolute;top:8px;bottom:8px;transform:translateX(-50%);z-index:2}
+.bl-college-drive-start{left:var(--drive-x);width:3px;background:rgba(255,255,255,.86)}
+.bl-college-first-down{left:var(--first-x);width:4px;background:#ffd23c;box-shadow:0 0 13px rgba(255,210,60,.76)}
+.bl-college-ball-marker{left:var(--ball-x);display:grid;place-items:center;width:34px}
+.bl-college-ball-marker span{width:24px;height:15px;border-radius:50%;background:#7a421e;border:2px solid #f2d1a3;box-shadow:0 0 13px rgba(255,255,255,.72);transform:rotate(-18deg)}
+.bl-college-direction-arrow{position:absolute;left:var(--ball-x);top:50%;width:72px;height:3px;z-index:1;background:rgba(255,255,255,.84);transform:translateY(-50%)}
+.bl-college-direction-arrow::after{content:"";position:absolute;right:-2px;top:50%;width:0;height:0;border-block:7px solid transparent;border-left:12px solid rgba(255,255,255,.88);transform:translateY(-50%)}
+.bl-college-field[data-direction="left"] .bl-college-direction-arrow{transform:translate(-100%,-50%)}
+.bl-college-field[data-direction="left"] .bl-college-direction-arrow::after{left:-2px;right:auto;border-left:0;border-right:12px solid rgba(255,255,255,.88)}
+.bl-college-field[data-has-drive-start="false"] .bl-college-drive-start{display:none}
+.bl-college-field[data-field-visible="false"] .bl-college-ball-marker,.bl-college-field[data-field-visible="false"] .bl-college-direction-arrow{display:none}
+.bl-college-field-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;min-width:0}
+.bl-college-field-meta span{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:6px;min-width:0;padding:5px 8px;border-radius:4px;background:rgba(0,0,0,.34)}
+.bl-college-field-meta small{font-size:10px;line-height:1;text-transform:uppercase;color:#9fb0c4;font-weight:900;letter-spacing:.08em}
+.bl-college-field-meta b{font-size:14px;line-height:1;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
 
 /* Classic */
 .bl-classic{display:grid;grid-template-columns:1fr 115px 260px 115px 1fr;background:#111;border:5px solid #f2f2f2;box-shadow:10px 10px 0 #000}

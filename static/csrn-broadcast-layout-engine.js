@@ -76,7 +76,23 @@
       bases: Object.freeze([true, false, true]),
       pitcherName: "RYAN LITHERS",
       batterName: "TOMMY GUNNS",
-      batterPosition: "2B"
+      batterPosition: "2B",
+      ballSpot: "LEFT 42",
+      driveStart: "LEFT 25",
+      firstDownSpot: "RIGHT 48",
+      fieldDirection: "right",
+      field: Object.freeze({
+        ballSpot: "LEFT 42",
+        ballPct: 42,
+        driveStart: "LEFT 25",
+        driveStartPct: 25,
+        firstDownSpot: "RIGHT 48",
+        firstDownPct: 52,
+        direction: "right",
+        possession: "home",
+        downDistance: "1ST & 10",
+        visible: true
+      })
     }),
     player: Object.freeze({
       name: "ALEX CARTER",
@@ -587,6 +603,85 @@
     return footballState(state, className, includeAuxClock).replace('class="bl-game-state','data-module="game.state" class="bl-game-state');
   }
 
+  function clampPercent(value, fallback = 50) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.max(0, Math.min(100, numeric)) : fallback;
+  }
+
+  function collegiateInitials(team) {
+    return String(team.name || team.shortName || "TEAM")
+      .replace(/[^A-Za-z0-9 ]+/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 3)
+      .map((word) => word.slice(0, 1))
+      .join("")
+      .toUpperCase() || "T";
+  }
+
+  function collegiateLogo(team, side) {
+    const logo = team.logo ? `<img src="${esc(team.logo)}" alt="">` : `<span>${esc(collegiateInitials(team))}</span>`;
+    return `<div class="bl-college-clean-logo" data-module="${side}.logo" data-bind="${side}.logo">${logo}</div>`;
+  }
+
+  function collegiateTeamPanel(team, side) {
+    return `<section class="bl-college-team bl-${side}" data-module="${side}.team">
+      ${collegiateLogo(team, side)}
+      <div class="bl-college-identity" data-module="${side}.identity">
+        <span data-bind="${side}.name">${esc(team.shortName || team.name)}</span>
+        <small data-bind="${side}.mascot">${esc(team.mascot)}</small>
+      </div>
+      <strong class="bl-college-score" data-module="${side}.score" data-bind="${side}.score">${esc(team.score)}</strong>
+    </section>`;
+  }
+
+  function collegiateField(state) {
+    const field = state.game.field || {};
+    const ballPct = clampPercent(field.ballPct, 50);
+    const drivePct = clampPercent(field.driveStartPct, ballPct);
+    const firstPct = clampPercent(field.firstDownPct, ballPct);
+    const direction = String(field.direction || state.game.fieldDirection || "right").toLowerCase() === "left" ? "left" : "right";
+    const possession = String(field.possession || state.game.possession || "home").toLowerCase();
+    const visible = field.visible !== false;
+    const ballSpot = visible ? (field.ballSpot || state.game.ballSpot || "-") : "-";
+    const driveStart = field.driveStart || state.game.driveStart || "-";
+    const firstDownSpot = field.firstDownSpot || state.game.firstDownSpot || "-";
+    const downDistance = field.downDistance || state.game.downDistance || "-";
+    const yardNumbers = ["10","20","30","40","50","40","30","20","10"].map((yard) => `<span>${yard}</span>`).join("");
+    return `<section class="bl-college-field" data-module="game.field" data-direction="${esc(direction)}" data-possession="${esc(possession)}" data-has-drive-start="${driveStart !== "-" ? "true" : "false"}" data-field-visible="${visible ? "true" : "false"}" style="--ball-x:${ballPct}%;--drive-x:${drivePct}%;--first-x:${firstPct}%">
+      <div class="bl-college-field-grid" aria-hidden="true">
+        <div class="bl-college-yard-numbers">${yardNumbers}</div>
+        <i class="bl-college-drive-start"></i>
+        <i class="bl-college-first-down"></i>
+        <i class="bl-college-ball-marker"><span></span></i>
+        <b class="bl-college-direction-arrow"></b>
+      </div>
+      <div class="bl-college-field-meta">
+        <span><small>Drive</small><b data-bind="game.driveStart">${esc(driveStart)}</b></span>
+        <span><small>Down</small><b data-bind="game.downDistance">${esc(downDistance)}</b></span>
+        <span><small>Ball</small><b data-bind="game.ballSpot">${esc(ballSpot)}</b></span>
+        <span><small>Line</small><b data-bind="game.firstDownSpot">${esc(firstDownSpot)}</b></span>
+      </div>
+    </section>`;
+  }
+
+  function collegiateFootballScorebug(state, sport) {
+    return `<div class="bl-scorebug bl-collegiate bl-collegiate-tech bl-sport-${sport}" data-possession="${esc(state.game.possession || "home")}">
+      <div class="bl-college-frame-rail"></div>
+      <div class="bl-college-live-strip"><b>LIVE</b><span class="bl-college-ticker-copy">${esc(state.ticker.text || "CSRN LIVE")}</span><em>CSRN</em></div>
+      ${collegiateTeamPanel(state.visitor, "visitor")}
+      <section class="bl-college-core" data-module="game.state">
+        <div class="bl-college-clock-row">
+          <span>Q<span data-bind="game.period">${esc(state.game.period)}</span></span>
+          <strong data-bind="game.clock">${esc(state.game.clock)}</strong>
+        </div>
+        ${collegiateField(state)}
+      </section>
+      ${collegiateTeamPanel(state.home, "home")}
+    </div>`;
+  }
+
 
   function baseballRoleState(state) {
     const half = normalizeInningHalf(state.game.inningHalf);
@@ -947,6 +1042,7 @@
 
     collegiate(state, sport) {
       if (sport === "baseball" || sport === "softball") return baseballLineScore(state,"collegiate");
+      if (sport === "football") return collegiateFootballScorebug(state, sport);
       return `<div class="bl-scorebug bl-collegiate bl-sport-${sport}">
         <section class="bl-college-team bl-home">${explicitTeam(state.home,"home",{order:["logo","copy"],record:true})}</section>
         ${genericScore(state.home,"home")}${sportState(state,sport,"bl-college-state")}${genericScore(state.visitor,"visitor")}
@@ -1362,7 +1458,7 @@
       componentRendererFamily: "collegiate",
       sports:{
         football:{components:{
-          scorebug:{zone:"bottom-center",layer:100},ticker:{zone:"bottom-center",layer:110,allowOverlapWith:["scorebug"]},
+          scorebug:{zone:"bottom-center",width:1410,height:225,layer:100},ticker:{zone:"bottom-center",height:58,layer:110,allowOverlapWith:["scorebug"]},
           playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80},
           highlightVideo:{zone:"top-right",layer:70},sponsor:{zone:"top-left",layer:60},
           captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120}

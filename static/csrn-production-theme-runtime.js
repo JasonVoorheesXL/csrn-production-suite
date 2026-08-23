@@ -84,6 +84,14 @@ const PACKAGE_ALIASES = Object.freeze({
           "/static/csrn-neon-r2-engine.js?v=16.9-r8",
           "/static/csrn-neon-softball-r42-driver.js?v=16.9-r8",
           "/static/csrn-neon-baseball-r43-driver.js?v=16.9-r8"]
+  }),
+  collegiate_traditional: Object.freeze({
+    globalName: "CSRNBroadcastLayoutEngine",
+    playerSupported: false,
+    tickerSelector: ".bl-college-ticker-copy",
+    tickerKind: "inside",
+    css: ["/static/csrn-broadcast-layout-engine.css?v=17.0-collegiate-field"],
+    js:  ["/static/csrn-broadcast-layout-engine.js?v=17.0-collegiate-field"]
   })
 });
 
@@ -613,6 +621,16 @@ function mergeRuntimeState(base, runtime, captionState = null) {
   base.game.down_distance = productionDown.combined;
 
   base.game.possession = textValue(source.possession, gameSource.possession, base.game.possession).toLowerCase();
+  const field = productionFieldState(source, gameSource, source.canonical_field_state);
+  base.game.field = field;
+  base.game.ballSpot = field.ballSpot;
+  base.game.ball_spot = field.ballSpot;
+  base.game.driveStart = field.driveStart;
+  base.game.drive_start = field.driveStart;
+  base.game.firstDownSpot = field.firstDownSpot;
+  base.game.first_down_spot = field.firstDownSpot;
+  base.game.fieldDirection = field.direction;
+  base.game.field_direction = field.direction;
 
   base.ticker = {...(base.ticker || {})};
   base.ticker.text = eventPlainText(source) || "CSRN LIVE";
@@ -1027,6 +1045,88 @@ function productionBallOn(runtime) {
   return numbers?.length ? numbers[numbers.length - 1] : raw.toUpperCase();
 }
 
+function parseFieldSpot(value) {
+  const raw = textValue(value).trim().toUpperCase();
+  if (!raw || raw === "-") return null;
+  const side = raw.includes("RIGHT") ? "right" : raw.includes("LEFT") ? "left" : "";
+  if (/GOAL|GL/.test(raw)) {
+    if (side === "right") return {raw, side, yard:0, pct:100};
+    if (side === "left") return {raw, side, yard:0, pct:0};
+  }
+  const number = Number(raw.match(/\d+/)?.[0]);
+  if (!Number.isFinite(number)) return null;
+  const yard = Math.max(0, Math.min(50, number));
+  let pct = 50;
+  if (side === "left") pct = yard;
+  else if (side === "right") pct = 100 - yard;
+  else pct = yard === 50 ? 50 : yard;
+  return {raw, side, yard, pct:Math.max(0, Math.min(100, pct))};
+}
+
+function spotFromPercent(pct) {
+  const bounded = Math.max(0, Math.min(100, Number(pct)));
+  if (!Number.isFinite(bounded)) return "";
+  if (bounded <= 0) return "LEFT GOAL";
+  if (bounded >= 100) return "RIGHT GOAL";
+  if (bounded <= 50) return `LEFT ${Math.round(bounded)}`;
+  return `RIGHT ${Math.round(100 - bounded)}`;
+}
+
+function productionFieldDirection(source, fieldSource) {
+  const possession = textValue(source.possession, fieldSource.possession, "home").toLowerCase();
+  const raw = possession === "visitor"
+    ? textValue(source.visitor_direction, fieldSource.visitor_direction, source.visitorDirection)
+    : textValue(source.home_direction, fieldSource.home_direction, source.homeDirection);
+  const normalized = raw.trim().toLowerCase();
+  if (["left", "west", "rtl", "right-to-left"].includes(normalized)) return "left";
+  if (["right", "east", "ltr", "left-to-right"].includes(normalized)) return "right";
+  return possession === "visitor" ? "left" : "right";
+}
+
+function productionFieldState(source, gameSource = {}, canonicalField = {}) {
+  const fieldSource = objectValue(canonicalField, source.field, source.field_state, gameSource.field);
+  const ballRaw = textValue(
+    fieldSource.ball_spot,
+    fieldSource.ballSpot,
+    source.ball_spot,
+    source.ball_on,
+    gameSource.ball_spot,
+    gameSource.ballSpot
+  );
+  const driveRaw = textValue(
+    fieldSource.drive_start,
+    fieldSource.driveStart,
+    source.drive_start,
+    source.drive_start_spot,
+    source.possession_start_spot,
+    gameSource.drive_start,
+    gameSource.driveStart
+  );
+  const direction = productionFieldDirection(source, fieldSource);
+  const ball = parseFieldSpot(ballRaw);
+  const drive = parseFieldSpot(driveRaw);
+  const downDistance = productionDownDistance(source);
+  const distance = Number(downDistance.distance);
+  const gainPct = ball && Number.isFinite(distance)
+    ? Math.max(0, Math.min(100, ball.pct + (direction === "left" ? -distance : distance)))
+    : null;
+
+  return {
+    ballSpot: ball?.raw || "",
+    ballPct: ball?.pct ?? 50,
+    driveStart: drive?.raw || "",
+    driveStartPct: drive?.pct ?? ball?.pct ?? 50,
+    firstDownSpot: gainPct === null ? "" : spotFromPercent(gainPct),
+    firstDownPct: gainPct ?? ball?.pct ?? 50,
+    direction,
+    possession: textValue(source.possession, fieldSource.possession, "home").toLowerCase(),
+    down: downDistance.down,
+    distance: downDistance.distance,
+    downDistance: downDistance.combined,
+    visible: source.ball_spot_visible !== false
+  };
+}
+
 const STADIUM_LED_GLYPHS = Object.freeze({
   " ":["00000","00000","00000","00000","00000","00000","00000"],
   "0":["01110","10001","10011","10101","11001","10001","01110"],
@@ -1146,6 +1246,39 @@ function applyFootballBoardOverrides(root, alias, runtime) {
     });
     root.querySelectorAll('[data-bind="game.downDistance"]').forEach(node => {
       node.textContent = downDistance.combined;
+    });
+    return;
+  }
+
+  if (alias === "collegiate_traditional") {
+    const field = productionFieldState(runtime, {}, runtime.canonical_field_state);
+    const fieldRoot = root.querySelector(".bl-college-field");
+    if (fieldRoot) {
+      fieldRoot.style.setProperty("--ball-x", `${field.ballPct}%`);
+      fieldRoot.style.setProperty("--drive-x", `${field.driveStartPct}%`);
+      fieldRoot.style.setProperty("--first-x", `${field.firstDownPct}%`);
+      fieldRoot.dataset.direction = field.direction;
+      fieldRoot.dataset.possession = field.possession;
+      fieldRoot.dataset.hasDriveStart = field.driveStart ? "true" : "false";
+      fieldRoot.dataset.fieldVisible = field.visible ? "true" : "false";
+    }
+    root.querySelectorAll('[data-bind="game.clock"]').forEach(node => {
+      node.textContent = clock;
+    });
+    root.querySelectorAll('[data-bind="game.period"]').forEach(node => {
+      node.textContent = period;
+    });
+    root.querySelectorAll('[data-bind="game.downDistance"]').forEach(node => {
+      node.textContent = field.downDistance;
+    });
+    root.querySelectorAll('[data-bind="game.ballSpot"]').forEach(node => {
+      node.textContent = field.visible ? (field.ballSpot || "-") : "-";
+    });
+    root.querySelectorAll('[data-bind="game.driveStart"]').forEach(node => {
+      node.textContent = field.driveStart || "-";
+    });
+    root.querySelectorAll('[data-bind="game.firstDownSpot"]').forEach(node => {
+      node.textContent = field.firstDownSpot || "-";
     });
   }
 }
@@ -2461,7 +2594,7 @@ async function renderSelected() {
     mergeManualMediaState(state, runtime);
     const playerMedia = await preparePlayerMedia(state, runtime);
     const activeVideoMode = polledVideoMode;
-    const packageId = selected.packageId;
+    const packageId = selected.packageId || alias;
     if (!packageId) throw new Error("Selected engine has no packageId.");
 
     clearNode(scoreTarget);

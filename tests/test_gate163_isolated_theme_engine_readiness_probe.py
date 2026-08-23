@@ -55,7 +55,7 @@ def test_gate163_r2_probe_is_read_only_and_isolated():
 
 def test_gate163_r2_probe_covers_approved_packages():
     js=read("static/csrn-production-theme-readiness-probe.js")
-    for package in ("friday_night_stadium","eight_bit_gameday","digital_neon","heritage_press"):
+    for package in ("friday_night_stadium","eight_bit_gameday","digital_neon","heritage_press","collegiate_traditional"):
         assert package in js
 
 

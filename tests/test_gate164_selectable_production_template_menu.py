@@ -22,6 +22,7 @@ def test_gate164_menu_contains_approved_choices_and_legacy():
         "eight_bit_gameday",
         "heritage_press",
         "digital_neon",
+        "collegiate_traditional",
     ):
         assert package_id in js
 
