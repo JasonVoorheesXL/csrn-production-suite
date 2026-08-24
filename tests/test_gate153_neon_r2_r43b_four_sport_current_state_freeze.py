@@ -3,7 +3,9 @@ import hashlib
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = {
-    'static/csrn-layout-lab.html': 'F6F1C74509E254659A95B009A195FB466BDD0EE1E1479149DD8B697D45E01BCD',
+    # Updated for the intentional Collegiate Tech videoMode dropdown addition
+    # (dev-tool only, no production rendering-engine change).
+    'static/csrn-layout-lab.html': '6873BC913B6F0B9B1B7BDE3517BE6024FF38ED321678D6BF9199B95A50B0CE07',
     'static/csrn-neon-baseball-r43-driver.css': 'C403FF7B1098D3F9CB31B05200DF20E8EFC17A0378DC6066AA17233B593FF5CE',
     'static/csrn-neon-baseball-r43-driver.js': 'CB3A14B86D543FF58E44C0B01A6701442A72000F4F261C53C8005BCAB66CB1F0',
     'static/csrn-neon-r2-engine.css': 'C9F1F9316EA1F16E86099F90DDD417075FF7111DA341867A8BFE2D7378EF043F',

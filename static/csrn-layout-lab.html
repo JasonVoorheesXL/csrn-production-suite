@@ -33,6 +33,12 @@ code{color:#ffe26d}
   <label>Package <select id="package"></select></label>
   <label>Sport <select id="sport"></select></label>
   <label>Scenario <select id="scenario"></select></label>
+  <label>Video Mode <select id="videoMode">
+    <option value="">default (clash/VS)</option>
+    <option value="player">player spotlight</option>
+    <option value="highlight">highlight video</option>
+    <option value="sponsor">sponsor spotlight</option>
+  </select></label>
   <label><input id="diagnostics" type="checkbox" checked> Diagnostics</label>
   <button id="rerender">Render</button>
   <button id="editMode">Edit Layout</button>
@@ -113,6 +119,7 @@ code{color:#ffe26d}
     const packageSelect=document.getElementById("package");
     const sportSelect=document.getElementById("sport");
     const scenarioSelect=document.getElementById("scenario");
+    const videoModeSelect=document.getElementById("videoMode");
     Object.values(engine.manifests).forEach(item=>{
       const approved=item.id===neonR2Engine.packageId?neonR2Engine.manifests[neonR2Engine.packageId]:item.id===heritageEngine.packageId?heritageEngine.manifests[heritageEngine.packageId]:item.id===pixelEngine.packageId?pixelEngine.manifests[pixelEngine.packageId]:item.id===stadiumEngine.packageId?stadiumEngine.manifests[stadiumEngine.packageId]:item;
       packageSelect.add(new Option(approved.name,approved.id));
@@ -293,7 +300,8 @@ code{color:#ffe26d}
         sportFixture(sportSelect.value),
         {
           diagnostics:document.getElementById("diagnostics").checked,
-          activeComponents:engine.scenarios[scenarioSelect.value]
+          activeComponents:engine.scenarios[scenarioSelect.value],
+          videoMode:videoModeSelect.value||undefined
         }
       );
       status.textContent=`READY | ${result.packageId} | ${result.sport} | ${result.components.length} COMPONENTS`;
@@ -374,7 +382,7 @@ code{color:#ffe26d}
     const baseRender=render;
     render=function(){
       const targetEngine=rendererFor(packageSelect.value);
-      const result=targetEngine.renderPackage(document.getElementById("layout"),packageSelect.value,sportSelect.value,stressState(),{diagnostics:document.getElementById("diagnostics").checked,activeComponents:engine.scenarios[scenarioSelect.value]});
+      const result=targetEngine.renderPackage(document.getElementById("layout"),packageSelect.value,sportSelect.value,stressState(),{diagnostics:document.getElementById("diagnostics").checked,activeComponents:engine.scenarios[scenarioSelect.value],videoMode:videoModeSelect.value||undefined});
       document.getElementById("layout").classList.toggle("composer-active",editing);applyDraft();wireComposer();
       status.textContent=`READY | ${result.packageId} | ${result.sport} | ${result.components.length} COMPONENTS`;
       marker.textContent="CSRN_LAYOUT_ENGINE_READY";document.body.dataset.layoutEngineReady="true";
@@ -415,6 +423,7 @@ code{color:#ffe26d}
       render();
     };
     scenarioSelect.onchange=render;
+    videoModeSelect.onchange=render;
     document.getElementById("diagnostics").onchange=render;
     document.getElementById("rerender").onclick=render;
     window.addEventListener("resize",scale);
