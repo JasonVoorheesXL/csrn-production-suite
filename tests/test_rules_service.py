@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-from contextlib import nullcontext
+import threading
 from typing import Any
 
 from rules_service import RulesService
@@ -111,7 +111,10 @@ def build_service(
         },
         resolve_player=resolve_player,
         show_player_graphic=show_player_graphic,
-        transaction_lock=nullcontext(),
+        # play() acquires/releases this directly (for lock-wait-time
+        # diagnostics) rather than only using it as a context manager, so it
+        # needs a real Lock -- nullcontext() has no .acquire()/.release().
+        transaction_lock=threading.Lock(),
         now=lambda: 1_700_000_000.125,
     )
     return service, current, saved, graphics, history_calls
