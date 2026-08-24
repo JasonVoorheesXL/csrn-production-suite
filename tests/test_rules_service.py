@@ -70,12 +70,21 @@ def build_service(
             ("visitor", "4"): "New Hope Returner",
             ("visitor", "55"): "New Hope Defender",
         }
+        headshots = {
+            ("home", "22"): "/roster-headshots/home__22-jordan-runner.jpg",
+        }
+        resolved = (team, text) in known
         return {
             "number": text,
             "name": known.get((team, text), ""),
-            "resolved": (team, text) in known,
+            "resolved": resolved,
             "roster_id": f"{team}-roster" if text else "",
             "player_id": f"{team}-{text}" if text else "",
+            "headshot": headshots.get((team, text), "") if resolved else "",
+            "position": "",
+            "grade": "",
+            "height": "",
+            "weight": "",
         }
 
     def show_player_graphic(
@@ -251,6 +260,48 @@ def test_run_touchdown_scores_and_triggers_player_graphic() -> None:
     assert result.data["play"]["label"] == "Touchdown Run"
     assert graphics[0]["player"]["number"] == "22"
     assert current["clock_running"] is False
+
+
+def test_run_touchdown_player_graphic_carries_roster_headshot() -> None:
+    # The player-spotlight card showed a broken/missing photo for players
+    # who DO have a headshot on file when the touchdown was recorded through
+    # the statistician's detailed play form. resolve_game_roster_player()
+    # found the real roster player internally but its return value never
+    # included headshot, and _show_touchdown_graphic() built a synthetic
+    # player dict that dropped it even when present.
+    service, current, _, graphics, _ = build_service()
+    result = service.play(
+        {
+            "team": "home",
+            "play_type": "run",
+            "start_spot": "RIGHT 10",
+            "end_spot": "RIGHT GOAL",
+            "player_number": "22",
+        }
+    )
+    assert result.ok
+    assert graphics[0]["player"]["headshot"] == "/roster-headshots/home__22-jordan-runner.jpg"
+    assert current["player_graphic"]["visible"] is True
+
+
+def test_punt_return_touchdown_player_graphic_carries_roster_headshot() -> None:
+    # The returner path already threaded a real roster_id/player_id through
+    # (unlike the run/pass path); confirms it also now carries the headshot.
+    service, current, _, graphics, _ = build_service()
+    result = service.play(
+        {
+            "team": "home",
+            "play_type": "punt",
+            "start_spot": "LEFT 20",
+            "landing_spot": "RIGHT 30",
+            "end_spot": "LEFT GOAL",
+            "kicker_number": "7",
+            "returner_number": "4",
+        }
+    )
+    assert result.ok
+    assert graphics[0]["player"]["number"] == "4"
+    assert graphics[0]["player"]["headshot"] == ""  # New Hope Returner has no headshot fixture -- must stay empty, not invent one
 
 
 def test_complete_pass_records_passer_and_receiver() -> None:

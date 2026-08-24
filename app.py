@@ -3001,7 +3001,18 @@ def resolve_game_roster_player(state: dict[str, Any], team: str, number: Any) ->
     if not player:
         return {"number": jersey, "name": "", "resolved": False}
     name = str(player.get("preferred_name") or f"{player.get('first_name','')} {player.get('last_name','')}".strip()).strip()
-    return {"number": jersey, "name": name, "resolved": True, "roster_id": str(roster.get("id", "")), "player_id": str(player.get("id", ""))}
+    return {
+        "number": jersey,
+        "name": name,
+        "resolved": True,
+        "roster_id": str(roster.get("id", "")),
+        "player_id": str(player.get("id", "")),
+        "headshot": str(player.get("headshot", "") or ""),
+        "position": str(player.get("position", "") or ""),
+        "grade": str(player.get("grade", "") or ""),
+        "height": str(player.get("height", "") or ""),
+        "weight": str(player.get("weight", "") or ""),
+    }
 
 STATISTICS_SERVICE: StatisticsService | None = None
 

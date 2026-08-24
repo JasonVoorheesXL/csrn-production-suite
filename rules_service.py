@@ -588,22 +588,19 @@ class RulesService:
                     state[f"{team}_score"] = int(state.get(f"{team}_score", 0)) + 6
                     CanonicalStateFoundation.enter_pending_try(state, team)
                     self._stop_clock(state)
-                    td_number = (
-                        numbers["receiver"]
+                    td_role = (
+                        "receiver"
                         if kind == "pass" and outcome == "complete"
-                        else numbers["player"]
+                        else "player"
                     )
-                    td_name = (
-                        names["receiver"]
-                        if kind == "pass" and outcome == "complete"
-                        else names["player"]
-                    )
+                    td_number = numbers[td_role]
+                    td_name = names[td_role]
                     self._show_touchdown_graphic(
                         state,
                         team=team,
                         number=td_number,
                         name=td_name,
-                        player_ref={},
+                        player_ref=refs[td_role],
                         position="",
                         detail=(
                             f"{yards}-yard touchdown "
@@ -926,7 +923,11 @@ class RulesService:
             "preferred_name": name,
             "first_name": name,
             "last_name": "",
-            "position": position,
+            "position": position or str(player_ref.get("position", "") or ""),
+            "headshot": str(player_ref.get("headshot", "") or ""),
+            "grade": str(player_ref.get("grade", "") or ""),
+            "height": str(player_ref.get("height", "") or ""),
+            "weight": str(player_ref.get("weight", "") or ""),
         }
         self._show_player_graphic(
             state,
