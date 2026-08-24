@@ -1671,6 +1671,25 @@
   }
 
 
+  function fitCollegiatePlayerName(root) {
+    const node = root.querySelector(".bl-college-player .bl-college-video-copy strong");
+    if (!node) return;
+    node.style.fontSize = "";
+    const available = node.clientWidth;
+    if (!available) return;
+    let size = parseFloat(getComputedStyle(node).fontSize) || 51;
+    // Never shrink below the pre-1.5x size (34px) -- the point of the fit
+    // pass is to keep long names on one line without cutting them off,
+    // not to undo the size increase for everyone else.
+    let guard = 0;
+    while (node.scrollWidth > available + 1 && size > 34 && guard < 40) {
+      size -= 1;
+      node.style.fontSize = `${size}px`;
+      guard += 1;
+    }
+    node.dataset.fitFontSize = String(size);
+  }
+
   function fitNeonTeamNames(root) {
     for (const node of root.querySelectorAll(".bl-neon-team-name")) {
       node.style.fontSize = "";
@@ -1723,6 +1742,9 @@
 
     if (manifest.componentRendererFamily === "neon") {
       fitNeonTeamNames(root);
+    }
+    if (manifest.componentRendererFamily === "collegiate") {
+      fitCollegiatePlayerName(root);
     }
     root.dataset.ready = "true";
     if (manifest.componentRendererFamily === "press") {

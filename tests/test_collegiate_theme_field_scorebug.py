@@ -82,6 +82,28 @@ def test_collegiate_video_board_supports_player_highlight_and_sponsor_modes():
     assert "sponsorName: textValue(graphic.sponsor_name" in runtime
     assert "sponsorLogo: textValue(graphic.sponsor_logo" in runtime
 
+
+def test_collegiate_player_spotlight_is_sized_up_and_never_truncates():
+    js = read("static/csrn-broadcast-layout-engine.js")
+    css = read("static/csrn-broadcast-layout-engine.css")
+
+    # 1.5x sizing pass, scoped to the player card specifically (.bl-college-player)
+    # so it doesn't also inflate the highlight/sponsor cards that share the same
+    # base .bl-college-video-copy/.bl-college-player-portrait classes.
+    assert ".bl-college-player .bl-college-player-portrait{width:177px;height:177px}" in css
+    assert ".bl-college-player .bl-college-player-portrait b{font-size:48px}" in css
+    assert ".bl-college-player .bl-college-video-copy small{font-size:24px}" in css
+    assert ".bl-college-player .bl-college-video-copy strong{font-size:51px}" in css
+    assert ".bl-college-player .bl-college-video-copy span{font-size:27px}" in css
+
+    # A long real name at 51px can exceed the card width -- auto-fit shrinks it
+    # (never below the pre-1.5x 34px) instead of letting the ellipsis cut it off,
+    # the same pattern fitNeonTeamNames() already uses elsewhere in this file.
+    assert "function fitCollegiatePlayerName(root)" in js
+    assert 'if (manifest.componentRendererFamily === "collegiate") {\n      fitCollegiatePlayerName(root);' in js
+    assert "size > 34 && guard < 40" in js
+    assert ".bl-college-video-copy strong{min-width:0" in css
+
     assert "bl-college-video-replacement" in css
     assert "bl-college-player-portrait" in css
     assert "bl-college-sponsor-lockup" in css

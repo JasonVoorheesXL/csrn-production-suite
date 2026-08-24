@@ -118,11 +118,16 @@
 .bl-college-video-replacement{position:relative;z-index:3;grid-column:1/-1;grid-row:1;align-self:stretch;display:flex;align-items:center;justify-content:center;gap:22px;margin:14px;padding:18px 26px;border:1px solid var(--glass-line);border-radius:10px;background:linear-gradient(150deg,rgba(10,24,39,.72),rgba(2,8,16,.9) 55%,rgba(12,28,42,.7));box-shadow:0 18px 38px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 0 1px rgba(255,255,255,.06);backdrop-filter:blur(10px) saturate(1.1);color:#f8fbff;text-align:left;overflow:hidden}
 .bl-college-video-copy{display:grid;gap:4px;min-width:0}
 .bl-college-video-copy small{font-size:16px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#9fd0ff}
-.bl-college-video-copy strong{font-size:34px;line-height:1.05;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bl-college-video-copy strong{min-width:0;font-size:34px;line-height:1.05;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bl-college-video-copy span{font-size:18px;font-weight:700;color:#d7e6f8}
 .bl-college-player-portrait{flex:0 0 auto;display:grid;place-items:center;width:118px;height:118px;border-radius:50%;border:1px solid rgba(255,255,255,.42);background:rgba(4,12,20,.58);box-shadow:0 0 22px rgba(180,220,255,.22),inset 0 1px 0 rgba(255,255,255,.26);overflow:hidden}
 .bl-college-player-portrait img{width:100%;height:100%;object-fit:cover}
 .bl-college-player-portrait b{font-size:32px;font-weight:950}
+.bl-college-player .bl-college-player-portrait{width:177px;height:177px}
+.bl-college-player .bl-college-player-portrait b{font-size:48px}
+.bl-college-player .bl-college-video-copy small{font-size:24px}
+.bl-college-player .bl-college-video-copy strong{font-size:51px}
+.bl-college-player .bl-college-video-copy span{font-size:27px}
 .bl-college-sponsor-lockup{display:flex;align-items:center;gap:10px;margin-top:8px;padding-top:8px;border-top:1px solid var(--glass-line)}
 .bl-college-sponsor-lockup img{width:34px;height:34px;object-fit:contain;border-radius:4px;background:rgba(255,255,255,.9)}
 .bl-college-sponsor-lockup span{display:grid;gap:1px;font-size:13px}
