@@ -43,7 +43,7 @@ def event_service(state):
     def ap(_roster,pid): return ({"id":_roster or "r"},copy.deepcopy(by_id.get(pid))) if pid in by_id else (None,None)
     svc=EventService(
         load_state=load,save_state=save,public_state=lambda s:copy.deepcopy(dict(s)),push_history=hist,
-        update_linked_status=lambda *a,**k:None,automation_player=ap,manual_player=lambda m,t:m,
+        update_linked_status=lambda *a,**k:None,automation_player=ap,manual_player=lambda m,t,*a:m,
         player_display=lambda p:str((p or {}).get("preferred_name") or (p or {}).get("name") or ""),
         show_player_graphic=lambda *a,**k:None,apply_penalty=lambda *a,**k:{},
         spot_to_coord=RulesService.spot_to_coord,team_direction=RulesService.team_direction,

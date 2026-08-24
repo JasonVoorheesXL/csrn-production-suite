@@ -2903,13 +2903,35 @@ def event_position(player, defensive=False):
     return GraphicsService.event_position(player, defensive=defensive)
 
 
-def manual_automation_player(data, team_name):
+def _roster_player_by_school_and_number(school_id: str, number: str):
+    """Best-effort lookup used to backfill a manually-entered player (typed
+    number, no roster_id/player_id) with their real roster headshot -- the
+    same kind of number-match already used for stat-rail headshot decoration
+    in routes/live_game_routes.py, applied here for the player-spotlight path.
+    """
+    school_id = str(school_id or "").strip()
+    number = str(number or "").strip()
+    if not school_id or not number:
+        return None
+    candidates = [
+        player
+        for roster in load_rosters()
+        if str(roster.get("school_id", "") or "") == school_id
+        for player in roster.get("players", [])
+        if isinstance(player, dict)
+        and str(player.get("number", "") or "").strip() == number
+        and str(player.get("status", "active") or "active").strip().casefold() != "inactive"
+    ]
+    return candidates[0] if candidates else None
+
+
+def manual_automation_player(data, team_name, school_id=""):
     if not isinstance(data, dict) or not str(data.get("number", "")).strip():
         return None
     number = str(data.get("number", "")).strip()
     name = str(data.get("name", "")).strip() or f"{team_name} {number}"
     parts = name.split(" ", 1)
-    return {
+    result = {
         "id": "",
         "number": number,
         "preferred_name": name,
@@ -2923,6 +2945,13 @@ def manual_automation_player(data, team_name):
         "headshot": "",
         "manual": True,
     }
+    roster_match = _roster_player_by_school_and_number(school_id, number)
+    if roster_match:
+        result["headshot"] = str(roster_match.get("headshot", "") or "")
+        for key in ("grade", "height", "weight"):
+            if not result[key]:
+                result[key] = str(roster_match.get(key, "") or "")
+    return result
 
 def show_automation_player_graphic(
     state,

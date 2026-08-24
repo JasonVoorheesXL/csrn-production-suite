@@ -464,6 +464,10 @@ class EventService:
                 if team == "home"
                 else state.get("visitor_team")
             )
+            team_school_id = str(
+                (state.get("home_school_id") if team == "home" else state.get("visitor_school_id"))
+                or ""
+            )
             roster, player = self._automation_player(
                 str(incoming.get("roster_id", "")),
                 str(incoming.get("player_id", "")),
@@ -487,10 +491,12 @@ class EventService:
             player = player or self._manual_player(
                 incoming.get("manual_player"),
                 team_name,
+                team_school_id,
             )
             passer = passer or self._manual_player(
                 incoming.get("manual_passer"),
                 team_name,
+                team_school_id,
             )
             if player and not roster:
                 roster = {

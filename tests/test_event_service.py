@@ -83,7 +83,7 @@ def build_service(state: dict[str, Any] | None = None):
     def automation_player(roster_id: str, player_id: str):
         return ({"id": roster_id, "school_id": "H", "sport": "Football"}, players.get(player_id))
 
-    def manual_player(data, team_name):
+    def manual_player(data, team_name, school_id=""):
         if not isinstance(data, dict) or not data.get("number"):
             return None
         return {
