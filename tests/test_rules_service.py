@@ -304,6 +304,47 @@ def test_punt_return_touchdown_player_graphic_carries_roster_headshot() -> None:
     assert graphics[0]["player"]["headshot"] == ""  # New Hope Returner has no headshot fixture -- must stay empty, not invent one
 
 
+def test_pass_reception_touchdown_credits_passer_alongside_receiver() -> None:
+    # The receiver stays the spotlight card's main photo/headline (he's the
+    # one who scored); the QB gets a text-only credit via passer_name, not
+    # his own card.
+    service, current, _, graphics, _ = build_service()
+    result = service.play(
+        {
+            "team": "home",
+            "play_type": "pass",
+            "pass_outcome": "complete",
+            "start_spot": "LEFT 20",
+            "end_spot": "RIGHT GOAL",
+            "passer_number": "12",
+            "receiver_number": "22",
+        }
+    )
+    assert result.ok
+    assert result.data["play"]["touchdown"] is True
+    assert graphics[0]["player"]["number"] == "22"  # receiver, not the passer
+    assert graphics[0]["player"]["preferred_name"] == "Jordan Runner"
+    assert graphics[0]["passer_name"] == "Jason Quarterback"
+    assert current["player_graphic"]["visible"] is True
+
+
+def test_run_touchdown_graphic_has_no_passer_credit() -> None:
+    # A run touchdown has no separate QB role at all -- passer_name must
+    # stay empty rather than carrying over stale data.
+    service, _, _, graphics, _ = build_service()
+    result = service.play(
+        {
+            "team": "home",
+            "play_type": "run",
+            "start_spot": "RIGHT 10",
+            "end_spot": "RIGHT GOAL",
+            "player_number": "22",
+        }
+    )
+    assert result.ok
+    assert graphics[0]["passer_name"] == ""
+
+
 def test_interception_return_touchdown_shows_defensive_player_graphic() -> None:
     # A pick-six scored correctly (points, pending-try) but never showed the
     # player-spotlight graphic: the only two _show_touchdown_graphic() call

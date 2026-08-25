@@ -91,8 +91,8 @@ const PACKAGE_ALIASES = Object.freeze({
     playerSupported: false,
     tickerSelector: ".bl-college-ticker-copy",
     tickerKind: "inside",
-    css: ["/static/csrn-broadcast-layout-engine.css?v=17.0-collegiate-field"],
-    js:  ["/static/csrn-broadcast-layout-engine.js?v=17.0-collegiate-field"]
+    css: ["/static/csrn-broadcast-layout-engine.css?v=17.1-passer-credit"],
+    js:  ["/static/csrn-broadcast-layout-engine.js?v=17.1-passer-credit"]
   })
 });
 
@@ -547,6 +547,10 @@ function mergePlayerState(base, runtime) {
     teamColor: textValue(graphic.team_color, player.teamColor),
     team_color: textValue(graphic.team_color, player.team_color),
     eyebrow: textValue(graphic.eyebrow, player.eyebrow, "PLAYER SPOTLIGHT"),
+    // Pass-reception touchdowns only -- text credit alongside the
+    // receiver's card, never the passer's own photo/card.
+    passerName: textValue(graphic.passer_name, player.passerName),
+    passer_name: textValue(graphic.passer_name, player.passer_name),
     sponsorId: textValue(graphic.sponsor_id, player.sponsorId),
     sponsor_id: textValue(graphic.sponsor_id, player.sponsor_id),
     sponsorName: textValue(graphic.sponsor_name, player.sponsorName),

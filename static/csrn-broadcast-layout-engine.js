@@ -700,6 +700,15 @@
       .join(" · ");
   }
 
+  function collegiatePasserCredit(player) {
+    // Pass-reception touchdowns only -- a text credit for the QB
+    // alongside the receiver's card, never his own photo/card. The
+    // backend only populates passer_name for that case (rules_service.py),
+    // so an empty value here already means "not applicable."
+    const passer = String(player.passer_name || player.passerName || "").trim();
+    return passer ? `<em>pass from ${esc(passer)}</em>` : "";
+  }
+
   function collegiateVideoBoardContent(state, mode) {
     if (mode === "highlight") {
       const highlight = state.highlight || {};
@@ -731,6 +740,7 @@
           <small>${esc(player.eyebrow || "PLAYER SPOTLIGHT")}</small>
           <strong>${esc(player.name)}</strong>
           <span>${esc(collegiateSpotlightDetail(player))}</span>
+          ${collegiatePasserCredit(player)}
           ${collegiateSponsorLockup(player)}
         </div>
       </div>`;

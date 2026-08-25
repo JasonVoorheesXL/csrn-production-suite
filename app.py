@@ -391,6 +391,7 @@ DEFAULT_STATE: dict[str, Any] = {
         "team_name": "",
         "team_color": "#C9203B",
         "play_detail": "",
+        "passer_name": "",
         "eyebrow": "PLAYER PROFILE",
         "sponsor_id": "",
         "sponsor_lead_in": "",
@@ -2963,6 +2964,7 @@ def show_automation_player_graphic(
     eyebrow="",
     play_detail="",
     sponsor_id="",
+    passer_name="",
 ):
     result = get_graphics_service().show_automation_player(
         state,
@@ -2974,6 +2976,7 @@ def show_automation_player_graphic(
         eyebrow=eyebrow,
         play_detail=play_detail,
         sponsor_id=sponsor_id,
+        passer_name=passer_name,
     )
     state.clear()
     state.update(result.data["state"])

@@ -745,6 +745,7 @@ class GraphicsService:
         eyebrow: str = "",
         play_detail: str = "",
         sponsor_id: str = "",
+        passer_name: str = "",
     ) -> GraphicsResult:
         updated = copy.deepcopy(state)
         normalized_duration = self._duration(duration)
@@ -804,6 +805,9 @@ class GraphicsService:
                     or "#C9203B"
                 ),
                 "play_detail": str(play_detail or ""),
+                # Pass-reception touchdowns only -- the QB gets a text
+                # credit alongside the receiver's card, not his own photo.
+                "passer_name": str(passer_name or "").strip(),
                 "duration": normalized_duration,
                 "expires_at": now + normalized_duration,
                 "updated_at": now,

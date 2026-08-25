@@ -605,11 +605,8 @@ class RulesService:
                     state[f"{team}_score"] = int(state.get(f"{team}_score", 0)) + 6
                     CanonicalStateFoundation.enter_pending_try(state, team)
                     self._stop_clock(state)
-                    td_role = (
-                        "receiver"
-                        if kind == "pass" and outcome == "complete"
-                        else "player"
-                    )
+                    is_pass_reception = kind == "pass" and outcome == "complete"
+                    td_role = "receiver" if is_pass_reception else "player"
                     td_number = numbers[td_role]
                     td_name = names[td_role]
                     self._show_touchdown_graphic(
@@ -623,6 +620,12 @@ class RulesService:
                             f"{yards}-yard touchdown "
                             + ("reception" if kind == "pass" else "run")
                         ),
+                        # Only a pass-reception touchdown has a separate QB to
+                        # credit -- run TDs and the punt/kickoff-return and
+                        # turnover-return branches (their own
+                        # _show_touchdown_graphic() calls above) have no
+                        # passer role at all.
+                        passer_name=names["passer"] if is_pass_reception else "",
                     )
                 elif safety:
                     other = self.opposite(team)
@@ -934,6 +937,7 @@ class RulesService:
         player_ref: Mapping[str, Any],
         position: str,
         detail: str,
+        passer_name: str = "",
     ) -> None:
         if not number and not name:
             return
@@ -963,6 +967,7 @@ class RulesService:
             8,
             eyebrow="TOUCHDOWN",
             play_detail=detail,
+            passer_name=passer_name,
         )
 
 

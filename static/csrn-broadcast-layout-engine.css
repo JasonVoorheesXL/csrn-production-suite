@@ -120,6 +120,7 @@
 .bl-college-video-copy small{font-size:16px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#9fd0ff}
 .bl-college-video-copy strong{min-width:0;font-size:34px;line-height:1.05;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bl-college-video-copy span{font-size:18px;font-weight:700;color:#d7e6f8}
+.bl-college-video-copy em{font-style:normal;font-size:15px;font-weight:700;color:#9fb3ca}
 .bl-college-player-portrait{flex:0 0 auto;display:grid;place-items:center;width:118px;height:118px;border-radius:50%;border:1px solid rgba(255,255,255,.42);background:rgba(4,12,20,.58);box-shadow:0 0 22px rgba(180,220,255,.22),inset 0 1px 0 rgba(255,255,255,.26);overflow:hidden}
 .bl-college-player-portrait img{width:100%;height:100%;object-fit:cover}
 .bl-college-player-portrait b{font-size:32px;font-weight:950}
@@ -128,6 +129,7 @@
 .bl-college-player .bl-college-video-copy small{font-size:24px}
 .bl-college-player .bl-college-video-copy strong{font-size:51px}
 .bl-college-player .bl-college-video-copy span{font-size:27px}
+.bl-college-player .bl-college-video-copy em{font-size:20px}
 .bl-college-sponsor-lockup{display:flex;align-items:center;gap:10px;margin-top:8px;padding-top:8px;border-top:1px solid var(--glass-line)}
 .bl-college-sponsor-lockup img{width:34px;height:34px;object-fit:contain;border-radius:4px;background:rgba(255,255,255,.9)}
 .bl-college-sponsor-lockup span{display:grid;gap:1px;font-size:13px}
