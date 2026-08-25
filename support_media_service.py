@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 import qrcode
 import qrcode.image.svg
-from PIL import Image
+from PIL import Image, ImageOps
 
 
 @dataclass(frozen=True)
@@ -27,6 +27,16 @@ class SupportMediaService:
 
     SUPPORTED_HEADSHOT_TYPES = {".png", ".jpg", ".jpeg", ".webp"}
     MIN_HEADSHOT_DIMENSION = 64
+    # Broadcast graphics only ever display a headshot at ~177px (the
+    # collegiate player-spotlight card's portrait, the largest use).
+    # 1000px leaves generous headroom for high-DPI capture while keeping an
+    # unprocessed camera original (multi-thousand-pixel, multi-MB) from ever
+    # reaching disk -- an oversized file can blow past the frontend's
+    # image-load timeout during a live broadcast (imageLoads() in
+    # csrn-production-theme-runtime.js) and silently fall back to the team
+    # crest instead of erroring visibly.
+    MAX_HEADSHOT_DIMENSION = 1000
+    HEADSHOT_JPEG_QUALITY = 85
     DEFAULT_PORT = 5050
     CONNECTION_GUIDANCE = (
         "For USB tethering, connect the phone by USB, enable USB tethering, "
@@ -135,6 +145,43 @@ class SupportMediaService:
             },
         )
 
+    def _downscale_for_storage(
+        self, image: Image.Image, extension: str, original_payload: bytes
+    ) -> bytes:
+        """Re-encode an oversized upload at MAX_HEADSHOT_DIMENSION; pass
+        through untouched (byte-for-byte) when it's already within bounds."""
+        if (
+            image.width <= self.MAX_HEADSHOT_DIMENSION
+            and image.height <= self.MAX_HEADSHOT_DIMENSION
+        ):
+            return original_payload
+
+        # Camera originals commonly carry an EXIF orientation tag rather than
+        # storing pixels upright; apply it before resizing so a resized photo
+        # doesn't end up sideways.
+        oriented = ImageOps.exif_transpose(image) or image
+        resized = oriented.copy()
+        resized.thumbnail(
+            (self.MAX_HEADSHOT_DIMENSION, self.MAX_HEADSHOT_DIMENSION),
+            Image.Resampling.LANCZOS,
+        )
+
+        save_format = {
+            "jpg": "JPEG",
+            "jpeg": "JPEG",
+            "png": "PNG",
+            "webp": "WEBP",
+        }.get(extension.lstrip(".").lower(), "JPEG")
+        save_kwargs: dict[str, Any] = {}
+        if save_format == "JPEG":
+            if resized.mode not in ("RGB", "L"):
+                resized = resized.convert("RGB")
+            save_kwargs = {"quality": self.HEADSHOT_JPEG_QUALITY, "optimize": True}
+
+        buffer = io.BytesIO()
+        resized.save(buffer, format=save_format, **save_kwargs)
+        return buffer.getvalue()
+
     def upload_headshot(
         self,
         roster_id: Any,
@@ -162,6 +209,8 @@ class SupportMediaService:
             or image.height < self.MIN_HEADSHOT_DIMENSION
         ):
             return SupportMediaResult("IMAGE_TOO_SMALL", {})
+
+        payload = self._downscale_for_storage(image, extension, payload)
 
         roster_key = str(roster_id or "")
         player_key = str(player_id or "")

@@ -205,6 +205,46 @@ def test_upload_headshot_saves_file_and_player_metadata(tmp_path: Path) -> None:
     assert len(saves) == 1
 
 
+def test_upload_headshot_downscales_oversized_image(tmp_path: Path) -> None:
+    # Reproduces the Ja'kylen Sherrod case: an unprocessed camera original
+    # (here 2400x3000, standing in for the real 7000x8400) must not reach
+    # disk untouched -- it has to be brought within MAX_HEADSHOT_DIMENSION
+    # so it can't blow the frontend's image-load timeout during a live
+    # broadcast and silently fall back to the team crest.
+    service, current, _ = build_service(tmp_path)
+    result = service.upload_headshot(
+        "roster-1",
+        "player-1",
+        original_filename="camera-original.jpg",
+        raw=image_bytes(2400, 3000, fmt="JPEG"),
+    )
+    assert result.ok
+    path = tmp_path / "headshots" / result.data["filename"]
+    with Image.open(path) as saved:
+        assert saved.width <= SupportMediaService.MAX_HEADSHOT_DIMENSION
+        assert saved.height <= SupportMediaService.MAX_HEADSHOT_DIMENSION
+        # Aspect ratio preserved (2400:3000 == 4:5).
+        assert abs((saved.width / saved.height) - (2400 / 3000)) < 0.01
+    assert path.stat().st_size < len(image_bytes(2400, 3000, fmt="JPEG"))
+    player = current[0]["players"][0]
+    assert player["headshot"] == "/roster-headshots/roster-1__player-1.jpg"
+
+
+def test_upload_headshot_leaves_normal_sized_image_byte_identical(tmp_path: Path) -> None:
+    # No re-encoding pass for uploads already within bounds -- avoids
+    # needless quality loss on the common case.
+    service, _, _ = build_service(tmp_path)
+    result = service.upload_headshot(
+        "roster-1",
+        "player-1",
+        original_filename="portrait.jpg",
+        raw=image_bytes(400, 400, fmt="JPEG"),
+    )
+    assert result.ok
+    path = tmp_path / "headshots" / result.data["filename"]
+    assert path.read_bytes() == image_bytes(400, 400, fmt="JPEG")
+
+
 def test_upload_headshot_removes_file_when_roster_save_fails(tmp_path: Path) -> None:
     service, _, _ = build_service(tmp_path, save_failure=True)
     result = service.upload_headshot(
