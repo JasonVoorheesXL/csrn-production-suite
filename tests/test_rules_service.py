@@ -304,6 +304,73 @@ def test_punt_return_touchdown_player_graphic_carries_roster_headshot() -> None:
     assert graphics[0]["player"]["headshot"] == ""  # New Hope Returner has no headshot fixture -- must stay empty, not invent one
 
 
+def test_interception_return_touchdown_shows_defensive_player_graphic() -> None:
+    # A pick-six scored correctly (points, pending-try) but never showed the
+    # player-spotlight graphic: the only two _show_touchdown_graphic() call
+    # sites were kickoff/punt-return-TD and the offensive `elif touchdown:`
+    # branch, which is unreachable once `if turnover:` has already matched.
+    service, current, _, graphics, _ = build_service()
+    result = service.play(
+        {
+            "team": "home",
+            "play_type": "pass",
+            "pass_outcome": "interception",
+            "start_spot": "LEFT 20",
+            "turnover_spot": "LEFT 30",
+            "return_end_spot": "LEFT GOAL",
+            "passer_number": "12",
+            "returner_number": "4",
+        }
+    )
+    assert result.ok
+    play = result.data["play"]
+    assert play["turnover"] is True
+    assert play["touchdown"] is True
+    assert current["visitor_score"] == 6
+    assert current["home_score"] == 0
+    # The defense scored -- the graphic, label, and play-log attribution
+    # must all credit the returner, not the passer who threw the pick.
+    assert len(graphics) == 1
+    assert graphics[0]["player"]["number"] == "4"
+    assert graphics[0]["eyebrow"] == "TOUCHDOWN"
+    assert play["label"] == "Interception Return Touchdown"
+    assert play["player_number"] == "4"
+    assert play["player_name"] == "New Hope Returner"
+    assert "defensive touchdown" in play["result"]
+    # Must not double up ", defensive touchdown, touchdown".
+    assert play["result"].count("touchdown") == 1
+
+
+def test_fumble_return_touchdown_shows_defensive_player_graphic() -> None:
+    service, current, _, graphics, _ = build_service()
+    result = service.play(
+        {
+            "team": "home",
+            "play_type": "run",
+            "start_spot": "LEFT 20",
+            "end_spot": "LEFT 25",
+            "player_number": "22",
+            "fumble": True,
+            "fumble_lost": True,
+            "turnover_spot": "LEFT 25",
+            "return_end_spot": "LEFT GOAL",
+            "returner_number": "55",
+        }
+    )
+    assert result.ok
+    play = result.data["play"]
+    assert play["turnover"] is True
+    assert play["touchdown"] is True
+    assert current["visitor_score"] == 6
+    assert current["home_score"] == 0
+    assert len(graphics) == 1
+    assert graphics[0]["player"]["number"] == "55"
+    assert play["label"] == "Fumble Return Touchdown"
+    assert play["player_number"] == "55"
+    assert play["player_name"] == "New Hope Defender"
+    assert play["result"].count("touchdown") == 1
+
+
 def test_complete_pass_records_passer_and_receiver() -> None:
     service, _, _, _, _ = build_service()
     result = service.play(

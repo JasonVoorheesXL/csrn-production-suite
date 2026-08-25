@@ -583,6 +583,23 @@ class RulesService:
                         state[f"{turnover_team}_score"] = int(state.get(f"{turnover_team}_score", 0)) + 6
                         CanonicalStateFoundation.enter_pending_try(state, turnover_team)
                         touchdown = True
+                        self._show_touchdown_graphic(
+                            state,
+                            team=turnover_team,
+                            number=numbers["returner"],
+                            name=names["returner"],
+                            player_ref=refs["returner"],
+                            position="",
+                            detail=(
+                                f"{turnover_return_yards}-yard "
+                                + (
+                                    "interception"
+                                    if turnover_type == "interception"
+                                    else "fumble"
+                                )
+                                + " return"
+                            ),
+                        )
                     self._stop_clock(state)
                 elif touchdown:
                     state[f"{team}_score"] = int(state.get(f"{team}_score", 0)) + 6
@@ -671,7 +688,12 @@ class RulesService:
                 description += ", turnover on downs"
             if turnover_touchdown:
                 description += ", defensive touchdown"
-            if touchdown and kind in {"run", "pass"}:
+                label = (
+                    "Interception Return Touchdown"
+                    if turnover_type == "interception"
+                    else "Fumble Return Touchdown"
+                )
+            elif touchdown and kind in {"run", "pass"}:
                 description += ", touchdown"
                 label = "Touchdown Pass" if kind == "pass" else "Touchdown Run"
             elif first_down:
@@ -810,11 +832,15 @@ class RulesService:
                 "player_number": (
                     numbers["returner"]
                     if kind in {"kickoff", "punt"}
+                    else numbers["returner"]
+                    if turnover_touchdown
                     else numbers["player"] or numbers["receiver"]
                 ),
                 "player_name": (
                     names["returner"]
                     if kind in {"kickoff", "punt"}
+                    else names["returner"]
+                    if turnover_touchdown
                     else names["player"] or names["receiver"]
                 ),
                 "passer_number": numbers["passer"],
