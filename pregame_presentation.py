@@ -20,6 +20,19 @@ _LOCK = threading.RLock()
 _INSTALLED = False
 _NWS_CACHE: dict[str, Any] = {"key": "", "at": 0, "periods": []}
 
+# Eyebrows the automatic/statistician spotlight paths actually use
+# (rules_service.py's _show_player_spotlight() and event_service.py's
+# automatic branch). "PLAYER PROFILE" is the graphic's idle/manual default,
+# not a real in-game moment, so it's deliberately excluded.
+_SPOTLIGHT_EYEBROWS = {
+    "TOUCHDOWN",
+    "SACK",
+    "TURNOVER",
+    "FIRST DOWN",
+    "TWO-POINT CONVERSION",
+    "DEFENSIVE TOUCHDOWN",
+}
+
 
 def _csrn_app() -> Any:
     for name in ("__main__", "app"):
@@ -383,6 +396,53 @@ def _weather(active: dict[str, Any], state: dict[str, Any], game: dict[str, Any]
     return weather
 
 
+def _first_half_spotlights(state: dict[str, Any]) -> list[dict[str, Any]]:
+    """Real spotlight moments from the first half, for the halftime rotation.
+
+    Sourced directly from state["events"] -- every event that already fired
+    a player-spotlight graphic (rules_service.py's _show_player_spotlight(),
+    or event_service.py's automatic branch) carries the fully-resolved
+    graphic snapshot at event["after"]["player_graphic"] (headshot, team
+    logo/color, eyebrow, play detail -- everything needed to render a card).
+    Nothing here re-resolves a roster lookup; it only reads what was already
+    captured at the moment the graphic actually showed.
+    """
+    events = state.get("events")
+    if not isinstance(events, list):
+        return []
+    spotlights: list[dict[str, Any]] = []
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        if str(event.get("quarter", "")).strip() not in {"1", "2"}:
+            continue
+        after = event.get("after")
+        graphic = after.get("player_graphic") if isinstance(after, dict) else None
+        if not isinstance(graphic, dict) or not graphic.get("visible"):
+            continue
+        eyebrow = str(graphic.get("eyebrow", "")).strip().upper()
+        if eyebrow not in _SPOTLIGHT_EYEBROWS:
+            continue
+        spotlights.append({
+            "event_id": str(event.get("id", "")),
+            "quarter": str(event.get("quarter", "")),
+            "eyebrow": eyebrow,
+            "graphic_type": str(graphic.get("graphic_type", "")),
+            "full_name": str(graphic.get("full_name") or graphic.get("display_name") or ""),
+            "display_name": str(graphic.get("display_name") or graphic.get("full_name") or ""),
+            "number": str(graphic.get("number", "")),
+            "position": str(graphic.get("position", "")),
+            "headshot": str(graphic.get("headshot", "")),
+            "team_logo": str(graphic.get("team_logo", "")),
+            "team_name": str(graphic.get("team_name", "")),
+            "team_color": str(graphic.get("team_color", "") or "#C9203B"),
+            "play_detail": str(graphic.get("play_detail", "")),
+            "passer_name": str(graphic.get("passer_name", "")),
+            "created_at": int(event.get("created_at", 0) or 0),
+        })
+    return spotlights
+
+
 def _config() -> dict[str, Any]:
     csrn_app = _csrn_app()
     try:
@@ -721,6 +781,7 @@ def _payload() -> dict[str, Any]:
         "home_identity": home,
         "visitor_identity": visitor,
         "weather": weather,
+        "first_half_spotlights": _first_half_spotlights(state),
         "next_matchup": next_matchup,
         "automatic_storylines": automatic_storylines,
         "organization": _organization_branding(),

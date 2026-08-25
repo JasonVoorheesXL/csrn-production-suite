@@ -14,6 +14,7 @@
 .brand{display:flex;align-items:center;gap:24px;min-width:0}.brand img{width:132px;height:132px;object-fit:cover;border-radius:50%;clip-path:circle(50% at 50% 50%);background:transparent;filter:drop-shadow(0 4px 9px rgba(0,0,0,.45))}.brand-copy{min-width:0}.brand-line{display:flex;align-items:flex-end;gap:30px;white-space:nowrap;min-height:112px}.brand-short{position:relative;display:inline-block;font-family:"CSRN Karantina","Arial Black",sans-serif;font-size:144px;font-weight:700;letter-spacing:.005em;line-height:.69;text-transform:uppercase;color:var(--brand-primary);-webkit-text-stroke:1.8px #f7f7f7;paint-order:stroke fill;text-shadow:none;transform:skewX(-6deg);transform-origin:left center}.brand-short::after{content:attr(data-text);position:absolute;inset:0;color:transparent;-webkit-text-stroke:.45px rgba(255,255,255,.28);transform:translate(-1px,-1px);pointer-events:none}.brand-pregame{font-family:"CSRN Michroma","Arial Black",sans-serif;font-size:50px;font-weight:400;letter-spacing:.025em;line-height:.92;background:linear-gradient(180deg,#ffffff 0%,#d4d7dc 55%,#90959e 100%);-webkit-background-clip:text;background-clip:text;color:transparent;text-transform:uppercase;text-shadow:3px 4px 0 rgba(0,0,0,.82);transform:skewX(-5deg);transform-origin:left center}.brand-long{display:block;color:var(--brand-primary);font-family:"CSRN Michroma","Arial",sans-serif;font-weight:400;letter-spacing:.09em;font-size:15px;margin-top:10px;text-transform:uppercase;font-style:italic}
 .statebadge{font-family:"CSRN Michroma","Arial",sans-serif;font-weight:400;letter-spacing:.12em;border:1px solid color-mix(in srgb,var(--brand-primary) 60%,#ffffff);border-radius:999px;padding:13px 22px;background:color-mix(in srgb,var(--brand-primary) 25%,transparent)}
 .statebadge.delay{background:#7b240e;border-color:#e98a59}
+.statebadge.halftime{background:#7a5c0e;border-color:#e0b84a}
 .main{display:grid;grid-template-columns:36% 64%;min-height:0}
 .hero{padding:34px 46px 24px 64px;border-right:1px solid var(--line);display:flex;flex-direction:column;justify-content:center}
 .eyebrow{font-family:"CSRN Michroma","Arial",sans-serif;font-size:26px;letter-spacing:.09em;text-transform:uppercase;color:var(--brand-primary);font-weight:400;margin-bottom:26px}
@@ -26,6 +27,11 @@
 .countdown-wrap{margin-top:26px;padding-top:26px;border-top:1px solid rgba(255,255,255,.18)}.count-label{font-family:"CSRN Michroma","Arial",sans-serif;font-size:26px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:400}.countdown{font-family:"Arial Black",Arial,sans-serif;font-size:68px;font-weight:900;letter-spacing:.055em;margin-top:9px;text-shadow:3px 4px 0 #050609}.delay-note{font-size:20px;line-height:1.35;margin-top:10px;color:#ffd6c5}
 .content{padding:36px 64px 28px 52px;min-width:0;display:flex;align-items:center}.card{width:100%;display:none;animation:fade .4s ease}.card.active{display:block}@keyframes fade{from{opacity:.25;transform:translateY(8px)}to{opacity:1;transform:none}}
 .card-kicker{font-family:"CSRN Michroma","Arial",sans-serif;font-size:12px;color:var(--brand-primary);text-transform:uppercase;letter-spacing:.11em;font-weight:400}.card h1{font-size:44px;margin:9px 0 24px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}.info{background:rgba(255,255,255,.055);border:1px solid var(--line);border-radius:14px;padding:22px}.info span{display:block;color:var(--muted);font-size:14px;text-transform:uppercase;letter-spacing:.09em}.info strong{display:block;font-size:25px;margin-top:8px;overflow-wrap:anywhere}
+.spotlight-row{display:flex;gap:28px;align-items:center}
+.spotlight-portrait{flex:0 0 auto;width:132px;height:132px;border-radius:14px;object-fit:cover;border:1px solid var(--line);background:rgba(255,255,255,.055)}
+.spotlight-meta{min-width:0}
+.spotlight-meta .teammeta{font-size:20px;margin-top:10px}
+.spotlight-credit{font-size:18px;color:var(--muted);margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
 .profile-team{min-height:220px}
 .profile-team>span{font-size:18px}
 .profile-team>strong{font-size:34px;margin-top:10px}
@@ -142,7 +148,11 @@ function shouldShow(){
   if(cfg.mode==='delayed')return true;
   if(cfg.mode==='pregame')return true;
   const phase=String(game.broadcast_phase||game.status||'').toLowerCase();
-  if(phase==='live'||phase==='completed')return false;
+  // 'halftime' is deliberately NOT excluded -- this overlay is the actual
+  // intended halftime view (banner/weather/spotlight rotation), not just a
+  // pregame screen. Previously only 'live' was excluded, so 'postgame' and
+  // 'final' fell through to showing stale pregame content too.
+  if(['live','completed','postgame','final'].includes(phase))return false;
   if(['scheduled','fallback'].includes(cfg.transition_mode)){
     const target=parseScheduled(game,'');
     if(target&&Date.now()>=target.getTime())return false;
@@ -323,13 +333,46 @@ function delayGameStateCard(){
  if(phase!=='live'&&Number(g.home_score||0)===0&&Number(g.visitor_score||0)===0)return null;
  return `<section class="card"><div class="card-kicker">Game Status</div><h1>Play Suspended</h1><div class="scoreline"><div><div class="scoreteam">${esc(g.visitor_team)}</div><div class="score">${esc(g.visitor_score)}</div></div><div style="text-align:right"><div class="scoreteam">${esc(g.home_team)}</div><div class="score">${esc(g.home_score)}</div></div></div><div class="situation">${g.quarter?'Q'+esc(g.quarter):''} ${g.clock_visible?'· '+esc(clockText(g.clock_seconds)):''} ${g.down&&g.down!=='Off'?'· '+esc(g.down)+' & '+esc(g.distance):''} ${g.ball_spot?'· '+esc(g.ball_spot):''}</div></section>`;
 }
+function spotlightCard(entry){
+ // Native markup in this page's own card idiom (.card/.card-kicker/.info
+ // style) -- the video-board's .bl-college-player rendering lives in a
+ // completely separate, unrelated JS/CSS bundle this page never loads, so
+ // this reuses the *data* (the graphic snapshot already captured when the
+ // spotlight originally fired) rather than that other component.
+ if(!entry)return null;
+ const name=esc(entry.display_name||entry.full_name||'Player');
+ const number=entry.number?`#${esc(entry.number)}`:'';
+ const team=esc(entry.team_name||'');
+ const detail=esc(entry.play_detail||'');
+ const passer=String(entry.passer_name||'').trim();
+ const fallback=esc(entry.team_logo||'/static/csrn-logo.png');
+ const img=esc(entry.headshot||entry.team_logo||'/static/csrn-logo.png');
+ return `
+   <section class="card">
+     <div class="card-kicker">${esc(entry.eyebrow||'SPOTLIGHT')}${entry.quarter?' · Q'+esc(entry.quarter):''}</div>
+     <h1>${name}</h1>
+     <div class="spotlight-row">
+       <img class="spotlight-portrait" src="${img}" alt="" onerror="this.onerror=null;this.src='${fallback}'">
+       <div class="spotlight-meta">
+         <div class="teammeta">${[team,number].filter(Boolean).join(' · ')}</div>
+         <div class="teammeta">${detail}</div>
+         ${passer?`<div class="spotlight-credit">Pass from ${esc(passer)}</div>`:''}
+       </div>
+     </div>
+   </section>`;
+}
 function rebuildCards(){
  const weather=weatherCard(),delayState=delayGameStateCard();
+ const phase=String(data.game?.broadcast_phase||data.game?.status||'').toLowerCase();
+ const halftime=data.settings?.mode!=='delayed'&&phase==='halftime';
  let list;
  if(data.settings?.mode==='delayed'&&data.settings?.delay_type==='weather'){
    list=[weather,delayState,gameDetailsCard(),teamProfilesCard(),storylinesCard(),nextWeekCard()];
  }else if(data.settings?.mode==='delayed'){
    list=[delayState,gameDetailsCard(),weather,teamProfilesCard(),storylinesCard(),nextWeekCard()];
+ }else if(halftime){
+   const spotlights=Array.isArray(data.first_half_spotlights)?data.first_half_spotlights:[];
+   list=[weather,...spotlights.map(spotlightCard)];
  }else{
    list=[gameDetailsCard(),weather,teamProfilesCard(),storylinesCard(),nextWeekCard()];
  }
@@ -387,15 +430,19 @@ function teamFootballSocial(identity){
 function renderStatic(){
  applyOrganizationBranding();
  const g=data.game||{},cfg=data.settings||{},h=data.home_identity||{},v=data.visitor_identity||{},delayed=cfg.mode==='delayed';
- document.getElementById('stateBadge').textContent=delayed?'GAME DELAYED':'PREGAME';
+ const phase=String(g.broadcast_phase||g.status||'').toLowerCase();
+ const halftime=!delayed&&phase==='halftime';
+ const weatherDelay=delayed&&String(cfg.delay_type||'').toLowerCase()==='weather';
+ document.getElementById('stateBadge').textContent=delayed?(weatherDelay?'WEATHER DELAY':'GAME DELAYED'):halftime?'HALFTIME':'PREGAME';
  document.getElementById('stateBadge').classList.toggle('delay',delayed);
- document.getElementById('heroEyebrow').textContent=delayed?(cfg.delay_type||'Game')+' Delay':"Tonight's Matchup";
+ document.getElementById('stateBadge').classList.toggle('halftime',halftime);
+ document.getElementById('heroEyebrow').textContent=delayed?(cfg.delay_type||'Game')+' Delay':halftime?'Halftime':"Tonight's Matchup";
  document.getElementById('visitorName').textContent=teamLabel(v,g.visitor_team||'Visitor');
  document.getElementById('homeName').textContent=teamLabel(h,g.home_team||'Home');
  document.getElementById('visitorLogo').src=logo(v);document.getElementById('homeLogo').src=logo(h);
  document.getElementById('visitorMeta').textContent=[g.visitor_classification,recordText(g.visitor_record)].filter(Boolean).join(' · ');
  document.getElementById('homeMeta').textContent=[g.home_classification,recordText(g.home_record)].filter(Boolean).join(' · ');
-document.getElementById('countLabel').textContent=delayed?(cfg.estimated_start?'Estimated Resume In':'Game Delayed'):'Kickoff In';
+document.getElementById('countLabel').textContent=delayed?(cfg.estimated_start?'Estimated Resume In':'Game Delayed'):halftime?'Score at the Half':'Kickoff In';
  document.getElementById('delayNote').textContent=delayed?(cfg.delay_note||'Awaiting an update from game officials.'):'';
  document.getElementById('footerText').textContent=[g.date,g.scheduled_start,g.venue].filter(Boolean).join(' · ')||'CSRN Pregame';
  document.getElementById('root').classList.toggle('visible',shouldShow());
@@ -405,8 +452,14 @@ document.getElementById('countLabel').textContent=delayed?(cfg.estimated_start?'
 function tick(){
  if(!data)return;
  const cfg=data.settings||{},g=data.game||{},delayed=cfg.mode==='delayed';
- const target=parseScheduled(g,delayed?cfg.estimated_start:'');
- document.getElementById('countdown').textContent=(delayed&&!cfg.estimated_start)?'DELAYED':countdownText(target);
+ const phase=String(g.broadcast_phase||g.status||'').toLowerCase();
+ const halftime=!delayed&&phase==='halftime';
+ if(halftime){
+   document.getElementById('countdown').textContent=`${Number(g.home_score||0)}-${Number(g.visitor_score||0)}`;
+ }else{
+   const target=parseScheduled(g,delayed?cfg.estimated_start:'');
+   document.getElementById('countdown').textContent=(delayed&&!cfg.estimated_start)?'DELAYED':countdownText(target);
+ }
  document.getElementById('root').classList.toggle('visible',shouldShow());
  const rotation=Math.max(6,Number(cfg.rotation_seconds||10))*1000;
  if(cards.length>1&&Date.now()-lastCardSwitch>=rotation){cardIndex=(cardIndex+1)%cards.length;showCard(cardIndex);lastCardSwitch=Date.now()}
