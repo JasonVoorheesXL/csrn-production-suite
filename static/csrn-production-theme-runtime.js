@@ -2667,7 +2667,43 @@ function collegiatePlayerLeaders(statistics, side) {
         if (candidate) candidates.push(candidate);
       });
     });
-  return candidates.sort((a, b) => b.weight - a.weight);
+
+  // Each title (QB Leader, Scoring Leader, etc.) must surface only the one
+  // player who actually leads that category. Without this, every player
+  // with a nonzero stat generated their own same-titled candidate -- e.g. a
+  // kicker's 2-point XP became its own "Scoring Leader" entry alongside a
+  // receiver's 6-point touchdown -- and the rotation eventually reached it,
+  // looking like a ranking bug when the point totals themselves were
+  // correct all along.
+  const bestByTitle = new Map();
+  candidates.forEach(candidate => {
+    const existing = bestByTitle.get(candidate.title);
+    if (!existing || candidate.weight > existing.weight) {
+      bestByTitle.set(candidate.title, candidate);
+    }
+  });
+
+  return Array.from(bestByTitle.values()).sort((a, b) => b.weight - a.weight);
+}
+
+// How long each rotating leader stays on screen. Was 12000 -- too quick to
+// read on a live broadcast; doubled (plus a little) per operator feedback.
+const COLLEGIATE_LEADER_ROTATION_MS = 25000;
+
+function fitPlayerLeaderName(node) {
+  if (!node) return;
+  node.style.fontSize = "";
+  const available = node.clientWidth;
+  if (!available) return;
+  const base = parseFloat(getComputedStyle(node).fontSize) || 26;
+  const floor = Math.max(15, base * 0.6);
+  let size = base;
+  let guard = 0;
+  while (node.scrollWidth > available + 1 && size > floor && guard < 40) {
+    size -= 1;
+    node.style.fontSize = `${size}px`;
+    guard += 1;
+  }
 }
 
 function patchCollegiateRails(root, runtime, statistics) {
@@ -2687,15 +2723,21 @@ function patchCollegiateRails(root, runtime, statistics) {
     if (!leaderNode) return;
     const leaders = collegiatePlayerLeaders(statistics, side);
     const leader = leaders.length
-      ? leaders[(Math.floor(Date.now() / 12000) + sideIndex) % leaders.length]
+      ? leaders[(Math.floor(Date.now() / COLLEGIATE_LEADER_ROTATION_MS) + sideIndex) % leaders.length]
       : null;
+
+    // Same crest fallback the TD spotlight and roster pages already use --
+    // a leader with no headshot on file used to render blank instead of the
+    // team logo.
+    const identity = objectValue(runtime?.[`${side}_identity`]);
+    const teamLogo = textValue(identity.logo, runtime?.[`${side}_logo`]);
+    const nextImage = leader ? textValue(leader.image, teamLogo) : "";
 
     // This runs on a 250ms clock timer. Unconditionally tearing down and
     // recreating the <img> every tick forced a fresh, uncached fetch of the
     // headshot ~4x/second even when the leader hadn't changed -- visible as
     // reload/flicker on the live broadcast feed. Only touch the DOM when the
     // rendered image actually needs to change.
-    const nextImage = leader?.image || "";
     if (leaderNode.dataset.renderedImage !== nextImage) {
       leaderNode.querySelectorAll("img").forEach(node => node.remove());
       if (nextImage) {
@@ -2708,7 +2750,7 @@ function patchCollegiateRails(root, runtime, statistics) {
     }
 
     leaderNode.classList.toggle("is-empty", !leader);
-    leaderNode.classList.toggle("has-photo", Boolean(leader?.image));
+    leaderNode.classList.toggle("has-photo", Boolean(nextImage));
     const title = leaderNode.querySelector("span");
     const name = leaderNode.querySelector('[data-player="name"]');
     const line = leaderNode.querySelector('[data-player="line"]');
@@ -2721,6 +2763,11 @@ function patchCollegiateRails(root, runtime, statistics) {
     if (title) title.textContent = leader.title;
     if (name) name.textContent = leader.name;
     if (line) line.textContent = [leader.line, leader.detail].filter(Boolean).join(" · ");
+    // Same shrink-to-fit approach as the main player-spotlight card's name
+    // (fitCollegiatePlayerName in csrn-broadcast-layout-engine.js) -- a long
+    // name like "Finn Stubbendorff" could overflow the rail's fixed,
+    // overflow:hidden box and get clipped mid-word.
+    fitPlayerLeaderName(name);
   });
 }
 
