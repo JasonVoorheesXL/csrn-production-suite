@@ -2689,7 +2689,24 @@ function patchCollegiateRails(root, runtime, statistics) {
     const leader = leaders.length
       ? leaders[(Math.floor(Date.now() / 12000) + sideIndex) % leaders.length]
       : null;
-    leaderNode.querySelectorAll("img").forEach(node => node.remove());
+
+    // This runs on a 250ms clock timer. Unconditionally tearing down and
+    // recreating the <img> every tick forced a fresh, uncached fetch of the
+    // headshot ~4x/second even when the leader hadn't changed -- visible as
+    // reload/flicker on the live broadcast feed. Only touch the DOM when the
+    // rendered image actually needs to change.
+    const nextImage = leader?.image || "";
+    if (leaderNode.dataset.renderedImage !== nextImage) {
+      leaderNode.querySelectorAll("img").forEach(node => node.remove());
+      if (nextImage) {
+        const image = document.createElement("img");
+        image.src = nextImage;
+        image.alt = "";
+        leaderNode.prepend(image);
+      }
+      leaderNode.dataset.renderedImage = nextImage;
+    }
+
     leaderNode.classList.toggle("is-empty", !leader);
     leaderNode.classList.toggle("has-photo", Boolean(leader?.image));
     const title = leaderNode.querySelector("span");
@@ -2700,12 +2717,6 @@ function patchCollegiateRails(root, runtime, statistics) {
       if (name) name.textContent = "Awaiting Stats";
       if (line) line.textContent = "Live leaders rotate here";
       return;
-    }
-    if (leader.image) {
-      const image = document.createElement("img");
-      image.src = leader.image;
-      image.alt = "";
-      leaderNode.prepend(image);
     }
     if (title) title.textContent = leader.title;
     if (name) name.textContent = leader.name;
