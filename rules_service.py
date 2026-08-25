@@ -564,7 +564,7 @@ class RulesService:
                         if kind == "kickoff"
                         else "Punt Return Touchdown"
                     )
-                    self._show_touchdown_graphic(
+                    self._show_player_spotlight(
                         state,
                         team=receiving,
                         number=numbers["returner"],
@@ -583,7 +583,7 @@ class RulesService:
                         state[f"{turnover_team}_score"] = int(state.get(f"{turnover_team}_score", 0)) + 6
                         CanonicalStateFoundation.enter_pending_try(state, turnover_team)
                         touchdown = True
-                        self._show_touchdown_graphic(
+                        self._show_player_spotlight(
                             state,
                             team=turnover_team,
                             number=numbers["returner"],
@@ -600,6 +600,25 @@ class RulesService:
                                 + " return"
                             ),
                         )
+                    elif outcome != "sack":
+                        # A plain turnover (no return touchdown) never
+                        # triggered a defensive spotlight either -- only the
+                        # touchdown case above did. A sack that also happens
+                        # to be a fumble is credited via the SACK spotlight
+                        # below instead, so the same play doesn't fire two
+                        # spotlights.
+                        self._show_player_spotlight(
+                            state,
+                            team=turnover_team,
+                            number=numbers["returner"],
+                            name=names["returner"],
+                            player_ref=refs["returner"],
+                            position="",
+                            detail=description,
+                            graphic_type="turnover",
+                            eyebrow="TURNOVER",
+                            defensive=True,
+                        )
                     self._stop_clock(state)
                 elif touchdown:
                     state[f"{team}_score"] = int(state.get(f"{team}_score", 0)) + 6
@@ -609,7 +628,7 @@ class RulesService:
                     td_role = "receiver" if is_pass_reception else "player"
                     td_number = numbers[td_role]
                     td_name = names[td_role]
-                    self._show_touchdown_graphic(
+                    self._show_player_spotlight(
                         state,
                         team=team,
                         number=td_number,
@@ -623,7 +642,7 @@ class RulesService:
                         # Only a pass-reception touchdown has a separate QB to
                         # credit -- run TDs and the punt/kickoff-return and
                         # turnover-return branches (their own
-                        # _show_touchdown_graphic() calls above) have no
+                        # _show_player_spotlight() calls above) have no
                         # passer role at all.
                         passer_name=names["passer"] if is_pass_reception else "",
                     )
@@ -657,6 +676,27 @@ class RulesService:
                         self._stop_clock(state)
                 if not touchdown and not safety:
                     state["ball_spot"] = self.coord_to_spot(end)
+
+                if kind == "pass" and outcome == "sack":
+                    # A sack recorded through the statistician's play form
+                    # (this method, not EventService.trigger()) never fired
+                    # the spotlight at all -- confirmed against a real sack
+                    # tonight (Jaraylon Washington) that correctly updated
+                    # the stats-based Defensive Leader sidebar box but never
+                    # showed the center spotlight card, because nothing here
+                    # ever called _show_player_spotlight() for a sack.
+                    self._show_player_spotlight(
+                        state,
+                        team=self.opposite(team),
+                        number=numbers["sacker"],
+                        name=names["sacker"],
+                        player_ref=refs["sacker"],
+                        position="",
+                        detail=description,
+                        graphic_type="sack",
+                        eyebrow="SACK",
+                        defensive=True,
+                    )
 
             play_number = self._bounded_int(
                 state.get("next_play_number", 1),
@@ -927,7 +967,7 @@ class RulesService:
         state["clock_running"] = False
         state["clock_started_at"] = 0
 
-    def _show_touchdown_graphic(
+    def _show_player_spotlight(
         self,
         state: dict[str, Any],
         *,
@@ -937,6 +977,9 @@ class RulesService:
         player_ref: Mapping[str, Any],
         position: str,
         detail: str,
+        graphic_type: str = "touchdown",
+        eyebrow: str = "TOUCHDOWN",
+        defensive: bool = False,
         passer_name: str = "",
     ) -> None:
         if not number and not name:
@@ -963,9 +1006,10 @@ class RulesService:
             state,
             roster,
             player,
-            "touchdown",
+            graphic_type,
             8,
-            eyebrow="TOUCHDOWN",
+            defensive=defensive,
+            eyebrow=eyebrow,
             play_detail=detail,
             passer_name=passer_name,
         )

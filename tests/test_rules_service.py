@@ -412,6 +412,89 @@ def test_fumble_return_touchdown_shows_defensive_player_graphic() -> None:
     assert play["result"].count("touchdown") == 1
 
 
+def test_sack_shows_defensive_player_spotlight() -> None:
+    # Recorded through play() (the statistician's detailed play form) --
+    # confirmed live tonight: a real sack correctly updated the stats-based
+    # Defensive Leader sidebar box (separate code path, statistics_service.py)
+    # but never fired the center spotlight card at all, because nothing in
+    # play() ever called the spotlight function for a sack.
+    service, current, _, graphics, _ = build_service()
+    result = service.play(
+        {
+            "team": "home",
+            "play_type": "pass",
+            "pass_outcome": "sack",
+            "start_spot": "LEFT 20",
+            "end_spot": "LEFT 20",
+            "passer_number": "12",
+            "sacker_number": "55",
+        }
+    )
+    assert result.ok
+    assert result.data["play"]["label"] == "Sack"
+    assert len(graphics) == 1
+    assert graphics[0]["player"]["number"] == "55"
+    assert graphics[0]["player"]["preferred_name"] == "New Hope Defender"
+    assert graphics[0]["eyebrow"] == "SACK"
+    assert graphics[0]["graphic_type"] == "sack"
+    assert graphics[0]["defensive"] is True
+    assert current["player_graphic"]["visible"] is True
+
+
+def test_plain_interception_shows_defensive_player_spotlight() -> None:
+    # Same gap as the sack case: a turnover with no return touchdown never
+    # triggered a spotlight either -- only the touchdown branch did.
+    service, current, _, graphics, _ = build_service()
+    result = service.play(
+        {
+            "team": "home",
+            "play_type": "pass",
+            "pass_outcome": "interception",
+            "start_spot": "LEFT 20",
+            "turnover_spot": "LEFT 25",
+            "return_end_spot": "LEFT 25",
+            "passer_number": "12",
+            "returner_number": "55",
+        }
+    )
+    assert result.ok
+    play = result.data["play"]
+    assert play["turnover"] is True
+    assert play["touchdown"] is False
+    assert len(graphics) == 1
+    assert graphics[0]["player"]["number"] == "55"
+    assert graphics[0]["eyebrow"] == "TURNOVER"
+    assert graphics[0]["graphic_type"] == "turnover"
+    assert graphics[0]["defensive"] is True
+
+
+def test_sack_that_is_also_a_fumble_fires_only_the_sack_spotlight() -> None:
+    # A sack that strips the ball is both a sack and a turnover on the same
+    # play -- must credit the sacker once, not fire two competing spotlights.
+    service, current, _, graphics, _ = build_service()
+    result = service.play(
+        {
+            "team": "home",
+            "play_type": "pass",
+            "pass_outcome": "sack",
+            "start_spot": "LEFT 20",
+            "end_spot": "LEFT 18",
+            "passer_number": "12",
+            "sacker_number": "55",
+            "fumble": True,
+            "fumble_lost": True,
+            "turnover_spot": "LEFT 18",
+            "return_end_spot": "LEFT 18",
+            "returner_number": "55",
+        }
+    )
+    assert result.ok
+    assert result.data["play"]["turnover"] is True
+    assert len(graphics) == 1
+    assert graphics[0]["eyebrow"] == "SACK"
+    assert graphics[0]["player"]["number"] == "55"
+
+
 def test_complete_pass_records_passer_and_receiver() -> None:
     service, _, _, _, _ = build_service()
     result = service.play(
