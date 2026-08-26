@@ -584,7 +584,15 @@ class EventService:
                     or first_down_spotlight
                 )
                 and player
-                and str(player.get("id", "") or "").strip()
+                # A resolved roster player has an "id"; a manually-typed
+                # jersey number (manual_automation_player() in app.py) never
+                # does by design -- it always returns id="". Requiring "id"
+                # here meant a manual entry could never satisfy this gate at
+                # all, so the graphic silently never fired for one --
+                # confirmed against a real production TURNOVER event
+                # tonight whose player_graphic snapshot came back entirely
+                # empty. "number" is what both paths always guarantee.
+                and str(player.get("number", "") or player.get("id", "") or "").strip()
             ):
                 eyebrow = (
                     "TWO-POINT CONVERSION"

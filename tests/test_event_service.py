@@ -234,6 +234,13 @@ def test_touchdown_player_graphic_is_requested() -> None:
 
 
 def test_touchdown_ignores_stale_player_id_when_submitted_number_differs() -> None:
+    # The stale player_id is correctly ignored and the manually-typed
+    # number/name recorded instead -- that part was always correct. The
+    # graphic itself used to silently never fire for this case: the gate
+    # required player.get("id"), and a manual entry (manual_automation_
+    # player() in app.py) always returns id="" by design, so it could never
+    # satisfy that check. Fixed to accept "number" too, which both the
+    # roster-resolved and manual paths always guarantee.
     service, store, calls, _ = build_service()
     result = service.trigger({
         "team": "home",
@@ -245,10 +252,15 @@ def test_touchdown_ignores_stale_player_id_when_submitted_number_differs() -> No
     })
 
     assert result.ok
-    assert calls["graphics"] == []
     assert store["events"][0]["automation"]["player_id"] == ""
     assert store["events"][0]["automation"]["player_number"] == "88"
     assert store["events"][0]["automation"]["player_name"] == "Home"
+    assert len(calls["graphics"]) == 1
+    args, kwargs = calls["graphics"][-1]
+    player_arg = args[2]
+    assert player_arg["id"] == ""
+    assert player_arg["number"] == "88"
+    assert kwargs["eyebrow"] == "TOUCHDOWN"
 
 
 def test_sack_triggers_player_spotlight() -> None:
@@ -285,6 +297,32 @@ def test_turnover_without_return_touchdown_triggers_player_spotlight() -> None:
     assert result.ok
     assert calls["graphics"]
     _, kwargs = calls["graphics"][-1]
+    assert kwargs["eyebrow"] == "TURNOVER"
+    assert kwargs["defensive"] is True
+    assert store["player_graphic"]["visible"] is True
+
+
+def test_turnover_with_manual_number_only_still_triggers_player_spotlight() -> None:
+    # The exact real-world case: no player_id/roster_id at all, only a
+    # typed jersey number (e.g. the automatic roster match was rejected by
+    # the stale-number guard, or the operator just typed a number). This is
+    # what a real production TURNOVER event's player_graphic snapshot came
+    # back completely empty for -- confirmed against tonight's archive.
+    service, store, calls, _ = build_service()
+    result = service.trigger({
+        "team": "visitor",
+        "event": "TURNOVER",
+        "turnover_type": "interception",
+        "manual_player": {"number": "17", "name": "Brantley Rickard"},
+        "graphic_duration": 6,
+    })
+    assert result.ok
+    assert len(calls["graphics"]) == 1
+    args, kwargs = calls["graphics"][-1]
+    player_arg = args[2]
+    assert player_arg["id"] == ""
+    assert player_arg["number"] == "17"
+    assert player_arg["preferred_name"] == "Brantley Rickard"
     assert kwargs["eyebrow"] == "TURNOVER"
     assert kwargs["defensive"] is True
     assert store["player_graphic"]["visible"] is True
