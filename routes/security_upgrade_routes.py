@@ -100,6 +100,19 @@ def create_security_upgrade_blueprint(
 
     @routes.post("/api/upgrade/migrate")
     def run_upgrade_migration():
+        # This route is intentionally unauthenticated so it can migrate an
+        # old install's data BEFORE the operator has created their first
+        # PIN (there's no session to authenticate yet at that point). But
+        # with include_security defaulting to True, UpgradeService.run()
+        # can overwrite the active PIN/secret-key with whatever security
+        # data is bundled in the candidate install -- once a PIN already
+        # exists, that's no longer the pre-setup flow this route is for,
+        # so block it outright rather than only hiding the button
+        # client-side.
+        security = dependencies.load_security()
+        if bool(security.get("pin_hash")):
+            return jsonify({"error": "PIN_ALREADY_CONFIGURED"}), 409
+
         incoming = request.get_json(silent=True) or {}
         result = dependencies.get_upgrade_service().run(
             incoming.get("include_security", True)

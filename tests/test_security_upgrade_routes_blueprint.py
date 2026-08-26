@@ -303,3 +303,30 @@ def test_upgrade_migration_preserves_include_security_value(route_client) -> Non
     assert upgrade_service.run_calls == [False]
 
 
+def test_upgrade_migration_blocked_once_a_pin_is_configured(route_client) -> None:
+    # A real server-side gate, not just hiding the button client-side --
+    # this route can overwrite the active PIN with whatever security data
+    # is bundled in the candidate install, so it must refuse to run once
+    # an operator PIN already exists.
+    client, _, _, upgrade_service, security_record, _ = route_client
+    security_record["pin_hash"] = "configured"
+
+    response = client.post("/api/upgrade/migrate", json={})
+
+    assert response.status_code == 409
+    assert response.get_json() == {"error": "PIN_ALREADY_CONFIGURED"}
+    assert upgrade_service.run_calls == []
+
+
+def test_upgrade_migration_still_allowed_before_any_pin_exists(route_client) -> None:
+    # The legitimate pre-setup flow this route exists for: no PIN yet,
+    # no session to authenticate -- migration must still run.
+    client, _, _, upgrade_service, security_record, _ = route_client
+    assert security_record["pin_hash"] == ""
+
+    response = client.post("/api/upgrade/migrate", json={})
+
+    assert response.status_code == 200
+    assert upgrade_service.run_calls == [True]
+
+
