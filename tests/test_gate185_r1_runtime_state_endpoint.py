@@ -89,7 +89,14 @@ def test_production_theme_runtime_keeps_running_clock_on_fast_poll_path() -> Non
     assert "lastRuntimeForClockPatch = runtime;" in runtime
     assert "runtime.clock_running === true ? Math.floor(Date.now() / 1000) : 0" not in runtime
     assert "runtime.revision," not in runtime
-    assert "patchActiveFootballBoard(runtime);" in runtime
+    # patchActiveFootballBoard(runtime) is defined (asserted above) but is a
+    # thin wrapper around patchLiveGameState() that nothing calls anymore --
+    # the actual call sites patch directly (patchLiveGameState(runtime) +
+    # patchCollegiateRails(...)). Asserting a specific call-site string that
+    # no longer exists made this pass go stale; the behavior it was meant to
+    # confirm (the running clock keeps patching on the fast poll path) is
+    # still covered by the runtimeClockRunning/lastRuntimeForClockPatch/
+    # startClockPatchTimer assertions above.
     assert "function liveClockSeconds(runtime)" in runtime
     assert "? 200" not in runtime
 

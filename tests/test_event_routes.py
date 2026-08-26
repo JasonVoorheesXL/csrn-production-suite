@@ -25,7 +25,11 @@ class StubEventService:
         self.corrections_result = EventResult("OK", {"corrections": [{"id": "C1"}]})
         self.undo_result = EventResult("OK", {"state": {"home_score": 0}})
 
-    def set_control_source(self, authority: Any) -> EventResult:
+    def set_control_source(self, authority: Any, payload: Any = None) -> EventResult:
+        # routes/live_game_routes.py's set_control_source() route calls this
+        # with (incoming.get("authority", ""), incoming) -- two positional
+        # args -- which this stub's one-argument signature had drifted out
+        # of sync with.
         self.calls.append(("control", authority))
         return self.control_result
 
@@ -45,7 +49,7 @@ class StubEventService:
         self.calls.append(("corrections", None))
         return self.corrections_result
 
-    def undo(self) -> EventResult:
+    def undo(self, payload: Any = None) -> EventResult:
         self.calls.append(("undo", None))
         return self.undo_result
 

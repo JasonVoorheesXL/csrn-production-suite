@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
+import threading
 from pathlib import Path
 
 from rules_service import RulesService
@@ -144,7 +144,12 @@ def test_incomplete_rules_play_keeps_intended_receiver_and_description():
     def load(): return state
     def save(value): state.clear(); state.update(value)
     svc=RulesService(load_state=load,save_state=save,push_history=lambda s:None,source_allowed=lambda s,a:True,locked_payload=lambda s:{},
-        resolve_player=lambda s,t,n: roster.get((t,str(n)),{"resolved":False,"number":str(n)}),show_player_graphic=lambda *a,**k:None,transaction_lock=nullcontext(),now=lambda:10)
+        resolve_player=lambda s,t,n: roster.get((t,str(n)),{"resolved":False,"number":str(n)}),show_player_graphic=lambda *a,**k:None,
+        # play() acquires/releases this lock directly (for lock-wait-time
+        # diagnostics logging), not just via `with self._transaction_lock:` --
+        # nullcontext() has no .acquire()/.release(), so this raised
+        # AttributeError on every call, silently failing this test.
+        transaction_lock=threading.Lock(),now=lambda:10)
     result=svc.play({"team":"home","play_type":"pass","start_spot":"LEFT 20","end_spot":"LEFT 20","pass_outcome":"incomplete","passer_number":"2","receiver_number":"7"})
     assert result.ok
     row=result.data["play"]

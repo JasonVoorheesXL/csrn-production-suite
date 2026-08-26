@@ -55,23 +55,30 @@ class StubGameOperationsService:
         self.calls.append(("set", payload))
         return self.set_result
 
-    def toggle_scorebug(self) -> GameOperationsResult:
+    # All five real GameOperationsService methods below accept an optional
+    # payload (routes/live_game_routes.py always calls them with
+    # request.get_json(silent=True) or {}) -- this stub's zero-argument
+    # signatures had drifted out of sync with that, so every route test
+    # calling through to one of these raised TypeError. Accepting (and
+    # ignoring) the argument matches what these tests already assert on
+    # self.calls.
+    def toggle_scorebug(self, payload: Any = None) -> GameOperationsResult:
         self.calls.append(("scorebug", None))
         return self.scorebug_result
 
-    def toggle_halftime(self) -> GameOperationsResult:
+    def toggle_halftime(self, payload: Any = None) -> GameOperationsResult:
         self.calls.append(("halftime", None))
         return self.halftime_result
 
-    def end_game(self) -> GameOperationsResult:
+    def end_game(self, payload: Any = None) -> GameOperationsResult:
         self.calls.append(("end", None))
         return self.end_result
 
-    def reset_data(self) -> GameOperationsResult:
+    def reset_data(self, payload: Any = None) -> GameOperationsResult:
         self.calls.append(("reset", None))
         return self.reset_result
 
-    def new_broadcast(self) -> GameOperationsResult:
+    def new_broadcast(self, payload: Any = None) -> GameOperationsResult:
         self.calls.append(("new", None))
         return self.new_result
 

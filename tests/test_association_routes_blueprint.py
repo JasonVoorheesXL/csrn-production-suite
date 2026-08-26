@@ -181,6 +181,13 @@ def association_client():
                 get_workflow_service=lambda: workflow,
                 get_import_service=lambda: importer,
                 get_supplement_service=lambda: supplement,
+                # The dragonfly-import routes (/api/imports/dragonfly/*)
+                # were added to association_routes.py after this fixture
+                # was last updated; nothing in this file exercises them yet,
+                # so these just need to satisfy the dataclass constructor.
+                get_dragonfly_service=lambda: None,
+                get_dragonfly_sync_service=lambda: None,
+                get_school_service=lambda: None,
                 load_mhsaa_profile=lambda: manifests["profile"],
                 load_mhsaa_manifest=lambda: manifests["main"],
                 load_mhsaa_branding_manifest=lambda: manifests["branding"],
@@ -208,6 +215,14 @@ def test_association_blueprint_registers_preserved_urls(association_client) -> N
         "/api/imports/associations/profiles/<profile_id>",
         "/api/imports/associations/preview",
         "/api/imports/associations/import",
+        # Dragonfly-import routes, added after this manifest was last
+        # updated (see get_dragonfly_service/get_dragonfly_sync_service/
+        # get_school_service on AssociationRoutesDependencies).
+        "/api/imports/dragonfly/preview",
+        "/api/imports/dragonfly/sync-preview",
+        "/api/imports/dragonfly/replace-roster",
+        "/api/imports/dragonfly/school-info-preview",
+        "/api/imports/dragonfly/school-info-apply",
         "/api/imports/mhsaa/5A/analyze",
         "/api/imports/mhsaa/5A",
         "/api/imports/mhsaa/5A/branding/analyze",
