@@ -38,7 +38,14 @@ class SchoolRepository:
         self.path = Path(path)
         self.school_normalizer = school_normalizer
         self.collection_normalizer = collection_normalizer
-        self.policy = policy or PersistencePolicy(backup_count=20)
+        self.policy = policy or PersistencePolicy(
+            backup_count=20,
+            # Confirmed no legitimate workflow relies on saving an empty/
+            # drastically-smaller school database without force=True --
+            # every save call site only adds or updates records.
+            block_empty_replacement=True,
+            block_large_count_drop=True,
+        )
 
     @staticmethod
     def _extract(payload: Any) -> list[dict[str, Any]]:
@@ -129,7 +136,13 @@ class SchoolRepository:
         items = self._extract(payload)
         normalized, changed = self._normalize(items)
         if changed:
-            self.save(normalized)
+            # Force when the normalized result is itself empty -- an
+            # empty database is a normal, expected state to self-heal
+            # into (e.g. a fresh install), not a destructive write, and
+            # must not raise DestructiveWriteBlocked from inside load().
+            # Matches the same force=not bool(normalized) pattern already
+            # used by roster/broadcast/sponsor/venue repositories' load().
+            self.save(normalized, force=not bool(normalized))
         return copy.deepcopy(normalized)
 
     def save(self, schools: list[dict[str, Any]], *, force: bool = False) -> list[dict[str, Any]]:

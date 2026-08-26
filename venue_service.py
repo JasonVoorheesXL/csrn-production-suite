@@ -229,7 +229,13 @@ class VenueService:
             for item in venues
             if str(item.get("id", "")) != str(venue_id)
         ]
-        self._save_venues(remaining)
+        # Deleting a specific, named venue is an intentional, operator-
+        # identified action -- distinct from a bulk write accidentally
+        # wiping most/all venue entries, which the repository's
+        # destructive-write guard exists to catch. Also already gated
+        # above: a venue still referenced by a school/broadcast can't
+        # reach here at all.
+        self._save_venues(remaining, force=True)
         return VenueResult("OK", {"ok": True, "deleted": str(venue_id)})
 
     def references(self, venue_id: str) -> dict[str, list[dict[str, str]]]:

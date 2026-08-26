@@ -36,7 +36,7 @@ class Harness:
     def load_broadcasts(self) -> list[dict[str, Any]]:
         return copy.deepcopy(self.broadcasts)
 
-    def save_broadcasts(self, rows: list[dict[str, Any]]) -> None:
+    def save_broadcasts(self, rows: list[dict[str, Any]], *, force: bool = False) -> None:
         self.broadcasts = copy.deepcopy(rows)
 
     def get_school(self, school_id: str) -> dict[str, Any] | None:

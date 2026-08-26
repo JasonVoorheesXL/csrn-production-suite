@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from persistence_engine import JsonPersistenceEngine
+from persistence_engine import DestructiveWriteBlocked, JsonPersistenceEngine
 from roster_repository import RosterRepository, RosterRepositoryValidationError
 
 
@@ -46,6 +46,39 @@ def test_save_rejects_duplicate_player_ids_within_roster(tmp_path: Path) -> None
     repository = RosterRepository(engine(tmp_path), tmp_path / "rosters.json")
     with pytest.raises(RosterRepositoryValidationError):
         repository.save([{"id": "r1", "players": [{"id": "p1"}, {"id": "p1"}]}])
+
+
+def test_save_blocks_replacing_a_populated_roster_database_with_empty(tmp_path: Path) -> None:
+    repository = RosterRepository(engine(tmp_path), tmp_path / "rosters.json")
+    repository.save([{"id": "r1", "players": [{"id": "p1", "number": "7"}]}])
+    with pytest.raises(DestructiveWriteBlocked):
+        repository.save([])
+    # The populated database survives -- the blocked write never landed.
+    assert len(repository.load()) == 1
+
+
+def test_save_blocks_a_large_roster_entry_count_drop(tmp_path: Path) -> None:
+    # The guard counts roster ENTRIES (how many team rosters exist), not
+    # players within any one roster -- record_count() on this file's list
+    # payload is len(list). Losing most of the roster.json's team entries
+    # in one write is exactly the catastrophic case this protects against;
+    # a single roster's own "players" list shrinking, with the same number
+    # of roster entries before and after, does NOT trip this guard.
+    repository = RosterRepository(engine(tmp_path), tmp_path / "rosters.json")
+    five_rosters = [
+        {"id": f"r{i}", "players": [{"id": f"r{i}-p1", "number": "1"}]}
+        for i in range(5)
+    ]
+    repository.save(five_rosters)
+    with pytest.raises(DestructiveWriteBlocked):
+        repository.save(five_rosters[:1])
+
+
+def test_save_force_bypasses_the_destructive_write_guard(tmp_path: Path) -> None:
+    repository = RosterRepository(engine(tmp_path), tmp_path / "rosters.json")
+    repository.save([{"id": "r1", "players": [{"id": "p1", "number": "7"}]}])
+    repository.save([], force=True)
+    assert repository.load() == []
 
 
 def test_get_returns_copy(tmp_path: Path) -> None:

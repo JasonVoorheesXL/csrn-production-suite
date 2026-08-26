@@ -42,7 +42,15 @@ class BroadcastRepository:
         self.engine = engine
         self.path = Path(path)
         self.normalizer = normalizer
-        self.policy = policy or PersistencePolicy(backup_count=50)
+        self.policy = policy or PersistencePolicy(
+            backup_count=50,
+            # Confirmed no legitimate workflow relies on saving an empty/
+            # drastically-smaller broadcast database without force=True --
+            # every save call site (broadcast_service.py) only adds,
+            # updates, or single-item-deletes a broadcast.
+            block_empty_replacement=True,
+            block_large_count_drop=True,
+        )
 
         self._lock = RLock()
         self._cache: list[dict[str, Any]] | None = None

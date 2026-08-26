@@ -22,13 +22,13 @@ class MemoryStore:
     def load_schools(self) -> list[dict[str, Any]]:
         return copy.deepcopy(self.schools)
 
-    def save_schools(self, items: list[dict[str, Any]]) -> None:
+    def save_schools(self, items: list[dict[str, Any]], *, force: bool = False) -> None:
         self.schools = copy.deepcopy(items)
 
     def load_venues(self) -> list[dict[str, Any]]:
         return copy.deepcopy(self.venues)
 
-    def save_venues(self, items: list[dict[str, Any]]) -> None:
+    def save_venues(self, items: list[dict[str, Any]], *, force: bool = False) -> None:
         self.venues = copy.deepcopy(items)
 
     def load_logos(self) -> list[dict[str, Any]]:

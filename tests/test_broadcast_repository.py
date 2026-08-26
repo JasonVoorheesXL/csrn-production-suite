@@ -291,7 +291,11 @@ def test_saving_empty_index_remains_allowed(
         ]
     )
 
-    repository.save([])
+    # Broadcasts routinely and legitimately churn down to zero entries
+    # (e.g. the operator deletes every broadcast). That's still an
+    # intentional, explicit write, so it goes through force=True rather
+    # than being silently exempt from the destructive-write guard.
+    repository.save([], force=True)
 
     assert repository.load() == []
 

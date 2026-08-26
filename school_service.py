@@ -515,6 +515,11 @@ class SchoolService:
             return SchoolResult("SCHOOL_NOT_FOUND")
 
         self._save_schools(
-            [school for school in schools if school.get("id") != school_id]
+            [school for school in schools if school.get("id") != school_id],
+            # Deleting a specific, named school is an intentional,
+            # operator-identified action -- distinct from a bulk import
+            # accidentally wiping most/all school entries, which the
+            # repository's destructive-write guard exists to catch.
+            force=True,
         )
         return SchoolResult("OK", {"ok": True})

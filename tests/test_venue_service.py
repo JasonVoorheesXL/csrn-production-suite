@@ -21,7 +21,7 @@ class MemoryStore:
     def load_venues(self) -> list[dict[str, Any]]:
         return copy.deepcopy(self.venues)
 
-    def save_venues(self, venues: list[dict[str, Any]]) -> None:
+    def save_venues(self, venues: list[dict[str, Any]], *, force: bool = False) -> None:
         self.venues = copy.deepcopy(venues)
         self.saved.append(copy.deepcopy(venues))
 

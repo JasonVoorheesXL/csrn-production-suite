@@ -189,7 +189,12 @@ class SponsorService:
                 sponsor
                 for sponsor in sponsors
                 if str(sponsor.get("id", "")) != str(sponsor_id)
-            ]
+            ],
+            # Deleting a specific, named sponsor is an intentional,
+            # operator-identified action -- distinct from a bulk write
+            # accidentally wiping most/all sponsor entries, which the
+            # repository's destructive-write guard exists to catch.
+            force=True,
         )
         return SponsorResult("OK", {"ok": True})
 

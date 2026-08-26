@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from dragonfly_service import DragonFlyService
+from persistence_engine import DestructiveWriteBlocked
 from roster_service import RosterService
 
 
@@ -414,7 +415,25 @@ class DragonFlySyncService:
         target["players"] = new_players
 
         # Intentionally do not modify school identity/branding metadata.
-        self._save_rosters(rosters)
+        # roster_repository.py's guard now blocks an empty replacement (this
+        # method already self-guards that case above) or a >=75% player-
+        # count drop -- a real possibility here since this replaces the
+        # whole roster with a fresh scrape. Surface it as a normal result
+        # code instead of letting DestructiveWriteBlocked crash the request.
+        new_count = len(new_players)
+        try:
+            self._save_rosters(rosters)
+        except DestructiveWriteBlocked as exc:
+            return DragonFlySyncResult(
+                "DRAGONFLY_ROSTER_DROP_BLOCKED",
+                {
+                    "preview": preview_result.data,
+                    "database_modified": False,
+                    "previous_player_count": previous_count,
+                    "player_count": new_count,
+                    "message": str(exc),
+                },
+            )
 
         return DragonFlySyncResult(
             "OK",

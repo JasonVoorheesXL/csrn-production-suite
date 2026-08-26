@@ -104,7 +104,7 @@ def make_service(
     if config:
         settings["weather"].update(config)
 
-    def save_venues(rows):
+    def save_venues(rows, *, force: bool = False):
         venue_rows[:] = rows
 
     service = VenueWeatherService(

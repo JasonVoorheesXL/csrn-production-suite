@@ -20,7 +20,7 @@ class MemoryStore:
     def load_rosters(self) -> list[dict[str, Any]]:
         return copy.deepcopy(self.rosters)
 
-    def save_rosters(self, items: list[dict[str, Any]]) -> None:
+    def save_rosters(self, items: list[dict[str, Any]], *, force: bool = False) -> None:
         self.rosters = copy.deepcopy(items)
         self.save_count += 1
 

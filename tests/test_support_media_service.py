@@ -34,7 +34,7 @@ def build_service(
     def load_rosters():
         return current
 
-    def save_rosters(items):
+    def save_rosters(items, *, force: bool = False):
         if save_failure:
             raise OSError("save blocked")
         saves.append(items)

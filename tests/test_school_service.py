@@ -16,7 +16,7 @@ class MemoryStore:
     def load_schools(self) -> list[dict[str, Any]]:
         return copy.deepcopy(self.schools)
 
-    def save_schools(self, schools: list[dict[str, Any]]) -> None:
+    def save_schools(self, schools: list[dict[str, Any]], *, force: bool = False) -> None:
         self.schools = copy.deepcopy(schools)
         self.school_saves += 1
 

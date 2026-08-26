@@ -21,7 +21,7 @@ class MemoryStore:
     def load_sponsors(self) -> list[dict[str, Any]]:
         return copy.deepcopy(self.sponsors)
 
-    def save_sponsors(self, items: list[dict[str, Any]]) -> None:
+    def save_sponsors(self, items: list[dict[str, Any]], *, force: bool = False) -> None:
         self.sponsors = copy.deepcopy(items)
         self.save_count += 1
 

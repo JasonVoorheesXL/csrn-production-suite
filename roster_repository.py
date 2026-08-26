@@ -34,7 +34,17 @@ class RosterRepository:
         self.engine = engine
         self.path = Path(path)
         self.normalizer = normalizer
-        self.policy = policy or PersistencePolicy(backup_count=30)
+        self.policy = policy or PersistencePolicy(
+            backup_count=30,
+            # Confirmed no legitimate workflow relies on being able to save
+            # an empty/drastically-smaller roster database without force=True:
+            # dragonfly_sync_service.py's replace_roster() (the one bulk-
+            # replace call site) already self-guards against zero incoming
+            # players and returns a clean error instead of saving; every
+            # other caller only adds/updates/deletes a single record.
+            block_empty_replacement=True,
+            block_large_count_drop=True,
+        )
         self._lock = RLock()
         self._cache: list[dict[str, Any]] | None = None
         self._cache_signature: FileCacheSignature | None = None

@@ -693,7 +693,12 @@ class RosterService:
                 roster
                 for roster in rosters
                 if str(roster.get("id", "")) != str(roster_id)
-            ]
+            ],
+            # Deleting a specific, named roster is an intentional, operator-
+            # identified action -- distinct from a bulk import/sync
+            # accidentally wiping most/all roster entries, which the
+            # repository's destructive-write guard exists to catch.
+            force=True,
         )
         return RosterResult("OK", {"ok": True})
 

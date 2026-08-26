@@ -567,7 +567,13 @@ class BroadcastService:
             for row in items
             if str(row.get("broadcast_id", "")) != str(broadcast_id)
         ]
-        self._save_broadcasts(remaining)
+        # Deleting a specific, named broadcast is an intentional, operator-
+        # identified action -- distinct from a bulk write accidentally
+        # wiping most/all broadcast entries, which the repository's
+        # destructive-write guard exists to catch. Broadcasts routinely and
+        # legitimately churn down to zero entries this way (see
+        # tests/test_broadcast_repository.py::test_saving_empty_index_remains_allowed).
+        self._save_broadcasts(remaining, force=True)
         self._delete_detail(str(broadcast_id))
 
         state = self._load_state()

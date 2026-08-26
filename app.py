@@ -832,9 +832,9 @@ def load_schools() -> list[dict[str, Any]]:
     ensure_data_architecture()
     return SCHOOL_REPOSITORY.load()
 
-def save_schools(schools: list[dict[str, Any]]) -> None:
+def save_schools(schools: list[dict[str, Any]], *, force: bool = False) -> None:
     ensure_data_architecture()
-    SCHOOL_REPOSITORY.save(schools)
+    SCHOOL_REPOSITORY.save(schools, force=force)
 
 
 SCHOOL_SERVICE: SchoolService | None = None
@@ -865,9 +865,9 @@ def load_venues() -> list[dict[str, Any]]:
     return VENUE_REPOSITORY.load()
 
 
-def save_venues(items: list[dict[str, Any]]) -> None:
+def save_venues(items: list[dict[str, Any]], *, force: bool = False) -> None:
     ensure_data_architecture()
-    VENUE_REPOSITORY.save(items)
+    VENUE_REPOSITORY.save(items, force=force)
 
 
 VENUE_SERVICE: VenueService | None = None
@@ -1040,9 +1040,9 @@ def load_sponsors() -> list[dict[str, Any]]:
     return SPONSOR_REPOSITORY.load()
 
 
-def save_sponsors(items: list[dict[str, Any]]) -> None:
+def save_sponsors(items: list[dict[str, Any]], *, force: bool = False) -> None:
     ensure_data_architecture()
-    SPONSOR_REPOSITORY.save(items)
+    SPONSOR_REPOSITORY.save(items, force=force)
 
 
 SPONSOR_SERVICE: SponsorService | None = None
@@ -1169,9 +1169,11 @@ def load_broadcasts() -> list[dict[str, Any]]:
 
 def save_broadcasts(
     items: list[dict[str, Any]],
+    *,
+    force: bool = False,
 ) -> None:
     ensure_data_architecture()
-    BROADCAST_REPOSITORY.save(items)
+    BROADCAST_REPOSITORY.save(items, force=force)
 
 
 def write_broadcast_detail(
@@ -1367,9 +1369,9 @@ def load_rosters() -> list[dict[str, Any]]:
     recover_rosters_if_needed()
     return ROSTER_REPOSITORY.load()
 
-def save_rosters(items: list[dict[str, Any]]) -> None:
+def save_rosters(items: list[dict[str, Any]], *, force: bool = False) -> None:
     ensure_data_architecture()
-    ROSTER_REPOSITORY.save(items)
+    ROSTER_REPOSITORY.save(items, force=force)
 
 
 ROSTER_SERVICE: RosterService | None = None
