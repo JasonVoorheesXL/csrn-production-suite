@@ -186,3 +186,48 @@ def test_render_document_uses_middle_dot_entity_for_matchup_separator() -> None:
     assert "Football &middot; Varsity" in document
     assert "Football ? Varsity" not in document
     assert "Football | Varsity" not in document
+
+
+def players(count: int) -> list[dict]:
+    return [
+        {
+            "id": f"p{i}",
+            "number": str(i),
+            "first_name": f"Player{i}",
+            "last_name": "Test",
+            "position": "WR",
+            "pronunciation": "",
+            "status": "active",
+        }
+        for i in range(count)
+    ]
+
+
+def test_roster_pages_stays_a_single_column_at_or_under_capacity() -> None:
+    # 38 is ROWS_PER_COLUMN -- exactly at the single-column cutoff.
+    service = make_service()
+    html = service._roster_pages(roster(players=players(38)), "Team", "")
+    assert html.count('<section class="roster-page">') == 1
+    assert "roster-columns" not in html
+
+
+def test_roster_pages_condenses_a_large_roster_to_exactly_two_pages() -> None:
+    # A roster over 76 active players (2 x ROWS_PER_COLUMN) previously
+    # split into 2 logical chunks that each still overflowed onto extra
+    # physical pages -- confirmed against Itawamba AHS's real 82-player
+    # roster, which rendered as 4 physical pages instead of 2. Each
+    # oversized half now lays out as 2 columns on the same physical page
+    # instead of spilling further.
+    service = make_service()
+    html = service._roster_pages(roster(players=players(82)), "Team", "")
+    assert html.count('<section class="roster-page">') == 2
+    assert html.count('<div class="roster-columns">') == 2
+
+
+def test_roster_pages_mid_size_roster_still_uses_two_plain_pages() -> None:
+    # 39-76 players: still exactly 2 pages, but each half already fits in
+    # a single column (no need for the 2-column layout).
+    service = make_service()
+    html = service._roster_pages(roster(players=players(72)), "Team", "")
+    assert html.count('<section class="roster-page">') == 2
+    assert "roster-columns" not in html
