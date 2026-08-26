@@ -20,15 +20,20 @@ EXPECTED_BLUEPRINTS = {
     "broadcast_package_routes",
     "broadcast_routes",
     "caption_routes",
+    "coin_toss_routes",
     "commissioning_routes",
     "deployment_routes",
     "graphics_routes",
     "game_day_safety_routes",
     "live_game_routes",
     "logo_routes",
+    "mhsaa_division_routes",
     "obs_routes",
     "page_routes",
     "personnel_routes",
+    # The halftime/pregame/delay overlay (pregame_universal_overlay.html) --
+    # added after this allowlist was last updated.
+    "pregame_presentation",
     "recovery_routes",
     "recap_routes",
     "rehearsal_routes",
@@ -46,12 +51,20 @@ EXPECTED_BLUEPRINTS = {
 
 PUBLIC_ENDPOINTS = {
     "asset_routes.asset_file",
+    # Sponsor ad video served to the overlay's own OBS browser source, same
+    # public-media pattern as asset_file/sponsor_logo_file/roster_headshot_file.
+    "asset_routes.sponsor_ad_file",
     "caption_routes.caption_overlay",
     "caption_routes.caption_overlay_state",
+    "live_game_routes.statistics_overlay_state",
     "logo_routes.school_logo_file",
     "page_routes.control_panel",
     "page_routes.overlay",
     "personnel_routes.personnel_headshot_file",
+    # The halftime/pregame/delay overlay: OBS has no operator login session,
+    # same reasoning as every other overlay-facing endpoint in this set.
+    "pregame_presentation.overlay",
+    "pregame_presentation.status",
     "security_upgrade_routes.login",
     "security_upgrade_routes.logout",
     "security_upgrade_routes.run_upgrade_migration",
@@ -64,6 +77,10 @@ PUBLIC_ENDPOINTS = {
     "support_routes.roster_headshot_file",
     "system_routes.get_state",
     "system_routes.get_runtime_state",
+    # POST /api/overlay-health: the overlay itself (running unauthenticated
+    # in OBS) self-reports health/status back to the server; there is no
+    # operator session to authenticate it with.
+    "system_routes.report_overlay_health",
     "theme_routes.current_theme_css",
     "theme_routes.public_theme_state",
     "weather_routes.weather_overlay",
