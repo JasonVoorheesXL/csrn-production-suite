@@ -305,6 +305,20 @@ class StateService:
 
     @staticmethod
     def push_history(state: dict[str, Any]) -> None:
+        # Once a broadcast is completed, GameOperationsService's
+        # _archive_and_clear_history_if_final() has (or is about to have)
+        # cleared history/events/plays from the live state -- the archived
+        # snapshot in Data/Broadcasts/<id>.json becomes the durable record,
+        # and app.load_state_for_reporting() relies on events/plays staying
+        # empty to know it needs to fall back to that archive. A later
+        # action on the same completed broadcast (confirmed: set_control_
+        # source() running 17s after end_game() finalized and cleared
+        # tonight's Caledonia/Northwood game) would otherwise silently
+        # re-populate "cleared" history with a single stray snapshot,
+        # leaving debris behind with no further purpose -- there's no more
+        # live game to undo actions within once it's over.
+        if str(state.get("status", "")).strip().lower() == "completed":
+            return
         snapshot = {
             key: copy.deepcopy(value)
             for key, value in state.items()

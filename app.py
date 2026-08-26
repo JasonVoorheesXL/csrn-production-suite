@@ -1819,7 +1819,14 @@ def load_state_for_reporting() -> dict[str, Any]:
     state = load_state()
     if str(state.get("status", "")).strip().lower() != "completed":
         return state
-    if state.get("history") or state.get("events") or state.get("plays"):
+    # events/plays are what statistics/recap/play-register actually consume
+    # -- history is irrelevant to whether backfilling is needed. Checking
+    # history here was the bug: a stray leftover history entry (e.g. from
+    # set_control_source() running after end_game() -- see
+    # StateService.push_history()'s completed-broadcast guard) made this
+    # `or` trip and skip the archive fallback even though events/plays were
+    # both genuinely empty.
+    if state.get("events") or state.get("plays"):
         return state
     broadcast_id = str(state.get("broadcast_id", "") or "").strip()
     if not broadcast_id:

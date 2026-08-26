@@ -186,6 +186,30 @@ def test_history_is_capped_at_fifty() -> None:
     assert state["history"][0] == {"n": 1}
 
 
+def test_push_history_is_a_noop_once_the_broadcast_is_completed() -> None:
+    # Confirmed live: set_control_source() ran 17s after end_game() had
+    # already finalized and cleared a real broadcast's history/events/plays
+    # to []. It calls this same shared push_history() unconditionally, which
+    # silently re-populated "cleared" history with one stray snapshot --
+    # debris with no further purpose, since there's no more live game to
+    # undo actions within once it's over. app.load_state_for_reporting()
+    # relies on events/plays staying empty to know it needs to fall back to
+    # the archived snapshot.
+    state = defaults() | {"status": "completed", "history": []}
+    StateService.push_history(state)
+    assert state["history"] == []
+
+
+def test_push_history_still_records_the_final_pre_archive_snapshot() -> None:
+    # end_game() calls push_history() while status is still "live" (before
+    # it flips to "completed" and the archive+clear runs) -- that snapshot
+    # must still be recorded normally; only pushes made *after* the
+    # broadcast is already completed should be skipped.
+    state = defaults() | {"status": "live", "history": []}
+    StateService.push_history(state)
+    assert len(state["history"]) == 1
+
+
 def test_public_state_removes_local_media_paths() -> None:
     service, _ = build()
     state = defaults() | {
