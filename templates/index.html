@@ -4493,7 +4493,7 @@ async function runSponsorAdvertisement(){
     status.textContent='Preparing sponsor advertisement…';status.className='status';
     RuntimeDiagnostics.send('COMMERCIAL_START_REQUESTED',{status:'PREPARING',media_asset_id:mediaAssetId});
     const duration=await sponsorAdvertisementDuration(asset);
-    currentState=await api('/api/graphics/sponsor-spotlight',{action:'show',sponsor_id:sponsorId,media_asset_id:mediaAssetId,lead_in:'SPONSOR MESSAGE',caption:asset.name||'',duration,visible:true});
+    currentState=await api('/api/graphics/sponsor-spotlight',{action:'show',sponsor_id:sponsorId,media_asset_id:mediaAssetId,lead_in:'SPONSOR MESSAGE',caption:'',duration,visible:true});
     RuntimeDiagnostics.send('COMMERCIAL_STARTED',{status:'ON_AIR',media_asset_id:mediaAssetId,duration_ms:duration*1000});
     render();
   }catch(error){RuntimeDiagnostics.send('COMMERCIAL_FAILED',{status:'ERROR',media_asset_id:mediaAssetId});status.textContent=error.message||'Unable to run sponsor advertisement.';status.className='status error'}
