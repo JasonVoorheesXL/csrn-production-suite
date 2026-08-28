@@ -2344,7 +2344,12 @@ function mountCentralBoardMedia(root, runtime, mode, alias) {
       video.preload = "auto";
       video.controls = false;
       video.loop = false;
-      video.muted = true;
+      // Sole sponsor renderer now that the legacy #sponsorSpotlight panel is gated
+      // off whenever a themed board is active — so this element carries the audio
+      // for approved advertisement commercials.
+      const wantsAudio = textValue(graphic.presentation_mode, "").toLowerCase() === "advertisement" && graphic.audio_enabled === true;
+      video.muted = !wantsAudio;
+      video.volume = 1;
       video.setAttribute("playsinline", "");
       video.addEventListener("error", () => {
         video.remove();
@@ -2352,6 +2357,16 @@ function mountCentralBoardMedia(root, runtime, mode, alias) {
       }, {once:true});
       mediaWrap.appendChild(video);
       video.play().catch(() => {
+        // Unmuted autoplay can be blocked without a user gesture; fall back to a
+        // muted commercial rather than dropping the video entirely.
+        if (!video.muted) {
+          video.muted = true;
+          video.play().catch(() => {
+            video.remove();
+            if (!installImage(logoUrl)) mediaWrap.classList.add("media-unavailable");
+          });
+          return;
+        }
         video.remove();
         if (!installImage(logoUrl)) mediaWrap.classList.add("media-unavailable");
       });
