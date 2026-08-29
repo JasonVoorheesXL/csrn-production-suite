@@ -4480,6 +4480,10 @@ function renderSponsorAdvertisementPreview(){
   const preview=document.getElementById('sadPreview');if(!preview)return;
   const media=asset?.file_url?`<video src="${escapeHtml(asset.file_url)}" muted autoplay loop playsinline preload="metadata"></video>`:'';
   preview.innerHTML=`${media}<strong>SPONSOR ADVERTISEMENT · ${escapeHtml(sponsor?.name||'SELECT SPONSOR')}</strong><span>${escapeHtml(asset?.name||'Select an approved advertisement video.')} · AUDIO ON AIR</span>`;
+  // Read the run time now, when the operator picks the video -- not on the
+  // Run click. Populates sponsorAdvertisementDurationCache so the trigger
+  // path is a cache hit instead of a cold <video> metadata load.
+  if(asset?.file_url)sponsorAdvertisementDuration(asset).catch(()=>{});
 }
 function sponsorAdvertisementDuration(asset){
   if(!asset?.file_url)return Promise.reject(new Error('Advertisement video is missing.'));
@@ -4499,14 +4503,21 @@ async function runSponsorAdvertisement(){
   const status=document.getElementById('sadStatus');
   const asset=assetRecords.find(a=>a.id===mediaAssetId);
   if(!sponsorId||!asset){status.textContent='Select an active sponsor and an approved advertisement video.';status.className='status error';return}
+  // Immediate acknowledgment the instant the operator clicks -- reuses the
+  // command client's SUBMITTING status surface. Independent of whatever
+  // later confirms the video is actually playing on the overlay.
+  commandClientStatus('SUBMITTING · sponsor advertisement','warning',0);
+  status.textContent='Sponsor video triggered — starting…';status.className='status';
   try{
-    status.textContent='Preparing sponsor advertisement…';status.className='status';
     RuntimeDiagnostics.send('COMMERCIAL_START_REQUESTED',{status:'PREPARING',media_asset_id:mediaAssetId});
+    // Cache hit off the selection-time pre-read (renderSponsorAdvertisementPreview);
+    // only blocks here on a cold cache.
     const duration=await sponsorAdvertisementDuration(asset);
     currentState=await api('/api/graphics/sponsor-spotlight',{action:'show',sponsor_id:sponsorId,media_asset_id:mediaAssetId,lead_in:'SPONSOR MESSAGE',caption:'',duration,visible:true});
     RuntimeDiagnostics.send('COMMERCIAL_STARTED',{status:'ON_AIR',media_asset_id:mediaAssetId,duration_ms:duration*1000});
+    commandClientStatus('COMMITTED · sponsor advertisement','success',1800);
     render();
-  }catch(error){RuntimeDiagnostics.send('COMMERCIAL_FAILED',{status:'ERROR',media_asset_id:mediaAssetId});status.textContent=error.message||'Unable to run sponsor advertisement.';status.className='status error'}
+  }catch(error){RuntimeDiagnostics.send('COMMERCIAL_FAILED',{status:'ERROR',media_asset_id:mediaAssetId});status.textContent=error.message||'Unable to run sponsor advertisement.';status.className='status error';commandClientStatus('Sponsor advertisement failed to start.','error',7000)}
 }
 async function stopSponsorAdvertisement(){RuntimeDiagnostics.send('COMMERCIAL_STOP_REQUESTED',{status:'STOPPING'});currentState=await api('/api/graphics/sponsor-spotlight',{action:'hide'});RuntimeDiagnostics.send('COMMERCIAL_STOPPED',{status:'STOPPED'});render()}
 function newSponsorAdvertisementAsset(){
@@ -4543,7 +4554,7 @@ function renderSponsorSpotlightPreview(){
   preview.innerHTML=`${media}<strong>${escapeHtml(document.getElementById('spsLead')?.value||'SPONSOR SPOTLIGHT')}</strong><span>${escapeHtml(document.getElementById('spsCaption')?.value||sponsor?.name||'Select sponsor media.')}</span>`;
 }
 function sponsorSpotlightPayload(action){return{action,sponsor_id:document.getElementById('spsSponsor').value,media_asset_id:document.getElementById('spsMedia').value,lead_in:document.getElementById('spsLead').value.trim(),caption:document.getElementById('spsCaption').value.trim(),duration:Number(document.getElementById('spsDuration').value||12),visible:action==='show'}}
-async function showSponsorSpotlight(){const p=sponsorSpotlightPayload('show');const status=document.getElementById('spsStatus');if(!p.sponsor_id||!p.media_asset_id){status.textContent='Select an active sponsor and its media.';status.className='status error';return}currentState=await api('/api/graphics/sponsor-spotlight',p);render()}
+async function showSponsorSpotlight(){const p=sponsorSpotlightPayload('show');const status=document.getElementById('spsStatus');if(!p.sponsor_id||!p.media_asset_id){status.textContent='Select an active sponsor and its media.';status.className='status error';return}commandClientStatus('SUBMITTING · sponsor spotlight','warning',0);status.textContent='Sponsor spotlight triggered — starting…';status.className='status';try{currentState=await api('/api/graphics/sponsor-spotlight',p);commandClientStatus('COMMITTED · sponsor spotlight','success',1800);render()}catch(error){status.textContent=error.message||'Unable to show sponsor spotlight.';status.className='status error';commandClientStatus('Sponsor spotlight failed to start.','error',7000)}}
 async function hideSponsorSpotlight(){currentState=await api('/api/graphics/sponsor-spotlight',{action:'hide'});render()}
 async function clearSponsorSpotlight(){currentState=await api('/api/graphics/sponsor-spotlight',{action:'clear'});render()}
 async function cancelGraphicsQueueItem(id){currentState=await api('/api/graphics/queue',{action:'cancel',id});render()}
