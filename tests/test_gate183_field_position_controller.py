@@ -19,6 +19,17 @@ def test_field_controller_commits_through_authoritative_correction_boundary():
     assert "source,down:currentState.down" in INDEX
 
 
+def test_game_context_box_uses_canonical_yards_to_goal_not_territory_regex():
+    # The drive/down box (#rulesContext) must derive yards-to-goal /
+    # red-zone from canonical_field_state (measured toward the end zone the
+    # offense is driving toward), NOT the old regex that flagged RED ZONE
+    # for the ball being near *either* goal line.
+    assert "currentState.canonical_field_state" in INDEX
+    assert "cfs.yards_to_goal" in INDEX
+    assert "${toGoal} to goal" in INDEX
+    assert r"/VISITOR ([1-9]|1\d|20)$/" not in INDEX  # dead, wrong-reference regex removed
+
+
 def test_drive_direction_is_integrated_with_field_controller():
     assert "setFieldDrive('broadcaster','left')" in INDEX
     assert "setFieldDrive('statistician','right')" in INDEX

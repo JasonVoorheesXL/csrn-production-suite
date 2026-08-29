@@ -97,8 +97,34 @@ class CanonicalStateFoundation:
         )
 
     @classmethod
+    def yards_to_goal(cls, state: Mapping[str, Any]) -> int:
+        """Yards from the ball to the goal line the possessing team is driving
+        toward -- i.e. yards to score, NOT distance into the labeled team's
+        territory.
+
+        ball_spot coord runs 0 (LEFT/HOME goal) .. 100 (RIGHT/VISITOR goal).
+        A team driving "right" attacks coord 100, so it has (100 - coord) to
+        go; a team driving "left" attacks coord 0, so it has (coord) to go.
+        Possession direction already flips at halftime, so this is correct in
+        both halves without any special-casing.
+
+        Example: ball on the Caledonia 30 (30 yds from Caledonia's goal). If
+        Itawamba has it and is driving at that goal -> 30 to score. If
+        Caledonia has it (driving the other way) -> 70 to score.
+        """
+
+        roles = cls.team_roles(state)
+        coord = cls._spot_to_coord(state.get("ball_spot") or 50)
+        direction = str(
+            state.get(f"{roles.possessing_team}_direction", "right") or "right"
+        ).strip().lower()
+        to_goal = coord if direction == "left" else 100 - coord
+        return max(0, min(100, int(to_goal)))
+
+    @classmethod
     def field_state(cls, state: Mapping[str, Any]) -> dict[str, Any]:
         roles = cls.team_roles(state)
+        to_goal = cls.yards_to_goal(state)
         return {
             "ball_spot": str(state.get("ball_spot", "") or ""),
             "possession": roles.possessing_team,
@@ -106,6 +132,8 @@ class CanonicalStateFoundation:
             "defense": roles.defense,
             "down": str(state.get("down", "1st") or "1st"),
             "distance": str(state.get("distance", "10") or "10"),
+            "yards_to_goal": to_goal,
+            "red_zone": 0 < to_goal <= 20,
             "drive_direction": str(
                 state.get(f"{roles.possessing_team}_direction", "right") or "right"
             ),

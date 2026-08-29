@@ -3841,7 +3841,17 @@ function render() {
   const sec=Number(currentState.clock_seconds??720), clock=document.getElementById('gameClockReadout'); if(clock)clock.textContent=`${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`; const cs=document.getElementById('gameClockStatus');if(cs){cs.textContent=currentState.clock_running?'RUNNING':'STOPPED';cs.classList.toggle('running',Boolean(currentState.clock_running))}
   const driveTeam=currentState.possession==='visitor'?'visitor':'home',driveDir=currentState[driveTeam+'_direction'];const ddr=document.getElementById('driveDirRight'),ddl=document.getElementById('driveDirLeft');if(ddr)ddr.classList.toggle('active',driveDir==='right');if(ddl)ddl.classList.toggle('active',driveDir==='left');
   renderFieldPositionControllers();
-  const ctx=document.getElementById('rulesContext');if(ctx){const d=String(currentState.distance||'10');const spot=currentState.ball_spot||'50';const red=/VISITOR ([1-9]|1\d|20)$/.test(spot)||/HOME ([1-9]|1\d|20)$/.test(spot);ctx.textContent=`${currentState.down||'1st'} & ${d} · Ball: ${spot} · ${currentState.possession==='home'?currentState.home_team:currentState.visitor_team}${currentState.down==='4th'?' · FOURTH DOWN':''}${d==='Goal'?' · GOAL TO GO':''}${red?' · RED ZONE':''}`;}
+  const ctx=document.getElementById('rulesContext');if(ctx){const d=String(currentState.distance||'10');const spot=currentState.ball_spot||'50';
+    // yards-to-goal is measured toward the end zone the possessing team is
+    // driving toward (canonical_field_state.yards_to_goal), NOT proximity to
+    // whichever team's territory the yard line is labeled with. The old
+    // regex here flagged RED ZONE for the ball being near *either* goal line.
+    const cfs=currentState.canonical_field_state||{};
+    const toGoal=Number.isFinite(Number(cfs.yards_to_goal))?Number(cfs.yards_to_goal):null;
+    const dNum=parseInt(d,10);
+    const goalToGo=d==='Goal'||(toGoal!==null&&toGoal>0&&Number.isFinite(dNum)&&dNum>=toGoal);
+    const redZone=cfs.red_zone===true||(toGoal!==null&&toGoal>0&&toGoal<=20);
+    ctx.textContent=`${currentState.down||'1st'} & ${d} · Ball: ${spot} · ${currentState.possession==='home'?currentState.home_team:currentState.visitor_team}${toGoal!==null?` · ${toGoal} to goal`:''}${currentState.down==='4th'?' · FOURTH DOWN':''}${goalToGo?' · GOAL TO GO':''}${redZone?' · RED ZONE':''}`;}
 
   const rs=document.getElementById('readinessSummary'); if(rs) rs.dataset.broadcastStatus=currentState.status||'planned';
   const startButton=document.getElementById('startBroadcastButton'); if(startButton){startButton.disabled=currentState.status==='completed'; startButton.title=currentState.status==='completed'?'Completed broadcasts open in review mode.':'';}
