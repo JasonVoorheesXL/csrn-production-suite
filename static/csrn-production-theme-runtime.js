@@ -41,6 +41,46 @@ const PLAYER_PENDING_CLASS = "csrn-production-theme-player-pending";
 const HIGHLIGHT_ACTIVE_CLASS = "csrn-production-theme-highlight-active";
 const SPONSOR_ACTIVE_CLASS = "csrn-production-theme-sponsor-active";
 
+// --- Sponsor video warm cache ------------------------------------------------
+// The 5-15s gap between the operator clicking Run and a sponsor commercial
+// appearing is a cold fetch+decode: mountCentralBoardMedia() built a brand
+// new <video src> every trigger. Sponsor videos are configured in advance,
+// so keep a hidden preloaded <video> per URL and hand that warm element to
+// the board on trigger. media_url persists in runtime state after a hide, so
+// warmSponsorVideo() (called every poll) has the next commercial buffered
+// well before Run is clicked again. First-ever trigger of a URL is still
+// cold -- eliminating that needs an arm-on-select signal (see summary).
+const sponsorVideoWarmCache = new Map(); // url -> detached HTMLVideoElement
+const SPONSOR_WARM_CACHE_MAX = 6;
+
+function warmSponsorVideo(url) {
+  if (typeof url !== "string" || !url) return null;
+  const existing = sponsorVideoWarmCache.get(url);
+  if (existing) return existing;
+  const el = document.createElement("video");
+  el.preload = "auto";
+  el.muted = true;
+  el.loop = false;
+  el.playsInline = true;
+  el.setAttribute("playsinline", "");
+  el.src = url;
+  try { el.load(); } catch (_) {}
+  sponsorVideoWarmCache.set(url, el);
+  while (sponsorVideoWarmCache.size > SPONSOR_WARM_CACHE_MAX) {
+    const oldestUrl = sponsorVideoWarmCache.keys().next().value;
+    const oldest = sponsorVideoWarmCache.get(oldestUrl);
+    sponsorVideoWarmCache.delete(oldestUrl);
+    try { oldest.removeAttribute("src"); oldest.load(); } catch (_) {}
+  }
+  return el;
+}
+
+function takeWarmSponsorVideo(url) {
+  const el = warmSponsorVideo(url);
+  sponsorVideoWarmCache.delete(url); // the board fully owns it now
+  return el;
+}
+
 const PACKAGE_ALIASES = Object.freeze({
   friday_night_stadium: Object.freeze({
     globalName: "CSRNFridayNightStadiumEngine",
@@ -2345,9 +2385,13 @@ function mountCentralBoardMedia(root, runtime, mode, alias) {
     };
 
     if (type === "video" && primaryUrl) {
-      const video = document.createElement("video");
+      // Reuse the hidden element that has been buffering this URL since the
+      // last poll -- .play() on it starts near-instantly instead of the
+      // 5-15s cold fetch+decode of a freshly created <video>.
+      const video = takeWarmSponsorVideo(primaryUrl) || document.createElement("video");
       video.className = "csrn-production-sponsor-asset";
-      video.src = primaryUrl;
+      if (video.getAttribute("src") !== primaryUrl) video.src = primaryUrl;
+      try { video.currentTime = 0; } catch (_) {}
       video.autoplay = true;
       video.playsInline = true;
       video.preload = "auto";
@@ -2825,6 +2869,12 @@ async function renderSelected() {
     const captionSegment = activeCaptionSegment(captionState);
     runtimeClockRunning = runtime.clock_running === true;
     lastRuntimeForClockPatch = runtime;
+    // Buffer the next sponsor commercial ahead of the Run click. media_url
+    // survives a hide in state, so this warms the element between commercials.
+    const warmSpot = objectValue(runtime.sponsor_spotlight);
+    if (String(warmSpot.media_type || "").toLowerCase() === "video") {
+      warmSponsorVideo(imageCandidate(warmSpot.media_url));
+    }
     const playerPending =
       playerVisible(runtime) && themedIntegratedPlayerSupported(alias);
     setPlayerPending(playerPending);
