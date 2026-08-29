@@ -77,6 +77,10 @@ PUBLIC_ENDPOINTS = {
     "support_routes.roster_headshot_file",
     "system_routes.get_state",
     "system_routes.get_runtime_state",
+    # GET /api/health: dependency-free liveness probe for
+    # CSRN_GAME_DAY_LAUNCHER.ps1, which has no operator session and must be
+    # able to reach it even when the state write path is stuck.
+    "system_routes.get_health",
     # POST /api/overlay-health: the overlay itself (running unauthenticated
     # in OBS) self-reports health/status back to the server; there is no
     # operator session to authenticate it with.

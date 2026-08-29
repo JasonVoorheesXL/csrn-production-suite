@@ -127,6 +127,25 @@ def test_blueprint_registers_preserved_system_urls(system_client) -> None:
     assert ("/api/runtime-state", ("GET",)) in rules
     assert ("/api/readiness", ("GET",)) in rules
     assert ("/api/build-journal", ("GET",)) in rules
+    assert ("/api/health", ("GET",)) in rules
+
+
+def test_health_route_is_public_fast_and_never_reads_state(system_client) -> None:
+    client, _, _, calls = system_client
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["service"] == "csrn"
+    assert isinstance(payload["pid"], int)
+    assert isinstance(payload["time"], int)
+    assert isinstance(payload["uptime_s"], int) and payload["uptime_s"] >= 0
+    # The whole point of the endpoint: it must answer without touching the
+    # state load path (which can be stuck behind the write lock mid-game).
+    assert calls["state"] == 0
+    assert calls["runtime_load_state"] == 0
+    assert calls["public_state"] == 0
+    assert calls["runtime_state"] == 0
 
 
 def test_state_route_remains_public_and_filters_state(system_client) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import os
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
@@ -12,6 +13,13 @@ from runtime_diagnostics_service import get_runtime_diagnostics, latest_id, new_
 
 
 RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
+
+# Captured once at import so /api/health can report process uptime without
+# touching any service, lock, or file. The launcher's readiness probe needs an
+# endpoint that still answers a fast 200 even when the state write path is
+# jammed -- so this route must never call load_state()/load_runtime_state() or
+# take any lock.
+_PROCESS_STARTED = time.time()
 
 
 _OVERLAY_HEALTH: dict[str, Any] = {
@@ -83,6 +91,23 @@ def create_system_blueprint(
     @dependencies.require_auth
     def diagnostics():
         return jsonify(dict(dependencies.diagnostic_status()))
+
+    @routes.get("/api/health")
+    def get_health():
+        # Public, dependency-free liveness probe for CSRN_GAME_DAY_LAUNCHER.ps1.
+        # Intentionally does NOT read game state or take any lock: the launcher
+        # uses it to tell "healthy" apart from "port bound but hung", so it has
+        # to answer even when a mutation is stuck holding the state lock.
+        now = time.time()
+        return jsonify(
+            {
+                "status": "ok",
+                "service": "csrn",
+                "pid": os.getpid(),
+                "time": int(now),
+                "uptime_s": int(max(0.0, now - _PROCESS_STARTED)),
+            }
+        )
 
     @routes.get("/api/state")
     def get_state():
