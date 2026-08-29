@@ -70,4 +70,6 @@ def test_spotlight_card_reuses_page_native_markup_idiom() -> None:
 def test_rebuild_cards_wires_spotlights_into_existing_rotation() -> None:
     html = read("templates/pregame_universal_overlay.html")
     assert "const halftime=data.settings?.mode!=='delayed'&&phase==='halftime';" in html
-    assert "list=[weather,...spotlights.map(spotlightCard)];" in html
+    # weather + the completed half's spotlight cards + active sponsors, all
+    # in the page's existing cards[]/tick() rotation.
+    assert "list=[weather,...spotlights.map(spotlightCard),...sponsors];" in html

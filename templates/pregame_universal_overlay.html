@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CSRN Universal Pregame / Delay Overlay</title>
+<title>CSRN Broadcast State Overlay</title>
 <style>
 :root{--bg:#0d1015;--panel:#171c24;--line:rgba(255,255,255,.14);--muted:#aeb7c4;--brand-primary:#c9203b;--brand-secondary:#000000;--brand-accent:#ffffff;--white:#f5f7fa}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;color:var(--white);font-family:Arial,Helvetica,sans-serif}
@@ -75,7 +75,7 @@
 <div id="root">
   <div class="stage">
     <div class="topbar">
-      <div class="brand"><img id="orgLogo" src="/static/csrn-logo.png"><div class="brand-copy"><div class="brand-line"><strong id="orgShortName" class="brand-short">CSRN</strong><strong class="brand-pregame">PREGAME</strong></div><span id="orgLongName" class="brand-long">CALEDONIA SPORTS RADIO NETWORK</span></div></div>
+      <div class="brand"><img id="orgLogo" src="/static/csrn-logo.png"><div class="brand-copy"><div class="brand-line"><strong id="orgShortName" class="brand-short">CSRN</strong><strong id="brandStateLabel" class="brand-pregame">PREGAME</strong></div><span id="orgLongName" class="brand-long">CALEDONIA SPORTS RADIO NETWORK</span></div></div>
       <div id="stateBadge" class="statebadge">PREGAME</div>
     </div>
     <div class="main">
@@ -361,10 +361,28 @@ function spotlightCard(entry){
      </div>
    </section>`;
 }
+function sponsorCard(sp){
+ // Same sponsor roster the Sponsor Advertisement / Sponsor Spotlight
+ // controls use (SponsorService), rendered in this page's own card idiom
+ // and dropped into the existing cards[]/tick() rotation -- no separate
+ // list, pull, or rotation mechanism.
+ if(!sp||!sp.name)return null;
+ const logo=esc(sp.logo||'/static/csrn-logo.png');
+ return `
+   <section class="card">
+     <div class="card-kicker">${esc(sp.lead_in||'Proud sponsor of tonight’s broadcast')}</div>
+     <h1>${esc(sp.name)}</h1>
+     <div class="spotlight-row">
+       <img class="spotlight-portrait" src="${logo}" alt="" onerror="this.onerror=null;this.src='/static/csrn-logo.png'">
+       ${sp.package?`<div class="spotlight-meta"><div class="teammeta">${esc(sp.package)}</div></div>`:''}
+     </div>
+   </section>`;
+}
 function rebuildCards(){
  const weather=weatherCard(),delayState=delayGameStateCard();
  const phase=String(data.game?.broadcast_phase||data.game?.status||'').toLowerCase();
  const halftime=data.settings?.mode!=='delayed'&&phase==='halftime';
+ const sponsors=Array.isArray(data.halftime_sponsors)?data.halftime_sponsors.map(sponsorCard):[];
  let list;
  if(data.settings?.mode==='delayed'&&data.settings?.delay_type==='weather'){
    list=[weather,delayState,gameDetailsCard(),teamProfilesCard(),storylinesCard(),nextWeekCard()];
@@ -372,12 +390,12 @@ function rebuildCards(){
    list=[delayState,gameDetailsCard(),weather,teamProfilesCard(),storylinesCard(),nextWeekCard()];
  }else if(halftime){
    const spotlights=Array.isArray(data.first_half_spotlights)?data.first_half_spotlights:[];
-   list=[weather,...spotlights.map(spotlightCard)];
+   list=[weather,...spotlights.map(spotlightCard),...sponsors];
  }else{
    list=[gameDetailsCard(),weather,teamProfilesCard(),storylinesCard(),nextWeekCard()];
  }
  cards=list.filter(Boolean);
- document.getElementById('cards').innerHTML=cards.join('')||'<div class="empty">Pregame information is loading.</div>';
+ document.getElementById('cards').innerHTML=cards.join('')||`<div class="empty">${halftime?'Halftime coverage is loading.':'Pregame information is loading.'}</div>`;
  const dots=document.getElementById('dots');dots.innerHTML=cards.map((_,i)=>`<i class="dot"></i>`).join('');
  cardIndex=Math.min(cardIndex,Math.max(0,cards.length-1));showCard(cardIndex);
 }
@@ -433,7 +451,13 @@ function renderStatic(){
  const phase=String(g.broadcast_phase||g.status||'').toLowerCase();
  const halftime=!delayed&&phase==='halftime';
  const weatherDelay=delayed&&String(cfg.delay_type||'').toLowerCase()==='weather';
- document.getElementById('stateBadge').textContent=delayed?(weatherDelay?'WEATHER DELAY':'GAME DELAYED'):halftime?'HALFTIME':'PREGAME';
+ // One state word drives BOTH the pill AND the brand-lockup label. The
+ // brand label used to be a hard-coded "PREGAME" that stayed on screen
+ // during halftime/delay -- that is the literal "PREGAME" seen live.
+ const stateWord=delayed?(weatherDelay?'WEATHER DELAY':'GAME DELAYED'):halftime?'HALFTIME':'PREGAME';
+ document.getElementById('stateBadge').textContent=stateWord;
+ const brandStateLabel=document.getElementById('brandStateLabel');
+ if(brandStateLabel)brandStateLabel.textContent=stateWord;
  document.getElementById('stateBadge').classList.toggle('delay',delayed);
  document.getElementById('stateBadge').classList.toggle('halftime',halftime);
  document.getElementById('heroEyebrow').textContent=delayed?(cfg.delay_type||'Game')+' Delay':halftime?'Halftime':"Tonight's Matchup";
@@ -444,7 +468,7 @@ function renderStatic(){
  document.getElementById('homeMeta').textContent=[g.home_classification,recordText(g.home_record)].filter(Boolean).join(' · ');
 document.getElementById('countLabel').textContent=delayed?(cfg.estimated_start?'Estimated Resume In':'Game Delayed'):halftime?'Score at the Half':'Kickoff In';
  document.getElementById('delayNote').textContent=delayed?(cfg.delay_note||'Awaiting an update from game officials.'):'';
- document.getElementById('footerText').textContent=[g.date,g.scheduled_start,g.venue].filter(Boolean).join(' · ')||'CSRN Pregame';
+ document.getElementById('footerText').textContent=[g.date,g.scheduled_start,g.venue].filter(Boolean).join(' · ')||(halftime?'CSRN Halftime':delayed?'CSRN':'CSRN Pregame');
  document.getElementById('root').classList.toggle('visible',shouldShow());
  rebuildCards();
  if(!lastCardSwitch)lastCardSwitch=Date.now();

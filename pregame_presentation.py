@@ -443,6 +443,42 @@ def _first_half_spotlights(state: dict[str, Any]) -> list[dict[str, Any]]:
     return spotlights
 
 
+def _halftime_sponsors() -> list[dict[str, Any]]:
+    """Active sponsors for the halftime rotation.
+
+    Not a new list or pull mechanism: it reads the same sponsor roster the
+    Sponsor Advertisement / Sponsor Spotlight controls pick from
+    (SponsorService.list_payload()), filtered to currently-active sponsors
+    that have a logo, and hands the overlay {name, logo} to cycle through its
+    existing card rotation.
+    """
+    try:
+        payload = _csrn_app().get_sponsor_service().list_payload()
+    except Exception:
+        return []
+    rows = payload.get("sponsors", []) if isinstance(payload, dict) else []
+    sponsors: list[dict[str, Any]] = []
+    for source in rows if isinstance(rows, list) else []:
+        if not isinstance(source, dict):
+            continue
+        if not source.get("active", True):
+            continue
+        if str(source.get("effective_status", "")).strip().lower() == "expired":
+            continue
+        logo = str(source.get("logo_url", "") or "").strip()
+        name = str(source.get("name", "") or "").strip()
+        if not name or not logo:
+            continue
+        lead_ins = source.get("lead_ins") if isinstance(source.get("lead_ins"), list) else []
+        sponsors.append({
+            "name": name,
+            "logo": logo,
+            "package": str(source.get("package", "") or "").strip(),
+            "lead_in": str(lead_ins[0] if lead_ins else "Proud sponsor of tonight's broadcast"),
+        })
+    return sponsors
+
+
 def _config() -> dict[str, Any]:
     csrn_app = _csrn_app()
     try:
@@ -782,6 +818,7 @@ def _payload() -> dict[str, Any]:
         "visitor_identity": visitor,
         "weather": weather,
         "first_half_spotlights": _first_half_spotlights(state),
+        "halftime_sponsors": _halftime_sponsors(),
         "next_matchup": next_matchup,
         "automatic_storylines": automatic_storylines,
         "organization": _organization_branding(),

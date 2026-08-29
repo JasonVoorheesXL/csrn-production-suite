@@ -70,3 +70,43 @@ def test_first_half_spotlights_handles_missing_or_malformed_events() -> None:
     assert pregame_presentation._first_half_spotlights({}) == []
     assert pregame_presentation._first_half_spotlights({"events": "not-a-list"}) == []
     assert pregame_presentation._first_half_spotlights({"events": [None, 5, "x"]}) == []
+
+
+class _FakeSponsorService:
+    def __init__(self, sponsors):
+        self._sponsors = sponsors
+
+    def list_payload(self):
+        return {"sponsors": self._sponsors}
+
+
+def _use_sponsors(monkeypatch, sponsors):
+    fake_app = types.SimpleNamespace(get_sponsor_service=lambda: _FakeSponsorService(sponsors))
+    monkeypatch.setattr(pregame_presentation, "_csrn_app", lambda: fake_app)
+
+
+def test_halftime_sponsors_returns_active_named_sponsors_with_a_logo(monkeypatch) -> None:
+    _use_sponsors(monkeypatch, [
+        {"name": "Next Stage Media", "logo_url": "/asset-files/nsm.png", "active": True,
+         "effective_status": "Active", "package": "Presenting", "lead_ins": ["Presented by"]},
+        {"name": "Blank Logo Co", "logo_url": "", "active": True, "effective_status": "Active"},
+        {"name": "", "logo_url": "/x.png", "active": True, "effective_status": "Active"},
+        {"name": "Lapsed LLC", "logo_url": "/l.png", "active": True, "effective_status": "Expired"},
+        {"name": "Inactive Inc", "logo_url": "/i.png", "active": False, "effective_status": "Active"},
+    ])
+    out = pregame_presentation._halftime_sponsors()
+    assert [s["name"] for s in out] == ["Next Stage Media"]
+    assert out[0] == {
+        "name": "Next Stage Media",
+        "logo": "/asset-files/nsm.png",
+        "package": "Presenting",
+        "lead_in": "Presented by",
+    }
+
+
+def test_halftime_sponsors_is_empty_and_never_raises_when_service_fails(monkeypatch) -> None:
+    def boom():
+        raise RuntimeError("no sponsor service")
+
+    monkeypatch.setattr(pregame_presentation, "_csrn_app", lambda: types.SimpleNamespace(get_sponsor_service=boom))
+    assert pregame_presentation._halftime_sponsors() == []
