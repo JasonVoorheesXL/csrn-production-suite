@@ -3,11 +3,88 @@
 Branch: **`overnight-fixes-20260828`** (off `gate6/final-visual-matrix` @ `0f1d67d`).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
-Full test suite (deterministic, `-p no:randomly`): **51 failed, 2185 passed**.
-Baseline before this session was **51 failed, 2175 passed** — the 51 failures are
-identical (pre-existing static-asset / theme-cache-version pins, documented in
-`docs/WEEK_OF_2026-08-25_FIXES.md`), and the +10 passing are the new tests added
-this session. **0 regressions introduced.**
+Full test suite (deterministic, `-p no:randomly`) after **round 2**: **51 failed,
+2206 passed** (baseline 51 / 2175). The 51 failures are identical to baseline
+(pre-existing static-asset / theme-cache-version pins). **0 regressions
+introduced** across both rounds, verified by before/after failure-set diff on
+every commit.
+
+---
+
+## ROUND 2 — your 4 decisions + the halftime correction (2026-08-29)
+
+| Commit | Item | Notes |
+|---|---|---|
+| `6339675` | **1. Field position** | There is **no yards-to-go NUMBER** on the statistician page. What existed: the ball-spot label ("ITAWAMBA 30", correct) and a **RED ZONE flag in the Game Context box computed from the wrong reference** (`/VISITOR (1-20)$/ ‖ /HOME (1-20)$/` — near *either* goal line, ignoring drive direction — and mostly dead since ball_spot is stored `LEFT N`/`RIGHT N`). Built it per spec: `CanonicalStateFoundation.yards_to_goal()` (toward the end zone the offense drives to; correct across the halftime end-swap) + `field_state()` exposes `yards_to_goal`/`red_zone`; the Game Context box now shows "· N to goal" and derives RED ZONE / GOAL TO GO from it. 10 new tests incl. your exact Caledonia-30 example (30 vs 70) and the Q2-vs-Q3 flip. |
+| `6e29854` | **2. Halftime sponsor area** + **the correction** | See below. |
+| — | **3. nlink check** | Left warn-only as implemented (`6077eaa`). No change. |
+| — | **4. tmp sweep `--apply`** | Ran it. **Deleted 29 orphaned `.state.json.*.tmp` files, 54.6 MB.** Nothing to commit (gitignored). The tool's 60-min age floor correctly left the running app's live temp file alone. |
+
+### The halftime "PREGAME" bug — real root cause (correction accepted)
+
+`0bc9486`'s verdict was wrong. It correctly rewired the `#stateBadge` pill,
+the hero eyebrow, and the count label to the `halftime` phase — but there is
+a **second on-screen "PREGAME"** it never touched: a hard-coded
+`<strong class="brand-pregame">PREGAME</strong>` in the top-left brand
+lockup. No JS ever changed it, so it stayed on screen through halftime and
+delay. That is the literal "PREGAME" you saw after the restarts.
+
+Every "pregame" that can render in `pregame_universal_overlay.html`:
+1. **brand-lockup label** — hard-coded → **fixed** (now `id="brandStateLabel"`,
+   set from the same `stateWord` as the pill → reads "HALFTIME" at halftime).
+2. **empty-state** "Pregame information is loading." → **fixed** (halftime-aware).
+3. **footer fallback** "CSRN Pregame" → **fixed** (halftime-aware).
+4. **`<title>`** (browser tab only) → changed to "CSRN Broadcast State Overlay".
+5. `storylinesCard()`'s "Pregame Storylines" `<h1>` — **already safe**, the
+   halftime branch never includes that card.
+
+Checked the other overlay too: `templates/overlay.html` and
+`static/csrn-production-theme-runtime.js` render **no "PREGAME"** anywhere
+(only `*_pregame_record` field names). So `/pregame-overlay` was the only
+source that could show it.
+
+**Why the test missed it:** `test_halftime_overlay.py` only asserted the
+string `halftime?'HALFTIME':'PREGAME'` was *present in the file* — it never
+checked the rendered halftime output is "pregame"-free.
+
+**New test** `tests/test_halftime_overlay_no_pregame.py`: asserts each leak
+point is fixed, re-derives the halftime card set from the template source and
+asserts it excludes the pregame-only cards, and simulates `renderStatic()`'s
+label logic for `phase='halftime'` asserting no output string contains
+"pregame". (No JS runtime in this env — `node`/`dukpy`/`bs4` all absent —
+so this is the strongest automated check possible here; the manual step
+below is the real proof.)
+
+### Sponsor area
+
+There is **no automatic on-air sponsor rotation system** to hook into — both
+existing on-air sponsor mechanisms (Sponsor Advertisement, Sponsor Spotlight)
+are operator-triggered single shots, and `social_service`'s `sponsor_rules.
+rotation` is for social-post attribution in a different state store. So I
+used the **sponsor roster itself** (`SponsorService.list_payload()`, the same
+list those two controls pick from), filtered to active sponsors that have a
+logo, rendered as cards in the overlay's **existing** `cards[]`/`tick()`
+rotation — no new list, pull, or rotation engine. On the real app this
+resolves to 3 active sponsors right now. **If you meant a different source,
+say so and it's a one-line change in `_halftime_sponsors()`.**
+
+### MANUAL LIVE VERIFICATION for the halftime overlay (do this — tests aren't enough)
+
+1. Merge, **restart CSRN**, and **hard-refresh the `/pregame-overlay` OBS
+   browser source** (its right-click menu → "Refresh cache of current page").
+2. Statistician page → Period Administration → **Start Halftime**.
+3. On `/pregame-overlay` confirm: brand lockup top-left reads **"CSRN
+   HALFTIME"** (not "CSRN PREGAME"); pill "HALFTIME"; eyebrow "Halftime";
+   the big number is the score; label "Score at the Half".
+4. Watch one full rotation: weather → any Q1/Q2 spotlight cards → one card
+   per active sponsor. Nothing says "Pregame Storylines".
+5. **End Halftime** → overlay hides. Then restart once more and repeat, to
+   confirm it holds across restarts (the thing that failed last time).
+
+Note: tonight's game recorded 6 spotlight events but all in Q3/Q4, so the
+first-half spotlight rotation will be empty for *this* broadcast's data —
+the data path itself is sound (those 6 events do carry
+`after.player_graphic`). A real first-half TD/sack will populate it.
 
 ---
 
