@@ -319,10 +319,26 @@ class StateService:
         # live game to undo actions within once it's over.
         if str(state.get("status", "")).strip().lower() == "completed":
             return
+        # The growing per-game arrays (events/plays/redo_stack/correction_log/
+        # graphics_queue) are independently authoritative and reconciled by
+        # EventService -- embedding a full copy of each in every one of the 50
+        # retained snapshots made state.json grow O(N^2) over a broadcast
+        # (8.5MB in one game). Undo's normal path rebuilds from the live
+        # arrays, not from these snapshots; only the no-events fallback reads a
+        # snapshot, and normalize() re-seeds the missing arrays there.
         snapshot = {
             key: copy.deepcopy(value)
             for key, value in state.items()
-            if key not in {"history", LEDGER_FIELD}
+            if key
+            not in {
+                "history",
+                "events",
+                "plays",
+                "redo_stack",
+                "correction_log",
+                "graphics_queue",
+                LEDGER_FIELD,
+            }
         }
         history = state.setdefault("history", [])
         if not isinstance(history, list):
@@ -333,6 +349,10 @@ class StateService:
     def public(self, state: Mapping[str, Any]) -> StateResult:
         result = copy.deepcopy(dict(state))
         result.pop(LEDGER_FIELD, None)
+        # /api/state consumers (command center, OBS overlays) never read the
+        # undo archive; shipping the full history array on every poll is pure
+        # payload weight.
+        result.pop("history", None)
         for key in ("home_identity", "visitor_identity"):
             identity = result.get(key)
             if isinstance(identity, dict):
