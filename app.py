@@ -592,6 +592,35 @@ def _drive_backed_game_day_state() -> bool:
         return True
     return any(part.lower() in {"my drive", "google drive"} for part in STATE_FILE.parts)
 
+
+def authority_state_hardlink_warning(path: Any) -> str | None:
+    """Return a warning string if the live state authority file has extra hard
+    links (st_nlink > 1), else None.
+
+    Tonight's stability incident traced partly to the Google Drive sync client
+    hard-linking state.json into `.tmp.driveupload\\<id>` mid-write, which
+    defeats the local-authority / Drive-mirror split and lets Drive lock the
+    hot write path. A quiet startup check makes a recurrence obvious in the
+    console instead of only showing up as mid-game write failures. Warn-only
+    by design -- it must never stop CSRN from starting a broadcast.
+    """
+
+    try:
+        candidate = Path(path)
+        if not candidate.exists():
+            return None
+        nlink = candidate.stat().st_nlink
+    except (OSError, TypeError, ValueError):
+        return None
+    if nlink and nlink > 1:
+        return (
+            f"[WARN] State authority file has {nlink} hard links: {candidate}. "
+            "Something outside CSRN (usually Google Drive's sync client) is "
+            "holding another link to the hot write path. Move the live state "
+            "out of any synced folder; keep Drive for periodic snapshots only."
+        )
+    return None
+
 STATE_AUTHORITY_PATH = _local_state_authority_path()
 DRIVE_BACKED_GAME_DAY_STATE = _drive_backed_game_day_state()
 STATE_REPOSITORY = (
@@ -3319,6 +3348,9 @@ if __name__ == "__main__":
 
     print("\nCSRN Production Suite — Command Center is running.")
     print(f"State authority: drive_backed={DRIVE_BACKED_GAME_DAY_STATE} mirror={STATE_FILE} authority={STATE_AUTHORITY_PATH}")
+    _authority_hardlink_warning = authority_state_hardlink_warning(STATE_AUTHORITY_PATH)
+    if _authority_hardlink_warning:
+        print(_authority_hardlink_warning)
     print("Laptop: http://127.0.0.1:5050")
     print(f"Phone/iPad: http://{ip}:5050")
     print("OBS overlay: http://127.0.0.1:5050/overlay")
