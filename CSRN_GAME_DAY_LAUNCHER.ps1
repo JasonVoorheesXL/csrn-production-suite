@@ -21,11 +21,64 @@ if (-not $obsRunning) {
 }
 
 # --- CSRN ---
-$csrnRunning = Get-NetTCPConnection -LocalPort 5050 -State Listen -ErrorAction SilentlyContinue
+# Distinguish three states instead of only "is port 5050 listening":
+#   HEALTHY - port bound AND /api/health answers 200 {"status":"ok"} -> do nothing
+#   DOWN    - nothing listening on 5050                              -> start CSRN
+#   HUNG    - port bound but /api/health did not answer in time      -> ask to kill+restart
+# When HEALTHY the behaviour is unchanged: fall through and open the tabs.
+$HealthUrl = "http://127.0.0.1:5050/api/health"
+$launcher  = Join-Path $Repo "RUN_CSRN_COMMAND_CENTER.bat"
 
-if (-not $csrnRunning) {
-    $launcher = Join-Path $Repo "RUN_CSRN_COMMAND_CENTER.bat"
+function Get-CsrnHealth {
+    $listener = Get-NetTCPConnection -LocalPort 5050 -State Listen -ErrorAction SilentlyContinue
+    if (-not $listener) { return "DOWN" }
+    try {
+        $response = Invoke-WebRequest -Uri $HealthUrl -UseBasicParsing -TimeoutSec 3
+        if ($response.StatusCode -eq 200) {
+            $body = $response.Content | ConvertFrom-Json
+            if ($body.status -eq "ok") { return "HEALTHY" }
+        }
+        return "HUNG"
+    }
+    catch {
+        # Port is bound but the HTTP layer did not respond in time / errored.
+        return "HUNG"
+    }
+}
 
+function Get-Port5050Owner {
+    $connection = Get-NetTCPConnection -LocalPort 5050 -State Listen -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if (-not $connection) { return $null }
+    return Get-Process -Id $connection.OwningProcess -ErrorAction SilentlyContinue
+}
+
+$health = Get-CsrnHealth
+
+if ($health -eq "HUNG") {
+    $owner = Get-Port5050Owner
+    if ($owner) { $ownerText = "PID $($owner.Id) ($($owner.ProcessName))" } else { $ownerText = "an unknown process" }
+
+    Add-Type -AssemblyName PresentationFramework
+    $answer = [System.Windows.MessageBox]::Show(
+        "Port 5050 is held by $ownerText but CSRN's health check is not responding.`n`nThe previous CSRN instance appears hung. Stop it and start a fresh one?",
+        "CSRN Game Day",
+        "YesNo",
+        "Warning"
+    )
+
+    if ($answer -eq "Yes" -and $owner) {
+        Stop-Process -Id $owner.Id -Force
+        Start-Sleep -Seconds 2
+        $health = "DOWN"
+    }
+    else {
+        # Do not open browser tabs pointed at a known-bad instance.
+        exit 1
+    }
+}
+
+if ($health -eq "DOWN") {
     if (-not (Test-Path $launcher)) {
         Add-Type -AssemblyName PresentationFramework
         [System.Windows.MessageBox]::Show(
@@ -43,26 +96,22 @@ if (-not $csrnRunning) {
 }
 
 # --- Wait for CSRN to be ready ---
+# Require an actual HEALTHY /api/health, not just any 2xx-4xx from the HTML
+# page (a half-alive instance can still serve a cached page).
 $ready = $false
 
 for ($i = 0; $i -lt 60; $i++) {
-    try {
-        $response = Invoke-WebRequest -Uri $CommandCenter -UseBasicParsing -TimeoutSec 2
-        if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) {
-            $ready = $true
-            break
-        }
+    if ((Get-CsrnHealth) -eq "HEALTHY") {
+        $ready = $true
+        break
     }
-    catch {
-    }
-
     Start-Sleep -Seconds 1
 }
 
 if (-not $ready) {
     Add-Type -AssemblyName PresentationFramework
     [System.Windows.MessageBox]::Show(
-        "CSRN did not become available on port 5050 within 60 seconds.`n`nCheck the CSRN Command Center window for an error.",
+        "CSRN did not become healthy on port 5050 within 60 seconds.`n`nCheck the CSRN Command Center window for an error.",
         "CSRN Game Day",
         "OK",
         "Warning"
