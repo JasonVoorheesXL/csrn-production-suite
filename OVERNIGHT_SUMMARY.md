@@ -3,11 +3,72 @@
 Branch: **`overnight-fixes-20260828`** (off `gate6/final-visual-matrix` @ `0f1d67d`).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
-Full test suite (deterministic, `-p no:randomly`) after **round 3**: **51 failed,
-2211 passed** (baseline 51 / 2175). The 51 failures are identical to baseline
+Full test suite (deterministic, `-p no:randomly`) after **round 4**: **51 failed,
+2222 passed** (baseline 51 / 2175). The 51 failures are identical to baseline
 (pre-existing static-asset / theme-cache-version pins). **0 regressions
-introduced** across all three rounds, verified by before/after failure-set diff
+introduced** across all four rounds, verified by before/after failure-set diff
 on every commit.
+
+---
+
+## ROUND 4 — sponsor video trigger delay (2026-08-29)
+
+Reproducible 5-15 s between clicking Run and a sponsor commercial appearing.
+Traced, not guessed:
+
+| hop | what | cost | fix |
+|---|---|---|---|
+| A | `sponsorAdvertisementDuration(asset)` — a hidden `<video>` metadata load with a 6 s timeout — ran **on the Run click** | 2-6 s on first trigger per page load (or a hard fail on timeout) | `cb9f338` — moved to selection time |
+| B | `POST /api/graphics/sponsor-spotlight` | server does dict work only, ~50 ms | not the cause |
+| C | overlay poll picks up the new `sponsor_spotlight` | `refresh()` runs every 500 ms | not the cause |
+| **D** | **overlay fetches + decodes the video from scratch** — `mountCentralBoardMedia()` did `document.createElement("video") + src + play()` every trigger, and `host.replaceChildren()` destroyed the prior element so even re-runs were cold | **5-15 s** | `8234893` — warm-video preload cache |
+
+### `cb9f338` — instant operator ack + probe off the trigger path (control page)
+
+- `renderSponsorAdvertisementPreview()` (fires on sponsor/video select) now
+  kicks off `sponsorAdvertisementDuration(asset)` so the cache is warm before
+  Run is clicked; `runSponsorAdvertisement()` still probes inline as a
+  cold-cache fallback.
+- `runSponsorAdvertisement()` and `showSponsorSpotlight()` call
+  `commandClientStatus('SUBMITTING · sponsor advertisement' / '… spotlight',
+  'warning', 0)` **synchronously before any `await`** — same status surface
+  the `LiveCommandClient` uses — plus a panel line "Sponsor video triggered —
+  starting…". COMMITTED / failure states report on the same surface.
+  `showSponsorSpotlight()` also gained a `try/catch` (was a silent throw).
+- Staged as isolated hunks; the uncommitted `45000/20000` timeout WIP in
+  `templates/index.html` is untouched.
+
+### `8234893` — overlay preloads sponsor commercials (theme runtime)
+
+- `sponsorVideoWarmCache: Map<url, detached <video preload="auto">>`, bounded
+  to 6. Every poll warms `runtime.sponsor_spotlight.media_url` when it's a
+  video. `graphics_service` keeps `media_url` in state after a **hide**, so
+  between commercials the next one is already buffering.
+- The sponsor board reuses the warm element
+  (`takeWarmSponsorVideo(url) || document.createElement("video")`), resets
+  `currentTime`, then `play()` — near-instant when buffered.
+- **Effect:** the 2nd+ trigger of any sponsor video in a session (the common
+  case) starts within ~1 s. **The first-ever trigger of a URL is still cold.**
+
+### Still open — first-trigger cold load
+
+Eliminating the very first trigger needs an **arm-on-select** signal: when the
+operator picks a sponsor video, write `media_url`/`media_type` into
+`sponsor_spotlight` at `visible:false` so the overlay preloads it during the
+(seconds-to-minutes) gap before Run. That touches `graphics_service`
+(new `action:"arm"` that sets media without `activate_primary`/`visible`),
+both overlays, and the control page — a live-broadcast protocol change I did
+not want to make unattended. ~1-2 hrs with tests; flagged for your call.
+
+### Manual verification
+
+1. Deploy, restart, hard-refresh the `/overlay` OBS source.
+2. Run a sponsor ad. First run: still a few seconds (cold) — but the control
+   page now says "Sponsor video triggered — starting…" **instantly**.
+3. Stop, wait ~2-3 s (one poll warms it), Run the **same** sponsor again →
+   appears within ~1 s.
+4. Confirm a normal commercial still plays start-to-finish with audio, and
+   the logo fallback still shows on a bad media URL.
 
 ---
 
