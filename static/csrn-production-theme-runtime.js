@@ -745,9 +745,11 @@ function mountScroller(target, alias, items, runtime, kind) {
     const text = textFor(persistentItems);
 
     if (!text) {
+      // Nothing persistent left to loop -- clear the theme ticker visually,
+      // but keep TICKER_ACTIVE_CLASS so the legacy #eventTicker stays
+      // suppressed. The active package still owns this slot.
       viewport.remove();
       if (kind === "replace-sibling") target.style.display = "";
-      document.documentElement.classList.remove(TICKER_ACTIVE_CLASS);
       return;
     }
 
@@ -827,9 +829,11 @@ function mountScroller(target, alias, items, runtime, kind) {
           if (persistentItems.length) {
             animatePersistent();
           } else {
+            // Transient stories finished scrolling and nothing persistent
+            // follows: clear the visual, but keep TICKER_ACTIVE_CLASS so the
+            // legacy #eventTicker stays suppressed while this package is active.
             viewport.remove();
             if (kind === "replace-sibling") target.style.display = "";
-            document.documentElement.classList.remove(TICKER_ACTIVE_CLASS);
           }
         })
         .catch(() => {});
@@ -947,7 +951,12 @@ function patchThemeTicker(runtime) {
     runtime,
     false
   );
-  document.documentElement.classList.toggle(TICKER_ACTIVE_CLASS, active);
+  // A production theme OWNS the ticker slot for as long as it is the active
+  // package, even on a quiet play when activateThemeTicker() has nothing new
+  // to scroll and returns false. Toggling the class off here was letting the
+  // legacy #eventTicker flash back in at the bottom of the screen on
+  // individual plays. Only deactivate() (theme -> legacy fallback) releases it.
+  document.documentElement.classList.add(TICKER_ACTIVE_CLASS);
   return active;
 }
 
@@ -2904,8 +2913,11 @@ async function renderSelected() {
     setHostState(scoreHost(), true, alias, packageId, "rendered");
     document.documentElement.classList.add(SCORE_ACTIVE_CLASS);
 
-    const tickerActive = activateThemeTicker(scoreTarget, alias, spec, runtime, true);
-    document.documentElement.classList.toggle(TICKER_ACTIVE_CLASS, tickerActive);
+    activateThemeTicker(scoreTarget, alias, spec, runtime, true);
+    // Own the ticker slot whenever the theme rendered, same as SCORE_ACTIVE_CLASS
+    // above -- a dark theme ticker must not hand the slot back to the legacy
+    // #eventTicker. Released only by deactivate().
+    document.documentElement.classList.add(TICKER_ACTIVE_CLASS);
 
     const integratedPlayerActive = activeVideoMode === "player";
 
