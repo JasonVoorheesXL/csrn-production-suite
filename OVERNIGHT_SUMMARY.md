@@ -4,14 +4,14 @@ Branch: **`overnight-fixes-20260828`** (off `gate6/final-visual-matrix` @ `0f1d6
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
 Full test suite (deterministic, `-p no:randomly`) after **round 3**: **51 failed,
-2208 passed** (baseline 51 / 2175). The 51 failures are identical to baseline
+2211 passed** (baseline 51 / 2175). The 51 failures are identical to baseline
 (pre-existing static-asset / theme-cache-version pins). **0 regressions
 introduced** across all three rounds, verified by before/after failure-set diff
 on every commit.
 
 ---
 
-## ROUND 3 — legacy bottom ticker + theme ticker speed (2026-08-29)
+## ROUND 3 — legacy bottom ticker + theme ticker speed (both done) (2026-08-29)
 
 ### 1. Legacy `#eventTicker` flashing back per-play — FIXED (`510ac9d`)
 
@@ -51,7 +51,21 @@ the bottom edge must stay clear the whole time. Then switch the theme
 selector to "Legacy / None" and confirm `#eventTicker` returns (unchanged
 path).
 
-### 2. Current theme's ticker is too slow — NEEDS YOUR RATE (not committed)
+### 2. Current theme's ticker is too slow — DONE, Option A / "fast" (`2e825df`)
+
+You chose **Option A** with the **Fast** preset. `app.py`
+`DEFAULT_STATE["ticker_speed"]`: `"slow"` (36 px/s) → **`"fast"` (189 px/s)**.
+No scroll-math change. New broadcasts start on Fast; the Scroll Speed
+control still offers all four presets.
+
+**A game already in progress keeps its saved value** — flip the Scroll Speed
+control to Fast to change it live. And the `Math.max(18, distance/speed)`
+floor is untouched: a lone scoring line still takes ~18 s to cross (+4 s
+pauses) on any preset; Fast only pulls clear of the floor once several
+stories are queued (string wider than ~3,400 px). Lowering that floor was
+Options B/C/D and was not taken.
+
+<details><summary>Original analysis (options B/C/D, if you revisit)</summary>
 
 `csrn-production-theme-runtime.js` → `tickerSpeed()`:
 ```js
@@ -75,6 +89,8 @@ Pick one (I'll implement + test whichever you choose):
 Don't want to copy the legacy ticker's feel — the legacy map is
 `{very_slow:24, slow:36, normal:84, fast:189}` with the same 18 s floor, i.e.
 identical. Option C/D deliberately diverge.
+
+</details>
 
 ---
 
