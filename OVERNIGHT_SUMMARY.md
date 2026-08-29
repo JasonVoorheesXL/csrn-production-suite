@@ -3,11 +3,78 @@
 Branch: **`overnight-fixes-20260828`** (off `gate6/final-visual-matrix` @ `0f1d67d`).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
-Full test suite (deterministic, `-p no:randomly`) after **round 2**: **51 failed,
-2206 passed** (baseline 51 / 2175). The 51 failures are identical to baseline
+Full test suite (deterministic, `-p no:randomly`) after **round 3**: **51 failed,
+2208 passed** (baseline 51 / 2175). The 51 failures are identical to baseline
 (pre-existing static-asset / theme-cache-version pins). **0 regressions
-introduced** across both rounds, verified by before/after failure-set diff on
-every commit.
+introduced** across all three rounds, verified by before/after failure-set diff
+on every commit.
+
+---
+
+## ROUND 3 — legacy bottom ticker + theme ticker speed (2026-08-29)
+
+### 1. Legacy `#eventTicker` flashing back per-play — FIXED (`510ac9d`)
+
+**What it is:** `templates/overlay.html` carries two tickers — the legacy
+`#eventTicker` (bottom edge, driven by the inline `refresh()` in that file)
+and the production theme's own ticker (top, rendered by
+`csrn-production-theme-runtime.js`). The legacy one is hidden *only* by a CSS
+rule gated on `html.csrn-production-theme-ticker-active`.
+
+**Root cause (confirmed in source):** the runtime added that class only when
+its ticker had something to scroll *on that tick*. `activateThemeTicker()`
+returns `false` on a quiet play ("no new transient story and no persistent
+scoring story: leave the ticker dark"), and the two call sites did
+`classList.toggle(TICKER_ACTIVE_CLASS, <that boolean>)` — so on any routine
+play the class came **off** and the legacy `#eventTicker` reappeared at the
+bottom, then vanished again on the next scoring play. Two more sites inside
+`mountScroller` removed the class when the theme scroller ran out of stories.
+That is the per-play flash. The "too fast" look is the legacy track's
+`animate()` restarting from offset 0 every play (signature change) so it
+never settles.
+
+**Fix:** 4 one-line changes, all one direction — an active production package
+**owns** the ticker slot regardless of content (same as `SCORE_ACTIVE_CLASS`,
+which was already handled this way). `patchThemeTicker()` and the full-render
+path now `classList.add(TICKER_ACTIVE_CLASS)`; the `mountScroller` teardown
+branches no longer remove it; `deactivate()` (theme → legacy fallback)
+is now the **only** remover, so legacy-theme mode still shows `#eventTicker`.
+
+**Also found:** `static/csrn-production-theme-adapter.js` (still
+`<script>`-loaded in overlay.html, `?v=16.2-r1`) is **dead code** — its
+`apply()` / `setLegacyVisible()` are never called by anything. Not touched;
+flag for a future cleanup.
+
+**Manual verify:** deploy, restart, hard-refresh `/overlay`; with a
+production theme active run several plays incl. routine ones between scores —
+the bottom edge must stay clear the whole time. Then switch the theme
+selector to "Legacy / None" and confirm `#eventTicker` returns (unchanged
+path).
+
+### 2. Current theme's ticker is too slow — NEEDS YOUR RATE (not committed)
+
+`csrn-production-theme-runtime.js` → `tickerSpeed()`:
+```js
+({very_slow:24, slow:36, normal:84, fast:189})[runtime.ticker_speed] || 36   // px/sec
+```
+Live state has `ticker_speed:"slow"` → **36 px/s** (also the `app.py` default).
+Scroll time per loop is `Math.max(18, distance / 36) + 2s pauses × 2`. The
+**`Math.max(18, …)` floor** means any line under ~650 px still takes 18 s to
+cross (+4 s pause) — most single scoring lines hit that floor. So both the
+low px/s *and* the 18 s floor make it crawl.
+
+Pick one (I'll implement + test whichever you choose):
+
+| | Change | ~loop time, 900 px line | Notes |
+|---|---|---|---|
+| **A** | none — just set the Scroll Speed dropdown to **Normal** | ~22 s (floor still bites) | zero risk, instant, try it first |
+| **B** | floor `18 → 10` only, keep presets | ~29 s | conservative |
+| **C** | `slow: 36 → 55` **and** floor `18 → 10` | ~20 s | my lean — fixes the two real causes, only touches "slow" |
+| **D** | presets `{very_slow:30, slow:52, normal:80, fast:150}` + floor `18 → 10` | ~21 s at "slow" | if you want all four presets retuned |
+
+Don't want to copy the legacy ticker's feel — the legacy map is
+`{very_slow:24, slow:36, normal:84, fast:189}` with the same 18 s floor, i.e.
+identical. Option C/D deliberately diverge.
 
 ---
 
