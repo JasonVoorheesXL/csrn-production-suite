@@ -15,7 +15,7 @@ def test_gate165_state_defaults_to_legacy(tmp_path, monkeypatch):
     assert state["authoritative"] is True
 
 
-@pytest.mark.parametrize("package_id", sorted(service.APPROVED_PACKAGE_IDS))
+@pytest.mark.parametrize("package_id", sorted(service.SELECTABLE_PACKAGE_IDS))
 def test_gate165_round_trip_persistence(tmp_path, monkeypatch, package_id):
     path = tmp_path / "state.json"
     monkeypatch.setenv("CSRN_PRODUCTION_TEMPLATE_STATE_PATH", str(path))
@@ -31,6 +31,31 @@ def test_gate165_invalid_package_rejected(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="invalid_production_template"):
         service.write_production_template_state("not_real")
     assert not path.exists()
+
+
+def test_disabled_package_cannot_be_selected_and_reads_back_as_default(tmp_path, monkeypatch):
+    # digital_neon is temporarily hidden: still "approved" (a known id) but
+    # not "selectable". write rejects it; a stale state file naming it reads
+    # back as the default rather than persisting a hidden selection.
+    assert "digital_neon" in service.DISABLED_PACKAGE_IDS
+    assert "digital_neon" in service.APPROVED_PACKAGE_IDS
+    assert "digital_neon" not in service.SELECTABLE_PACKAGE_IDS
+
+    path = tmp_path / "state.json"
+    monkeypatch.setenv("CSRN_PRODUCTION_TEMPLATE_STATE_PATH", str(path))
+    with pytest.raises(ValueError, match="invalid_production_template"):
+        service.write_production_template_state("digital_neon")
+
+    path.write_text(json.dumps({"schema": service.SCHEMA, "package_id": "digital_neon"}), encoding="utf-8")
+    assert service.read_production_template_state()["package_id"] == service.DEFAULT_PACKAGE_ID
+
+
+def test_neon_engine_code_is_left_intact():
+    # This round is a hide, not a removal.
+    for engine in ("static/csrn-neon-r1-engine.js", "static/csrn-neon-r2-engine.js"):
+        assert (ROOT / engine).is_file()
+    layout = (ROOT / "static" / "csrn-broadcast-layout-engine.js").read_text(encoding="utf-8")
+    assert 'id:"digital_neon"' in layout
 
 
 def test_gate165_routes_live_in_blueprint_layer_not_app():

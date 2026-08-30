@@ -17,7 +17,22 @@
     collegiate_traditional: "Collegiate Tech"
   });
 
-  const APPROVED = new Set(Object.keys(LABELS));
+  // Temporarily hidden from selection -- Neon code is kept, it comes back.
+  // TO RE-ENABLE NEON: remove "digital_neon" here (and from
+  // DISABLED_PACKAGE_IDS in production_template_service.py). Nothing else.
+  const DISABLED = new Set(["digital_neon"]);
+
+  const APPROVED = new Set(
+    Object.keys(LABELS).filter(id => !DISABLED.has(id))
+  );
+
+  function pruneDisabledOptions() {
+    const select = document.getElementById(SELECT_ID);
+    if (!select) return;
+    for (const option of Array.from(select.options)) {
+      if (DISABLED.has(option.value)) option.remove();
+    }
+  }
   let activePackageId = "legacy";
   let loading = false;
 
@@ -97,14 +112,6 @@
       return;
     }
 
-    if (
-      packageId === "digital_neon" &&
-      !window.confirm("Neon is currently deferred / unvalidated. Apply it to the production overlay anyway?")
-    ) {
-      select.value = activePackageId;
-      return;
-    }
-
     const liveLike =
       window.currentState &&
       ["live", "halftime", "postgame"].includes(String(window.currentState.phase || "").toLowerCase());
@@ -156,6 +163,7 @@
     const refresh = byId(REFRESH_ID);
     if (!select || !apply || !refresh) return false;
 
+    pruneDisabledOptions();
     apply.addEventListener("click", applyTheme);
     refresh.addEventListener("click", loadThemeState);
     select.addEventListener("change", () => {

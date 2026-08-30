@@ -14,8 +14,14 @@ const OPTIONS = Object.freeze([
   Object.freeze({id:"collegiate_traditional", label:"Collegiate"})
 ]);
 
+// Temporarily hidden from selection (Neon code kept; it comes back).
+// TO RE-ENABLE NEON: remove "digital_neon" here + in
+// production_template_service.py's DISABLED_PACKAGE_IDS.
+const DISABLED = Object.freeze(new Set(["digital_neon"]));
+const SELECTABLE_OPTIONS = Object.freeze(OPTIONS.filter(option => !DISABLED.has(option.id)));
+
 function valid(value) {
-  return OPTIONS.some(option => option.id === value);
+  return SELECTABLE_OPTIONS.some(option => option.id === value);
 }
 
 function optionLabel(packageId) {
@@ -133,7 +139,7 @@ function buildPanel() {
   main.insertBefore(section, main.firstChild);
 
   const menu = document.getElementById(MENU_ID);
-  for (const option of OPTIONS) {
+  for (const option of SELECTABLE_OPTIONS) {
     const node = document.createElement("option");
     node.value = option.id;
     node.textContent = option.label;

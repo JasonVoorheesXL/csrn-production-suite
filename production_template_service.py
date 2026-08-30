@@ -23,6 +23,17 @@ APPROVED_PACKAGE_IDS = frozenset(
         "collegiate_traditional",
     }
 )
+
+# Temporarily hidden from the operator's theme picker. All Neon code
+# (engines, renderer, adapter entries) is intentionally left intact -- this
+# is a hide, not a removal, and it is coming back.
+#   TO RE-ENABLE NEON: delete "digital_neon" from this one set (and from the
+#   matching DISABLED set in static/csrn-pregame-theme-selector.js). Nothing
+#   else needs to change.
+DISABLED_PACKAGE_IDS = frozenset({"digital_neon"})
+
+# What the picker may actually select / persist right now.
+SELECTABLE_PACKAGE_IDS = APPROVED_PACKAGE_IDS - DISABLED_PACKAGE_IDS
 _LOCK = threading.RLock()
 _BASE_DIR = Path(__file__).resolve().parent
 
@@ -49,7 +60,9 @@ def state_path() -> Path:
 
 def _normalize(value: Any) -> str:
     candidate = str(value or "").strip()
-    return candidate if candidate in APPROVED_PACKAGE_IDS else DEFAULT_PACKAGE_ID
+    # A stale state file naming a now-disabled package degrades to the
+    # default rather than persisting a hidden selection.
+    return candidate if candidate in SELECTABLE_PACKAGE_IDS else DEFAULT_PACKAGE_ID
 
 
 def default_state() -> dict[str, Any]:
@@ -78,7 +91,9 @@ def read_production_template_state() -> dict[str, Any]:
 
 def write_production_template_state(package_id: Any) -> dict[str, Any]:
     requested = str(package_id or "").strip()
-    if requested not in APPROVED_PACKAGE_IDS:
+    if requested not in SELECTABLE_PACKAGE_IDS:
+        # Covers both genuinely unknown ids and temporarily-disabled ones
+        # (e.g. digital_neon) -- neither can be made the live selection.
         raise ValueError("invalid_production_template")
 
     state = default_state()
