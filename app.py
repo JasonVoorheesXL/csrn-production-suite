@@ -681,6 +681,59 @@ def authority_state_hardlink_warning(path: Any) -> str | None:
         )
     return None
 
+
+def break_authority_mirror_hardlink(authority: Any, mirror: Any) -> str | None:
+    """If the local state authority and the Drive mirror are literally the
+    same file (hard-linked -> identical device+inode), rewrite the authority
+    in place so the two become independent files. Returns a message when it
+    acted, else None.
+
+    A hard-linked pair defeats the whole authority/mirror split: a Drive
+    lock on the mirror is a lock on the hot authority write. Every save
+    already ``os.replace``s a fresh temp into place, which gives the
+    authority a new inode -- this just does that eagerly at startup so the
+    files are genuinely separate before the first write (and before the
+    throttled mirror's possibly-delayed first write).
+
+    Only a confirmed authority<->mirror pairing is touched. An authority
+    whose extra link is Drive's transient ``.tmp.driveupload\\<id>`` is left
+    alone; ``authority_state_hardlink_warning`` still surfaces that.
+    """
+
+    try:
+        a = Path(authority)
+        m = Path(mirror)
+        if not (a.exists() and m.exists()):
+            return None
+        sa = a.stat()
+        sm = m.stat()
+        if not (sa.st_dev == sm.st_dev and sa.st_ino == sm.st_ino):
+            return None
+        payload = a.read_bytes()
+        descriptor, raw_temp = tempfile.mkstemp(
+            prefix=f".{a.name}.", suffix=".relink", dir=str(a.parent)
+        )
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(raw_temp, str(a))
+            raw_temp = None
+        finally:
+            if raw_temp is not None:
+                try:
+                    os.unlink(raw_temp)
+                except OSError:
+                    pass
+        return (
+            f"[fix] State authority {a} was hard-linked to the Drive mirror "
+            f"{m}; rewrote the authority so they are now independent files."
+        )
+    except OSError:
+        return None
+
+
 STATE_AUTHORITY_PATH = _local_state_authority_path()
 DRIVE_BACKED_GAME_DAY_STATE = _drive_backed_game_day_state()
 
@@ -3446,6 +3499,10 @@ if __name__ == "__main__":
     print("\nCSRN Production Suite — Command Center is running.")
     print(f"State authority: drive_backed={DRIVE_BACKED_GAME_DAY_STATE} mirror={STATE_FILE} authority={STATE_AUTHORITY_PATH}")
     print(f"Core backups: {CORE_BACKUP_ROOT}")
+    if DRIVE_BACKED_GAME_DAY_STATE:
+        _relink_fix = break_authority_mirror_hardlink(STATE_AUTHORITY_PATH, STATE_FILE)
+        if _relink_fix:
+            print(_relink_fix)
     _authority_hardlink_warning = authority_state_hardlink_warning(STATE_AUTHORITY_PATH)
     if _authority_hardlink_warning:
         print(_authority_hardlink_warning)
