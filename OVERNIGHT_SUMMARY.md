@@ -1,16 +1,138 @@
 # Overnight Session Summary — 2026-08-28 → 08-30
 
-Rounds 1-4 branch: **`overnight-fixes-20260828`**. Round 5 branch:
-**`overnight-fixes-20260830`**. **Round 6 branch:
-`round6-settings-audit-20260830`** (off `overnight-fixes-20260830` @
-`9267318`, carries rounds 1-5).
+Round 6 branch: **`round6-settings-audit-20260830`**. **Round 7 branch:
+`round7-ruleset-engine-20260830`** (off `round6-settings-audit-20260830` @
+`6c1e915`, carries rounds 1-6).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
-Full test suite (deterministic, `-p no:randomly`) after **round 6**: **51 failed,
-2258 passed** (round-6 baseline 51 / 2250). The 51 failures are
+Full test suite (deterministic, `-p no:randomly`) after **round 7**: **51 failed,
+2291 passed** (round-7 baseline 51 / 2258). The 51 failures are
 **byte-identical to baseline on every single commit** — `diff`ed each time,
-never moved. Pre-existing static-asset / theme-cache-version pins.
-**0 regressions across all six rounds.**
+never moved. **0 regressions across all seven rounds.**
+
+---
+
+## ROUND 7 — Facebook config + ruleset engine + internal-surface manifest (2026-08-30)
+
+`templates/index.html` was **not touched this round** at all — verified. The
+uncommitted "Start Broadcast" button and 45000/20000 values are untouched.
+
+| commit | task | |
+|---|---|---|
+| `9a6d0d7` | **A** — drop the dead `local_oauth_test` Facebook sentinel | |
+| `fa83a26` | **B1** — ruleset engine + `us-nfhs`/`us-ms-mhsaa` + golden test | |
+| `fbc5462` | **B2** — consumer 1: `PenaltyService` catalog from the ruleset | |
+| `e0058ae` | **B3** — consumer 2: `reconcile_5a_csrn_ids` reserved IDs from the ruleset | |
+| `078b1e2` | **B4** — retire the dead `rules_edition` config stub | |
+| `0ca8a39` | **B5** — consumer 3: kickoff / free-kick / try spots from the ruleset | |
+| `1e22af7` | **B6** — consumer 4: quarter length + quarter set from the ruleset | |
+| `d4cce8f` | **C** — `docs/internal_only_surfaces.json` manifest (documentation only) | |
+
+### TASK A — Facebook config: DEFINITIVE
+
+**`facebook_connection: "local_oauth_test"` is dead / always-dropped. Nothing
+live could route through it.** Traced:
+- The string `"local_oauth_test"` appeared **only** in the `DEFAULT_CONFIG`
+  literal (`app.py`). Zero references in any live `.py`/`.js`/`.html`.
+- **Nothing reads `config["social"]["publishing"]`.** The only consumer of
+  the config `social` subtree is `social_service.py`, which reads
+  `.get("website")` and nothing else.
+- Any config save that touches `social` runs through
+  `ConfigurationService.normalize_social_block()`, which returns only
+  `{facebook, youtube, x, website, instagram}` — **the whole `publishing`
+  block is dropped** on the first such save.
+- Live Facebook behaviour is entirely in `facebook_connection.json`
+  (`FacebookConnectionService`, `DEFAULT_API_VERSION = "v25.0"`) and
+  `social_state.json` (`SocialService.DEFAULT_STATE["settings"]`).
+  `facebook_connection_service.py` never imports `DEFAULT_CONFIG`.
+
+**Cleanup:** `facebook_connection` `"local_oauth_test"` → `""` (matching
+`facebook`/`youtube`/`x`/`website` `""` in the same block) + a comment that
+the whole `publishing` sub-block is dead placeholder config. `facebook_api_
+version: "v25.0"` left as-is — it's *also* the genuine live default on the
+FB service, so redundant but not wrong. **Recommend removing the whole
+`publishing` block wholesale in a future cleanup** — kept minimal this round.
+
+### TASK B — ruleset engine
+
+**`ruleset_service.py`** + `rulesets/football/us-nfhs.json` (base) +
+`rulesets/football/us-ms-mhsaa.json` (`extends: football/us-nfhs`, adds only
+MS classification + timezone/association; inherits NFHS rules unchanged).
+`load_ruleset()` walks/deep-merges the `extends` chain (parent-then-child;
+child dicts merge recursively, child scalars/lists/`null` replace;
+cycle-guarded; cached). `resolve(country, region, association, sport)` maps a
+jurisdiction via a small `_CATALOG`, **falling back to the generic base,
+never a jurisdiction doc**. Helpers: `penalty_rules()`,
+`field_spot_yardage()`, `available_rulesets()`. `CSRN_RULESETS_DIR` override.
+
+**Golden test (`test_ruleset_golden.py`)** — proves the resolved
+`us-ms-mhsaa` ruleset is byte-identical to the live constants **before any
+consumer changed**: `penalty_rules(ruleset) == PenaltyService.RULES`
+exactly; spots `own_40`/`own_20`/`opp_3` == the `canonical_state_service`
+literals; period `720` == `PeriodService` reset == `DEFAULT_STATE
+["clock_seconds"]`, quarters `["1".."4","OT"]`; classification `1A-7A` +
+`{"MS5A-001":"caledonia","MS5A-002":"new-hope"}` + `{state}{class}-{seq:03d}`;
+defaults `America/Chicago` + `MHSAA`.
+
+**Consumers migrated — one per commit, each byte-identical, each with a
+"fall back to the literal if the ruleset engine is unavailable" guard:**
+
+| commit | consumer | now reads |
+|---|---|---|
+| `fbc5462` | `PenaltyService.enforce()` | `_penalty_rules()` → ruleset `penalties` (was `RULES` literal) |
+| `e0058ae` | `app.reconcile_5a_csrn_ids()` | `_five_a_classification_rules()` → ruleset `classification.{reserved_ids,id_format}` (was Caledonia/"new hope" string special-cases + `f"MS5A-{n:03d}"`) |
+| `0ca8a39` | `CanonicalStateFoundation.enter_kickoff/enter_free_kick/enter_pending_try` | `_field_yards()` → ruleset `field.*_spot` (was `40`/`20`/`3` inline) |
+| `1e22af7` | `PeriodService._quarter()` + `_stop_clock(reset=True)` | `_period()` → ruleset `period.{quarters,quarter_length_seconds}` (was `{"1".."4","OT"}` + `720`) |
+
+In every case the original literal is kept as a named `*_FALLBACK` and as
+the golden anchor; the golden test guarantees they stay in sync.
+
+**`rules_edition` retired (`078b1e2`).** It was `"NFHS"` in
+`DEFAULT_CONFIG.application`, force-re-injected by
+`CoreRepositoryRuntime.load_config()` every load, and **read by nothing**.
+Removed from both. Chose *retire* over *repoint* — repointing would have
+meant wiring a brand-new reader, out of scope. (`tools/apply_phase_2_4.py`
+still sets it — a one-time phase-2.4 migrator, not run in normal operation;
+left as historical.)
+
+**Not migrated this round (flagged, your call):**
+- `DEFAULT_CONFIG.broadcast_defaults.timezone = "America/Chicago"` and
+  `dragonfly_service` / `dragonfly_sync_service`'s `association: str =
+  "MHSAA"` default params. These are config-seed / broad-signature
+  defaults, not game-logic constants; both values now *also* live in the
+  ruleset `defaults` block and could be wired to seed from there in a
+  later config-seeding pass.
+- `DEFAULT_STATE["clock_seconds"] = 720` (the broadcast-create seed, separate
+  from `PeriodService`) — same story, also in the ruleset now.
+- **Bonus finding:** `app.py` has a second, divergent, `PENALTY_RULES` dict
+  (line ~3254) — 19 entries with `replay_down` flags — that is **defined
+  and referenced nowhere**. Dead. Not touched (out of scope); worth deleting.
+
+**To add a real second jurisdiction later:** drop a JSON in `rulesets/`,
+add one `_CATALOG` row in `ruleset_service.py`. No consumer changes.
+
+### TASK C — internal-only surface manifest (documentation only)
+
+`docs/internal_only_surfaces.json` — machine-readable, for the eventual
+commercial packaging split. **Nothing removed, gated, or restricted.**
+Lists:
+- **`run_core_foundation.py`** — the debug Flask entry point
+  (`application.run(debug=CSRN_DEBUG)`; real launcher is `app.py` →
+  `waitress`).
+- **`system_routes`** (partial): `/api/diagnostics`,
+  `/api/runtime-diagnostics`, `/api/runtime-diagnostics/export` — the rest
+  of that blueprint (`/api/state`, `/api/health`, …) stays customer.
+- **`rehearsal_routes`** (whole blueprint): rehearsals + `release-readiness`
+  + `release-freeze`/`-unfreeze` + `release-manifest`.
+- **`deployment_routes`** (partial): `/api/deployment/{status,update/
+  validate,update/prepare,support-bundle}`; the `/api/licensing/*` routes
+  listed separately for your review.
+- An `explicitly_not_listed` section (commissioning, recovery, upgrade,
+  MHSAA/DragonFly) left for your decision.
+
+Kept honest with `test_internal_only_surfaces_manifest.py` — every
+referenced file exists and every listed route string is actually declared
+in its module.
 
 ---
 
