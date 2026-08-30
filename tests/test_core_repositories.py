@@ -223,6 +223,76 @@ def test_local_mirrored_state_commits_locally_before_mirror(tmp_path: Path) -> N
     assert persisted["state_revision"] == 12
 
 
+def _wait_for(predicate, timeout: float = 3.0) -> bool:
+    import time as _t
+
+    deadline = _t.monotonic() + timeout
+    while _t.monotonic() < deadline:
+        if predicate():
+            return True
+        _t.sleep(0.02)
+    return predicate()
+
+
+def test_mirror_write_due_thresholds() -> None:
+    persistence = None  # not needed for the pure predicate
+    repo = LocalMirroredStateRepository.__new__(LocalMirroredStateRepository)
+    repo._mirror_min_interval = 90.0
+    repo._mirror_max_pending_mutations = 8
+    assert repo._mirror_write_due(1, 0.0) is False
+    assert repo._mirror_write_due(8, 0.0) is True        # mutation-count threshold
+    assert repo._mirror_write_due(1, 90.0) is True       # interval threshold
+    assert repo._mirror_write_due(1, 89.999) is False
+
+
+def test_first_mirror_write_is_immediate_then_throttled(tmp_path: Path) -> None:
+    persistence = engine(tmp_path)
+    local = tmp_path / "Local" / "state.json"
+    mirror = tmp_path / "Drive" / "state.json"
+    repo = LocalMirroredStateRepository(
+        persistence,
+        authority_path=local,
+        mirror_path=mirror,
+        defaults=STATE_DEFAULTS,
+        mirror_min_interval=1000.0,        # long, so only the "first write" rule can fire
+        mirror_max_pending_mutations=1000,
+    )
+
+    repo.replace({**STATE_DEFAULTS, "broadcast_id": "g", "state_revision": 1})
+    assert _wait_for(lambda: mirror.exists() and json.loads(mirror.read_text()).get("state_revision") == 1)
+
+    # A second mutation inside the interval and under the count cap must NOT
+    # reach the mirror -- the local authority still has it.
+    repo.replace({**STATE_DEFAULTS, "broadcast_id": "g", "state_revision": 2})
+    import time as _t
+    _t.sleep(0.3)
+    assert json.loads(local.read_text())["state_revision"] == 2
+    assert json.loads(mirror.read_text()).get("state_revision") == 1  # throttled
+
+    # flush() forces the pending snapshot out (shutdown path).
+    repo.flush()
+    assert _wait_for(lambda: json.loads(mirror.read_text()).get("state_revision") == 2)
+
+
+def test_mutation_count_cap_forces_a_mirror_write_within_the_interval(tmp_path: Path) -> None:
+    persistence = engine(tmp_path)
+    local = tmp_path / "Local" / "state.json"
+    mirror = tmp_path / "Drive" / "state.json"
+    repo = LocalMirroredStateRepository(
+        persistence,
+        authority_path=local,
+        mirror_path=mirror,
+        defaults=STATE_DEFAULTS,
+        mirror_min_interval=1000.0,
+        mirror_max_pending_mutations=3,
+    )
+    repo.replace({**STATE_DEFAULTS, "state_revision": 1})   # first -> immediate
+    assert _wait_for(lambda: mirror.exists() and json.loads(mirror.read_text()).get("state_revision") == 1)
+    for rev in (2, 3, 4):                                   # 3 pending -> hits the cap
+        repo.replace({**STATE_DEFAULTS, "state_revision": rev})
+    assert _wait_for(lambda: json.loads(mirror.read_text()).get("state_revision") == 4)
+
+
 def test_security_failed_attempt_workflow(tmp_path: Path) -> None:
     repository = SecurityRepository(engine(tmp_path), tmp_path / "security.json", SECURITY_DEFAULTS)
 

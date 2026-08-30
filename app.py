@@ -683,16 +683,46 @@ def authority_state_hardlink_warning(path: Any) -> str | None:
 
 STATE_AUTHORITY_PATH = _local_state_authority_path()
 DRIVE_BACKED_GAME_DAY_STATE = _drive_backed_game_day_state()
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, "").strip() or default)
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, "").strip() or default)
+    except (TypeError, ValueError):
+        return default
+
+
+# The Drive mirror is game-day disaster recovery, not real-time redundancy:
+# coalesce writes to at most one per interval / per N mutations so it stops
+# contending with Drive's uploader on every play. Tune with
+# CSRN_STATE_MIRROR_INTERVAL_SECONDS / CSRN_STATE_MIRROR_MAX_MUTATIONS.
+STATE_MIRROR_INTERVAL_SECONDS = _env_float("CSRN_STATE_MIRROR_INTERVAL_SECONDS", 90.0)
+STATE_MIRROR_MAX_MUTATIONS = _env_int("CSRN_STATE_MIRROR_MAX_MUTATIONS", 8)
+
 STATE_REPOSITORY = (
     LocalMirroredStateRepository(
         CORE_PERSISTENCE,
         authority_path=STATE_AUTHORITY_PATH,
         mirror_path=STATE_FILE,
         defaults=DEFAULT_STATE,
+        mirror_min_interval=STATE_MIRROR_INTERVAL_SECONDS,
+        mirror_max_pending_mutations=STATE_MIRROR_MAX_MUTATIONS,
     )
     if DRIVE_BACKED_GAME_DAY_STATE
     else StateRepository(CORE_PERSISTENCE, STATE_FILE, DEFAULT_STATE)
 )
+
+if hasattr(STATE_REPOSITORY, "flush"):
+    import atexit as _atexit
+
+    _atexit.register(STATE_REPOSITORY.flush)
 SECURITY_REPOSITORY = SecurityRepository(CORE_PERSISTENCE, SECURITY_FILE, DEFAULT_SECURITY)
 SECURITY_SERVICE = SecurityService(
     SECURITY_REPOSITORY,
@@ -3383,6 +3413,13 @@ def _record_clean_shutdown_and_stop(signum, frame):
         print(f"\nReceived {signal_name} — recording clean application shutdown...")
     except Exception as exc:
         print(f"[WARN] Could not record clean shutdown marker: {exc}")
+    # Push the final state to the throttled Drive mirror before exit so the
+    # last plays are not left only in the local authority.
+    try:
+        if hasattr(STATE_REPOSITORY, "flush"):
+            STATE_REPOSITORY.flush()
+    except Exception as exc:
+        print(f"[WARN] Could not flush state mirror on shutdown: {exc}")
     # Re-raise so Waitress's own (SystemExit, KeyboardInterrupt) handling in
     # server.run() still gets a chance to close its sockets cleanly.
     raise SystemExit(0)

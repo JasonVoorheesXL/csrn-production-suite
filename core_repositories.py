@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import threading
+import time
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -180,7 +181,21 @@ class StateRepository(JsonObjectRepository):
 
 
 class LocalMirroredStateRepository:
-    """Local game-day state authority with an asynchronous project mirror."""
+    """Local game-day state authority with a throttled project mirror.
+
+    The authority write (local, non-synced) happens on every mutation. The
+    mirror write into the project folder -- which is typically Google-Drive-
+    synced -- is disaster-recovery only, so it is coalesced: the background
+    writer flushes the latest pending snapshot at most once per
+    ``mirror_min_interval`` seconds, or immediately once ``mirror_max_pending
+    _mutations`` have queued, whichever comes first. This stops the mirror
+    fighting Drive's uploader on every single play. The very first mirror
+    write (from recovery) is immediate, and ``flush()`` forces one out (call
+    it on shutdown).
+    """
+
+    DEFAULT_MIRROR_MIN_INTERVAL = 90.0
+    DEFAULT_MIRROR_MAX_PENDING_MUTATIONS = 8
 
     def __init__(
         self,
@@ -189,6 +204,10 @@ class LocalMirroredStateRepository:
         authority_path: Path,
         mirror_path: Path,
         defaults: Mapping[str, Any],
+        mirror_min_interval: float | None = None,
+        mirror_max_pending_mutations: int | None = None,
+        monotonic: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.engine = engine
         self.path = Path(authority_path)
@@ -198,7 +217,25 @@ class LocalMirroredStateRepository:
         self._mirror = StateRepository(engine, self.mirror_path, defaults)
         self._mirror_lock = threading.Lock()
         self._mirror_pending: dict[str, Any] | None = None
+        self._mirror_pending_count = 0
         self._mirror_worker: threading.Thread | None = None
+        self._mirror_min_interval = float(
+            self.DEFAULT_MIRROR_MIN_INTERVAL
+            if mirror_min_interval is None
+            else max(0.0, mirror_min_interval)
+        )
+        self._mirror_max_pending_mutations = int(
+            self.DEFAULT_MIRROR_MAX_PENDING_MUTATIONS
+            if mirror_max_pending_mutations is None
+            else max(1, mirror_max_pending_mutations)
+        )
+        self._monotonic = monotonic
+        self._sleep = sleep
+        self._mirror_last_write = 0.0
+        # The recovery push and the operator's first real mutation both go to
+        # the mirror at once (don't leave it on stale defaults at kickoff);
+        # throttling starts after that.
+        self._mirror_immediate_writes_remaining = 2
         self._recover_authority()
 
     @staticmethod
@@ -249,6 +286,7 @@ class LocalMirroredStateRepository:
         snapshot = copy.deepcopy(dict(state))
         with self._mirror_lock:
             self._mirror_pending = snapshot
+            self._mirror_pending_count += 1
             if self._mirror_worker is not None:
                 return
             self._mirror_worker = threading.Thread(
@@ -258,21 +296,64 @@ class LocalMirroredStateRepository:
             )
             self._mirror_worker.start()
 
+    def _mirror_write_due(self, pending_count: int, elapsed_seconds: float) -> bool:
+        return (
+            pending_count >= self._mirror_max_pending_mutations
+            or elapsed_seconds >= self._mirror_min_interval
+        )
+
+    def _write_mirror(self, snapshot: Mapping[str, Any]) -> None:
+        try:
+            self._mirror.replace(snapshot)
+        except Exception:
+            pass
+        else:
+            self._mirror_last_write = self._monotonic()
+            if self._mirror_immediate_writes_remaining > 0:
+                self._mirror_immediate_writes_remaining -= 1
+
     def _mirror_loop(self) -> None:
         while True:
             with self._mirror_lock:
                 snapshot = self._mirror_pending
-                self._mirror_pending = None
+                count = self._mirror_pending_count
             if snapshot is None:
                 with self._mirror_lock:
                     if self._mirror_pending is None:
                         self._mirror_worker = None
                         return
                 continue
-            try:
-                self._mirror.replace(snapshot)
-            except Exception:
-                pass
+
+            elapsed = self._monotonic() - self._mirror_last_write
+            due = (
+                self._mirror_immediate_writes_remaining > 0
+                or self._mirror_write_due(count, elapsed)
+            )
+            if not due:
+                # Hold the latest snapshot; re-check soon (bounded so a burst
+                # of mutations can still trip the count threshold promptly).
+                self._sleep(max(0.05, min(2.0, self._mirror_min_interval - elapsed)))
+                continue
+
+            with self._mirror_lock:
+                snapshot = self._mirror_pending
+                self._mirror_pending = None
+                self._mirror_pending_count = 0
+            if snapshot is not None:
+                self._write_mirror(snapshot)
+
+    def flush(self) -> None:
+        """Write the latest pending snapshot to the mirror now (best effort).
+
+        For shutdown -- the throttled loop may be mid-interval with the final
+        state still only in the local authority.
+        """
+        with self._mirror_lock:
+            snapshot = self._mirror_pending
+            self._mirror_pending = None
+            self._mirror_pending_count = 0
+        if snapshot is not None:
+            self._write_mirror(snapshot)
 
 
 class SecurityRepository(JsonObjectRepository):
