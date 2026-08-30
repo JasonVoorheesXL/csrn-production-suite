@@ -522,13 +522,23 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "youtube": "",
         "x": "",
         "website": "",
+        # NOTE: this whole "publishing" sub-block is currently dead config --
+        # nothing reads config["social"]["publishing"]. Live publishing
+        # behaviour is in social_state.json (SocialService.DEFAULT_STATE
+        # ["settings"]) and facebook_connection.json
+        # (FacebookConnectionService, DEFAULT_API_VERSION = "v25.0"). Any
+        # config save that touches "social" also drops this block via
+        # ConfigurationService.normalize_social_block(). Kept for now only as
+        # a harmless placeholder; facebook_connection is "" instead of the
+        # old test-mode sentinel that read like a real setting but was never
+        # wired up. See Round 7 Task A.
         "publishing": {
             "preview_first": True,
             "auto_create_drafts": False,
             "allow_auto_publish": False,
             "facebook_credential_ref": "CSRN_FACEBOOK_SECURE_PAGE_TOKEN",
             "facebook_api_version": "v25.0",
-            "facebook_connection": "local_oauth_test",
+            "facebook_connection": "",
             "x_mode": "assisted_manual",
             "x_oauth": False,
             "x_api": False,
