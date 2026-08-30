@@ -77,7 +77,6 @@ class CoreRepositoryRuntime:
     def load_config(self) -> dict[str, Any]:
         self.module.ensure_data_architecture()
         config = self.config.load()
-        config.setdefault("application", {})["rules_edition"] = "NFHS"
         return config
 
     def save_config(self, config: dict[str, Any]) -> None:

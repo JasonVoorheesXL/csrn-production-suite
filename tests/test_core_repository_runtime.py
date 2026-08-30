@@ -95,7 +95,9 @@ def test_config_identity_is_supplied_by_repository(tmp_path: Path) -> None:
     config = module.load_config()
 
     assert config["application"]["build"] == "V1.13A6F-OPERATIONAL-REHEARSAL-RELEASE-FREEZE"
-    assert config["application"]["rules_edition"] == "NFHS"
+    # rules_edition was a dead "NFHS" stub -- retired in round 7 (ruleset_service
+    # is the real mechanism now); the runtime no longer force-injects it.
+    assert "rules_edition" not in config["application"]
 
 
 def test_runtime_generates_and_persists_missing_secret_key(

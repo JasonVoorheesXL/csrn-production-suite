@@ -548,7 +548,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "application": {
         "version": RUNTIME_VERSION,
         "build": RUNTIME_BUILD,
-        "rules_edition": "NFHS",
+        # (rules_edition removed -- it was a dead "NFHS" stub read by nothing.
+        #  Rule variance now lives in ruleset_service / rulesets/*.json.)
         "automatic_backup": True,
         "auto_save": True,
         "operator_timeout_hours": 12,
