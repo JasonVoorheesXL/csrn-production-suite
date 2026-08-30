@@ -1,0 +1,23 @@
+{
+  "id": "football/us-ms-mhsaa",
+  "extends": "football/us-nfhs",
+  "label": "Mississippi HS Football (MHSAA)",
+  "jurisdiction": {
+    "country": "US",
+    "region": "MS",
+    "association": "MHSAA"
+  },
+  "classification": {
+    "scheme": "letter_grade_1a_7a",
+    "classes": ["1A", "2A", "3A", "4A", "5A", "6A", "7A"],
+    "id_format": "{state}{class}-{seq:03d}",
+    "reserved_ids": {
+      "MS5A-001": "caledonia",
+      "MS5A-002": "new-hope"
+    }
+  },
+  "defaults": {
+    "timezone": "America/Chicago",
+    "association": "MHSAA"
+  }
+}

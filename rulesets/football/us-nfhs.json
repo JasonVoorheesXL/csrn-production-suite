@@ -1,0 +1,57 @@
+{
+  "id": "football/us-nfhs",
+  "label": "NFHS Football (generic U.S. high school)",
+  "sport": "football",
+  "jurisdiction": {
+    "country": "US",
+    "region": null,
+    "association": "NFHS"
+  },
+  "period": {
+    "count": 4,
+    "quarter_length_seconds": 720,
+    "quarters": ["1", "2", "3", "4", "OT"],
+    "overtime_format": "nfhs_10yard"
+  },
+  "field": {
+    "kickoff_spot": "own_40",
+    "free_kick_spot": "own_20",
+    "try_spot": "opp_3",
+    "touchback_spot": "own_20"
+  },
+  "penalties": {
+    "Offensive/False Start": {"yards": 5, "dead_ball": true},
+    "Offensive/Holding": {"yards": 10},
+    "Offensive/Illegal Formation": {"yards": 5},
+    "Offensive/Illegal Motion": {"yards": 5},
+    "Offensive/Illegal Shift": {"yards": 5},
+    "Offensive/Delay of Game": {"yards": 5, "dead_ball": true},
+    "Offensive/Intentional Grounding": {"yards": 5, "loss_of_down": true},
+    "Offensive/Ineligible Receiver Downfield": {"yards": 5},
+    "Offensive/Personal Foul": {"yards": 15},
+    "Offensive/Unsportsmanlike Conduct": {"yards": 15},
+    "Defensive/Offside": {"yards": 5},
+    "Defensive/Encroachment": {"yards": 5, "dead_ball": true},
+    "Defensive/Holding": {"yards": 10, "automatic_first_down": true},
+    "Defensive/Pass Interference": {"yards": 15, "automatic_first_down": true},
+    "Defensive/Roughing the Passer": {"yards": 15, "automatic_first_down": true},
+    "Defensive/Face Mask": {"yards": 15},
+    "Defensive/Personal Foul": {"yards": 15, "automatic_first_down": true},
+    "Defensive/Unsportsmanlike Conduct": {"yards": 15, "automatic_first_down": true},
+    "Special Teams/Kick Catch Interference": {"yards": 15},
+    "Special Teams/Illegal Block": {"yards": 10},
+    "Special Teams/Holding": {"yards": 10},
+    "Special Teams/Running Into the Kicker": {"yards": 5},
+    "Special Teams/Roughing the Kicker": {"yards": 15, "automatic_first_down": true},
+    "Special Teams/Personal Foul": {"yards": 15}
+  },
+  "classification": {
+    "scheme": null,
+    "id_format": null,
+    "reserved_ids": {}
+  },
+  "defaults": {
+    "timezone": null,
+    "association": "NFHS"
+  }
+}
