@@ -562,9 +562,64 @@ def ensure_data_architecture() -> None:
     SPONSOR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     SOCIAL_CARDS_DIR.mkdir(parents=True, exist_ok=True)
 
-CORE_BACKUP_DIR = DATA_DIR / "Backups" / "Core"
-CORE_QUARANTINE_DIR = DATA_DIR / "Backups" / "Quarantine"
+LEGACY_CORE_BACKUP_ROOT = DATA_DIR / "Backups"
+
+
+def _core_backup_root() -> Path:
+    """Local, non-synced home for JsonPersistenceEngine's rolling snapshots
+    and quarantine copies.
+
+    Those are written on every save (JsonPersistenceEngine._snapshot ->
+    shutil.copy2) and had grown to hundreds of MB inside the Google-Drive-
+    synced project tree, where Drive's uploader then churned through every
+    one. Disaster-recovery backups do not need cloud redundancy in real
+    time; keep them beside the local state authority instead.
+
+    Override with CSRN_CORE_BACKUP_ROOT. Falls back to the old in-Data
+    location only when there is no LOCALAPPDATA (non-Windows dev).
+    """
+    explicit = os.environ.get("CSRN_CORE_BACKUP_ROOT", "").strip()
+    if explicit:
+        return Path(explicit).expanduser()
+    root = os.environ.get("LOCALAPPDATA", "").strip()
+    if root:
+        return Path(root).expanduser() / "PossumFrog" / "CSRN Production Suite" / "Backups"
+    return LEGACY_CORE_BACKUP_ROOT
+
+
+CORE_BACKUP_ROOT = _core_backup_root()
+CORE_BACKUP_DIR = CORE_BACKUP_ROOT / "Core"
+CORE_QUARANTINE_DIR = CORE_BACKUP_ROOT / "Quarantine"
 CORE_PERSISTENCE = JsonPersistenceEngine(CORE_BACKUP_DIR, CORE_QUARANTINE_DIR)
+
+
+def legacy_core_backup_notice() -> str | None:
+    """One-line startup notice if old snapshots still sit in the synced tree.
+
+    Relocation is intentionally NOT automatic on the live save path -- run
+    tools/migrate_core_backups.py --apply when convenient. New snapshots
+    already go to CORE_BACKUP_ROOT.
+    """
+    try:
+        if CORE_BACKUP_ROOT.resolve() == LEGACY_CORE_BACKUP_ROOT.resolve():
+            return None
+        total = 0
+        for sub in ("Core", "Quarantine"):
+            old_dir = LEGACY_CORE_BACKUP_ROOT / sub
+            if not old_dir.is_dir():
+                continue
+            for f in old_dir.rglob("*"):
+                if f.is_file():
+                    total += f.stat().st_size
+        if total <= 0:
+            return None
+        return (
+            f"[note] {total / (1024 * 1024):.0f} MB of old core backups remain in "
+            f"{LEGACY_CORE_BACKUP_ROOT} (Drive-synced). New snapshots now go to "
+            f"{CORE_BACKUP_ROOT}. Run tools/migrate_core_backups.py --apply to relocate the old ones."
+        )
+    except OSError:
+        return None
 CONFIG_REPOSITORY = ConfigurationRepository(
     CORE_PERSISTENCE,
     CONFIG_FILE,
@@ -3353,9 +3408,13 @@ if __name__ == "__main__":
 
     print("\nCSRN Production Suite — Command Center is running.")
     print(f"State authority: drive_backed={DRIVE_BACKED_GAME_DAY_STATE} mirror={STATE_FILE} authority={STATE_AUTHORITY_PATH}")
+    print(f"Core backups: {CORE_BACKUP_ROOT}")
     _authority_hardlink_warning = authority_state_hardlink_warning(STATE_AUTHORITY_PATH)
     if _authority_hardlink_warning:
         print(_authority_hardlink_warning)
+    _legacy_backup_notice = legacy_core_backup_notice()
+    if _legacy_backup_notice:
+        print(_legacy_backup_notice)
     print("Laptop: http://127.0.0.1:5050")
     print(f"Phone/iPad: http://{ip}:5050")
     print("OBS overlay: http://127.0.0.1:5050/overlay")
