@@ -117,3 +117,17 @@ def test_dry_run_moves_nothing(tmp_path: Path) -> None:
     assert rc == 0
     assert (src / "Core" / "state" / "a.json").exists()
     assert not dst.exists()
+
+
+def test_apply_closing_message_scopes_deletion_to_core_and_quarantine(tmp_path, capsys) -> None:
+    # Data/Backups also holds Recovery/GameDay/Installers this tool never
+    # touches; the message must not tell the operator to nuke the whole tree.
+    src, dst = tmp_path / "src", tmp_path / "dst"
+    _seed(src)
+    (src / "Recovery").mkdir()
+    (src / "Recovery" / "marker.json").write_text("{}", encoding="utf-8")
+    migrate_core_backups.main(["--source", str(src), "--dest", str(dst), "--apply"])
+    out = capsys.readouterr().out
+    assert "Core" in out and "Quarantine" in out
+    assert "delete the empty" not in out
+    assert (src / "Recovery" / "marker.json").exists()  # untouched

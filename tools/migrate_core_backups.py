@@ -124,7 +124,14 @@ def main(argv: list[str] | None = None) -> int:
         (dest_root / ".core-backups-migrated").parent.mkdir(parents=True, exist_ok=True)
         (dest_root / ".core-backups-migrated").write_text("completed\n", encoding="utf-8")
         print(f"\nMoved {moved} file(s), {_format_size(total)} -> {dest_root}")
-        print(f"You can now delete the empty {source_root} tree from the synced folder.")
+        emptied = ", ".join(
+            str(source_root / sub) for sub in ("Core", "Quarantine") if (source_root / sub).is_dir()
+        )
+        print(
+            f"Only the {emptied} subdir(s) were emptied and are now safe to delete. "
+            f"Leave the rest of {source_root} alone -- it holds other backup content "
+            f"(Recovery, GameDay, Installers, ...) this tool does not manage."
+        )
     else:
         print(f"\nWould move {len(moves)} file(s), {_format_size(total)} -> {dest_root}")
         print("Re-run with --apply to move.")
