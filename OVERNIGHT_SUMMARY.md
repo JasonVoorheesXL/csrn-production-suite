@@ -1,13 +1,138 @@
-# Overnight Session Summary — 2026-08-28 → 08-29
+# Overnight Session Summary — 2026-08-28 → 08-30
 
-Branch: **`overnight-fixes-20260828`** (off `gate6/final-visual-matrix` @ `0f1d67d`).
+Rounds 1-4 branch: **`overnight-fixes-20260828`** (off `gate6/final-visual-matrix`
+@ `0f1d67d`). **Round 5 branch: `overnight-fixes-20260830`** (off
+`overnight-fixes-20260828` @ `0c96780`, so it carries rounds 1-4).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
-Full test suite (deterministic, `-p no:randomly`) after **round 4**: **51 failed,
-2222 passed** (baseline 51 / 2175). The 51 failures are identical to baseline
-(pre-existing static-asset / theme-cache-version pins). **0 regressions
-introduced** across all four rounds, verified by before/after failure-set diff
-on every commit.
+Full test suite (deterministic, `-p no:randomly`) after **round 5**: **51 failed,
+2249 passed** (round-5 baseline 51 / 2222; original baseline 51 / 2175). The 51
+failures are **byte-identical to baseline on every single commit** (verified by
+`diff` of the sorted failure list — flagged loudly if it ever moved; it never
+did). Pre-existing static-asset / theme-cache-version pins. **0 regressions.**
+
+---
+
+## ROUND 5 — sponsor re-fire guard + Tier 2 storage (2026-08-30)
+
+Branch `overnight-fixes-20260830`. Per-commit full-suite runs, failure-set
+`diff`ed against the 51 baseline each time — **NONE moved.**
+`templates/index.html`: verified before every commit that only my own hunk
+was staged — the uncommitted "Start Broadcast (Go Live)" button and the
+45000 / 20000 timeout WIP are **completely untouched** (`git diff HEAD --
+templates/index.html` is exactly those 4 hunks and nothing else).
+
+| commit | task | files |
+|---|---|---|
+| `ba744d4` | **A** — block rapid sponsor re-fire | `templates/index.html`, `tests/test_sponsor_trigger_feedback.py` |
+| `e2baadf` | **B1** — core backups off the synced path | `app.py`, `tools/migrate_core_backups.py`, `tests/test_core_backup_relocation.py` |
+| `b2d5182` | **B2** — coalesce the Drive mirror | `core_repositories.py`, `app.py`, `tests/test_core_repositories.py`, `tests/test_state_mirror_throttle.py` |
+| `acbbfcc` | **B3** — break authority↔mirror hardlink | `app.py`, `tests/test_authority_mirror_hardlink_break.py` |
+| `eac9c18` | **B4** — end-to-end layout scenarios | `tests/test_tier2_layout_scenarios.py` |
+
+### TASK A — sponsor video trigger delay
+
+**Most of Task A was already done in Round 4** (base branch): the 5-15 s was
+traced to (1) a `sponsorAdvertisementDuration()` `<video>` metadata probe
+running *on the Run click* — moved to selection time in `cb9f338` — and
+(2) the overlay fetching + decoding the commercial cold every trigger,
+because `mountCentralBoardMedia()` rebuilt the `<video>` each time — fixed
+with a warm-preload cache in `8234893`. The instant "SUBMITTING · …" ack and
+"Sponsor video triggered — starting…" panel line are also Round 4. "Sponsor
+live" = the existing `#sadOnAirBadge` / `#spsOnAirBadge` "ON AIR" set from
+state in `render()`.
+
+**What this round adds (`ba744d4`):** nothing stopped the operator
+re-clicking Run during the delay and firing the command twice. A shared
+`sponsorTriggerBusy` flag + `setSponsorTriggerButtons()` — both
+`runSponsorAdvertisement()` and `showSponsorSpotlight()` (they write the same
+`sponsor_spotlight` state) bail early if a trigger is running, set the flag
+and disable both Run buttons *before the first `await`*, and clear/re-enable
+in `finally`. The two buttons got ids (`sadRunButton` / `spsShowButton`);
+they sit outside the poll-driven `render()` button sweeps so the `finally`
+is authoritative.
+
+Answers to the numbered questions: (1) yes — no preload before Round 4, now
+warm-cached; (2) overlay poll is 500 ms, not a factor; (3) the command
+round-trip is **fully separate** from the Tier 1 state-write/lock path — the
+delay is client-side asset loading only (server `update_sponsor_spotlight`
+is pure dict work); (4) the duration probe on the click, now moved.
+
+### TASK B — Tier 2: storage off the Drive sync path
+
+**Layout before:** authority `state.json` at
+`%LOCALAPPDATA%\PossumFrog\CSRN Production Suite\GameDay\` (local, good);
+mirror at `<project>\state.json` (Drive-synced); `Data\Backups\Core`
+(~205 MB, snapshot on every save) inside the Drive-synced project.
+
+**B1 — `e2baadf` — core backups to a local root.** `app._core_backup_root()`
+→ `%LOCALAPPDATA%\PossumFrog\CSRN Production Suite\Backups` by default
+(override `CSRN_CORE_BACKUP_ROOT`); `CORE_BACKUP_DIR` / `CORE_QUARANTINE_DIR`
+/ `CORE_PERSISTENCE` hang off it, so **new** snapshots leave the synced tree
+immediately. Historical relocation is **not** automatic on the live save
+path — `tools/migrate_core_backups.py` (dry-run default, `--apply` to move)
+does per-file `shutil.move` (a file leaves the old spot only once fully
+written to the new one; existing targets never overwritten), same pattern as
+`tools/sweep_state_tmp.py`. `legacy_core_backup_notice()` prints a one-line
+startup pointer while the old snapshots remain.
+
+**B2 — `b2d5182` — coalesce the Drive mirror.** The authority write still
+happens every mutation. The mirror background writer now holds the latest
+pending snapshot and flushes it when **either** threshold trips:
+`CSRN_STATE_MIRROR_INTERVAL_SECONDS` (**default 90 s**) since the last mirror
+write, **or** `CSRN_STATE_MIRROR_MAX_MUTATIONS` (**default 8**) queued.
+The recovery push *and the operator's first real mutation* still mirror
+immediately (so it's never stuck on stale defaults at kickoff), then
+throttling begins. `flush()` forces a write; it's registered with `atexit`
+**and** called in the SIGINT/SIGTERM handler, so a clean exit pushes the
+final plays. A force-kill loses only *mirror freshness* — the local
+authority is the source of truth and recovery prefers it.
+
+**B3 — `acbbfcc` — break a confirmed authority↔mirror hardlink at startup.**
+`break_authority_mirror_hardlink()`: if the two paths resolve to the same
+device+inode it rewrites the authority in place (temp + `fsync` +
+`os.replace`) so they diverge — the same thing every save does, done eagerly.
+Only a confirmed authority↔mirror pairing is touched; an authority whose
+extra link is Drive's transient `.tmp.driveupload\<id>` is left for the
+warning. Called from the serve path (drive-backed only) just before
+`authority_state_hardlink_warning()`, which is **unchanged** and — per a new
+test — returns `None` again once the break has run on a linked pair, and
+**still fires** for a non-mirror extra link. **Goal 4 satisfied.**
+
+**B4 — `eac9c18` — goal 5 verified by tests + walk-through:**
+- *Fresh install* (no authority, no mirror, empty backup root): `_recover_
+  authority()` sees both `None` → writes defaults to the authority + queues
+  the mirror; `load()` returns defaults; first mutation persists to the
+  authority and reaches the mirror immediately. No crash.
+- *Existing hardlinked layout* (authority == mirror, mid-game rev 20):
+  `break_authority_mirror_hardlink()` diverges the inodes (`st_nlink` → 1),
+  then `LocalMirroredStateRepository` comes up and `load()` returns the
+  **existing** game (rev 20, score 21 — not defaults); a later write lands
+  in the now-independent authority and still mirrors promptly; the paths
+  stay separate inodes. No data drop.
+- *Existing layout, mirror newer than local*: recovery pulls the newer
+  revision into the authority (unchanged behaviour, re-asserted under the
+  throttle).
+
+### JUDGMENT CALLS — please confirm
+
+1. **Mirror throttle default: 90 s / 8 mutations.** A crash between mirror
+   writes loses at most that much *mirror staleness* — never authority data
+   (local authority is authoritative, recovery prefers it). Tighten/loosen
+   via `CSRN_STATE_MIRROR_INTERVAL_SECONDS` / `CSRN_STATE_MIRROR_MAX_MUTATIONS`.
+2. **Historical backup relocation is manual, not automatic.** `app.py` only
+   changes where *new* snapshots go and prints a pointer;
+   `tools/migrate_core_backups.py --apply` moves the ~205 MB when you run
+   it. I chose manual to keep a 205 MB cross-volume move off the live
+   startup path. If you'd rather it self-migrate on first run, say so.
+3. **New backup root: `%LOCALAPPDATA%\PossumFrog\CSRN Production Suite\
+   Backups`.** Sibling of the existing `GameDay\` state-authority dir.
+   Override with `CSRN_CORE_BACKUP_ROOT` if you want it elsewhere (e.g. a
+   second physical disk).
+4. The hardlink break **rewrites the authority file** on startup when it
+   detects the bad layout. It's `os.replace` of a byte-identical copy
+   (same thing the first save would do) and fully guarded, but it *is* a
+   write to the live authority at startup — flagging it explicitly.
 
 ---
 
