@@ -57,6 +57,32 @@ def test_show_sponsor_spotlight_also_acknowledges_immediately() -> None:
     assert "catch(error)" in body
 
 
+def test_rapid_re_trigger_is_blocked_while_one_is_in_flight() -> None:
+    # A shared guard: both sponsor triggers write the same sponsor_spotlight
+    # state, and the cold-video delay tempts a re-click.
+    assert "let sponsorTriggerBusy=false;" in INDEX
+    for name in ("runSponsorAdvertisement", "showSponsorSpotlight"):
+        body = _fn_body(name)
+        guard = body.index("if(sponsorTriggerBusy)")
+        set_busy = body.index("sponsorTriggerBusy=true")
+        first_await = body.index("await ")
+        clear = body.index("finally{sponsorTriggerBusy=false")
+        assert guard < set_busy < first_await, f"{name}: guard/set must precede any await"
+        assert clear > first_await, f"{name}: guard must clear in finally, after the awaits"
+
+
+def test_run_buttons_are_disabled_while_a_trigger_is_pending() -> None:
+    assert 'id="sadRunButton"' in INDEX
+    assert 'id="spsShowButton"' in INDEX
+    helper = INDEX[INDEX.index("function setSponsorTriggerButtons("):]
+    helper = helper[:helper.index("\n}\n") + 3]
+    assert "'sadRunButton'" in helper and "'spsShowButton'" in helper
+    for name in ("runSponsorAdvertisement", "showSponsorSpotlight"):
+        body = _fn_body(name)
+        assert "setSponsorTriggerButtons(true)" in body
+        assert "setSponsorTriggerButtons(false)" in body[body.index("finally"):]
+
+
 def test_duration_probe_runs_at_selection_not_only_at_trigger() -> None:
     preview = INDEX[INDEX.index("function renderSponsorAdvertisementPreview()"):]
     preview = preview[:preview.index("\n}\n") + 3]

@@ -416,7 +416,7 @@
               <label class="span-2">Advertisement Video<select id="sadMedia" onchange="renderSponsorAdvertisementPreview()"></select></label>
             </div>
             <div id="sadPreview" class="program-visual-preview player-highlight-preview"><strong>SPONSOR ADVERTISEMENT</strong><span>Select an active sponsor and an approved advertisement video.</span></div>
-            <div class="button-row graphics-actions"><button class="success" onclick="runSponsorAdvertisement()">Run Advertisement</button><button onclick="stopSponsorAdvertisement()">Stop</button><button onclick="newSponsorAdvertisementAsset()">Add / Manage Ad Video</button></div>
+            <div class="button-row graphics-actions"><button id="sadRunButton" class="success" onclick="runSponsorAdvertisement()">Run Advertisement</button><button onclick="stopSponsorAdvertisement()">Stop</button><button onclick="newSponsorAdvertisementAsset()">Add / Manage Ad Video</button></div>
             <div id="sadStatus" class="status">Sponsor Advertisement is ready. On-air audio will play with the video.</div>
           </details>
 
@@ -430,7 +430,7 @@
               <label class="span-2">Caption<input id="spsCaption" maxlength="180" placeholder="Optional sponsor message" oninput="renderSponsorSpotlightPreview()"></label>
             </div>
             <div id="spsPreview" class="program-visual-preview sponsor-spotlight-preview"><strong>SPONSOR SPOTLIGHT</strong><span>Select an active sponsor and its media.</span></div>
-            <div class="button-row graphics-actions"><button class="success" onclick="showSponsorSpotlight()">Show / Update</button><button onclick="hideSponsorSpotlight()">Hide</button><button class="danger" onclick="clearSponsorSpotlight()">Clear</button></div>
+            <div class="button-row graphics-actions"><button id="spsShowButton" class="success" onclick="showSponsorSpotlight()">Show / Update</button><button onclick="hideSponsorSpotlight()">Hide</button><button class="danger" onclick="clearSponsorSpotlight()">Clear</button></div>
             <div id="spsStatus" class="status">Sponsor Spotlight is ready.</div>
           </details>
 
@@ -4498,11 +4498,25 @@ function sponsorAdvertisementDuration(asset){
     video.src=asset.file_url;
   });
 }
+// Shared in-flight guard for both sponsor triggers: they write the same
+// sponsor_spotlight state, and with a cold-video delay the operator is
+// tempted to re-click -- which would re-fire the command and re-mount the
+// overlay video. One trigger at a time; the button is also disabled for the
+// duration so the block is visible.
+let sponsorTriggerBusy=false;
+function setSponsorTriggerButtons(disabled){
+  for(const id of ['sadRunButton','spsShowButton']){
+    const b=document.getElementById(id);
+    if(b)b.disabled=disabled;
+  }
+}
 async function runSponsorAdvertisement(){
   const sponsorId=document.getElementById('sadSponsor')?.value||'',mediaAssetId=document.getElementById('sadMedia')?.value||'';
   const status=document.getElementById('sadStatus');
   const asset=assetRecords.find(a=>a.id===mediaAssetId);
   if(!sponsorId||!asset){status.textContent='Select an active sponsor and an approved advertisement video.';status.className='status error';return}
+  if(sponsorTriggerBusy){status.textContent='Sponsor trigger already in progress…';status.className='status';return}
+  sponsorTriggerBusy=true;setSponsorTriggerButtons(true);
   // Immediate acknowledgment the instant the operator clicks -- reuses the
   // command client's SUBMITTING status surface. Independent of whatever
   // later confirms the video is actually playing on the overlay.
@@ -4518,6 +4532,7 @@ async function runSponsorAdvertisement(){
     commandClientStatus('COMMITTED · sponsor advertisement','success',1800);
     render();
   }catch(error){RuntimeDiagnostics.send('COMMERCIAL_FAILED',{status:'ERROR',media_asset_id:mediaAssetId});status.textContent=error.message||'Unable to run sponsor advertisement.';status.className='status error';commandClientStatus('Sponsor advertisement failed to start.','error',7000)}
+  finally{sponsorTriggerBusy=false;setSponsorTriggerButtons(false)}
 }
 async function stopSponsorAdvertisement(){RuntimeDiagnostics.send('COMMERCIAL_STOP_REQUESTED',{status:'STOPPING'});currentState=await api('/api/graphics/sponsor-spotlight',{action:'hide'});RuntimeDiagnostics.send('COMMERCIAL_STOPPED',{status:'STOPPED'});render()}
 function newSponsorAdvertisementAsset(){
@@ -4554,7 +4569,7 @@ function renderSponsorSpotlightPreview(){
   preview.innerHTML=`${media}<strong>${escapeHtml(document.getElementById('spsLead')?.value||'SPONSOR SPOTLIGHT')}</strong><span>${escapeHtml(document.getElementById('spsCaption')?.value||sponsor?.name||'Select sponsor media.')}</span>`;
 }
 function sponsorSpotlightPayload(action){return{action,sponsor_id:document.getElementById('spsSponsor').value,media_asset_id:document.getElementById('spsMedia').value,lead_in:document.getElementById('spsLead').value.trim(),caption:document.getElementById('spsCaption').value.trim(),duration:Number(document.getElementById('spsDuration').value||12),visible:action==='show'}}
-async function showSponsorSpotlight(){const p=sponsorSpotlightPayload('show');const status=document.getElementById('spsStatus');if(!p.sponsor_id||!p.media_asset_id){status.textContent='Select an active sponsor and its media.';status.className='status error';return}commandClientStatus('SUBMITTING · sponsor spotlight','warning',0);status.textContent='Sponsor spotlight triggered — starting…';status.className='status';try{currentState=await api('/api/graphics/sponsor-spotlight',p);commandClientStatus('COMMITTED · sponsor spotlight','success',1800);render()}catch(error){status.textContent=error.message||'Unable to show sponsor spotlight.';status.className='status error';commandClientStatus('Sponsor spotlight failed to start.','error',7000)}}
+async function showSponsorSpotlight(){const p=sponsorSpotlightPayload('show');const status=document.getElementById('spsStatus');if(!p.sponsor_id||!p.media_asset_id){status.textContent='Select an active sponsor and its media.';status.className='status error';return}if(sponsorTriggerBusy){status.textContent='Sponsor trigger already in progress…';status.className='status';return}sponsorTriggerBusy=true;setSponsorTriggerButtons(true);commandClientStatus('SUBMITTING · sponsor spotlight','warning',0);status.textContent='Sponsor spotlight triggered — starting…';status.className='status';try{currentState=await api('/api/graphics/sponsor-spotlight',p);commandClientStatus('COMMITTED · sponsor spotlight','success',1800);render()}catch(error){status.textContent=error.message||'Unable to show sponsor spotlight.';status.className='status error';commandClientStatus('Sponsor spotlight failed to start.','error',7000)}finally{sponsorTriggerBusy=false;setSponsorTriggerButtons(false)}}
 async function hideSponsorSpotlight(){currentState=await api('/api/graphics/sponsor-spotlight',{action:'hide'});render()}
 async function clearSponsorSpotlight(){currentState=await api('/api/graphics/sponsor-spotlight',{action:'clear'});render()}
 async function cancelGraphicsQueueItem(id){currentState=await api('/api/graphics/queue',{action:'cancel',id});render()}
