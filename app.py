@@ -957,29 +957,65 @@ def next_csrn_school_id(state: str, classification: str, schools: list[dict[str,
 
 
 
+def _five_a_classification_rules() -> tuple[str, list[tuple[str, str]]]:
+    """(id_format, [(reserved_id, name_slug), ...]) for the MS 5A pilot,
+    sourced from the us-ms-mhsaa football ruleset. Falls back to the old
+    literals if the ruleset engine is unavailable so school loading never
+    breaks.
+    """
+    id_format = "{state}{class}-{seq:03d}"
+    reserved = [("MS5A-001", "caledonia"), ("MS5A-002", "new-hope")]
+    try:
+        import ruleset_service
+
+        cls_rules = ruleset_service.resolve(
+            country="US", region="MS", association="MHSAA", sport="football"
+        ).get("classification", {})
+        if cls_rules.get("id_format"):
+            id_format = str(cls_rules["id_format"])
+        if isinstance(cls_rules.get("reserved_ids"), dict) and cls_rules["reserved_ids"]:
+            reserved = sorted(
+                (str(k), str(v)) for k, v in cls_rules["reserved_ids"].items()
+            )
+    except Exception:
+        pass
+    return id_format, reserved
+
+
 def reconcile_5a_csrn_ids(schools: list[dict[str, Any]]) -> bool:
     """Reserve MS5A-001 for Caledonia and MS5A-002 for New Hope.
 
     Remaining 5A schools are assigned stable alphabetical IDs beginning at 003.
     This migration is intentionally limited to the early 5A pilot database.
+    The reserved IDs and the ``{state}{class}-{seq:03d}`` id format are now
+    ruleset data (rulesets/football/us-ms-mhsaa.json), not literals here.
     """
     five_a = [s for s in schools if str(s.get("state", "MS")).upper() == "MS" and str(s.get("classification", "")).upper() == "5A"]
     if not five_a:
         return False
+    id_format, reserved = _five_a_classification_rules()
+
     def key_name(s):
         return str(s.get("official_name") or s.get("broadcast_name") or "").casefold()
-    cal = next((s for s in five_a if "caledonia" in key_name(s)), None)
-    nh = next((s for s in five_a if key_name(s).startswith("new hope") or "new hope" in key_name(s)), None)
-    ordered=[]
-    if cal: ordered.append(cal)
-    if nh and nh is not cal: ordered.append(nh)
+
+    def slug_matches(school, slug: str) -> bool:
+        target = slug.replace("-", " ").casefold()
+        name = key_name(school)
+        return name.startswith(target) or target in name
+
+    ordered: list[dict[str, Any]] = []
+    for _reserved_id, slug in reserved:
+        match = next((s for s in five_a if s not in ordered and slug_matches(s, slug)), None)
+        if match is not None:
+            ordered.append(match)
     ordered.extend(sorted([s for s in five_a if s not in ordered], key=key_name))
-    changed=False
+
+    changed = False
     for number, school in enumerate(ordered, start=1):
-        expected=f"MS5A-{number:03d}"
+        expected = id_format.format_map({"state": "MS", "class": "5A", "seq": number})
         if school.get("csrn_id") != expected:
             school["csrn_id"] = expected
-            changed=True
+            changed = True
     return changed
 
 def ensure_school_schema(school: dict[str, Any], schools: list[dict[str, Any]]) -> dict[str, Any]:
