@@ -1,15 +1,289 @@
 # Overnight Session Summary — 2026-08-28 → 08-30
 
-Rounds 1-4 branch: **`overnight-fixes-20260828`** (off `gate6/final-visual-matrix`
-@ `0f1d67d`). **Round 5 branch: `overnight-fixes-20260830`** (off
-`overnight-fixes-20260828` @ `0c96780`, so it carries rounds 1-4).
+Rounds 1-4 branch: **`overnight-fixes-20260828`**. Round 5 branch:
+**`overnight-fixes-20260830`**. **Round 6 branch:
+`round6-settings-audit-20260830`** (off `overnight-fixes-20260830` @
+`9267318`, carries rounds 1-5).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
-Full test suite (deterministic, `-p no:randomly`) after **round 5**: **51 failed,
-2249 passed** (round-5 baseline 51 / 2222; original baseline 51 / 2175). The 51
-failures are **byte-identical to baseline on every single commit** (verified by
-`diff` of the sorted failure list — flagged loudly if it ever moved; it never
-did). Pre-existing static-asset / theme-cache-version pins. **0 regressions.**
+Full test suite (deterministic, `-p no:randomly`) after **round 6**: **51 failed,
+2258 passed** (round-6 baseline 51 / 2250). The 51 failures are
+**byte-identical to baseline on every single commit** — `diff`ed each time,
+never moved. Pre-existing static-asset / theme-cache-version pins.
+**0 regressions across all six rounds.**
+
+---
+
+## ROUND 6 — settings audit, theme adjustments, rules-engine design (2026-08-30)
+
+`templates/index.html`: verified before every commit that only my own hunk
+was staged — the uncommitted "Start Broadcast (Go Live)" button and the
+45000 / 20000 timeout values are **untouched** (`git diff HEAD --
+templates/index.html` = exactly those 4 hunks).
+
+| commit | task | |
+|---|---|---|
+| `e8fc176` | **B1** — hide "Neon" from the theme picker (reversibly) | code kept intact |
+| `892bd60` | **B2** — rename customer-facing "Legacy" → "Basic Scorebug" | labels only |
+
+Tasks **A** (settings inventory) and **C** (rules-engine design) are
+investigation/proposal only — no code — and are the two big sections below.
+
+### TASK B — theme adjustments (implemented)
+
+**B1 — Neon hidden.** `production_template_service.py` gains
+`DISABLED_PACKAGE_IDS = {"digital_neon"}` and
+`SELECTABLE_PACKAGE_IDS = APPROVED - DISABLED`; `write_production_template_
+state()` rejects a disabled id, `_normalize()` degrades a stale state file
+that names one to `legacy`. The two client pickers
+(`csrn-pregame-theme-selector.js` — the live one; `csrn-production-template-
+menu.js` — the `/themes` page) get a matching `DISABLED` set that strips the
+`<option>` and fails client-side validation. The static
+`<option value="digital_neon">` is removed from `index.html`. **All Neon
+engine code is untouched** (`csrn-neon-r1/r2-engine.js`, the `digital_neon`
+entry in `csrn-broadcast-layout-engine.js`, `theme_service.py`'s
+"Digital Neon" preset). **To re-enable:** delete `"digital_neon"` from
+`DISABLED_PACKAGE_IDS` (production_template_service.py) **and** from
+`DISABLED` (csrn-pregame-theme-selector.js) — two commented one-liners.
+
+*Not touched, flag for you:* `theme_service.py`'s **`GraphicsThemeService`**
+is a **separate** CSS-preset system (`/themes` catalog: Modern Network,
+Minimal Radio, Classic 1980s, Heritage Press, …). It has its own
+"Digital Neon" **colour preset** — unrelated to the Neon overlay renderer.
+I left it alone. Tell me if you also want that preset hidden.
+
+**B2 — "Legacy" → "Basic Scorebug".** Label/copy only, in all three picker
+surfaces (`csrn-pregame-theme-selector.js` `LABELS.legacy`, the `/themes`
+menu label + 3 fallback-copy strings, the `index.html` `<option>` text).
+**Internal `"legacy"` id is unchanged** everywhere — `DEFAULT_PACKAGE_ID`,
+`currentAlias`, the render-failure fallback, CSS classes, `#eventTicker`.
+The asset-placement option "Flexible / Legacy" is a different concept and
+was left alone.
+
+---
+
+## TASK A — settings / options inventory (for your review; nothing changed)
+
+**Rec column** = my first-pass read of customer-visible vs
+CSRN-internal-only. **This is a recommendation, not a decision — nothing is
+hidden.**
+
+### A.1 — Environment variables (all read in project source)
+
+| Var | What it does | Where | First-pass rec |
+|---|---|---|---|
+| `CSRN_STATE_AUTHORITY_FILE` | Overrides the local state-authority path | `app.py:_local_state_authority_path` | Internal / advanced install |
+| `CSRN_GAME_DAY_LOCAL_STATE` | Force on/off the local-authority + Drive-mirror split | `app.py:_drive_backed_game_day_state` | Internal / advanced install |
+| `CSRN_CORE_BACKUP_ROOT` | Overrides where rolling snapshots + quarantine live (round 5) | `app.py:_core_backup_root` | Internal / advanced install |
+| `CSRN_STATE_MIRROR_INTERVAL_SECONDS` | Drive-mirror coalesce interval (round 5, default 90) | `app.py` | Internal / advanced install |
+| `CSRN_STATE_MIRROR_MAX_MUTATIONS` | Drive-mirror coalesce mutation cap (round 5, default 8) | `app.py` | Internal / advanced install |
+| `CSRN_PRODUCTION_TEMPLATE_STATE_PATH` | Overrides the production-template state file (used by tests/sims) | `production_template_service.py` | Internal / test only |
+| `CSRN_INSTALLED` / `CSRN_RUNTIME_ROOT` / `CSRN_DATA_ROOT` | Dev-vs-installed data-location resolution | `product_paths.py` | Internal (installer/packaging) |
+| `CSRN_HOST` / `CSRN_PORT` / `CSRN_DEBUG` | Host/port/Flask-debug for the **alternate** launcher `run_core_foundation.py` | `run_core_foundation.py` | `CSRN_DEBUG` = **dev only**; host/port arguably customer |
+| `CSRN_CUDA_DLL_PATHS` | Extra CUDA DLL search paths for the caption GPU worker | `caption_worker.py` | Customer (their GPU box) but niche |
+| `CSRN_FACEBOOK_SECURE_PAGE_TOKEN` / `CSRN_FACEBOOK_PAGE_ACCESS_TOKEN` | Env refs for FB publishing credentials | `DEFAULT_CONFIG.social`, `facebook_connection_service` | Customer (their own FB creds) |
+| `LOCALAPPDATA`, `ProgramFiles`, `USERPROFILE`, `PATH` | OS paths | various | n/a (OS) |
+| launcher-only: `CSRN_COMMAND_CENTER`, `CSRN_ENVIRONMENT`, `CSRN_EXIT`, `CSRN_GAME_DAY_LAUNCHER` | Referenced only in `.bat`/`.ps1` launch scripts | launchers | Internal (packaging) |
+
+*Note:* `run_core_foundation.py` is a **second entry point** with
+`application.run(debug=CSRN_DEBUG)`. The real game-day launcher runs
+`app.py` → `waitress.serve` (no debug). Worth deciding whether
+`run_core_foundation.py` ships to customers at all.
+
+### A.2 — Configuration Manager (`Settings` module, `DEFAULT_CONFIG`, `/api/config`)
+
+All operator-editable in the in-app **Configuration Manager** unless noted.
+
+| Setting | What | Code | First-pass rec |
+|---|---|---|---|
+| Organization: name, short_name, logo, primary/secondary/accent colour | Branding on overlays & pregame | `DEFAULT_CONFIG.organization`, `cfgOrg*` inputs | **Customer** |
+| Default broadcast: venue, sport, timezone, home_school_id, visual_mode | Seeds new broadcasts | `DEFAULT_CONFIG.broadcast_defaults` | **Customer** |
+| `broadcast_defaults.theme` = `"CSRN Dark"` | Legacy/unused theme string; `cfgTheme` input is **readonly** | `DEFAULT_CONFIG` | Internal / vestigial — recommend hide or wire up |
+| Folders: graphics/assets/obs/archive/exports/backups | Path names | `DEFAULT_CONFIG.folders`, `cfg*` inputs | Customer (advanced) — mostly cosmetic now |
+| OBS: websocket_enabled, controlled_commands, host, port, password, scene collection, profile, required scene, browser source, program-visual scene, graphic/camera source names | OBS integration wiring | `DEFAULT_CONFIG.obs`, `cfgObs*` | **Customer** (their OBS) |
+| Weather: use_home_venue_address, alert_radius_miles, refresh_seconds, stale_after_seconds, user_agent | Weather widget behaviour | `DEFAULT_CONFIG.weather` (only `cfgRadius` is in the UI) | **Customer**; `user_agent` string is internal |
+| Licensing: provider, enforcement_mode (`installed_only`), activation_endpoint | Licensing plumbing | `DEFAULT_CONFIG.licensing`, `entitlement_service` | **Internal / CSRN business** |
+| `graphics_theme`: active_preset (`modern_network`), school_color_adaptation, season_lock | `GraphicsThemeService` CSS presets | `DEFAULT_CONFIG.graphics_theme`, `/themes` | Customer-facing feature, but see Task B note |
+| Social: facebook/youtube/x/website + publishing block (preview_first, auto_create_drafts, allow_auto_publish, x_mode, x_oauth, x_api, facebook_api_version `v25.0`, facebook_connection `local_oauth_test`) | Social posting | `DEFAULT_CONFIG.social` | **Customer** for handles/toggles; `facebook_connection: "local_oauth_test"` and `facebook_api_version` look **internal/dev** |
+| Application: version, build, **rules_edition `"NFHS"`**, automatic_backup, auto_save, operator_timeout_hours (12), upgrade_manager_enabled, last_migration_status | App behaviour | `DEFAULT_CONFIG.application`, `cfgAutoBackup/AutoSave/SessionHours` | `automatic_backup`/`auto_save`/`operator_timeout_hours` = **customer**; `version`/`build`/`last_migration_status` = read-only display; **`rules_edition` is a dead stub** (see Task C); `upgrade_manager_enabled` = internal |
+
+### A.3 — `DEFAULT_STATE` fields an operator changes during a broadcast
+
+These are game controls, not "settings" per se, but they are operator-set:
+scores, quarter, down, distance, clock, possession, ball_spot,
+`ticker_visible` / `ticker_speed` (very_slow…fast) / `ticker_pause`,
+`ball_spot_visible`, `scorebug_visible`, `visual_mode` (graphic/camera),
+`game_data_authority` (broadcaster ↔ statistician), `contest_type`
+(official/…), `record_policy`, `region_game`, `production_type`,
+`special_designations`, coin-toss, crew names, records, classifications.
+**All customer.** (`classification` / `home_region` / `csrn_id`-style
+fields carry MS-specific assumptions — see Task C.)
+
+### A.4 — Caption settings (`caption_service.DEFAULT_PROFILE`, Caption Setup UI)
+
+`caption_model` (small.en / medium.en / turbo / large-v3), `channel_mode`
+(speaker_labeled / …), `speech_threshold` (0.00075), `audio_device` + host
+API + channel count, per-channel speaker labels & enable flags,
+live/preview toggles. **All customer** (their audio hardware & captions).
+
+### A.5 — Theme / production-template selection
+
+Production template picker (`legacy`→"Basic Scorebug", friday_night_stadium,
+eight_bit_gameday, heritage_press, ~~digital_neon~~ now hidden,
+collegiate_traditional). Server-authoritative via `/api/production-template`.
+**Customer.**
+
+### A.6 — Internal / development-and-evaluation tooling reachable in the app
+
+These are **PIN-gated operator routes** but are clearly built for CSRN's own
+release process, not for running a broadcast. **Strong first-pass rec:
+gate behind an internal/dev flag or remove from customer builds.**
+
+| Surface | Route(s) | What it is |
+|---|---|---|
+| **Diagnostics module** ("Football Release Readiness", "Technical Diagnostics", "Live Runtime Diagnostics", incident-bundle export) | `/api/diagnostics`, `runtime_diagnostics_service` | Release-readiness scoring + incident bundle export — CSRN release QA |
+| **Rehearsals** | `/api/game-day/rehearsals*`, `/api/game-day/release-readiness`, `release-freeze`/`unfreeze`, `release-manifest` | Pre-release drill tracking & release freeze — CSRN release process |
+| **Commissioning** | `/api/game-day/commissioning*`, `/commissioning/report` | New-install commissioning checklist + report — arguably customer onboarding, but report language is internal |
+| **Deployment / Licensing** | `/api/deployment/*`, `/api/licensing/*`, `support-bundle`, `update/validate`, `update/prepare` | Update packaging, licence install/remove, support bundle — CSRN ops |
+| **Recovery** | `/api/game-day/recovery/*` (snapshots, restore, rollback-plan, known-good, unclean-shutdown) | Disaster recovery tooling — **customer-relevant** but advanced |
+| **Upgrade module** | `upgradeModule` in index.html, `upgrade_manager.py` / `upgrade_service.py` | In-app updater — customer-relevant if updates ship that way |
+| **MHSAA import routes** | `/api/imports/mhsaa/5A*`, `mhsaa_division_routes` (`/api/associations`, division analyze/import) | Mississippi-specific school-data import — **CSRN/MS only** (see Task C) |
+| **DragonFly roster/school sync** | `dragonfly_service`, `dragonfly_sync_service` (`association="MHSAA"` default) | External roster source integration, MHSAA-defaulted |
+| Repo root `CSRN_GATE*_*.md` / `*_AUDIT*.txt` / `_gate*_rollback_*` dirs | not served | Dev artefacts on disk only — **not reachable from the running app** (checked: no "gate"/"audit" strings in operator UI) |
+
+The one clearly-labelled "for iterating on this codebase" item **visible in
+the operator UI** was the old `digital_neon` option text
+"Neon — Deferred / Unvalidated" — removed in B1.
+
+---
+
+## TASK C — rules-engine investigation + design proposal (proposal only)
+
+### C.1 — Honest inventory: what jurisdiction/sport-driven logic actually exists
+
+**None.** Every rule value in CSRN today is a hardcoded constant assuming
+**NFHS 11-man football** with **Mississippi MHSAA** identifiers. There is no
+ruleset abstraction, no per-jurisdiction data, no sport parameter in the
+game-logic layer. Specifics:
+
+| Rule area | Where | Current state |
+|---|---|---|
+| **School ID / classification scheme** | `app.py:reconcile_5a_csrn_ids()` (the one you named) | Hardcodes `MS5A-001` = Caledonia, `MS5A-002` = New Hope, then alphabetical `MS5A-003+`; filters `state=="MS" and classification=="5A"`. Wired in as `SCHOOL_REPOSITORY`'s `collection_normalizer`, so it runs on **every school-list load**. |
+| Classification names | `mhsaa_division_routes.py:SUPPORTED_CLASSES = ("1A".."7A")`; `/api/associations` hardcodes MHSAA + MAIS, `state:"MS"`, `sports:["Football"]` | MHSAA class names baked in |
+| **Penalty yardage** | `penalty_service.py:PENALTY_CATALOG` (class attr) | ~30 fixed entries (5/10/15, loss-of-down, auto-first-down flags). NFHS-flavoured. **No jurisdiction key, no NFHS/NCAA/CFL/8-man variance.** `enforce()` takes a `yards` override arg but nothing selects a ruleset. |
+| **Kickoff spot** | `canonical_state_service.py:enter_kickoff()` → `_team_own_yard_spot(state, kicking, 40)` | Own **40** hardcoded (NFHS post-2019; NCAA kicks from the 35). |
+| **Free kick after safety** | `canonical_state_service.py:enter_free_kick()` → own **20** | Hardcoded. |
+| **Try (PAT) spot** | `canonical_state_service.py:enter_pending_try()` → opponent **3** | Hardcoded (NFHS; NFL/NCAA differ). |
+| **Quarter length** | `period_service.py` → `clock_seconds = 720` (12:00) | Hardcoded (NFHS; NCAA 15:00). |
+| **Period structure** | `period_service.py:_quarter()` → `{"1","2","3","4","OT"}` | 4 quarters + single OT hardcoded; no halves-only, no running-clock/mercy rules, OT format not modelled. |
+| **`rules_edition` config field** | `DEFAULT_CONFIG.application.rules_edition = "NFHS"`; **force-pinned** to `"NFHS"` in `core_repository_runtime.py:80` and `tools/apply_phase_2_4.py:35` | **Read by nothing.** Dead stub — the only existing "hook" for rules variance, and it drives zero logic. |
+| Timezone default | `DEFAULT_CONFIG.broadcast_defaults.timezone = "America/Chicago"` | Mississippi default |
+| Association default | `dragonfly_service` / `dragonfly_sync_service` — `association: str = "MHSAA"` in 8 signatures | MHSAA-defaulted |
+| Sport in **game logic** | `rules_service`, `period_service`, `penalty_service`, `canonical_state_service`, `statistics_service`, `event_service`, `game_operations_service` | **Zero non-football branching** — grepped, confirmed. Sport only branches in the **overlay/theme JS** (scorebug layout: innings vs quarters), which is presentation, not rules. |
+
+**Explicitly flagged (the "no yards-to-go" lesson):** I did **not** find a
+partial or half-built ruleset system anywhere. `rules_service.py` +
+`penalty_service.py` are the "rules engine", but they are procedural
+football code with literal constants — not data-driven, not parameterised
+by jurisdiction or sport. If you were told a ruleset layer exists, it does
+not.
+
+### C.2 — Proposed design: a `Ruleset` keyed by (jurisdiction, sport)
+
+**Shape.** A ruleset is a plain data document (JSON), not code:
+
+```
+rulesets/
+  football/
+    us-ms-mhsaa.json        # CSRN's current behaviour, expressed as data
+    us-ncaa.json
+    us-nfhs.json            # generic NFHS (ms-mhsaa "extends" this)
+    ca-cfl.json
+  basketball/
+    us-nfhs.json
+  _schema.json
+```
+
+```jsonc
+// rulesets/football/us-ms-mhsaa.json
+{
+  "id": "football/us-ms-mhsaa",
+  "extends": "football/us-nfhs",
+  "label": "Mississippi HS Football (MHSAA)",
+  "jurisdiction": { "country": "US", "region": "MS", "association": "MHSAA" },
+  "sport": "football",
+  "period": { "count": 4, "length_seconds": 720, "overtime": "nfhs_10yard" },
+  "kickoff": { "spot": "own_40", "touchback_spot": "own_20", "free_kick_spot": "own_20" },
+  "try": { "spot": "opp_3" },
+  "penalties": {
+    "Defensive/Pass Interference": { "yards": 15, "automatic_first_down": true }
+    // only deltas from the parent ruleset; everything else inherited
+  },
+  "classification": {
+    "scheme": "letter_grade",           // 1A..7A
+    "id_format": "MS{class}-{seq:03d}",  // MS5A-001
+    "reserved_ids": { "MS5A-001": "caledonia", "MS5A-002": "new-hope" }
+  }
+}
+```
+
+**Where it lives.**
+- `ruleset_service.py` — loads + merge-resolves `extends` chains, validates
+  against `_schema.json`, exposes `get_ruleset(jurisdiction, sport) -> dict`.
+- Files ship in `rulesets/` (read-only, packaged). A customer never edits
+  JSON; they pick from a list.
+- The resolved ruleset is attached to broadcast state once at
+  broadcast-create time (`state["ruleset_id"]` + a resolved copy cached),
+  so a mid-game rules change is deliberate, not incidental.
+
+**How the game logic consumes it.** Replace the literal constants with
+lookups, e.g.:
+- `penalty_service.enforce(...)` takes `ruleset` (or reads
+  `state["ruleset"]`); `PENALTY_CATALOG` becomes `ruleset["penalties"]`
+  merged over a shipped default.
+- `canonical_state_service.enter_kickoff()` reads
+  `ruleset["kickoff"]["spot"]` (a symbolic spot like `own_40` resolved by
+  the existing `_team_own_yard_spot` helper).
+- `period_service` reads `ruleset["period"]["length_seconds"]` /
+  `["count"]`.
+- `reconcile_5a_csrn_ids()` → generalised
+  `reconcile_classification_ids(schools, ruleset["classification"])`; the
+  Caledonia/New Hope reservation becomes `reserved_ids` **data** in the
+  MS-MHSAA ruleset, not a special-cased function.
+
+**How the customer selects.** Pregame / Configuration Manager gets a
+**Location** control (country → region/state → association) and the existing
+**Sport** control. `(location, sport)` maps to a `ruleset_id`. Default for a
+fresh install could be `football/us-nfhs` (generic) rather than the
+MS-specific one. CSRN's own setup just picks "United States → Mississippi →
+MHSAA / Football", which resolves to `football/us-ms-mhsaa` — **one entry
+in the catalogue, no special-cased code.**
+
+**Migration path (incremental, low-risk).**
+1. Add `ruleset_service.py` + the schema + `football/us-nfhs.json` +
+   `football/us-ms-mhsaa.json` that **exactly reproduces today's constants**.
+   Add a golden test: resolved MS-MHSAA ruleset == current hardcoded values.
+2. Point **one** consumer at it at a time (start with `period_service`
+   quarter length — smallest blast radius), keeping the constant as the
+   fallback when no ruleset is attached. Full suite green at each step.
+3. Only after all consumers read the ruleset: add the Location UI and a
+   second real ruleset (e.g. `us-ncaa`) to prove variance works.
+4. `rules_edition` config field: either delete it or repurpose it as the
+   `ruleset_id` selector.
+
+**Open questions for you (design decisions, not mine to make):**
+- Ruleset granularity: is "MHSAA" enough, or do you need per-classification
+  overrides (e.g. 8-man vs 11-man within a state)?
+- OT formats vary a lot (NFHS 10-yard, NCAA, GHSAA, etc.) — model as a
+  named strategy (`"overtime": "nfhs_10yard"`) resolved in code, or fully
+  data-drive it?
+- Do customers ever need to author/override a ruleset, or is "pick from
+  CSRN's catalogue" sufficient for v1?
+- Non-football: basketball/baseball game logic doesn't exist yet at all —
+  is (location, sport) the right key now, or is sport a bigger lift that
+  should gate this?
+
+---
 
 ---
 
