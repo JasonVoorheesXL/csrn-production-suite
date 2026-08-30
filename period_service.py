@@ -27,10 +27,38 @@ class PeriodService:
 
     VALID_TEAMS = {"home", "visitor"}
 
-    @staticmethod
-    def _quarter(value: Any) -> str:
+    # Period structure + quarter length, sourced once from the football
+    # ruleset (US/MS/MHSAA). Literals are the frozen fallback + golden anchor.
+    _QUARTERS_FALLBACK = ("1", "2", "3", "4", "OT")
+    _QUARTER_SECONDS_FALLBACK = 720
+    _period_cache: dict[str, Any] | None = None
+
+    @classmethod
+    def _period(cls) -> dict[str, Any]:
+        if cls._period_cache is None:
+            quarters = list(cls._QUARTERS_FALLBACK)
+            seconds = cls._QUARTER_SECONDS_FALLBACK
+            try:
+                import ruleset_service
+
+                period = ruleset_service.resolve(
+                    country="US", region="MS", association="MHSAA", sport="football"
+                ).get("period", {})
+                if isinstance(period.get("quarters"), list) and period["quarters"]:
+                    quarters = [str(q).strip().upper() for q in period["quarters"]]
+                if isinstance(period.get("quarter_length_seconds"), int):
+                    seconds = int(period["quarter_length_seconds"])
+            except Exception:
+                quarters = list(cls._QUARTERS_FALLBACK)
+                seconds = cls._QUARTER_SECONDS_FALLBACK
+            cls._period_cache = {"quarters": quarters, "quarter_seconds": seconds}
+        return cls._period_cache
+
+    @classmethod
+    def _quarter(cls, value: Any) -> str:
         text = str(value or "1").strip().upper()
-        return text if text in {"1", "2", "3", "4", "OT"} else "1"
+        valid = cls._period()["quarters"]
+        return text if text in valid else valid[0]
 
     @staticmethod
     def _swap_directions(state: dict[str, Any]) -> None:
@@ -39,12 +67,12 @@ class PeriodService:
         state["home_direction"] = "left" if home == "right" else "right"
         state["visitor_direction"] = "left" if visitor == "right" else "right"
 
-    @staticmethod
-    def _stop_clock(state: dict[str, Any], *, reset: bool = False) -> None:
+    @classmethod
+    def _stop_clock(cls, state: dict[str, Any], *, reset: bool = False) -> None:
         state["clock_running"] = False
         state["clock_started_at"] = 0
         if reset:
-            state["clock_seconds"] = 720
+            state["clock_seconds"] = cls._period()["quarter_seconds"]
 
     @classmethod
     def _period_hold_reason(cls, state: Mapping[str, Any]) -> str:
