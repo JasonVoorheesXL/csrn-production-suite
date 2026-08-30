@@ -1,0 +1,77 @@
+{
+  "schema": "csrn-internal-only-surfaces-v1",
+  "purpose": "Groundwork for the eventual commercial packaging split. Lists the entry points and HTTP routes that Round 6's settings audit flagged as CSRN-internal-only (release QA / dev tooling) and NOT appropriate for a customer build. DOCUMENTATION ONLY as of Round 7 -- nothing here is removed, gated, or restricted yet.",
+  "generated": "2026-08-30",
+  "source": "Round 6 Task A.6 + Round 7 Task C",
+
+  "entry_points": [
+    {
+      "path": "run_core_foundation.py",
+      "why": "Second Flask entry point: application.run(host=CSRN_HOST, port=CSRN_PORT, debug=(CSRN_DEBUG=='1'), threaded=True). The real game-day launcher is app.py -> waitress.serve (no debug). A commercial build should ship only the waitress path.",
+      "action_for_packaging": "exclude from the commercial build"
+    }
+  ],
+
+  "route_blueprints": [
+    {
+      "blueprint": "system_routes",
+      "module": "routes/system_routes.py",
+      "scope": "partial -- this blueprint also serves customer routes (/api/state, /api/runtime-state, /api/config, /api/health). Only the diagnostics routes below are internal.",
+      "internal_routes": [
+        {"method": "GET",  "path": "/api/diagnostics"},
+        {"method": "GET",  "path": "/api/runtime-diagnostics"},
+        {"method": "POST", "path": "/api/runtime-diagnostics/export"}
+      ],
+      "why": "Engine-status + live runtime diagnostics + incident-bundle export. Built for CSRN release QA; the operator does not need them to run a broadcast."
+    },
+    {
+      "blueprint": "rehearsal_routes",
+      "module": "routes/rehearsal_routes.py",
+      "scope": "entire blueprint",
+      "internal_routes": [
+        {"method": "GET",   "path": "/api/game-day/rehearsals"},
+        {"method": "GET",   "path": "/api/game-day/rehearsals/catalog"},
+        {"method": "POST",  "path": "/api/game-day/rehearsals"},
+        {"method": "PATCH", "path": "/api/game-day/rehearsals/<rehearsal_id>/drills/<path:drill_key>"},
+        {"method": "POST",  "path": "/api/game-day/rehearsals/<rehearsal_id>/blockers"},
+        {"method": "PATCH", "path": "/api/game-day/rehearsals/<rehearsal_id>/blockers/<blocker_id>"},
+        {"method": "POST",  "path": "/api/game-day/rehearsals/<rehearsal_id>/complete"},
+        {"method": "POST",  "path": "/api/game-day/rehearsals/<rehearsal_id>/reopen"},
+        {"method": "GET",   "path": "/api/game-day/release-readiness"},
+        {"method": "POST",  "path": "/api/game-day/release-freeze"},
+        {"method": "POST",  "path": "/api/game-day/release-unfreeze"},
+        {"method": "GET",   "path": "/api/game-day/release-manifest"}
+      ],
+      "why": "Pre-release drill tracking + release freeze/unfreeze + release manifest. This is CSRN's own release process, not broadcast operation.",
+      "action_for_packaging": "do not register in the commercial build"
+    },
+    {
+      "blueprint": "deployment_routes",
+      "module": "routes/deployment_routes.py",
+      "scope": "partial -- deployment + support-bundle are internal; the /api/licensing/* routes are CSRN licensing business (borderline; your call).",
+      "internal_routes": [
+        {"method": "GET",  "path": "/api/deployment/status"},
+        {"method": "POST", "path": "/api/deployment/update/validate"},
+        {"method": "POST", "path": "/api/deployment/update/prepare"},
+        {"method": "POST", "path": "/api/deployment/support-bundle"}
+      ],
+      "related_licensing_routes_for_your_review": [
+        {"method": "GET",  "path": "/api/licensing/status"},
+        {"method": "GET",  "path": "/api/licensing/activation-request"},
+        {"method": "POST", "path": "/api/licensing/install"},
+        {"method": "POST", "path": "/api/licensing/remove"}
+      ],
+      "why": "Update packaging/validation and support-bundle generation are CSRN ops tooling. The support bundle in particular can collect logs/state and should not be a one-click customer action."
+    }
+  ],
+
+  "explicitly_not_listed": {
+    "note": "These were considered in Round 6 but are NOT classed internal-only here -- left for your decision.",
+    "items": [
+      "commissioning routes (/api/game-day/commissioning*) -- arguably customer onboarding",
+      "recovery routes (/api/game-day/recovery/*) -- customer-relevant disaster recovery, advanced",
+      "upgrade module / upgrade_service -- customer-relevant if updates ship in-app",
+      "MHSAA import + DragonFly sync -- Mississippi/CSRN-specific data plumbing, not a debug surface"
+    ]
+  }
+}
