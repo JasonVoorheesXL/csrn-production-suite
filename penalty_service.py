@@ -38,6 +38,28 @@ class PenaltyService:
         ("Special Teams", "Personal Foul"): {"yards": 15},
     }
 
+    # Resolved once from the ruleset engine (US/MS/MHSAA football). RULES
+    # above is now the frozen fallback + golden-test anchor, not the live
+    # source. See ruleset_service + tests/test_ruleset_golden.py.
+    _penalty_rules_cache: dict[tuple[str, str], dict[str, Any]] | None = None
+
+    @classmethod
+    def _penalty_rules(cls) -> dict[tuple[str, str], dict[str, Any]]:
+        if cls._penalty_rules_cache is None:
+            try:
+                import ruleset_service
+
+                ruleset = ruleset_service.resolve(
+                    country="US", region="MS", association="MHSAA", sport="football"
+                )
+                resolved = ruleset_service.penalty_rules(ruleset)
+                # A ruleset that somehow lost its penalties falls back rather
+                # than silently enforcing nothing.
+                cls._penalty_rules_cache = resolved or dict(cls.RULES)
+            except Exception:
+                cls._penalty_rules_cache = dict(cls.RULES)
+        return cls._penalty_rules_cache
+
     @staticmethod
     def opposite(team: str) -> str:
         return "visitor" if team == "home" else "home"
@@ -96,7 +118,7 @@ class PenaltyService:
         unit = cls.infer_unit(state, selected_team, requested_unit)
         name_text = str(name or "Penalty").strip() or "Penalty"
         outcome_text = str(outcome or "accepted").lower()
-        rule = copy.deepcopy(cls.RULES.get((unit, name_text), {}))
+        rule = copy.deepcopy(cls._penalty_rules().get((unit, name_text), {}))
         configured_yards = max(0, min(99, cls._safe_int(yards, cls._safe_int(rule.get("yards"), 0))))
 
         result: dict[str, Any] = {
