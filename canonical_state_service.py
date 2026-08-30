@@ -216,6 +216,35 @@ class CanonicalStateFoundation:
         return f"LEFT {value}" if value < 50 else f"RIGHT {100 - value}"
 
 
+    # Kickoff / free-kick / try spots, sourced once from the football ruleset
+    # (US/MS/MHSAA). The literals are the frozen fallback + golden anchor.
+    _FIELD_YARDS_FALLBACK = {"kickoff": 40, "free_kick": 20, "try": 3}
+    _field_yards_cache: dict[str, int] | None = None
+
+    @classmethod
+    def _field_yards(cls) -> dict[str, int]:
+        if cls._field_yards_cache is None:
+            resolved = dict(cls._FIELD_YARDS_FALLBACK)
+            try:
+                import ruleset_service
+
+                field = ruleset_service.resolve(
+                    country="US", region="MS", association="MHSAA", sport="football"
+                ).get("field", {})
+                mapping = {
+                    "kickoff": field.get("kickoff_spot"),
+                    "free_kick": field.get("free_kick_spot"),
+                    "try": field.get("try_spot"),
+                }
+                for key, spec in mapping.items():
+                    if spec:
+                        _side, yard = ruleset_service.field_spot_yardage(spec)
+                        resolved[key] = yard
+            except Exception:
+                resolved = dict(cls._FIELD_YARDS_FALLBACK)
+            cls._field_yards_cache = resolved
+        return cls._field_yards_cache
+
     @classmethod
     def _team_own_yard_spot(cls, state: Mapping[str, Any], team: str, yard: int) -> str:
         direction = str(state.get(f"{team}_direction", "right" if team == "home" else "left") or "right").lower()
@@ -237,7 +266,7 @@ class CanonicalStateFoundation:
         state["receiving_team"] = ""
         state["down"] = "Off"
         state["distance"] = "Off"
-        state["ball_spot"] = cls._opponent_yard_spot(state, scoring, 3)
+        state["ball_spot"] = cls._opponent_yard_spot(state, scoring, cls._field_yards()["try"])
         state["clock_running"] = False
         state["clock_started_at"] = 0
 
@@ -251,7 +280,7 @@ class CanonicalStateFoundation:
         state["receiving_team"] = receiving
         state["down"] = "Off"
         state["distance"] = "Off"
-        state["ball_spot"] = cls._team_own_yard_spot(state, kicking, 40)
+        state["ball_spot"] = cls._team_own_yard_spot(state, kicking, cls._field_yards()["kickoff"])
         state["clock_running"] = False
         state["clock_started_at"] = 0
 
@@ -265,7 +294,7 @@ class CanonicalStateFoundation:
         state["receiving_team"] = receiving
         state["down"] = "Off"
         state["distance"] = "Off"
-        state["ball_spot"] = cls._team_own_yard_spot(state, kicking, 20)
+        state["ball_spot"] = cls._team_own_yard_spot(state, kicking, cls._field_yards()["free_kick"])
         state["clock_running"] = False
         state["clock_started_at"] = 0
 
