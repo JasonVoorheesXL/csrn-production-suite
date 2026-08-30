@@ -6,7 +6,8 @@ const PANEL_ID = "csrnProductionTemplatePanel";
 const API = "/api/production-template";
 
 const OPTIONS = Object.freeze([
-  Object.freeze({id:"legacy", label:"Legacy / Current Production Overlay"}),
+  // Customer-facing name for the built-in scorebug. Internal id stays "legacy".
+  Object.freeze({id:"legacy", label:"Basic Scorebug"}),
   Object.freeze({id:"friday_night_stadium", label:"Friday Night Stadium"}),
   Object.freeze({id:"eight_bit_gameday", label:"8-Bit Gameday"}),
   Object.freeze({id:"heritage_press", label:"Heritage Press"}),
@@ -64,8 +65,8 @@ async function saveSelection() {
     });
     setMessage(
       packageId === "legacy"
-        ? "Legacy production overlay selected."
-        : "Production selection saved. The OBS overlay will render this approved package with automatic Legacy fallback on any render failure."
+        ? "Basic Scorebug selected."
+        : "Production selection saved. The OBS overlay will render this approved package with automatic Basic Scorebug fallback on any render failure."
     );
   } catch (error) {
     setMessage(`Save failed: ${error.message}`);
@@ -121,7 +122,7 @@ function buildPanel() {
   section.className = "csrn-production-template-panel";
   section.innerHTML = `
     <h2>Production Template Selection</h2>
-    <p>Choose the approved template used by the production OBS overlay. Legacy remains the automatic fallback if a selected package cannot load or render.</p>
+    <p>Choose the approved template used by the production OBS overlay. Basic Scorebug remains the automatic fallback if a selected package cannot load or render.</p>
     <div class="csrn-production-template-grid">
       <label for="${MENU_ID}">
         Approved production template

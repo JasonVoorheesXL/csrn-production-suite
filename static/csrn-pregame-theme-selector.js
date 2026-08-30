@@ -9,7 +9,8 @@
   const BADGE_ID = "csrnPregameThemeBadge";
 
   const LABELS = Object.freeze({
-    legacy: "Legacy",
+    // Customer-facing name for the built-in scorebug. Internal id stays "legacy".
+    legacy: "Basic Scorebug",
     friday_night_stadium: "Friday Night Stadium",
     eight_bit_gameday: "8-Bit Gameday",
     heritage_press: "Heritage Press",
