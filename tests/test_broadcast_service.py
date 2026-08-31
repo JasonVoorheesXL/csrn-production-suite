@@ -337,7 +337,7 @@ def test_create_never_inherits_a_more_recent_scrimmage_placeholder_record() -> N
     assert record["record_tracking"]["home_source"] == "automatic"
 
 
-def test_create_falls_back_to_manual_when_only_scrimmages_are_completed() -> None:
+def test_create_is_auto_managed_even_when_nothing_to_inherit_yet() -> None:
     harness = Harness()
     harness.broadcasts = [
         {
@@ -358,12 +358,14 @@ def test_create_falls_back_to_manual_when_only_scrimmages_are_completed() -> Non
             "home_school_id": "caledonia",
             "visitor_school_id": "new-hope",
             "season": "2026",
-            "home_pregame_record": {"wins": 3, "losses": 2, "ties": 0},
+            "home_pregame_record": {"wins": 0, "losses": 0, "ties": 0},
         }
     ).data["broadcast"]
-    # Nothing eligible to inherit -> the submitted manual snapshot stands.
-    assert record["home_pregame_record"] == {"wins": 3, "losses": 2, "ties": 0}
-    assert record["record_tracking"]["home_source"] == "manual"
+    # Nothing to inherit right now, but the submitted record stands and the
+    # primary side stays auto-managed so a later official result forward-
+    # propagates into this game.
+    assert record["home_pregame_record"] == {"wins": 0, "losses": 0, "ties": 0}
+    assert record["record_tracking"]["home_source"] == "automatic"
 
 
 def test_inherited_record_reports_available_with_a_source_label() -> None:
@@ -539,6 +541,107 @@ def test_official_non_region_loss_advances_only_overall_record() -> None:
     ).data["broadcast"]
     assert completed["home_postgame_record"] == {"wins": 6, "losses": 2, "ties": 0}
     assert completed["home_postgame_region_record"] == {"wins": 3, "losses": 0, "ties": 0}
+
+
+def _forward_propagation_broadcasts() -> list[dict[str, Any]]:
+    return [
+        {
+            "broadcast_id": "week1-live",
+            "status": "live",
+            "sport": "Football",
+            "season": "2026",
+            "record_policy": "official",
+            "region_game": False,
+            "home_school_id": "new-hope",
+            "visitor_school_id": "caledonia",
+            "record_tracking": {
+                "primary_school_id": "caledonia",
+                "primary_side": "visitor",
+                "home_source": "manual",
+                "visitor_source": "automatic",
+            },
+            "visitor_pregame_record": {"wins": 0, "losses": 0, "ties": 0},
+            "visitor_pregame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+        },
+        {
+            # scheduled BEFORE week 1 is finalized; auto-managed, still 0-0.
+            "broadcast_id": "week2-planned-auto",
+            "status": "planned",
+            "sport": "Football",
+            "season": "2026",
+            "record_policy": "official",
+            "home_school_id": "caledonia",
+            "visitor_school_id": "amory-high-school",
+            "record_tracking": {
+                "primary_school_id": "caledonia",
+                "primary_side": "home",
+                "home_source": "automatic",
+                "visitor_source": "manual",
+            },
+            "home_pregame_record": {"wins": 0, "losses": 0, "ties": 0},
+            "home_pregame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+        },
+        {
+            # operator typed the record here -> must never be overwritten.
+            "broadcast_id": "week3-planned-manual",
+            "status": "planned",
+            "sport": "Football",
+            "season": "2026",
+            "record_policy": "official",
+            "home_school_id": "caledonia",
+            "visitor_school_id": "houston-high-school",
+            "record_tracking": {
+                "primary_school_id": "caledonia",
+                "primary_side": "home",
+                "home_source": "manual",
+                "visitor_source": "manual",
+            },
+            "home_pregame_record": {"wins": 4, "losses": 0, "ties": 0},
+            "home_pregame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+        },
+    ]
+
+
+def test_finalizing_a_game_forward_propagates_to_auto_managed_future_games() -> None:
+    harness = Harness()
+    harness.broadcasts = _forward_propagation_broadcasts()
+
+    harness.service().update_linked_status(
+        "week1-live",
+        "completed",
+        {"final_home_score": 42, "final_visitor_score": 10},
+    )
+
+    by_id = {row["broadcast_id"]: row for row in harness.broadcasts}
+    # Caledonia lost week 1 -> 0-1, pushed into the auto-managed week-2 game.
+    assert by_id["week1-live"]["visitor_postgame_record"] == {
+        "wins": 0, "losses": 1, "ties": 0
+    }
+    assert by_id["week2-planned-auto"]["home_pregame_record"] == {
+        "wins": 0, "losses": 1, "ties": 0
+    }
+    # The manually-entered week-3 record is untouched.
+    assert by_id["week3-planned-manual"]["home_pregame_record"] == {
+        "wins": 4, "losses": 0, "ties": 0
+    }
+
+
+def test_forward_propagation_skips_scrimmage_completion() -> None:
+    harness = Harness()
+    rows = _forward_propagation_broadcasts()
+    rows[0]["record_policy"] = "non_record"
+    harness.broadcasts = rows
+
+    harness.service().update_linked_status(
+        "week1-live",
+        "completed",
+        {"final_home_score": 42, "final_visitor_score": 10},
+    )
+
+    by_id = {row["broadcast_id"]: row for row in harness.broadcasts}
+    assert by_id["week2-planned-auto"]["home_pregame_record"] == {
+        "wins": 0, "losses": 0, "ties": 0
+    }
 
 
 def test_editing_same_school_preserves_archived_classification_snapshot() -> None:

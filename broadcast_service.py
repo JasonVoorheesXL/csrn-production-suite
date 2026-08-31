@@ -283,6 +283,13 @@ class BroadcastService:
         visitor_region_pregame = self.normalize_record(
             data.get("visitor_pregame_region_record")
         )
+        # The primary side is auto-managed unless the operator explicitly
+        # overrode it -- even when there is nothing to inherit yet, so that a
+        # game scheduled before the prior result is finalized still gets its
+        # record forward-propagated when that result lands (see
+        # _propagate_record_forward). `inherited` only governs whether we
+        # overwrite the submitted record right now.
+        auto_primary = bool(primary_side) and not manual_override
         inherited = bool(latest_primary) and not manual_override
         if primary_side == "home" and inherited:
             home_pregame = copy.deepcopy(latest_primary["overall"])
@@ -347,8 +354,8 @@ class BroadcastService:
             "record_tracking": {
                 "primary_school_id": primary_school_id,
                 "primary_side": primary_side,
-                "home_source": "automatic" if primary_side == "home" and inherited else "manual",
-                "visitor_source": "automatic" if primary_side == "visitor" and inherited else "manual",
+                "home_source": "automatic" if primary_side == "home" and auto_primary else "manual",
+                "visitor_source": "automatic" if primary_side == "visitor" and auto_primary else "manual",
             },
         }
 
@@ -563,6 +570,7 @@ class BroadcastService:
             "final_visitor_score",
         }.issubset(extra):
             self._apply_completion_records(item)
+            self._propagate_record_forward(item, items)
         self._save_broadcasts(items)
         self._write_detail(copy.deepcopy(item), False)
         return BroadcastResult("OK", {"broadcast": copy.deepcopy(item)})
@@ -824,6 +832,97 @@ class BroadcastService:
             item["record_tracking_applied"] = False
         item[f"{primary_side}_postgame_record"] = overall
         item[f"{primary_side}_postgame_region_record"] = region
+
+    def _propagate_record_forward(
+        self,
+        completed_item: Broadcast,
+        items: list[Broadcast],
+    ) -> None:
+        """After an official game is finalized, refresh the pregame record of
+        every already-created ``planned`` broadcast for the same primary
+        school / sport / season that inherited its record automatically.
+
+        Manual entries (``{side}_source == "manual"``) are never touched, and
+        nothing is changed if a more recent official game already owns the
+        "latest tracked record".
+        """
+        tracking = completed_item.get("record_tracking", {})
+        if not isinstance(tracking, Mapping):
+            return
+        school_id = str(tracking.get("primary_school_id", "") or "")
+        completed_side = str(tracking.get("primary_side", "") or "")
+        if (
+            not school_id
+            or completed_side not in {"home", "visitor"}
+            or not bool(completed_item.get("record_tracking_applied"))
+            or str(completed_item.get("record_policy", "")) != "official"
+        ):
+            return
+        sport = str(completed_item.get("sport", "Football") or "Football")
+        season = str(completed_item.get("season", "") or "")
+        completed_at = int(
+            completed_item.get("completed_at", completed_item.get("updated_at", 0))
+            or 0
+        )
+        # Don't propagate a stale result: if a later official game for this
+        # school is already finalized, it owns the "latest tracked record".
+        for other in items:
+            if other is completed_item:
+                continue
+            if str(other.get("status", "")) != "completed":
+                continue
+            if str(other.get("record_policy", "")) != "official":
+                continue
+            if not bool(other.get("record_tracking_applied")):
+                continue
+            other_tracking = other.get("record_tracking", {})
+            if not isinstance(other_tracking, Mapping):
+                continue
+            if str(other_tracking.get("primary_school_id", "") or "") != school_id:
+                continue
+            if str(other.get("sport", "Football") or "Football") != sport:
+                continue
+            if str(other.get("season", "") or "") != season:
+                continue
+            if int(
+                other.get("completed_at", other.get("updated_at", 0)) or 0
+            ) > completed_at:
+                return
+        new_overall = self.normalize_record(
+            completed_item.get(f"{completed_side}_postgame_record")
+        )
+        new_region = self.normalize_record(
+            completed_item.get(f"{completed_side}_postgame_region_record")
+        )
+        for row in items:
+            if row is completed_item:
+                continue
+            if str(row.get("status", "")) != "planned":
+                continue
+            if str(row.get("sport", "Football") or "Football") != sport:
+                continue
+            if str(row.get("season", "") or "") != season:
+                continue
+            row_tracking = row.get("record_tracking", {})
+            if not isinstance(row_tracking, Mapping):
+                continue
+            if str(row_tracking.get("primary_school_id", "") or "") != school_id:
+                continue
+            side = str(row_tracking.get("primary_side", "") or "")
+            if side not in {"home", "visitor"}:
+                continue
+            if str(row_tracking.get(f"{side}_source", "manual")) != "automatic":
+                continue
+            if self.normalize_record(
+                row.get(f"{side}_pregame_record")
+            ) == new_overall and self.normalize_record(
+                row.get(f"{side}_pregame_region_record")
+            ) == new_region:
+                continue
+            row[f"{side}_pregame_record"] = copy.deepcopy(new_overall)
+            row[f"{side}_pregame_region_record"] = copy.deepcopy(new_region)
+            row["updated_at"] = int(self._clock())
+            self._write_detail(copy.deepcopy(row), False)
 
     def _branding_warnings(
         self,
