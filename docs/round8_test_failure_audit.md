@@ -25,11 +25,17 @@ Buckets (from the round brief):
 
 | Bucket | Count | Disposition this round |
 |---|---|---|
-| (a) obsolete | **38** | deleted (STEP 2) |
-| (b) fixable test problem | **2** | assertions updated (STEP 2) |
+| (a) obsolete | **37** | deleted (STEP 2) |
+| (b) fixable test problem | **3** | assertions updated (STEP 2) |
 | (c) flaky | **0** | — |
 | (d) production looks wrong / needs owner decision | **11** | documented only (STEP 4), left failing |
 | **Total** | **51** | |
+
+> Refinement made during STEP 2: `test_gate167_r9_rearms_player_mode_after_undo_or_new_event`
+> (row 35) was reclassified from (a) to (b). 5 of its 6 assertions still hold; only
+> the `latest.id` token is stale (the re-arm key now composes from
+> `graphic.player_id` / `graphic.roster_id` / timestamps instead of the latest
+> event's id). That is a one-line assertion update, not a dead test.
 
 There are **zero** flaky tests in the 51. Every failure is a deterministic
 assertion over static file content, a bundled image, or the blueprint set —
@@ -120,17 +126,24 @@ covered by sibling tests that keep passing.
 | 33 | test_gate171_r2_friday_night_layered_dynamic_clash_players.py :: test_runtime_and_cache_advance_to_gate171_r3 | `?v=18.5-r11` | overlay now `19.6-r18-*` |
 | 34 | test_gate172_r2_friday_color_clarity.py :: test_r2_advances_only_runtime_and_cache_contract | `?v=18.5-r11` + `friday-football-v10` label | overlay `19.6-r18-*`, schema now `v11` |
 
-**(a-2) Superseded implementation-detail contracts — 4**
+**(a-2) Superseded implementation-detail contracts — 3**
 Assert exact JS tokens / schema labels from an implementation that has since been
 rewritten. The *behaviour* each gate cared about is still present (and still
-covered by passing sibling tests); only the frozen literal is stale.
+covered by passing sibling tests); only the frozen literal is stale. Unlike
+row 35, these have no clean 1:1 assertion update — they pin whole blocks of a
+superseded implementation — so they are deleted rather than patched.
 
 | # | Test | Stale literal | Current reality |
 |--:|---|---|---|
-| 35 | test_gate167_r9_player_event_reliability.py :: test_gate167_r9_rearms_player_mode_after_undo_or_new_event | `"latest.id" in js` | re-arm still implemented via `playerActivationKey` / `lastPlayerActivationKey`; `latest.id` token gone |
-| 36 | test_gate171_r7_clean_layered_visual_rollback.py :: test_r7_restores_r2_compositor_treatment_without_losing_current_binding | `layeredSchema="friday-football-v10"`, `tintFridayMask(...)`, `globalAlpha=.54` | compositor rewritten to `friday-football-v11` / `constrainFridayColorMask`; sibling `test_r7_restores_clean_r2_layer_population` still passes |
-| 37 | test_gate172_r1_friday_new_player_layer_system.py :: test_gate172_preserves_r7_fallback_and_protected_theme_boundaries | `String(state.sport \|\| "football").toLowerCase() !== "football"` | guard refactored; token gone |
-| 38 | test_gate172_r1_friday_new_player_layer_system.py :: test_gate172_runtime_uses_v4_assets_and_selected_game_colors | `layeredSchema="friday-football-v10"`, `layers-v10/…?v=18.5-r12`, `?v=18.5-r11` | schema now `v11`; `binding-v46` part still passes |
+| 36 | test_gate171_r7_clean_layered_visual_rollback.py :: test_r7_restores_r2_compositor_treatment_without_losing_current_binding | `layeredSchema="friday-football-v10"`, `tintFridayMask(...)`, `globalAlpha=.54`, `secondaryAlpha=.68` | compositor rewritten to `friday-football-v11` / `constrainFridayColorMask`; sibling `test_r7_restores_clean_r2_layer_population` (R2 layer-art rollback) still passes |
+| 37 | test_gate172_r1_friday_new_player_layer_system.py :: test_gate172_preserves_r7_fallback_and_protected_theme_boundaries | `String(state.sport \|\| "football").toLowerCase() !== "football"` and the rest of the v10 guard block | guard refactored for v11; sibling `test_gate172_r11_*` tests cover the v11 system |
+| 38 | test_gate172_r1_friday_new_player_layer_system.py :: test_gate172_runtime_uses_v4_assets_and_selected_game_colors | ~25 tokens pinned to `layeredSchema="friday-football-v10"`, `layers-v10/…?v=18.5-r12`, `?v=18.5-r11` | schema now `v11`; `binding-v46` sub-assertion still passes. **Note:** this test also covered "protected theme boundaries" and "selected game colours" — if you want those re-asserted against v11, that is a follow-up. |
+
+**(b, moved from a-2) — 1**
+
+| # | Test | Failing assertion | Fix |
+|--:|---|---|---|
+| 35 | test_gate167_r9_player_event_reliability.py :: test_gate167_r9_rearms_player_mode_after_undo_or_new_event | `"latest.id" in js` | re-arm is still implemented (`playerActivationKey`, `lastPlayerActivationKey = ""`, `graphic.updated_at`, `graphic.expires_at` all still asserted and present). The key now composes from `graphic.player_id` / `graphic.roster_id` instead of the latest event's `id`. Replace the one `latest.id` line with `graphic.player_id` / `graphic.roster_id`. |
 
 #### (b) — fixable test problem, assertions updated this round — 2
 
@@ -162,12 +175,17 @@ covered by passing sibling tests); only the frozen literal is stale.
 See `OVERNIGHT_SUMMARY.md` (Round 8 section) for the commit-by-commit log and the
 running failure count. In summary:
 
-- **38 obsolete test functions deleted** (2 whole files removed:
+- **37 obsolete test functions deleted** — 34 overlay cache-bust / version pins
+  (commit `Round 8 STEP 2a`, 2 whole files removed:
   `test_gate169_r4_r4_overlay_cache_patch_contract.py`,
-  `test_gate169_r6_r3_cache_prefix_regression.py`). Passing sibling tests in the
-  other files are untouched.
-- **2 stale assertions updated** (`test_gate183`, `test_gate4`) to the current
-  equivalent code, preserving each test's original intent.
+  `test_gate169_r6_r3_cache_prefix_regression.py`) plus 3 superseded-implementation
+  contracts (`test_gate171_r7 :: test_r7_restores_r2_compositor_treatment…`,
+  `test_gate172_r1 :: test_gate172_preserves_r7_fallback…`,
+  `test_gate172_r1 :: test_gate172_runtime_uses_v4_assets…`). Passing sibling
+  tests in the other files are untouched.
+- **3 stale assertions updated** (`test_gate183`, `test_gate4`,
+  `test_gate167_r9 :: …rearms_player_mode…`) to the current equivalent code,
+  preserving each test's original intent.
 
 ## STEP 3 — flaky tests
 

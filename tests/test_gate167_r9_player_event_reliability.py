@@ -24,7 +24,11 @@ def test_gate167_r9_hides_legacy_player_during_pending_theme_render():
 def test_gate167_r9_rearms_player_mode_after_undo_or_new_event():
     js = read("static/csrn-production-theme-runtime.js")
     assert "function playerActivationKey" in js
-    assert "latest.id" in js
+    # The activation key now composes from the graphic's identity fields
+    # (player_id / roster_id) plus its timestamps, rather than the latest
+    # event's `id`. Re-arm behaviour on undo / new event is unchanged.
+    assert "graphic.player_id" in js
+    assert "graphic.roster_id" in js
     assert "graphic.updated_at" in js
     assert "graphic.expires_at" in js
     assert "activationKey" in js

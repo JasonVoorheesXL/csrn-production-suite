@@ -29,7 +29,11 @@ def test_player_identity_never_falls_back_to_csrn_branding() -> None:
     assert "player-silhouette.svg" in preview
     assert "identityMonogramData" in preview
     assert "school.primary_logo" in preview
-    assert "p?.headshot||teamLogo||'/static/player-silhouette.svg'" in preview
+    # Fallback order is unchanged (headshot -> team logo -> neutral silhouette),
+    # only the expression shape: the headshot is now routed through
+    # rosterHeadshotDisplayUrl() and the tail keeps team-logo-then-silhouette.
+    assert "p?.headshot?rosterHeadshotDisplayUrl(p.headshot)" in preview
+    assert "teamLogo||'/static/player-silhouette.svg'" in preview
     assert "wm.src=teamLogo||monogram" in preview
     assert "join(' / ')||'ATH'" in preview
     assert "toUpperCase()==='ATHLETE'?'ATH':value" in preview

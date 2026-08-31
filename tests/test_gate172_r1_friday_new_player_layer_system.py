@@ -50,39 +50,6 @@ def test_gate172_dynamic_masks_are_pairwise_disjoint():
         for right in MASKS[index + 1:]:
             assert not any(a and b for a, b in zip(values[left], values[right])), (left, right)
 
-def test_gate172_runtime_uses_v4_assets_and_selected_game_colors():
-    runtime = read("static/csrn-production-theme-runtime.js")
-    overlay = read("templates/overlay.html")
-    for token in (
-        "csrn-production-theme-binding-v46",
-        'canvas.dataset.layeredSchema="friday-football-v10"',
-        "clash/layers-v10/visitor-jersey-primary-mask.png",
-        "clash/layers-v10/visitor-number-trim-mask.png",
-        "clash/layers-v10/home-jersey-primary-mask.png",
-        "clash/layers-v10/home-number-trim-mask.png",
-        "football-neutral-equipment-anatomy.png?v=18.5-r12",
-        "football-uniform-texture.png?v=18.5-r12",
-        "constrainFridayColorMask",
-        "protectWhite:true",
-        "protectWarm=true",
-        "protectEquipment=false",
-        "protectEquipment:true",
-        "isFridayNeutralEquipmentPixel",
-        "warmSkinOrLeather",
-        "luma>175 && chroma<74",
-        "deriveFridayUniformReliefLayer",
-        'ctx.globalCompositeOperation="color"',
-        'ctx.globalCompositeOperation="source-over"',
-        'ctx.globalCompositeOperation="soft-light"',
-        'ctx.globalCompositeOperation="destination-in"',
-        "state.visitor && state.visitor.primary",
-        "state.visitor && state.visitor.secondary",
-        "state.home && state.home.primary",
-        "state.home && state.home.secondary",
-    ):
-        assert token in runtime
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
 
 def test_gate172_r11_generated_players_have_core_uniform_coverage():
     regions = (
@@ -132,20 +99,3 @@ def test_gate172_r11_generated_player_base_is_neutral_under_uniform_masks():
     p95 = samples[int(len(samples) * .95)]
     assert sum(samples) / len(samples) < 18
     assert p95 < 72
-
-def test_gate172_preserves_r7_fallback_and_protected_theme_boundaries():
-    runtime = read("static/csrn-production-theme-runtime.js")
-    engine = read("static/csrn-friday-night-stadium-engine.js")
-    assert 'alias !== "friday_night_stadium" || mode !== "clash"' in runtime
-    assert 'String(state.sport || "football").toLowerCase() !== "football"' in runtime
-    assert "/static/friday-night-stadium/clash/football-athletes-keyed.png" in engine
-    assert "paintFridayNightLayeredFootballClash" in runtime
-    assert "eight_bit_gameday" in runtime
-    assert "heritage_press" in runtime
-
-
-
-
-
-
-

@@ -14,7 +14,10 @@ def test_field_position_controller_exists_on_both_operator_surfaces():
 
 
 def test_field_controller_commits_through_authoritative_correction_boundary():
-    assert "api('/api/game-correction'" in INDEX
+    # The field slider commits through GameStateManager.mutate() (same wrapper
+    # the drive-direction control uses), still hitting the authoritative
+    # /api/game-correction endpoint with the same payload.
+    assert "GameStateManager.mutate('/api/game-correction'" in INDEX
     assert "note:'Field position controller'" in INDEX
     assert "source,down:currentState.down" in INDEX
 
