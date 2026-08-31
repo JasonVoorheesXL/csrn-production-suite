@@ -17,7 +17,6 @@ from flask import Blueprint, Response, jsonify, request
 
 
 _LOCK = threading.RLock()
-_INSTALLED = False
 _NWS_CACHE: dict[str, Any] = {"key": "", "at": 0, "periods": []}
 
 # Eyebrows the automatic/statistician spotlight paths actually use
@@ -833,10 +832,13 @@ def _payload() -> dict[str, Any]:
     }
 
 
-def install_pregame_presentation(app: Any) -> None:
-    global _INSTALLED
-    if _INSTALLED or getattr(app, "_csrn_pregame_presentation_installed", False):
-        return
+def build_pregame_presentation_blueprint() -> Blueprint:
+    """Build the pregame/halftime/delay overlay blueprint.
+
+    The application factory owns registration now -- app.py appends this
+    blueprint to APPLICATION_BLUEPRINTS before create_app(). `install_
+    pregame_presentation()` below stays only for any caller outside that path.
+    """
 
     csrn_app = _csrn_app()
     require_auth = getattr(csrn_app, "require_auth", lambda fn: fn)
@@ -990,6 +992,18 @@ def install_pregame_presentation(app: Any) -> None:
         })
         return jsonify(_payload())
 
-    app.register_blueprint(bp)
+    return bp
+
+
+def install_pregame_presentation(app: Any) -> None:
+    """Register the pregame blueprint on an already-constructed app.
+
+    The factory path (app.py -> APPLICATION_BLUEPRINTS -> create_application)
+    is the primary registration route; this remains for direct/legacy callers
+    and is idempotent per app.
+    """
+    if getattr(app, "_csrn_pregame_presentation_installed", False):
+        return
+    if "pregame_presentation" not in app.blueprints:
+        app.register_blueprint(build_pregame_presentation_blueprint())
     app._csrn_pregame_presentation_installed = True
-    _INSTALLED = True

@@ -3114,6 +3114,12 @@ GRAPHICS_ROUTES_BLUEPRINT = create_graphics_blueprint(
 )
 APPLICATION_BLUEPRINTS.append(GRAPHICS_ROUTES_BLUEPRINT)
 
+# CSRN UNIVERSAL PREGAME DELAY R14 -- the pregame/halftime/delay overlay.
+# Registered through the application factory like every other blueprint so
+# factory-built instances (and both real launchers) get it identically.
+from pregame_presentation import build_pregame_presentation_blueprint
+APPLICATION_BLUEPRINTS.append(build_pregame_presentation_blueprint())
+
 
 def automation_player(roster_id: str, player_id: str):
     roster = next((r for r in load_rosters() if str(r.get("id")) == str(roster_id)), None)
@@ -3491,9 +3497,8 @@ install_runtime_state_cache(app)
 from theme_public_state_cache import install_theme_public_state_cache
 install_theme_public_state_cache(app)
 
-# CSRN UNIVERSAL PREGAME DELAY R14
-from pregame_presentation import install_pregame_presentation
-install_pregame_presentation(app)
+# (pregame_presentation is now registered via APPLICATION_BLUEPRINTS above,
+# through the application factory -- no post-construction install needed.)
 
 def _record_clean_shutdown_and_stop(signum, frame):
     """Handle a deliberate SIGINT/SIGTERM (e.g. Ctrl+C) by writing the clean
