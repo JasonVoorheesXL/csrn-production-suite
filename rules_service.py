@@ -549,11 +549,11 @@ class RulesService:
                 else:
                     description += f", ball at {self.coord_to_spot(end)}"
                 description += (
-                    " â€” touchback"
+                    " — touchback"
                     if touchback
-                    else " â€” fair catch"
+                    else " — fair catch"
                     if fair_catch
-                    else " â€” blocked"
+                    else " — blocked"
                     if blocked
                     else ""
                 )

@@ -50,6 +50,30 @@ class StatisticsService:
         except (TypeError, ValueError):
             return fallback
 
+    # UTF-8 text that was once decoded as Windows-1252 and re-saved leaves a
+    # fixed mojibake signature (leading "â€"). The report is a
+    # coach-facing document, so any historical play text carrying this is
+    # repaired on the way out. The upstream root cause (a corrupted em-dash
+    # literal in rules_service.py) is fixed separately; this covers already
+    # persisted games.
+    _MOJIBAKE_REPAIRS = {
+        "â€”": "—",  # em dash
+        "â€“": "–",  # en dash
+        "â€™": "’",  # right single quote / apostrophe
+        "â€˜": "‘",  # left single quote
+        "â€œ": "“",  # left double quote
+        "â€": "”",  # right double quote
+        "â€¦": "…",  # ellipsis
+    }
+
+    @classmethod
+    def _repair_text(cls, value: Any) -> Any:
+        if not isinstance(value, str) or "â€" not in value:
+            return value
+        for bad, good in cls._MOJIBAKE_REPAIRS.items():
+            value = value.replace(bad, good)
+        return value
+
     @staticmethod
     def _active_rows(rows: Any, broadcast_id: str) -> list[dict[str, Any]]:
         if not isinstance(rows, list):
@@ -260,7 +284,7 @@ class StatisticsService:
                     "team": team,
                     "team_name": teams[team]["name"],
                     "label": str(event.get("label") or code),
-                    "description": str(event.get("description") or code),
+                    "description": self._repair_text(str(event.get("description") or code)),
                     "points": delta,
                     "home_score": self._safe_int(after.get("home_score", 0)),
                     "visitor_score": self._safe_int(after.get("visitor_score", 0)),
@@ -276,6 +300,9 @@ class StatisticsService:
             play["defense"] = defense
             play["offense_name"] = self.canonical_team_name(source_state, offense)
             play["defense_name"] = self.canonical_team_name(source_state, defense)
+            for text_field in ("result", "description", "label"):
+                if text_field in play:
+                    play[text_field] = self._repair_text(play[text_field])
             normalized_plays.append(play)
 
             kind = str(play.get("play_type", "")).lower()
