@@ -1,14 +1,129 @@
 # Overnight Session Summary — 2026-08-28 → 08-30
 
-Round 6 branch: **`round6-settings-audit-20260830`**. **Round 7 branch:
-`round7-ruleset-engine-20260830`** (off `round6-settings-audit-20260830` @
-`6c1e915`, carries rounds 1-6).
+Round 6 branch: **`round6-settings-audit-20260830`**. Round 7 branch:
+`round7-ruleset-engine-20260830`. **Round 8 branch:
+`round8-test-audit-20260830`** (off `round7-ruleset-engine-20260830` @
+`0c96780`, carries rounds 1-7).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
-Full test suite (deterministic, `-p no:randomly`) after **round 7**: **51 failed,
-2291 passed** (round-7 baseline 51 / 2258). The 51 failures are
-**byte-identical to baseline on every single commit** — `diff`ed each time,
-never moved. **0 regressions across all seven rounds.**
+Full test suite (deterministic, `-p no:randomly`, run with
+`.venv/Scripts/python.exe`) after **round 8**: **8 failed, 2293 passed**
+(down from the seven-round constant of 51 failed / 2291 passed). Round 8's
+whole job was to attack that 51. **35 obsolete tests removed, 3 stale
+assertions fixed, 0 production code changed, 0 real regressions.** The 8 that
+remain are all things that need your decision — see ROUND 8 below.
+
+---
+
+## ROUND 8 — pre-existing test-failure audit (2026-08-30)
+
+`templates/index.html` **not touched**. `broadcaster_print_service.py` +
+`tests/test_broadcaster_print_service.py` (your roster-page WIP) **not
+touched**. No production code touched at all this round — only tests + docs.
+
+Full analysis: **`docs/round8_test_failure_audit.md`** (51-row table).
+
+| commit | step | |
+|---|---|---|
+| `7ab3041` | **1** — `docs/round8_test_failure_audit.md`: categorise all 51 | |
+| `b5bf7ac` | **2a** — delete 34 obsolete overlay cache-bust / version-pin tests | |
+| `4a46c63` | **2b** — delete 3 superseded-impl tests, fix 3 stale assertions | |
+| `60a4f4b` | **2c** — delete 3 dead-subsystem tests (Friday `layers-v10` masks) | |
+| (this)    | summary | |
+
+### Interpreter note (matters for reproducing the baseline)
+
+The machine's global `python` is 3.14 and lacks `pronouncing` (imported by
+`roster_service.py`) → the suite fails to *collect* (58 errors). The real
+baseline only reproduces under the project **`.venv`** (Python 3.13.14):
+`51 failed, 2291 passed`. Every command this round used `.venv`.
+
+### STEP 1 — categorisation (all 51)
+
+| bucket | n | meaning | this round |
+|---|--:|---|---|
+| (a) obsolete | 40 | guards a version string / implementation / subsystem that has been intentionally superseded | **deleted** |
+| (b) fixable test problem | 3 | one stale literal; the tested behaviour still holds | **assertion updated** |
+| (c) flaky | 0 | — | — |
+| (d) production looks wrong / needs your call | 8 | left failing, code untouched, documented | **STEP 4** |
+
+**49 of the 51 trace to three already-shipped, intentional changes** whose
+guard tests were never updated:
+1. the themed-overlay runtime advanced from the "gate 16–17" era to
+   `csrn-production-theme-runtime.js?v=19.6-r18-r8-passer-credit` — ~34 tests
+   pinned the old `?v=` string;
+2. the Friday-Night layered-clash compositor was rewritten (`v10` → `v11`)
+   and its art regenerated;
+3. `static/csrn-broadcast-layout-engine.*` and
+   `csrn-friday-night-stadium-engine.js` (the frozen renderers) were rebuilt
+   for the "Collegiate Tech" theme series and `9064c67`.
+
+### STEP 2 — deletes + fixes
+
+- **40 obsolete tests deleted** (3 whole files gone:
+  `test_gate169_r4_r4_overlay_cache_patch_contract.py`,
+  `test_gate169_r6_r3_cache_prefix_regression.py`,
+  `test_gate172_r2_friday_color_clarity.py`). Every touched file keeps its
+  passing siblings; the one lost pass (`test_old_r6_cache_is_not_authoritative`)
+  was a tautology (`assert not 'v=18.5-r11'.endswith('v=16.9-r6')`).
+- **3 assertions updated**, intent preserved:
+  - `test_gate183 :: …authoritative_correction_boundary` — field slider now
+    commits via `GameStateManager.mutate('/api/game-correction', …)` (same
+    endpoint + payload as before; same wrapper the drive-direction control uses).
+  - `test_gate4 :: …never_falls_back_to_csrn_branding` — preview fallback chain
+    refactored to `p?.headshot ? rosterHeadshotDisplayUrl(p.headshot) :
+    (teamLogo || silhouette)`; same order, still no `csrn-logo.png`.
+  - `test_gate167_r9 :: …rearms_player_mode…` — re-arm key now composes from
+    `graphic.player_id` / `graphic.roster_id` + timestamps, not the latest
+    event's `id` (5 of 6 assertions were already valid).
+
+### STEP 3 — flaky
+
+**None.** Every one of the 51 is a deterministic assertion over file content,
+a bundled PNG, or the blueprint set. Five consecutive full runs → identical
+failure sets.
+
+### STEP 4 — the 8 that remain (need your decision; code untouched)
+
+**A. Renderer-freeze re-pin — 5 tests** (`test_gate116`, `test_gate126`,
+`test_gate12`, `test_gate13`, `test_gate14`). `csrn-broadcast-layout-engine.css/.js`
+(Gate 11.6 "Neon" freeze) and `csrn-friday-night-stadium-engine.js` (Gate 12.6)
+were deliberately evolved after the freezes and never re-pinned; the BIBLE
+freeze section is also stale. Per the tests' own change-control language this
+is an **explicit owner "unfreeze → re-freeze at the new SHA" decision**. I did
+not re-pin them or touch the renderers.
+
+**B. `gate166` scorebug-only relaxation — 1 test**
+(`test_gate166_scorebug_remains_scorebug_only`). Commit `9064c67` changed the
+themed-scorebug activation to
+`state.captionsActive ? ["scorebug","captions"] : ["scorebug"]` with a matching
+`throw` guard permitting exactly `{scorebug, captions}`. Looks fully
+intentional (captions belong with a themed scorebug). **Confirm and I'll relax
+the guard test next round.**
+
+**C. `pregame_presentation` not in the application factory — 2 tests**
+(`test_phase_5_architecture`, `test_theme_architecture`).
+`install_pregame_presentation()` runs on the module-level `app` only, not inside
+`create_application()`. **Both real launchers (`app.py` → `serve(app)`,
+`run_core_foundation.py` → `csrn_app.app`) are fine** — but factory-built app
+instances lack the universal pregame-delay layer, and two architecture tests
+already treat the factory as the expected owner. 2-part fix (register in the
+factory + whitelist the two intentionally-public endpoints in
+`audit_phase5_architecture`); low-risk but an init-order + audit-policy change,
+so left for you.
+
+### Follow-up this audit uncovered (not a test problem)
+
+The Friday-Night **`layers-v10` mask-compositing pipeline is dead code**:
+`paintFridayNightLayeredFootballClash()` in `csrn-production-theme-runtime.js`
+`return`s `paintFridayNightStandaloneFootballPlayers(...)` on its first line
+(live clash path uses pre-baked `players/palette-v2/*.png`), and
+`constrainFridayColorMask` / `deriveFridayUniformReliefLayer` /
+`FRIDAY_LAYERED_CLASH_ASSETS` have **zero call sites**. ~150 lines of dead
+runtime code + the `static/friday-night-stadium/clash/layers-v10/` art dir.
+Recommend a dedicated commit to delete both (plus the 3 remaining *passing*
+`test_gate172_r3` siblings that only exercise it) — needs your OK, it edits
+the live overlay runtime file.
 
 ---
 
