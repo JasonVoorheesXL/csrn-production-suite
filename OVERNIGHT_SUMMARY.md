@@ -1,15 +1,112 @@
 # Overnight Session Summary — 2026-08-28 → 08-31
 
-Round 7 branch: `round7-ruleset-engine-20260830`. Round 8 branch:
-`round8-test-audit-20260830`. **Round 9 branch:
-`round9-cleanup-20260831`** (off `round8-test-audit-20260830` @ `7c9fe14`,
-carries rounds 1-8).
+Round 8 branch: `round8-test-audit-20260830`. Round 9 branch:
+`round9-cleanup-20260831`. **Round 10 branch:
+`round10-report-fixes-20260831`** (off `round9-cleanup-20260831` @ `190cf64`,
+carries rounds 1-9).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
 Full test suite (deterministic, `-p no:randomly`, run with
-`.venv/Scripts/python.exe`) after **round 9**: **0 failed, 2298 passed.**
-Round 8 took the seven-round 51-failure constant down to 8 owner-decision
-items; Round 9 cleared all 8. **0 real regressions across all nine rounds.**
+`.venv/Scripts/python.exe`) after **round 10**: **0 failed, 2308 passed**
+(+10 new report-integrity tests since round 9). **0 real regressions across
+all ten rounds.**
+
+---
+
+## ROUND 10 — dead-code sweep + game-statistics report fixes (2026-08-31)
+
+`templates/index.html` **not touched** (0 bytes changed `190cf64..HEAD`).
+`broadcaster_print_service.py` + its test (your roster WIP) **not touched**.
+One commit per task.
+
+| commit | task | suite |
+|---|---|---|
+| `1c606e4` | **A** — sweep the residual `layers-v10` dead-code cluster | 2298 passed (unchanged) |
+| `4c6a76b` | **B** — fix the mojibake em-dash in the game-statistics report | 2298 → 2302 passed |
+| `bd84de8` | **C** — "Player not entered" fallback for the report Play Register | 2302 → 2308 passed |
+
+### Task A — dead-code sweep
+
+Round 9 Task D removed 3 top-level symbols and flagged the rest. Confirmed
+zero call sites, then deleted from `csrn-production-theme-runtime.js`
+(−174 lines, brace balance re-verified): `tintFridayMask`,
+`isFridayNeutralEquipmentPixel`, `compositeFridayMasks`,
+`clipFridayDetailLayer`, `colorizeFridayUniform`, `fridayHexToRgb`,
+`nearestFridayPaletteKey`, `const FRIDAY_PLAYER_PALETTE`, the post-`return`
+`palette-v1` body of `paintFridayNightLayeredFootballClash`, and two stale
+rollback-sentinel comments. Kept the pass-through shim + `fridayTeamColor` /
+`loadFridayLayeredAsset` / the whole `paintFridayNightStandaloneFootballPlayers`
+palette-v2 path (all live). `test_gate171_r2` / `test_gate172_r1` still green.
+The Friday layered-clash dead-code swamp is now fully cleared.
+
+### Task B — mojibake em-dash
+
+**Root cause:** `rules_service.py`'s kickoff/punt/return phrasing built the
+outcome suffix from a corrupted literal — `" <mojibake> touchback"` /
+`" … fair catch"` / `" … blocked"` — where the mojibake is a UTF-8 em dash
+(U+2014) once decoded as Windows-1252 and re-saved (`c3 a2 e2 82 ac e2 80 9d`).
+Every other dash in the file, and `event_service.py`'s kickoff text, is a
+correct em dash — hence the "inconsistent with nearby touchback lines".
+
+- `rules_service.py`: the 3 mojibake sequences → real em dash. Whole-repo
+  scan confirms this is the **only** live source file with the signature
+  (every other hit is under `Data/` or a `*-backup`/`*rollback` dir — i.e.
+  already-persisted play data downstream of this bug).
+- `statistics_service.py`: `StatisticsService._repair_text()` maps the fixed
+  cp1252←utf8 punctuation signatures back (em/en dash, curly quotes,
+  apostrophe, ellipsis), applied to `play_register` `result`/`description`/
+  `label` and `scoring_summary` `description`, so games **already recorded**
+  with the bad bytes also export clean. Live-overlay text untouched.
+- `tests/test_statistics_report_text_integrity.py` (4 tests): the report
+  never emits `â€`; clean text is left alone.
+
+### Task C — "Player not entered" in the Play Register
+
+**Investigation:** a play's description is **one pre-rendered string**.
+`rules_service` builds it (falling back to the opposing team's mascot name
+when a run/pass has no player entered — the "Indians run for 0 yards" case),
+stores it as `event["description"]` / `play["result"]`, and both the live
+overlay and `StatisticsService.report()` reuse it verbatim. The report does
+not regenerate it.
+
+**Fix (report generator only):** in `report()`'s `normalized_plays` loop,
+when a run play has no `player_number`/`player_name` (or a pass has no
+`passer_number`/`passer_name`) — the exact condition under which
+`rules_service` uses the mascot fallback — the Play Register row's
+`result`/`description` become **"Player not entered"**. Every play is
+deep-copied first, so `state["plays"]`/`state["events"]` (the overlay's
+source) are not touched — the broadcast overlay still shows the mascot
+fallback exactly as designed. Kickoffs/punts and any play with a number or
+name keep their rendered text.
+
+- `tests/test_statistics_report_play_register_fallback.py` (6 tests):
+  run/pass with nothing entered → "Player not entered"; number-present,
+  name-only, and kickoff cases untouched; explicit assertion that `report()`
+  does not mutate the source play text.
+
+### Side question — Caledonia vs Itawamba record (investigation only, no code change)
+
+**The record DID apply correctly — you did flag it official.** On
+`Data/Broadcasts/FB-2026-4A-W01-001.json` (Caledonia @ Itawamba, 2026-08-28,
+final 10–42):
+
+- `contest_type: "official"`, `record_policy: "official"`,
+  `record_tracking_applied: true`, `record_tracking.primary_school_id: "caledonia"`.
+- `visitor_postgame_record: {"wins": 0, "losses": 1, "ties": 0}` — **Caledonia is 0-1.**
+- The two earlier Caledonia games (`FB-2026-4A-W00-001/002` vs Houston) are
+  `contest_type: "scrimmage"` / `record_policy: "non_record"` and correctly
+  did **not** count.
+- The next scheduled Caledonia game (`FB-2026-OPEN-W00-001` vs Amory, 09-04,
+  `planned`) already shows Caledonia's **pregame** record as `{"wins": 0,
+  "losses": 1}` with `record_tracking.home_source: "automatic"` — the 0-1 was
+  carried forward automatically.
+
+CSRN has **no school-level aggregate standings record** — the W/L lives on
+each broadcast as `*_pregame_record` / `*_postgame_record`. `schools.json`
+has no `record` field. If you were looking at a scrimmage broadcast, or at
+the W01 game's *pregame* record (correctly 0-0 going in), or expecting a
+running total on the school record itself, that's why it looked like 0-0.
+Nothing to fix.
 
 ---
 
