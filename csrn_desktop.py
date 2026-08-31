@@ -278,7 +278,34 @@ def run(*, health_timeout: int = HEALTH_TIMEOUT_SECONDS) -> int:
     return 0
 
 
+def run_server_only() -> int:
+    """Run just the Waitress Command Center server (no window).
+
+    This is how a frozen build serves: the double-clicked executable starts
+    in shell mode, and ``start_server()`` re-execs the SAME executable with
+    ``--serve-only`` (see ``server_command``) so the packaged app needs no
+    ``.ps1`` / ``.bat`` chain. In a source checkout the child is plain
+    ``python app.py`` and this path is unused.
+    """
+
+    import app  # noqa: PLC0415 -- heavy import, only for the server child
+
+    app.run_command_center()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    raw = list(sys.argv[1:] if argv is None else argv)
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+    # Frozen re-exec: `<exe> --serve-only` -> be the server, not the shell.
+    if "--serve-only" in raw:
+        return run_server_only()
+
     parser = argparse.ArgumentParser(
         description="CSRN Production Suite desktop shell (pywebview)."
     )
@@ -288,12 +315,14 @@ def main(argv: list[str] | None = None) -> int:
         default=HEALTH_TIMEOUT_SECONDS,
         help="Seconds to wait for /api/health before giving up.",
     )
-    args = parser.parse_args(argv)
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    parser.add_argument(
+        "--serve-only",
+        action="store_true",
+        help="Run only the Waitress server (used by the frozen shell's re-exec).",
     )
+    args = parser.parse_args(raw)
+    if args.serve_only:  # pragma: no cover -- handled above, kept for --help
+        return run_server_only()
     return run(health_timeout=args.health_timeout)
 
 

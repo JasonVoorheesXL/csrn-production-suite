@@ -279,3 +279,54 @@ def test_app_routes_sigbreak_through_the_clean_shutdown_handler() -> None:
     )
     assert "signal.SIGBREAK" in source
     assert "_record_clean_shutdown_and_stop" in source
+
+
+# --------------------------------------------------------------------------
+# 15D -- frozen-startup branch
+# --------------------------------------------------------------------------
+
+
+def test_main_serve_only_delegates_to_the_command_center_server(monkeypatch) -> None:
+    import app as app_module
+
+    calls: list[str] = []
+    monkeypatch.setattr(app_module, "run_command_center", lambda: calls.append("served"))
+    # Must not try to open a window in serve-only mode.
+    monkeypatch.setattr(
+        csrn_desktop, "run", lambda **k: pytest.fail("serve-only must not run the shell")
+    )
+
+    assert csrn_desktop.main(["--serve-only"]) == 0
+    assert calls == ["served"]
+
+
+def test_app_exposes_run_command_center_as_the_single_server_entry() -> None:
+    import app as app_module
+    from pathlib import Path
+
+    assert callable(app_module.run_command_center)
+    source = Path(app_module.__file__).read_text(encoding="utf-8")
+    assert "def run_command_center()" in source
+    assert 'if __name__ == "__main__":\n    run_command_center()' in source
+    # The refactor must not have left a second serve() call behind.
+    assert source.count('serve(app, host="0.0.0.0", port=5050') == 1
+
+
+def test_frozen_build_launches_via_the_desktop_shell_not_the_bat_chain(monkeypatch) -> None:
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", "CSRNProductionSuite.exe", raising=False)
+    # A frozen build must re-exec ITSELF, never shell out to python app.py.
+    command = csrn_desktop.server_command()
+    assert command == ["CSRNProductionSuite.exe", "--serve-only"]
+    assert "app.py" not in " ".join(command)
+
+
+def test_run_core_foundation_is_not_a_packaging_entry_point() -> None:
+    from pathlib import Path
+
+    root = Path(csrn_desktop.__file__).resolve().parent
+    spec = (root / "packaging/windows/CSRNProductionSuite.spec").read_text(encoding="utf-8")
+    # Round 14 finding: run_core_foundation.py is a second Flask entry point
+    # with a debug server and CANNOT be runtime-gated -- it must simply never
+    # be a bundled entry point.
+    assert "run_core_foundation" not in spec

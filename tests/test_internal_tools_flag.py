@@ -49,6 +49,25 @@ def test_resolver_default_follows_installed_mode(
     assert app_module.internal_tools_enabled() is True
 
 
+def test_frozen_installed_build_disables_internal_tools_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Round 15D: a packaged build resolves product_paths with frozen=True
+    # (sys.frozen), which makes installed_mode True. With no explicit
+    # CSRN_INTERNAL_TOOLS the internal-only surfaces must be OFF -- the
+    # packaging step must not set that env var.
+    from types import SimpleNamespace
+
+    monkeypatch.delenv("CSRN_INTERNAL_TOOLS", raising=False)
+    monkeypatch.setattr(
+        app_module, "PRODUCT_PATHS", SimpleNamespace(installed_mode=True)
+    )
+    assert app_module.internal_tools_enabled() is False
+    # ...but an operator can still turn them on explicitly.
+    monkeypatch.setenv("CSRN_INTERNAL_TOOLS", "1")
+    assert app_module.internal_tools_enabled() is True
+
+
 @pytest.fixture
 def client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(app_module, "pin_is_configured", lambda: True)

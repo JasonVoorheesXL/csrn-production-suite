@@ -3643,7 +3643,16 @@ def _record_clean_shutdown_and_stop(signum, frame):
     raise SystemExit(0)
 
 
-if __name__ == "__main__":
+def run_command_center() -> None:
+    """Start the Waitress Command Center server and block until a shutdown
+    signal.
+
+    Single game-day server entry point: invoked by ``python app.py`` (the
+    developer / RUN_CSRN_COMMAND_CENTER.bat path) and by the frozen desktop
+    shell's ``--serve-only`` re-exec (``csrn_desktop.py``). Both must behave
+    identically.
+    """
+
     ensure_data_architecture()
     load_config()
     from waitress import serve
@@ -3686,6 +3695,10 @@ if __name__ == "__main__":
     print(f"Media server: http://127.0.0.1:{media_port} — READY")
     print("Server: Waitress production server — READY\n")
     serve(app, host="0.0.0.0", port=5050, threads=16)
+
+
+if __name__ == "__main__":
+    run_command_center()
 
 
 
