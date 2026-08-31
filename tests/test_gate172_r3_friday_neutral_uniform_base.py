@@ -34,41 +34,6 @@ ALL_ASSETS = [
 ]
 
 
-def test_friday_v10_semantic_masks_are_rgba_alpha_masks():
-    for name in MASKS:
-        img = Image.open(LAYERS / name)
-        assert img.mode == "RGBA", f"{name} must be RGBA"
-        assert img.convert("RGB").getextrema() == (
-            (255, 255),
-            (255, 255),
-            (255, 255),
-        )
-        lo, hi = img.getchannel("A").getextrema()
-        assert lo < hi, f"{name} alpha must carry semantic coverage"
-
-
-def test_friday_v10_neutral_base_has_zero_baked_chroma_under_strong_masks():
-    base = Image.open(BASE).convert("RGBA")
-    px = base.load()
-    chroma = []
-
-    for name in MASKS:
-        alpha = Image.open(LAYERS / name).convert("RGBA").getchannel("A")
-        ap = alpha.load()
-        strong = 0
-        for y in range(base.height):
-            for x in range(base.width):
-                if ap[x, y] >= 192:
-                    strong += 1
-                    r, g, b, _ = px[x, y]
-                    chroma.append(max(r, g, b) - min(r, g, b))
-        assert strong > 0, f"{name} has no strong semantic pixels"
-
-    assert chroma
-    assert sum(chroma) == 0
-    assert max(chroma) == 0
-
-
 def test_friday_v10_texture_highlight_shadow_layers_are_neutral():
     for name in NEUTRAL_LAYERS:
         img = Image.open(LAYERS / name).convert("RGBA")

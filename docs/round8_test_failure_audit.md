@@ -25,17 +25,27 @@ Buckets (from the round brief):
 
 | Bucket | Count | Disposition this round |
 |---|---|---|
-| (a) obsolete | **37** | deleted (STEP 2) |
+| (a) obsolete | **40** | deleted (STEP 2) |
 | (b) fixable test problem | **3** | assertions updated (STEP 2) |
 | (c) flaky | **0** | — |
-| (d) production looks wrong / needs owner decision | **11** | documented only (STEP 4), left failing |
+| (d) production looks wrong / needs owner decision | **8** | documented only (STEP 4), left failing |
 | **Total** | **51** | |
 
-> Refinement made during STEP 2: `test_gate167_r9_rearms_player_mode_after_undo_or_new_event`
-> (row 35) was reclassified from (a) to (b). 5 of its 6 assertions still hold; only
-> the `latest.id` token is stale (the re-arm key now composes from
-> `graphic.player_id` / `graphic.roster_id` / timestamps instead of the latest
-> event's id). That is a one-line assertion update, not a dead test.
+> Two reclassifications made during STEP 2 (both after deeper code-tracing):
+>
+> - `test_gate167_r9_rearms_player_mode_after_undo_or_new_event` (row 35): (a) → (b).
+>   5 of its 6 assertions still hold; only the `latest.id` token is stale (the
+>   re-arm key now composes from `graphic.player_id` / `graphic.roster_id` /
+>   timestamps instead of the latest event's id). One-line update, not a dead test.
+> - `test_gate172_r2` / `test_gate172_r3` mask-art failures (rows 47–49): (d) → (a).
+>   Reachability analysis proved the `layers-v10` mask-compositing pipeline is
+>   **dead code** — `paintFridayNightLayeredFootballClash()` unconditionally
+>   `return`s `paintFridayNightStandaloneFootballPlayers(...)` on its first line,
+>   and `constrainFridayColorMask` / `deriveFridayUniformReliefLayer` /
+>   `FRIDAY_LAYERED_CLASH_ASSETS` have zero call sites. The regenerated masks
+>   cannot affect any broadcast output, so these are obsolete, not a bug. (The
+>   dead runtime code + `layers-v10/` art itself is flagged for a follow-up
+>   cleanup — see STEP 4.)
 
 There are **zero** flaky tests in the 51. Every failure is a deterministic
 assertion over static file content, a bundled image, or the blueprint set —
@@ -145,14 +155,26 @@ superseded implementation — so they are deleted rather than patched.
 |--:|---|---|---|
 | 35 | test_gate167_r9_player_event_reliability.py :: test_gate167_r9_rearms_player_mode_after_undo_or_new_event | `"latest.id" in js` | re-arm is still implemented (`playerActivationKey`, `lastPlayerActivationKey = ""`, `graphic.updated_at`, `graphic.expires_at` all still asserted and present). The key now composes from `graphic.player_id` / `graphic.roster_id` instead of the latest event's `id`. Replace the one `latest.id` line with `graphic.player_id` / `graphic.roster_id`. |
 
-#### (b) — fixable test problem, assertions updated this round — 2
+**(a-3) Dead-subsystem tests — 3** (reclassified from (d) after reachability analysis)
+Test the `layers-v10` Friday-Night mask-compositing pipeline, which is
+unreachable (see the reclassification note above). The regenerated black-RGB /
+weak-alpha `layers-v10/*.png` cannot influence any rendered graphic.
+
+| # | Test | Pins | Why dead |
+|--:|---|---|---|
+| 47 | test_gate172_r2_friday_color_clarity.py :: test_r2_uses_color_clarity_texture_without_changing_player_masks | `football-uniform-color-clarity-texture.png` is `1672×941`; `ctx.globalAlpha=.54` etc. in the runtime | the `globalAlpha` tokens live in the dead `deriveFridayUniformReliefLayer` / post-`return` body; the texture is a `layers-v10` asset |
+| 48 | test_gate172_r3_friday_neutral_uniform_base.py :: test_friday_v10_semantic_masks_are_rgba_alpha_masks | each `layers-v10/*-mask.png` has RGB white (255) + varying alpha | inspects dead art only |
+| 49 | test_gate172_r3_friday_neutral_uniform_base.py :: test_friday_v10_neutral_base_has_zero_baked_chroma_under_strong_masks | masks have pixels with alpha ≥192 and the base is greyscale under them | inspects dead art only; the "no strong semantic pixels" failure has no runtime consequence |
+
+#### (b) — fixable test problem, assertions updated this round — 3
 
 | # | Test | Failing assertion | Fix |
 |--:|---|---|---|
+| 35 | test_gate167_r9_player_event_reliability.py :: test_gate167_r9_rearms_player_mode_after_undo_or_new_event | `"latest.id" in js` | see the (b, moved from a-2) row above — `latest.id` → `graphic.player_id` / `graphic.roster_id` |
 | 39 | test_gate183_field_position_controller.py :: test_field_controller_commits_through_authoritative_correction_boundary | `"api('/api/game-correction'" in INDEX` | field slider was refactored to commit via `GameStateManager.mutate('/api/game-correction', …)` — same authoritative endpoint, same `source`/`down`/`note:'Field position controller'` payload (those two assertions already pass). Update the one call-shape literal. Sibling `test_drive_direction_is_integrated_with_field_controller` already asserts the `GameStateManager.mutate` shape. |
 | 40 | test_gate4_identity_ui.py :: test_player_identity_never_falls_back_to_csrn_branding | `"p?.headshot\|\|teamLogo\|\|'/static/player-silhouette.svg'" in preview` | `renderPlayerGraphicPreview()` fallback chain was refactored to `photo.src = p?.headshot ? rosterHeadshotDisplayUrl(p.headshot) : (teamLogo \|\| '/static/player-silhouette.svg')` with a matching `onerror`. Same order (headshot → team logo → neutral silhouette), still **no** `csrn-logo.png` / CSRN branding — the test's actual intent holds. Update the literal to the current expression. |
 
-#### (d) — production looks wrong OR needs an owner decision; NOT fixed this round — 11
+#### (d) — production looks wrong OR needs an owner decision; NOT fixed this round — 8
 
 | # | Test | What it guards | Assessment | Confidence |
 |--:|---|---|---|---|
@@ -162,11 +184,8 @@ superseded implementation — so they are deleted rather than patched.
 | 44 | test_gate13_eight_bit_gameday_engine.py :: test_gate13_is_isolated_and_preserves_both_frozen_renderers | re-hashes Neon + Friday freezes | Same root cause as #41/#42 (the 8-bit engine's own hash still matches). | " |
 | 45 | test_gate14_heritage_press_engine.py :: test_gate14_isolated_engine_preserves_all_frozen_renderers | re-hashes Neon + Friday + 8-bit freezes | Same root cause as #41/#42. | " |
 | 46 | test_gate166_production_render_binding.py :: test_gate166_scorebug_remains_scorebug_only | themed scorebug package must activate `["scorebug"]` only and reject any other component | `9064c67` **relaxed** this on purpose: `activeComponents: state.captionsActive ? ["scorebug","captions"] : ["scorebug"]`. Captions may now ride with the themed scorebug. Sibling `test_gate166_scorebug_suppression_contract_survives` still passes. **Confirm captions-with-scorebug was intended** (looks deliberate) and I'll delete/relax this guard next round. | ~High it's intended; flagging because the round brief says to |
-| 47 | test_gate172_r2_friday_color_clarity.py :: test_r2_uses_color_clarity_texture_without_changing_player_masks | `football-uniform-color-clarity-texture.png` is `1672×941` RGBA | Live asset is `1536×1024`. All `layers-v10/` art appears to have been re-exported at the new size. Sibling `test_friday_v10_runtime_binds_every_layer_asset` passes, so the runtime does load them. Likely a deliberate art regen; can't confirm the compositor is size-agnostic without deeper canvas tracing. | Low — needs art-owner confirmation |
-| 48 | test_gate172_r3_friday_neutral_uniform_base.py :: test_friday_v10_semantic_masks_are_rgba_alpha_masks | each `layers-v10/*-mask.png` has RGB pinned to white (255) + a varying alpha channel | Live masks are RGB `(0,0,0)` + alpha. Under the compositor's `globalCompositeOperation="destination-in"` / `"color"` only the **alpha** channel is read, so black-vs-white RGB is very likely cosmetically inert — but I did not trace every draw call. | Low — needs art-owner confirmation |
-| 49 | test_gate172_r3_friday_neutral_uniform_base.py :: test_friday_v10_neutral_base_has_zero_baked_chroma_under_strong_masks | for each mask, pixels with alpha ≥192 exist AND the neutral base is greyscale under them | Fails at "`visitor-pants-mask.png` has no strong semantic pixels" — the regenerated masks never reach alpha ≥192. If the compositor thresholds on strong alpha this is a real visual regression; if it uses the full alpha ramp it's fine. **This is the one I'd look at first.** | Low–medium — recommend a visual spot-check of a Friday-Night clash render |
-| 50 | test_phase_5_architecture.py :: test_application_factory_returns_distinct_equivalent_instances | `set(create_app(...).blueprints) == EXPECTED_BLUEPRINTS`, which now includes `pregame_presentation` | `pregame_presentation` is installed **after** `create_app()` returns, directly on the module-level `app` (`app.py:3495 install_pregame_presentation(app)`), not inside `create_application()`. Both real launchers (`app.py:__main__ → serve(app)` and `run_core_foundation.py → csrn_app.app`) use that module-level `app`, so **production is fine** — but any factory-built instance (tests, a hypothetical alternate launcher) silently lacks the universal pregame-delay layer. Fix = move the install into `create_application()` (one line), but it shifts app-init order, so I'm leaving it for you. | High on the diagnosis; the fix is low-risk but is an init-order change |
-| 51 | test_theme_architecture.py :: test_completed_phase5_architecture_remains_clean | `audit_phase5_architecture()` — same `pregame_presentation` expectation | Identical root cause to #50 (`Missing Blueprints: pregame_presentation`). Same fix resolves both. | " |
+| 47 | test_phase_5_architecture.py :: test_application_factory_returns_distinct_equivalent_instances | `set(create_app(...).blueprints) == EXPECTED_BLUEPRINTS`, which now includes `pregame_presentation` | `pregame_presentation` is installed **after** `create_app()` returns, directly on the module-level `app` (`app.py:3495-3496 install_pregame_presentation(app)`), not inside `create_application()` (which takes an explicit `blueprints=` list). Both real launchers (`app.py:__main__ → serve(app)` and `run_core_foundation.py → csrn_app.app`) use that module-level `app`, so **production is fine** — but any factory-built instance (tests, a hypothetical alternate launcher) silently lacks the universal pregame-delay layer. Fix is 2 parts: call `install_pregame_presentation(application)` inside `create_application()`, and add `pregame_presentation.overlay` / `.status` to `audit_phase5_architecture`'s intentionally-public list. Low-risk, but it changes app-init order and audit policy. | High on the diagnosis; leaving the fix to you |
+| 48 | test_theme_architecture.py :: test_completed_phase5_architecture_remains_clean | `audit_phase5_architecture()` — same `pregame_presentation` expectation | Identical root cause to #47 (`Missing Blueprints: pregame_presentation`). The same 2-part fix resolves both. | " |
 
 ---
 
@@ -175,34 +194,67 @@ superseded implementation — so they are deleted rather than patched.
 See `OVERNIGHT_SUMMARY.md` (Round 8 section) for the commit-by-commit log and the
 running failure count. In summary:
 
-- **37 obsolete test functions deleted** — 34 overlay cache-bust / version pins
-  (commit `Round 8 STEP 2a`, 2 whole files removed:
-  `test_gate169_r4_r4_overlay_cache_patch_contract.py`,
-  `test_gate169_r6_r3_cache_prefix_regression.py`) plus 3 superseded-implementation
-  contracts (`test_gate171_r7 :: test_r7_restores_r2_compositor_treatment…`,
-  `test_gate172_r1 :: test_gate172_preserves_r7_fallback…`,
-  `test_gate172_r1 :: test_gate172_runtime_uses_v4_assets…`). Passing sibling
-  tests in the other files are untouched.
-- **3 stale assertions updated** (`test_gate183`, `test_gate4`,
+- **40 obsolete test functions deleted:**
+  - 34 overlay cache-bust / version pins (commit `STEP 2a`, 2 whole files removed:
+    `test_gate169_r4_r4_overlay_cache_patch_contract.py`,
+    `test_gate169_r6_r3_cache_prefix_regression.py`).
+  - 3 superseded-implementation contracts (commit `STEP 2b`):
+    `test_gate171_r7 :: test_r7_restores_r2_compositor_treatment…`,
+    `test_gate172_r1 :: test_gate172_preserves_r7_fallback…`,
+    `test_gate172_r1 :: test_gate172_runtime_uses_v4_assets…`.
+  - 3 dead-subsystem tests (commit `STEP 2c`):
+    `test_gate172_r2 :: test_r2_uses_color_clarity_texture…`,
+    `test_gate172_r3 :: test_friday_v10_semantic_masks_are_rgba_alpha_masks`,
+    `test_gate172_r3 :: test_friday_v10_neutral_base_has_zero_baked_chroma…`.
+  - Passing sibling tests in every touched file are untouched.
+- **3 stale assertions updated** (commit `STEP 2b`: `test_gate183`, `test_gate4`,
   `test_gate167_r9 :: …rearms_player_mode…`) to the current equivalent code,
   preserving each test's original intent.
 
 ## STEP 3 — flaky tests
 
-None. Nothing in the 51 is non-deterministic.
+**None.** Nothing in the 51 is non-deterministic — every failure is a static
+assertion over file content, a bundled PNG, or the blueprint set. No timing,
+threads, sockets, sleeps, or unseeded randomness. Five consecutive full runs
+produced byte-identical failure sets.
 
-## STEP 4 — production-behaviour concerns left for you
+## STEP 4 — production-behaviour concerns left for you (8 failing, code untouched)
 
-The 11 rows in bucket (d). The two worth your direct attention:
+**A. Renderer-freeze re-pin — rows 41–45 (5 tests).**
+`static/csrn-broadcast-layout-engine.css/.js` (the Gate 11.6 "Neon" freeze) and
+`static/csrn-friday-night-stadium-engine.js` (Gate 12.6) were deliberately
+evolved after the freezes — the "Collegiate Tech" theme series and commit
+`9064c67` respectively. The SHA-256 guards and the `CSRN_PROJECT_BIBLE.md` freeze
+section were never updated. Per the tests' own change-control language this needs
+an **explicit owner "unfreeze → re-freeze at the new hash" pass**; I did not
+re-pin them or touch the renderers.
 
-1. **`pregame_presentation` is not registered by the application factory** (#50/#51)
-   — production is unaffected, but it's an architectural inconsistency two tests
-   already encode as a defect. One-line fix, deferred because it changes init order.
-2. **Friday-Night `layers-v10` masks were regenerated with no strong-alpha pixels**
-   (#49) — could be a genuine clash-render regression. Recommend a visual check of
-   a Friday-Night Stadium clash graphic before deciding.
+**B. `gate166` scorebug-only contract was relaxed — row 46 (1 test).**
+`9064c67` changed the themed-scorebug activation to
+`activeComponents: state.captionsActive ? ["scorebug","captions"] : ["scorebug"]`,
+with a matching `throw` guard that now permits exactly `{scorebug, captions}`.
+This looks entirely intentional (captions belong with a themed scorebug). If you
+confirm, the guard test should be relaxed to match; I left it failing pending
+your word.
 
-Plus the **renderer freeze re-pin** (#41–#45): the Neon and Friday-Night engine
-files were intentionally evolved and the SHA-256 freezes + BIBLE section need an
-explicit owner "unfreeze / re-freeze" pass. I did not touch the freezes or the
-renderers.
+**C. `pregame_presentation` blueprint is not in the application factory — rows
+47–48 (2 tests).** `install_pregame_presentation()` runs on the module-level
+`app` only, not inside `create_application()`. **Both real launchers are fine**,
+but factory-built app instances lack the universal pregame-delay layer, and two
+architecture tests already encode the factory as the expected owner. 2-part fix
+(register in the factory + whitelist the two intentionally-public endpoints in
+`audit_phase5_architecture`); low-risk but an init-order + audit-policy change,
+so left for you.
+
+### Follow-up cleanup this audit uncovered (not a test problem)
+
+The Friday-Night **`layers-v10` mask-compositing pipeline is dead code**:
+`paintFridayNightLayeredFootballClash()` in `static/csrn-production-theme-runtime.js`
+unconditionally `return`s `paintFridayNightStandaloneFootballPlayers(...)` on its
+first line (the live path uses pre-baked `players/palette-v2/*.png`), and
+`constrainFridayColorMask`, `deriveFridayUniformReliefLayer`, and
+`FRIDAY_LAYERED_CLASH_ASSETS` have **zero call sites**. That's ~150 lines of dead
+runtime code plus the `static/friday-night-stadium/clash/layers-v10/` art
+directory. Recommend a dedicated commit to delete both (and the 3 remaining
+*passing* `test_gate172_r3` siblings that also only exercise it) — needs your OK
+because it edits the live overlay runtime file.
