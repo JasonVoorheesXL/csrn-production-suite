@@ -3651,6 +3651,12 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, _record_clean_shutdown_and_stop)
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, _record_clean_shutdown_and_stop)
+    if hasattr(signal, "SIGBREAK"):
+        # The pywebview desktop shell (csrn_desktop.py) closes this child
+        # with CTRL_BREAK_EVENT on window close -- route it through the same
+        # clean shutdown (recovery marker + Drive state-mirror flush) as
+        # Ctrl+C so a shell close is never read as an unclean exit.
+        signal.signal(signal.SIGBREAK, _record_clean_shutdown_and_stop)
 
     ip = local_ip()
     media_directory = ASSET_UPLOAD_DIR.parent / "SponsorAdvertisements"
