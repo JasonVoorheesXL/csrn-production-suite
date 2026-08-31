@@ -66,7 +66,7 @@ from caption_service import CaptionService
 from caption_worker import CaptionRuntime
 from weather_service import VenueWeatherService
 from operational_rehearsal_service import OperationalRehearsalService
-from product_paths import resolve_product_paths
+from product_paths import PRODUCT_NAME, PRODUCT_VENDOR, resolve_product_paths
 from entitlement_service import EntitlementService
 from deployment_service import DeploymentService
 from theme_service import GraphicsThemeService
@@ -663,7 +663,7 @@ def _core_backup_root() -> Path:
         return Path(explicit).expanduser()
     root = os.environ.get("LOCALAPPDATA", "").strip()
     if root:
-        return Path(root).expanduser() / "PossumFrog" / "CSRN Production Suite" / "Backups"
+        return Path(root).expanduser() / PRODUCT_VENDOR / PRODUCT_NAME / "Backups"
     return LEGACY_CORE_BACKUP_ROOT
 
 
@@ -715,8 +715,11 @@ def _local_state_authority_path() -> Path:
     if explicit:
         return Path(explicit).expanduser().resolve()
     root = os.environ.get("LOCALAPPDATA", "").strip()
+    # NOTE: the non-LOCALAPPDATA fallback intentionally keeps its own
+    # "~/.possumfrog" base (not product_paths' "~/.possumfrog/csrn-production-
+    # suite") -- changing it would relocate the file on non-Windows dev.
     base = Path(root).expanduser() if root else Path.home() / ".possumfrog"
-    candidate = base / "PossumFrog" / "CSRN Production Suite" / "GameDay" / "state.json"
+    candidate = base / PRODUCT_VENDOR / PRODUCT_NAME / "GameDay" / "state.json"
     try:
         candidate.parent.mkdir(parents=True, exist_ok=True)
         return candidate
@@ -922,7 +925,7 @@ def application_identity() -> dict[str, str]:
     build = str(
         application.get("build") or RUNTIME_BUILD
     )
-    product = "CSRN Production Suite"
+    product = PRODUCT_NAME
     if VERSION_FILE.exists():
         try:
             lines = [line.strip() for line in VERSION_FILE.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -3658,7 +3661,7 @@ if __name__ == "__main__":
         print("CSRN will not start in an unsafe mode that serves local video/audio media through Waitress.")
         raise SystemExit(1) from exc
 
-    print("\nCSRN Production Suite — Command Center is running.")
+    print(f"\n{PRODUCT_NAME} — Command Center is running.")
     print(f"State authority: drive_backed={DRIVE_BACKED_GAME_DAY_STATE} mirror={STATE_FILE} authority={STATE_AUTHORITY_PATH}")
     print(f"Core backups: {CORE_BACKUP_ROOT}")
     if DRIVE_BACKED_GAME_DAY_STATE:

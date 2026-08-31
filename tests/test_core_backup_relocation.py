@@ -131,3 +131,34 @@ def test_apply_closing_message_scopes_deletion_to_core_and_quarantine(tmp_path, 
     assert "Core" in out and "Quarantine" in out
     assert "delete the empty" not in out
     assert (src / "Recovery" / "marker.json").exists()  # untouched
+
+
+def test_vendor_path_segments_come_from_product_paths_constants(
+    monkeypatch, tmp_path: Path
+) -> None:
+    # Round 13 Task D: the "PossumFrog" / "CSRN Production Suite" path
+    # fragments in app.py are now product_paths.PRODUCT_VENDOR / PRODUCT_NAME,
+    # with the resolved paths byte-identical (pure duplication removal).
+    import product_paths
+
+    monkeypatch.delenv("CSRN_CORE_BACKUP_ROOT", raising=False)
+    monkeypatch.delenv("CSRN_STATE_AUTHORITY_FILE", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "LocalAppData"))
+
+    backup_root = app._core_backup_root()
+    assert backup_root == (
+        tmp_path / "LocalAppData"
+        / product_paths.PRODUCT_VENDOR / product_paths.PRODUCT_NAME / "Backups"
+    )
+
+    state_path = app._local_state_authority_path()
+    assert state_path == (
+        tmp_path / "LocalAppData"
+        / product_paths.PRODUCT_VENDOR / product_paths.PRODUCT_NAME
+        / "GameDay" / "state.json"
+    )
+
+    source = (Path(__file__).resolve().parents[1] / "app.py").read_text(
+        encoding="utf-8"
+    )
+    assert '"PossumFrog" / "CSRN Production Suite"' not in source
