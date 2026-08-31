@@ -1771,22 +1771,6 @@ function themeVideoModeFor(alias, runtime) {
 // Gate 17.2 R1 — approved from-scratch Friday Night football player system.
 // The frozen Stadium engine owns geometry and the native clash host. Production
 // replaces only athlete pixels using isolated semantic masks and neutral detail.
-const FRIDAY_LAYERED_CLASH_ASSETS = Object.freeze({
-  base:"/static/friday-night-stadium/clash/layers-v10/football-neutral-equipment-anatomy.png?v=18.5-r12",
-  texture:"/static/friday-night-stadium/clash/layers-v10/football-uniform-color-clarity-texture.png?v=18.5-r12",
-  deepTexture:"/static/friday-night-stadium/clash/layers-v10/football-uniform-texture.png?v=18.5-r12",
-  highlights:"/static/friday-night-stadium/clash/layers-v10/football-highlights.png?v=18.5-r12",
-  shadows:"/static/friday-night-stadium/clash/layers-v10/football-shadows.png?v=18.5-r12",
-  visitorJersey:"/static/friday-night-stadium/clash/layers-v10/visitor-jersey-primary-mask.png?v=18.5-r15",
-  visitorPants:"/static/friday-night-stadium/clash/layers-v10/visitor-pants-mask.png?v=18.5-r12",
-  visitorHelmet:"/static/friday-night-stadium/clash/layers-v10/visitor-helmet-primary-mask.png?v=18.5-r12",
-  visitorTrim:"/static/friday-night-stadium/clash/layers-v10/visitor-number-trim-mask.png?v=18.5-r12",
-  homeJersey:"/static/friday-night-stadium/clash/layers-v10/home-jersey-primary-mask.png?v=18.5-r16-r3",
-  homePants:"/static/friday-night-stadium/clash/layers-v10/home-pants-mask.png?v=18.5-r12",
-  homeHelmet:"/static/friday-night-stadium/clash/layers-v10/home-helmet-primary-mask.png?v=18.5-r12",
-  homeTrim:"/static/friday-night-stadium/clash/layers-v10/home-number-trim-mask.png?v=18.5-r12"
-});
-
 // Historical Gate 17.1 contract sentinels retained for rollback-test continuity:
 // canvas.dataset.layeredSchema="friday-football-v11"
 // ctx.drawImage(tintFridayMask(visitorSecondary,visitorAccent,width,height),0,0);
@@ -1832,64 +1816,6 @@ function isFridayNeutralEquipmentPixel(x,y,red,green,blue) {
   return visitorFaceguard || homeFaceguard;
 }
 
-function constrainFridayColorMask(base,mask,width,height,{protectWhite=false,protectWarm=true,protectEquipment=false}={}) {
-  const layer=document.createElement("canvas");
-  layer.width=width; layer.height=height;
-  const ctx=layer.getContext("2d",{willReadFrequently:true});
-  ctx.clearRect(0,0,width,height);
-  ctx.drawImage(mask,0,0,width,height);
-  const maskData=ctx.getImageData(0,0,width,height);
-  const baseCanvas=document.createElement("canvas");
-  baseCanvas.width=width; baseCanvas.height=height;
-  const baseCtx=baseCanvas.getContext("2d",{willReadFrequently:true});
-  baseCtx.drawImage(base,0,0,width,height);
-  const baseData=baseCtx.getImageData(0,0,width,height).data;
-
-  for (let index=0; index<maskData.data.length; index+=4) {
-    const baseAlpha=baseData[index+3];
-    if (!baseAlpha) {
-      maskData.data[index+3]=0;
-      continue;
-    }
-
-    if (protectWhite) {
-      const red=baseData[index], green=baseData[index+1], blue=baseData[index+2];
-      const luma=(red*0.2126)+(green*0.7152)+(blue*0.0722);
-      const chroma=Math.max(red,green,blue)-Math.min(red,green,blue);
-      if (luma>175 && chroma<74) {
-        maskData.data[index+3]=0;
-        continue;
-      }
-    }
-
-    if (protectWarm) {
-      const red=baseData[index], green=baseData[index+1], blue=baseData[index+2];
-      const luma=(red*0.2126)+(green*0.7152)+(blue*0.0722);
-      const warmSkinOrLeather=red>92 && green>38 && blue<132 && red>green*1.12 && green>blue*1.05 && luma>58;
-      if (warmSkinOrLeather) {
-        maskData.data[index+3]=0;
-        continue;
-      }
-    }
-
-    if (protectEquipment) {
-      const pixel=index/4;
-      const x=pixel % width;
-      const y=Math.floor(pixel / width);
-      const red=baseData[index], green=baseData[index+1], blue=baseData[index+2];
-      if (isFridayNeutralEquipmentPixel(x,y,red,green,blue)) {
-        maskData.data[index+3]=0;
-        continue;
-      }
-    }
-
-    maskData.data[index+3]=Math.round(maskData.data[index+3] * (baseAlpha / 255));
-  }
-
-  ctx.putImageData(maskData,0,0);
-  return layer;
-}
-
 function compositeFridayMasks(masks,width,height) {
   const layer=document.createElement("canvas");
   layer.width=width; layer.height=height;
@@ -1905,20 +1831,6 @@ function clipFridayDetailLayer(image,mask,width,height) {
   const ctx=layer.getContext("2d");
   ctx.clearRect(0,0,width,height);
   ctx.drawImage(image,0,0,width,height);
-  ctx.globalCompositeOperation="destination-in";
-  ctx.drawImage(mask,0,0,width,height);
-  ctx.globalCompositeOperation="source-over";
-  return layer;
-}
-
-function deriveFridayUniformReliefLayer(base,mask,width,height) {
-  const layer=document.createElement("canvas");
-  layer.width=width; layer.height=height;
-  const ctx=layer.getContext("2d");
-  ctx.clearRect(0,0,width,height);
-  ctx.filter="grayscale(1) contrast(1.65) brightness(.92)";
-  ctx.drawImage(base,0,0,width,height);
-  ctx.filter="none";
   ctx.globalCompositeOperation="destination-in";
   ctx.drawImage(mask,0,0,width,height);
   ctx.globalCompositeOperation="source-over";
