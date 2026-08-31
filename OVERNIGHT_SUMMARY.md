@@ -1,14 +1,111 @@
 # Overnight Session Summary — 2026-08-28 → 08-31
 
-Round 10 branch: `round10-report-fixes-20260831`. Round 11 branch:
-`round11-record-inheritance-20260831`. **Round 12 branch:
-`round12-identity-profile-20260831`** (off `round11-record-inheritance-20260831`
-@ `7bba8d1`, carries rounds 1-11).
+Round 11 branch: `round11-record-inheritance-20260831`. Round 12 branch:
+`round12-identity-profile-20260831`. **Round 13 branch:
+`round13-dehardcode-cleanup-20260831`** (off `round12-identity-profile-20260831`
+@ `437815b`, carries rounds 1-12).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
 Full test suite (deterministic, `-p no:randomly`, run with
-`.venv/Scripts/python.exe`) after **round 12**: **0 failed, 2331 passed**.
-**0 real regressions across all twelve rounds.**
+`.venv/Scripts/python.exe`) after **round 13**: **0 failed, 2341 passed**.
+**0 real regressions across all thirteen rounds.**
+
+---
+
+## ROUND 13 — finish the de-hardcoding pass (2026-08-31)
+
+Continues Round 12: existing Caledonia install sees **zero behaviour/data
+change** (proven by test at each step); everything identity-shaped now comes
+from the Identity Profile; a fresh install is genuinely blank.
+
+`templates/index.html` **not touched** (0 bytes `437815b..HEAD`).
+`broadcaster_print_service.py` + `tests/test_broadcaster_print_service.py`
+carry the owner's `ROWS_PER_COLUMN` roster WIP; Task C edited both, isolated
+its changes hunk-by-hunk, and the WIP diff is verified **byte-identical** to
+the round-start capture and still unstaged.
+
+| commit | task | suite |
+|---|---|---|
+| `9ec3e87` | **A** — DEFAULT_STATE team/venue + csrn-logo fallback → Identity Profile | 2331 → 2333 |
+| `0f33a72` | **B** — pregame Next Matchup genericized; drop the "Cavaliers" caption seed | 2333 → 2337 |
+| `54fabca` | **C** — roster print order from `record_tracking`, not a "caledonia" name match | 2337 → 2340 |
+| `a122043` | **D** — app.py vendor-path fragments → `product_paths.PRODUCT_VENDOR/NAME` | 2340 → 2341 |
+
+### Task A — team/venue + logo fallback
+
+`identity_service.py`: new `state_defaults` section (`home_team` / `venue` —
+legacy Caledonia values for an existing install, `""` for a fresh one) plus a
+`branding_logo(organization)` helper (configured logo path or `""`, never a
+hard-coded `csrn-logo.png`). `app.py` `DEFAULT_STATE["home_team"]` / `["venue"]`
+now read from it. The `csrn-logo.png` fallback is removed from
+`diagnostics_service` (Logo-file check skipped when no logo configured),
+`graphics_service` (personnel graphic with no school → injected org logo),
+and `pregame_presentation._organization_branding`. Golden test: legacy seed ==
+frozen historical copy; `app.DEFAULT_STATE` still "Caledonia" /
+"Caledonia High School". Fresh test: blank, no "caledonia", no "csrn-logo".
+
+### Task B — investigate + genericize
+
+**Next Matchup** was *logic that could already derive from Identity Profile
+data*: `_caledonia_school()` hard-coded a name lookup; the profile already
+carries `broadcast_defaults.home_school_id`. Now `_primary_school()` resolves
+by that id; `primary_team` / `_organization_branding` name/short_name
+fallbacks → `""`. Zero change for Caledonia (all values are in its config).
+
+**caption_worker**: `current_caption_prompt_terms()` in app.py already builds
+the per-game vocabulary from live game state (both teams' names, mascots,
+rosters, personnel); only a literal `"Cavaliers"` was seeded alongside the
+generic football terms — dropped.
+
+**Flagged, NOT changed** (more than a straightforward substitution):
+- `templates/pregame_universal_overlay.html`: ~5 hard-coded "Caledonia Sports
+  Radio Network" / "/CaledoniaSRN" branding fallbacks in the ribbon/social JS
+  (live overlay, needs visual verification; the backend now feeds the real
+  org name so these only surface on a blank fresh install).
+- `caption_worker.py`: the `\bcaledoni\b` regex + `== "caledonia"` /
+  `== "cavaliers"` branches are genuine team-tuned ASR misrecognition
+  corrections, not derivable from Identity Profile data, inert on a
+  non-Caledonia install. The `caption_initial_prompt` seed list + example
+  sentence would need the primary-team name threaded through the caption
+  subprocess boundary.
+
+### Task C — roster print order
+
+`broadcaster_print_service._render_document` decided roster page ORDER (CSRN's
+own team first) via `"caledonia" in home_team/visitor_team`. It now keys off
+`record_tracking.primary_side` — the same value already read two lines above
+for the cover logo. **Provably zero output change**: all four reprintable
+broadcasts in `broadcasts.json` carry `primary_side` and it matches the old
+name test on every one; the one legacy `Caledonia`-as-visitor detail file
+with no `record_tracking` is not in `broadcasts.json` so it is unreachable
+via the print-sheet endpoint. Fresh install → plain home-first.
+
+### Task D — vendor-path unification
+
+`"PossumFrog" / "CSRN Production Suite"` was open-coded in three `app.py` path
+builders + a banner; `product_paths.py` already exports `PRODUCT_VENDOR` /
+`PRODUCT_NAME` with identical values. Pure literal substitution — verified
+`CORE_BACKUP_ROOT` and the state-authority path still resolve to
+`%LOCALAPPDATA%\PossumFrog\CSRN Production Suite\...` byte-for-byte. Left
+deliberately: the non-LOCALAPPDATA `~/.possumfrog` fallback base (aligning it
+to `product_paths` would relocate the file on non-Windows dev).
+
+### Task E — MHSAA MS5A-001=caledonia (investigate only)
+
+**Verdict: (a) — expected ruleset data with a legitimate safety fallback, NOT
+a bug. No action taken.** The only code reference is `app.py:_five_a_
+classification_rules()`, where `[("MS5A-001", "caledonia"), ("MS5A-002",
+"new-hope")]` is assigned then **immediately overridden** by
+`ruleset_service.resolve(...)["classification"]["reserved_ids"]` from
+`rulesets/football/us-ms-mhsaa.json` (identical mapping). The `try/except`
+keeps the literal only if the ruleset engine is unavailable — the exact
+Round-7 consumer pattern (`PenaltyService`, `PeriodService`,
+`CanonicalStateFoundation` all do this). Nothing else in live source
+references those reserved IDs; the `MS5A-*` values in `Data/Schools`,
+`Data/Logos`, `Data/Venues` are persisted reconciliation *output*, not a
+bypass.
+
+---
 
 ---
 
