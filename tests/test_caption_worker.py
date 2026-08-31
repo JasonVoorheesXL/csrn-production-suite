@@ -263,6 +263,45 @@ def test_caption_runtime_starts_and_stops_worker() -> None:
     assert FakeWorker.stopped is True
 
 
+def test_caption_runtime_uses_bundled_model_dir_env_when_no_profile_model(
+    monkeypatch,
+) -> None:
+    # Round 15F: a frozen build's runtime hook sets CSRN_WHISPER_MODEL_DIR to
+    # the bundled small.en directory so captions load offline.
+    FakeWorker.last_created = None
+    monkeypatch.setenv("CSRN_WHISPER_MODEL_DIR", r"C:\bundle\models\faster-whisper-small.en")
+    service = RuntimeCaptionService(
+        {"source_type": "audio_device", "audio_device": "0"}  # no caption_model
+    )
+    runtime = CaptionRuntime(
+        caption_service=service,
+        load_broadcast_id=lambda: "game-1",
+        worker_factory=FakeWorker,
+    )
+    runtime.start()
+    assert (
+        FakeWorker.last_created.kwargs["settings"].model_name
+        == r"C:\bundle\models\faster-whisper-small.en"
+    )
+
+
+def test_caption_runtime_profile_model_still_wins_over_the_bundle_env(
+    monkeypatch,
+) -> None:
+    FakeWorker.last_created = None
+    monkeypatch.setenv("CSRN_WHISPER_MODEL_DIR", r"C:\bundle\models\small.en")
+    service = RuntimeCaptionService(
+        {"source_type": "audio_device", "audio_device": "0", "caption_model": "medium.en"}
+    )
+    runtime = CaptionRuntime(
+        caption_service=service,
+        load_broadcast_id=lambda: "game-1",
+        worker_factory=FakeWorker,
+    )
+    runtime.start()
+    assert FakeWorker.last_created.kwargs["settings"].model_name == "medium.en"
+
+
 def test_caption_runtime_tracks_per_channel_audio_levels() -> None:
     service = RuntimeCaptionService({"source_type": "audio_device", "audio_device": "0"})
     runtime = CaptionRuntime(caption_service=service, load_broadcast_id=lambda: "game-1")

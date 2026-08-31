@@ -214,7 +214,14 @@ class CaptionRuntime:
                 device=device,
                 device_name=str(profile.get("audio_device_name") or ""),
                 device_host_api=str(profile.get("audio_device_host_api") or ""),
-                model_name=str(profile.get("caption_model") or CaptionWorkerSettings.model_name),
+                model_name=str(
+                    profile.get("caption_model")
+                    # Round 15F: a frozen build's runtime hook sets this to
+                    # the bundled CTranslate2 small.en directory so captions
+                    # load offline. An explicit caption_model still wins.
+                    or os.environ.get("CSRN_WHISPER_MODEL_DIR")
+                    or CaptionWorkerSettings.model_name
+                ),
                 speech_threshold=threshold,
                 chunk_seconds=5.0,
                 overlap_seconds=1.4,

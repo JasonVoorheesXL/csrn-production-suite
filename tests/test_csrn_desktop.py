@@ -329,4 +329,68 @@ def test_run_core_foundation_is_not_a_packaging_entry_point() -> None:
     # Round 14 finding: run_core_foundation.py is a second Flask entry point
     # with a debug server and CANNOT be runtime-gated -- it must simply never
     # be a bundled entry point.
-    assert "run_core_foundation" not in spec
+    assert 'excludes=["pytest", "run_core_foundation"]' in spec
+
+
+# --------------------------------------------------------------------------
+# 15F -- .spec fixes + bundling
+# --------------------------------------------------------------------------
+
+
+def test_pyinstaller_spec_targets_the_shell_and_fixes_round14_gaps() -> None:
+    from pathlib import Path
+
+    root = Path(csrn_desktop.__file__).resolve().parent
+    spec = (root / "packaging/windows/CSRNProductionSuite.spec").read_text(encoding="utf-8")
+
+    assert 'ROOT / "csrn_desktop.py"' in spec        # entry = the shell
+    assert "console=False" in spec                   # GUI shell, no console
+    assert '_tree(ROOT / "rulesets", "rulesets")' in spec   # Round 14: was missing
+    assert '"Graphics"' not in spec                  # Round 14: nonexistent dir removed
+    assert "collect_all" in spec and "ctranslate2" in spec and "onnxruntime" in spec
+    assert "CSRN_WHISPER_MODEL_DIR" in spec          # bundle the model
+    assert "CSRN_BUNDLED_CHROMIUM_DIR" in spec       # bundle Chromium
+    assert "rthook_bundled_runtime.py" in spec       # points them offline
+
+
+def test_bundled_runtime_hook_wires_playwright_and_hf_offline() -> None:
+    from pathlib import Path
+
+    root = Path(csrn_desktop.__file__).resolve().parent
+    hook = (root / "packaging/windows/rthook_bundled_runtime.py").read_text(encoding="utf-8")
+    assert "PLAYWRIGHT_BROWSERS_PATH" in hook
+    assert "ms-playwright" in hook
+    assert "CSRN_WHISPER_MODEL_DIR" in hook
+    assert "HF_HUB_OFFLINE" in hook
+
+
+# --------------------------------------------------------------------------
+# 15G -- Inno Setup (.iss) updates
+# --------------------------------------------------------------------------
+
+
+def test_installer_launches_the_shell_exe_and_opens_the_lan_ports() -> None:
+    from pathlib import Path
+
+    root = Path(csrn_desktop.__file__).resolve().parent
+    iss = (root / "packaging/windows/csrn-production-suite.iss").read_text(encoding="utf-8")
+
+    # launched executable is the frozen shell -- no .ps1 / .bat chain
+    assert 'MyAppExeName "CSRNProductionSuite.exe"' in iss
+    launched = [
+        line for line in iss.splitlines()
+        if line.strip().startswith("Filename:") and "{#MyAppExeName}" in line
+    ]
+    assert launched  # the shell exe is what gets launched
+    assert not any(
+        line.strip().startswith(("Filename:", "Source:")) and (".ps1" in line or ".bat" in line)
+        for line in iss.splitlines()
+    )
+    # desktop + Start-Menu shortcuts
+    assert "{autodesktop}\\{#MyAppName}" in iss
+    assert "{group}\\{#MyAppName}" in iss or "{autoprograms}\\{#MyAppName}" in iss
+    # LAN reachability without a per-launch firewall prompt, cleaned up on uninstall
+    assert "localport=5050" in iss and "localport=5051" in iss
+    assert "[UninstallRun]" in iss and "delete rule" in iss
+    # WebView2 runtime step for older Win10
+    assert "MicrosoftEdgeWebview2Setup.exe" in iss
