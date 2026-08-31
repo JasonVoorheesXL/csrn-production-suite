@@ -2842,7 +2842,10 @@ def current_caption_prompt_terms() -> list[str]:
                 state.get(f"{side}_identity", {}).get("mascot", ""),
             ]
         )
-    terms.extend(["Cavaliers", "first and ten", "yard line"])
+    # Generic football vocabulary only -- the actual team names / mascots come
+    # from the loaded game state above, not a hard-coded "Cavaliers" seed
+    # (Round 13 Task B).
+    terms.extend(["first and ten", "yard line"])
     terms.extend(_caption_name_terms_from_rosters(state))
     terms.extend(_caption_name_terms_from_personnel(state))
     seen: set[str] = set()

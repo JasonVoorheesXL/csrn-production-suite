@@ -110,3 +110,49 @@ def test_halftime_sponsors_is_empty_and_never_raises_when_service_fails(monkeypa
 
     monkeypatch.setattr(pregame_presentation, "_csrn_app", lambda: types.SimpleNamespace(get_sponsor_service=boom))
     assert pregame_presentation._halftime_sponsors() == []
+
+
+def test_primary_school_resolves_via_configured_home_school_id(monkeypatch) -> None:
+    # Round 13 Task B: the "Next Matchup" primary team comes from the Identity
+    # Profile's broadcast_defaults.home_school_id, not a hard-coded name lookup.
+    monkeypatch.setattr(
+        pregame_presentation,
+        "_config",
+        lambda: {"broadcast_defaults": {"home_school_id": "delta-valley"}},
+    )
+    monkeypatch.setattr(
+        pregame_presentation,
+        "_schools",
+        lambda: [
+            {"id": "delta-valley", "broadcast_name": "Delta Valley", "short_name": "DV"},
+            {"id": "other", "broadcast_name": "Other"},
+        ],
+    )
+    assert pregame_presentation._primary_school()["broadcast_name"] == "Delta Valley"
+
+
+def test_primary_school_is_empty_when_no_home_school_is_configured(monkeypatch) -> None:
+    monkeypatch.setattr(
+        pregame_presentation,
+        "_config",
+        lambda: {"broadcast_defaults": {"home_school_id": ""}},
+    )
+    monkeypatch.setattr(
+        pregame_presentation,
+        "_schools",
+        lambda: [{"id": "caledonia", "broadcast_name": "Caledonia"}],
+    )
+    assert pregame_presentation._primary_school() == {}
+
+
+def test_organization_branding_has_no_caledonia_csrn_fallback(monkeypatch) -> None:
+    monkeypatch.setattr(
+        pregame_presentation,
+        "_config",
+        lambda: {"organization": {}, "broadcast_defaults": {}, "social": {}},
+    )
+    monkeypatch.setattr(pregame_presentation, "_schools", lambda: [])
+    branding = pregame_presentation._organization_branding()
+    assert branding["name"] == ""
+    assert branding["short_name"] == ""
+    assert branding["logo"] == ""

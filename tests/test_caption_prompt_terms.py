@@ -85,3 +85,27 @@ def test_caption_prompt_terms_include_active_roster_and_coach_names(monkeypatch)
     assert "Head Coach Michael Campbell" in terms
     assert "Inactive Player" not in terms
     assert "Test Only" not in terms
+
+
+def test_caption_prompt_terms_do_not_inject_a_hardcoded_cavaliers(monkeypatch) -> None:
+    # Round 13 Task B: the mascot seed used to be a literal "Cavaliers". Now
+    # the team names / mascots come only from the loaded game state.
+    monkeypatch.setattr(
+        app_module,
+        "load_state",
+        lambda: {
+            "sport": "Football",
+            "home_team": "Amory",
+            "visitor_team": "Houston",
+            "home_identity": {"broadcast_name": "Amory", "mascot": "Panthers"},
+            "visitor_identity": {"broadcast_name": "Houston", "mascot": "Hilltoppers"},
+        },
+    )
+    monkeypatch.setattr(app_module, "load_rosters", lambda: [])
+    monkeypatch.setattr(app_module, "load_broadcasters", lambda: [])
+
+    terms = app_module.current_caption_prompt_terms()
+
+    assert "Cavaliers" not in terms
+    assert "Amory" in terms and "Panthers" in terms
+    assert "first and ten" in terms and "yard line" in terms

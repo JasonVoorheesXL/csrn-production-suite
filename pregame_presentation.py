@@ -530,10 +530,14 @@ def _school_by_name(name: str) -> dict[str, Any]:
     return {}
 
 
-def _caledonia_school() -> dict[str, Any]:
-    # CSRN's own team is authoritative for the "Next Matchup" pregame card.
-    for candidate in ("Caledonia", "Caledonia High School"):
-        row = _school_by_name(candidate)
+def _primary_school() -> dict[str, Any]:
+    # The configured primary team (broadcast_defaults.home_school_id from the
+    # Identity Profile) drives the "Next Matchup" pregame card. A fresh install
+    # with no primary configured simply has no Next Matchup.
+    config = _config()
+    defaults = config.get("broadcast_defaults", {})
+    if isinstance(defaults, dict):
+        row = _school_by_id(str(defaults.get("home_school_id", "") or ""))
         if row:
             return row
     return {}
@@ -624,7 +628,7 @@ def _row_side_matches_school(row: dict[str, Any], side: str, school: dict[str, A
 def _next_matchup(active: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
     # User-facing CSRN pregame "Next Matchup" is intentionally about Caledonia,
     # regardless of whether Caledonia is home or visitor in the current game.
-    primary = _caledonia_school()
+    primary = _primary_school()
     if not primary:
         return {}
 
@@ -664,7 +668,7 @@ def _next_matchup(active: dict[str, Any], state: dict[str, Any]) -> dict[str, An
         "venue": row.get("venue", ""),
         "contest_type": row.get("contest_type", ""),
         "primary_school_id": next(iter(_school_identifiers(primary)), ""),
-        "primary_team": str(primary.get("broadcast_name", "Caledonia") or "Caledonia"),
+        "primary_team": str(primary.get("broadcast_name", "") or ""),
     }
 
 
@@ -757,8 +761,10 @@ def _organization_branding() -> dict[str, Any]:
         social = {}
 
     return {
-        "name": str(organization.get("name") or "Caledonia Sports Radio Network").strip(),
-        "short_name": str(organization.get("short_name") or "CSRN").strip(),
+        # From the Identity Profile organization block -- no Caledonia/CSRN
+        # fallback (Round 13 Task B).
+        "name": str(organization.get("name") or "").strip(),
+        "short_name": str(organization.get("short_name") or "").strip(),
         "logo": logo,
         "primary_color": str(organization.get("primary_color") or "#C9203B").strip(),
         "secondary_color": str(organization.get("secondary_color") or "#000000").strip(),
@@ -826,7 +832,7 @@ def _payload() -> dict[str, Any]:
         "organization": _organization_branding(),
         "pregame_diagnostics": {
             "broadcast_records": len(_broadcast_records()),
-            "caledonia_school_found": bool(_caledonia_school()),
+            "primary_school_found": bool(_primary_school()),
             "next_matchup_found": bool(next_matchup),
             "weather_location_resolved": bool(weather.get("location_resolution", {}).get("resolved")),
             "weather_game_periods": len(weather.get("game_forecast", [])) if isinstance(weather.get("game_forecast"), list) else 0,
