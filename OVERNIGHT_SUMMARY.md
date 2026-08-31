@@ -1,14 +1,92 @@
 # Overnight Session Summary — 2026-08-28 → 08-31
 
-Round 9 branch: `round9-cleanup-20260831`. Round 10 branch:
-`round10-report-fixes-20260831`. **Round 11 branch:
-`round11-record-inheritance-20260831`** (off `round10-report-fixes-20260831`
-@ `57a1b9d`, carries rounds 1-10).
+Round 10 branch: `round10-report-fixes-20260831`. Round 11 branch:
+`round11-record-inheritance-20260831`. **Round 12 branch:
+`round12-identity-profile-20260831`** (off `round11-record-inheritance-20260831`
+@ `7bba8d1`, carries rounds 1-11).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
 Full test suite (deterministic, `-p no:randomly`, run with
-`.venv/Scripts/python.exe`) after **round 11**: **0 failed, 2317 passed**.
-**0 real regressions across all eleven rounds.**
+`.venv/Scripts/python.exe`) after **round 12**: **0 failed, 2331 passed**.
+**0 real regressions across all twelve rounds.**
+
+---
+
+## ROUND 12 — Identity Profile + de-hardcoded launcher URLs + internal-surface flag (2026-08-31)
+
+Preparing for an eventual packaged/commercial build (the pywebview shell is a
+separate future round). **The existing Caledonia/CSRN install sees zero
+behaviour or data change** -- proven by test. A new customer install starts
+blank/template instead of inheriting Caledonia's identity.
+
+`templates/index.html` **not touched** (0 bytes changed `7bba8d1..HEAD`);
+`broadcaster_print_service.py` **not touched**.
+
+| commit | task | suite |
+|---|---|---|
+| `4bd8c19` | **A** — external Identity Profile for organization + broadcast_defaults | 2317 → 2323 |
+| `8ee9f74` | **B** — de-hardcode the launcher's Facebook/YouTube live URLs | 2323 → 2326 |
+| `b228347` | **C** — runtime flag to exclude the internal-only surfaces | 2326 → 2331 |
+
+### Task A — external Identity Profile
+
+- `product_paths.py`: `ProductPaths.identity_file`
+  (`runtime_root/identity_profile.json` installed, repo-colocated in dev --
+  same pattern as `state_file` / `security_file`).
+- `identity_service.py` (new): `load_identity_profile()` /
+  `save_identity_profile()`. Seeds once on first run:
+  * **existing install** (`state.json` OR `config.json` already present) →
+    seeded with the exact former literals (`LEGACY_ORGANIZATION` /
+    `LEGACY_BROADCAST_DEFAULTS` / `LEGACY_STREAMING`, moved verbatim out of
+    `app.py` + the launcher);
+  * **fresh install** → blank template (identity fields `""`, `sport` still
+    `"Football"`, nothing Caledonia-identifying).
+- `app.py`: evaluates `_EXISTING_INSTALL` BEFORE any repo auto-creates
+  `config.json`, loads `IDENTITY_PROFILE`, and `DEFAULT_CONFIG` now reads
+  `organization` / `broadcast_defaults` from it. `save_config()` mirrors those
+  two sections back into `identity_profile.json`. The existing `/api/config`
+  settings form already edits both -- **no new UI**. (A guided first-run
+  wizard is flagged as future Layout-Builder-adjacent polish, not built.)
+- **Zero-change proof:** the legacy seed equals a frozen golden copy of the
+  historical literals; `DEFAULT_CONFIG` and `load_config()` still resolve
+  exactly the Caledonia identity (on-disk `config.json` still wins the merge
+  as before). A fresh-install test asserts a blank profile with no
+  "caledonia" anywhere.
+- **Flagged, NOT fixed** (Caledonia/CSRN still hard-coded outside the two
+  blocks): `DEFAULT_STATE["home_team"]`/`["venue"]`; the `csrn-logo.png`
+  fallback in diagnostics/graphics/pregame; `pregame_presentation`'s
+  Caledonia-centric "Next Matchup"; `caption_worker` vocabulary;
+  `broadcaster_print_service` `home_is_caledonia` branch; `app.py`
+  PossumFrog/"CSRN Production Suite" vendor path fragments (Round 6 already
+  flagged) and the MHSAA `MS5A-001=caledonia` reconcile.
+
+### Task B — launcher live URLs
+
+`CSRN_GAME_DAY_LAUNCHER.ps1` opened CSRN's own Facebook/YouTube producer
+pages for every install. Those two URLs now live in the Identity Profile's
+`streaming` block. `GET /api/identity/streaming-links` (public -- the launcher
+has no operator session, same rationale as `/api/health`) serves them; the
+`.ps1` keeps the two literals as a documented fallback that matches this
+install's seed exactly, then overlays whatever the running app reports.
+`phase5_architecture.PUBLIC_ENDPOINTS` whitelists the new endpoint.
+
+### Task C — internal-only surface flag
+
+`app.py:internal_tools_enabled()` resolves `CSRN_INTERNAL_TOOLS` -- explicit
+`1`/`0` wins; **unset means ON in a dev/source checkout, OFF in an
+installed/frozen build** (`product_paths.installed_mode`), so this dev
+checkout is unaffected and a packaged build is safe by default.
+`_install_internal_tools_gate()` adds an `app.before_request` hook that 404s
+(`INTERNAL_TOOLS_DISABLED`) the catalogued paths -- `/api/diagnostics`,
+`/api/runtime-diagnostics*`, `/api/game-day/rehearsals*`,
+`/api/game-day/release-*`, `/api/deployment/{status,update/*,support-bundle}`
+-- when the flag is off; the routes stay **registered** so the route
+manifest / phase-5 audit don't move. `/api/config`, `/api/health`,
+`/api/state`, `/api/licensing/*` and commissioning/recovery are NOT gated.
+`run_core_foundation.py` got a header saying it must be excluded from a
+bundle entirely (a whole entry point, not gateable). `docs/internal_only_
+surfaces.json` gains a `runtime_enforcement` block. This round wires the flag
++ enforcement only; the packaging/bundling step is a separate future round.
 
 ---
 
