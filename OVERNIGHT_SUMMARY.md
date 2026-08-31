@@ -23,9 +23,9 @@ additions.** Deliverable is a written report:
 (0 bytes changed — verified against the round-start capture, same as every
 round since Round 11). Suite unchanged at 2341 passed.
 
-| commit | task |
-|---|---|
-| `75b148b` | scoping report + summary section |
+One commit on `round14-pywebview-scoping-20260831`: the scoping report
+(`docs/pywebview_shell_scoping.md`) plus this summary section. No other
+files.
 
 ### What the report covers
 
