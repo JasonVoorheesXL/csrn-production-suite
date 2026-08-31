@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 import os
 from pathlib import Path
@@ -12,6 +13,9 @@ import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Callable
+
+
+_LOGGER = logging.getLogger("csrn.captions")
 
 
 class CaptionWorkerDependencyError(RuntimeError):
@@ -154,6 +158,7 @@ class CaptionRuntime:
             "last_gain": 1.0,
             "model_device": "",
             "model_compute_type": "",
+            "model_compute_reason": "",
             "capture_device": "",
             "capture_host_api": "",
             "capture_channels": 0,
@@ -257,6 +262,7 @@ class CaptionRuntime:
                     "last_gain": 1.0,
                     "model_device": "",
                     "model_compute_type": "",
+                    "model_compute_reason": "",
                     "capture_device": "",
                     "capture_host_api": "",
                     "capture_channels": 0,
@@ -451,6 +457,7 @@ class CaptionRuntime:
                     {
                         "model_device": str(event.get("device") or ""),
                         "model_compute_type": str(event.get("compute_type") or ""),
+                        "model_compute_reason": str(event.get("reason") or ""),
                     }
                 )
             elif kind == "hardware_audio":
@@ -976,7 +983,17 @@ class ChannelCaptionWorker:
                 block_queue.put_nowait(indata.copy())
 
         model = self._load_model(model_class)
-        self.on_event({"type": "model", "device": "cuda", "compute_type": "float16"})
+        device, compute_type, compute_reason = getattr(
+            self, "_last_compute_target", ("cuda", "float16", "")
+        )
+        self.on_event(
+            {
+                "type": "model",
+                "device": device,
+                "compute_type": compute_type,
+                "reason": compute_reason,
+            }
+        )
         chunk_size = max(1, int(self.settings.sample_rate * self.settings.chunk_seconds))
         overlap_size = max(
             0,
@@ -1229,30 +1246,71 @@ class ChannelCaptionWorker:
         average = sum(log_probabilities) / len(log_probabilities)
         return round(max(0.0, min(1.0, math.exp(average))), 4)
 
+    def _resolve_compute_target(self, model_class: Any) -> tuple[str, str, str]:
+        """Pick ``(device, compute_type, reason)`` for the caption model.
+
+        Round 15B: prefer an NVIDIA CUDA GPU (float16), but fall back to CPU
+        (int8) when CUDA / cuDNN is unavailable instead of refusing to
+        caption. ``reason`` is a human-readable string that gets logged and
+        surfaced in the caption status/diagnostics so the operator can tell
+        from the logs alone which path ran.
+        """
+
+        is_faster_whisper = str(
+            getattr(model_class, "__module__", "")
+        ).startswith("faster_whisper")
+        if not is_faster_whisper:
+            # A stub/fake model class (tests) -- no hardware probe, keep the
+            # historical default so existing fakes see the same arguments.
+            return "cuda", "float16", "test model class (no hardware probe)"
+        ok, detail = self._probe_cuda_float16()
+        if ok:
+            return "cuda", "float16", "NVIDIA CUDA GPU detected (float16)"
+        return (
+            "cpu",
+            "int8",
+            f"CPU int8 fallback -- CUDA float16 unavailable: {detail}",
+        )
+
     def _load_model(self, model_class: Any) -> Any:
-        key = (model_class, self.settings.model_name, "cuda", "float16")
+        device, compute_type, reason = self._resolve_compute_target(model_class)
+        key = (model_class, self.settings.model_name, device, compute_type)
         with self._model_lock:
             model = self._model_cache.get(key)
             if model is not None:
+                self._last_compute_target = (device, compute_type, reason)
                 return model
-            if str(getattr(model_class, "__module__", "")).startswith("faster_whisper"):
-                self._verify_cuda_float16()
             try:
                 model = model_class(
                     self.settings.model_name,
-                    device="cuda",
-                    compute_type="float16",
+                    device=device,
+                    compute_type=compute_type,
                 )
             except Exception as exc:
                 raise RuntimeError(
-                    "Unable to load the live-caption model on the NVIDIA GPU. "
-                    "Verify the CUDA-enabled faster-whisper/CTranslate2 installation."
+                    f"Unable to load the live-caption model on {device} "
+                    f"({compute_type}). Verify the faster-whisper / "
+                    "CTranslate2 installation."
                 ) from exc
             self._model_cache[key] = model
+            self._last_compute_target = (device, compute_type, reason)
+            _LOGGER.info(
+                "Live captions: loaded model %s on %s (%s) -- %s",
+                self.settings.model_name,
+                device,
+                compute_type,
+                reason,
+            )
             return model
 
     @staticmethod
-    def _verify_cuda_float16() -> None:
+    def _probe_cuda_float16() -> tuple[bool, str]:
+        """Non-raising CUDA/cuDNN float16 readiness probe.
+
+        Returns ``(True, "")`` when the NVIDIA GPU path is usable, or
+        ``(False, <reason>)`` so the caller can fall back to CPU int8.
+        """
+
         if sys.platform == "win32":
             _prepare_windows_cuda_dll_paths()
             dll_paths = _discover_windows_cuda_dll_paths()
@@ -1263,44 +1321,31 @@ class ChannelCaptionWorker:
             ]
             if missing:
                 searched = ", ".join(str(path) for path in dll_paths) or "none"
-                raise RuntimeError(
-                    "Live captions cannot start on CUDA because required NVIDIA DLLs are missing from PATH: "
+                return False, (
+                    "required NVIDIA DLLs missing from PATH: "
                     + ", ".join(missing)
-                    + f". Searched CUDA/cuDNN folders: {searched}. "
-                    + "Install CUDA 12 cuBLAS and cuDNN 9 for CUDA 12, then restart CSRN."
+                    + f" (searched: {searched})"
                 )
 
         try:
             import ctranslate2
-        except Exception as exc:
-            raise RuntimeError(
-                "Unable to import CTranslate2 for live captions. "
-                "Install the CUDA-enabled faster-whisper/CTranslate2 runtime."
-            ) from exc
+        except Exception as exc:  # pragma: no cover - import-time only
+            return False, f"CTranslate2 import failed: {exc}"
 
         try:
             cuda_count = int(ctranslate2.get_cuda_device_count())
         except Exception as exc:
-            raise RuntimeError(
-                "CTranslate2 could not query CUDA devices for live captions. "
-                "Verify the NVIDIA driver and CUDA runtime libraries."
-            ) from exc
+            return False, f"CTranslate2 could not query CUDA devices: {exc}"
         if cuda_count < 1:
-            raise RuntimeError(
-                "CTranslate2 does not see an NVIDIA CUDA device for live captions."
-            )
+            return False, "no CUDA device visible to CTranslate2"
 
         try:
             supported = set(ctranslate2.get_supported_compute_types("cuda"))
         except Exception as exc:
-            raise RuntimeError(
-                "CTranslate2 could not query CUDA compute types for live captions."
-            ) from exc
+            return False, f"CTranslate2 could not query CUDA compute types: {exc}"
         if "float16" not in supported:
-            raise RuntimeError(
-                "The selected NVIDIA GPU does not report CTranslate2 float16 support. "
-                "Live captions require CUDA float16 on this build."
-            )
+            return False, "GPU does not report CTranslate2 float16 support"
+        return True, ""
 
     @staticmethod
     def _optional_dependencies():

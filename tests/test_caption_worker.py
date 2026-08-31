@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -8,6 +9,7 @@ import pytest
 from caption_worker import (
     CaptionWorkerDependencyError,
     CaptionRuntime,
+    CaptionWorkerSettings,
     ChannelCaptionWorker,
     clean_football_caption_text,
     likely_broken_caption_fragment,
@@ -72,16 +74,94 @@ def test_optional_dependency_error_is_actionable(monkeypatch) -> None:
         worker._optional_dependencies()
 
 
-def test_live_caption_model_requires_cuda_float16() -> None:
+def test_live_caption_model_prefers_cuda_but_keeps_the_gpu_probe() -> None:
+    # Round 15B: the GPU path is still preferred and still probes CUDA /
+    # cuDNN float16 the same way -- it just no longer raises when the probe
+    # fails (see the CPU-fallback tests below).
     source = Path(__file__).resolve().parents[1].joinpath("caption_worker.py").read_text(encoding="utf-8")
-    assert 'device="cuda"' in source
-    assert 'compute_type="float16"' in source
+    assert '"cuda", "float16"' in source
+    assert '"cpu",' in source and '"int8",' in source
+    assert "_probe_cuda_float16" in source
     assert "get_cuda_device_count" in source
     assert 'get_supported_compute_types("cuda")' in source
     assert "cublas64_12.dll" in source
     assert "cudnn_ops64_9.dll" in source
     assert "_prepare_windows_cuda_dll_paths" in source
     assert "add_dll_directory" in source
+
+
+class _FakeWhisperModel:
+    # Mimic faster_whisper.WhisperModel enough for _load_model: the real
+    # module prefix is what gates the hardware probe.
+    __module__ = "faster_whisper.transcribe"
+
+    def __init__(self, name, *, device, compute_type):
+        self.name = name
+        self.device = device
+        self.compute_type = compute_type
+
+
+def _fresh_worker() -> ChannelCaptionWorker:
+    ChannelCaptionWorker._model_cache.clear()
+    return ChannelCaptionWorker(
+        caption_service=object(),
+        load_broadcast_id=lambda: "",
+        settings=CaptionWorkerSettings(model_name="small.en"),
+    )
+
+
+def test_caption_model_falls_back_to_cpu_int8_when_cuda_is_unavailable(
+    monkeypatch, caplog
+) -> None:
+    monkeypatch.setattr(
+        ChannelCaptionWorker,
+        "_probe_cuda_float16",
+        staticmethod(lambda: (False, "no CUDA device visible to CTranslate2")),
+    )
+    worker = _fresh_worker()
+    with caplog.at_level(logging.INFO, logger="csrn.captions"):
+        model = worker._load_model(_FakeWhisperModel)
+
+    assert (model.device, model.compute_type) == ("cpu", "int8")
+    device, compute_type, reason = worker._last_compute_target
+    assert (device, compute_type) == ("cpu", "int8")
+    assert "fallback" in reason.lower()
+    assert "no CUDA device" in reason
+    # The path taken must be visible from the logs alone.
+    assert any(
+        "cpu" in record.getMessage().lower() and "int8" in record.getMessage().lower()
+        for record in caplog.records
+    )
+
+
+def test_caption_model_uses_cuda_float16_when_the_probe_succeeds(monkeypatch) -> None:
+    monkeypatch.setattr(
+        ChannelCaptionWorker,
+        "_probe_cuda_float16",
+        staticmethod(lambda: (True, "")),
+    )
+    worker = _fresh_worker()
+    model = worker._load_model(_FakeWhisperModel)
+
+    assert (model.device, model.compute_type) == ("cuda", "float16")
+    assert worker._last_compute_target[:2] == ("cuda", "float16")
+
+
+def test_caption_model_status_event_reports_the_resolved_compute_path() -> None:
+    service = RuntimeCaptionService({"source_type": "audio_device", "audio_device": "0"})
+    runtime = CaptionRuntime(caption_service=service, load_broadcast_id=lambda: "g1")
+    runtime._worker_event(
+        {
+            "type": "model",
+            "device": "cpu",
+            "compute_type": "int8",
+            "reason": "CPU int8 fallback -- CUDA float16 unavailable: no CUDA device",
+        }
+    )
+    status = runtime.status()
+    assert status["model_device"] == "cpu"
+    assert status["model_compute_type"] == "int8"
+    assert "fallback" in status["model_compute_reason"].lower()
 
 
 def test_caption_initial_prompt_includes_broadcast_football_vocabulary() -> None:
