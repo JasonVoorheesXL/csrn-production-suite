@@ -1,14 +1,75 @@
 # Overnight Session Summary — 2026-08-28 → 08-31
 
-Round 11 branch: `round11-record-inheritance-20260831`. Round 12 branch:
-`round12-identity-profile-20260831`. **Round 13 branch:
-`round13-dehardcode-cleanup-20260831`** (off `round12-identity-profile-20260831`
-@ `437815b`, carries rounds 1-12).
+Round 12 branch: `round12-identity-profile-20260831`. Round 13 branch:
+`round13-dehardcode-cleanup-20260831`. **Round 14 branch:
+`round14-pywebview-scoping-20260831`** (off `round13-dehardcode-cleanup-20260831`
+@ `d2498f8`, carries rounds 1-13).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
 Full test suite (deterministic, `-p no:randomly`, run with
-`.venv/Scripts/python.exe`) after **round 13**: **0 failed, 2341 passed**.
-**0 real regressions across all thirteen rounds.**
+`.venv/Scripts/python.exe`) after **round 14**: **0 failed, 2341 passed**
+(unchanged — Round 14 is investigate-only, no application code touched).
+**0 real regressions across all fourteen rounds.**
+
+---
+
+## ROUND 14 — pywebview app-shell scoping (2026-08-31)
+
+**Investigate-only. No production code, no packaging changes, no dependency
+additions.** Deliverable is a written report:
+[`docs/pywebview_shell_scoping.md`](docs/pywebview_shell_scoping.md).
+
+`templates/index.html` and `broadcaster_print_service.py` **not touched**
+(0 bytes changed — verified against the round-start capture, same as every
+round since Round 11). Suite unchanged at 2341 passed.
+
+| commit | task |
+|---|---|
+| `75b148b` | scoping report + summary section |
+
+### What the report covers
+
+- **Task A — launch & runtime survey.** Full double-click→running-app chain
+  (`CSRN_GAME_DAY_LAUNCHER.ps1` 3-state DOWN/HEALTHY/HUNG triage → `cmd` →
+  `RUN_CSRN_COMMAND_CENTER.bat` env-check + preflight + recovery-marker chain
+  → `app.py` waitress:5050 + isolated media server:5051 + SIGINT clean-shutdown
+  → Chrome tabs incl. the Round-12 Identity-Profile streaming-link override).
+  Full runtime dependency inventory. Flagged: **`pronouncing`/`cmudict` are
+  used by `roster_service.py` but missing from `requirements.txt`**; live
+  captions are **GPU-only** (CUDA 12 + cuDNN 9, no CPU fallback in code); the
+  `small.en` whisper model downloads from HuggingFace on first use; Playwright
+  needs an out-of-band ~150 MB Chromium (roster print-sheet PDF + dragonfly);
+  `ruleset_service` resolves `rulesets/` via `__file__` and the existing
+  `.spec` does not bundle it; the `.spec` `datas` references a non-existent
+  `Graphics/` dir.
+- **Task B — integration shape.** pywebview owns ONE native window at
+  `http://127.0.0.1:5050/?module=pregame`; Waitress still serves everything.
+  Does NOT replace the OBS browser-source overlays (OBS hits 5050 directly)
+  or LAN phone/iPad access (keep `host="0.0.0.0"`). Shell must own: health-gated
+  window open, clean-shutdown on window-close (no signal is delivered — must
+  call the recovery marker + state flush path itself), window chrome/sizing,
+  and the "5051 fails → don't start" guard. Recommends the child-process model
+  for the first cut.
+- **Task C — packaging.** Keep PyInstaller onedir + Inno Setup (already
+  scaffolded in `packaging/windows/`). Reserved: `product_paths` license /
+  installation fields, `entitlement_service` dev-vs-unlicensed,
+  `build_release_package.py` payload format, the per-user `.iss`. Undefined /
+  gaps: first-run onboarding SCREEN (only the backend Identity Profile file +
+  `/api/config` exist — biggest UX gap), `.spec` fixes, Playwright-Chromium
+  strategy, whisper model + CUDA prerequisite handling, code-signing,
+  external updater / update-check. **Confirmed:** `CSRN_INTERNAL_TOOLS`
+  correctly resolves OFF in a frozen build (`sys.frozen` →
+  `installed_mode` → `not installed_mode` = False) provided packaging doesn't
+  set the env var and `run_core_foundation.py` is physically excluded.
+- **Task D — risks / owner decisions.** Bundle size (~0.5–1 GB depending on
+  model/Chromium bundling); unsigned-build SmartScreen/AV false-positives are
+  a real risk (OV cert ≈ $200–500/yr, EV ≈ $300–700/yr); **no youth-tier /
+  native-companion-app plans are documented in the repo** — assume no bearing
+  unless the owner says otherwise; ctranslate2/onnxruntime are the known
+  PyInstaller pain points.
+- **Round 15 breakdown** — 8 tasks (15A–15H): add deps → `csrn_desktop.py`
+  shell → frozen startup branch → first-run onboarding → `.spec` fixes →
+  Chromium strategy → `.iss` updates → docs.
 
 ---
 
