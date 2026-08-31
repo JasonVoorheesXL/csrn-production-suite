@@ -1767,14 +1767,10 @@ function themeVideoModeFor(alias, runtime) {
 }
 
 
-
 // Gate 17.2 R1 — approved from-scratch Friday Night football player system.
 // The frozen Stadium engine owns geometry and the native clash host. Production
-// replaces only athlete pixels using isolated semantic masks and neutral detail.
-// Historical Gate 17.1 contract sentinels retained for rollback-test continuity:
-// canvas.dataset.layeredSchema="friday-football-v11"
-// ctx.drawImage(tintFridayMask(visitorSecondary,visitorAccent,width,height),0,0);
-// ctx.drawImage(tintFridayMask(homeSecondary,homeAccent,width,height),0,0);
+// replaces only athlete pixels using pre-rendered palette-v2 player images
+// (see paintFridayNightStandaloneFootballPlayers). No runtime masking/tinting.
 
 const fridayLayeredAssetCache = new Map();
 function loadFridayLayeredAsset(url) {
@@ -1792,129 +1788,6 @@ function loadFridayLayeredAsset(url) {
 function fridayTeamColor(value,fallback) {
   const text=String(value || "").trim();
   return /^#[0-9a-f]{6}$/i.test(text) ? text : fallback;
-}
-
-function tintFridayMask(mask,color,width,height) {
-  const layer=document.createElement("canvas");
-  layer.width=width; layer.height=height;
-  const ctx=layer.getContext("2d");
-  ctx.clearRect(0,0,width,height);
-  ctx.drawImage(mask,0,0,width,height);
-  ctx.globalCompositeOperation="source-in";
-  ctx.fillStyle=color;
-  ctx.fillRect(0,0,width,height);
-  ctx.globalCompositeOperation="source-over";
-  return layer;
-}
-
-function isFridayNeutralEquipmentPixel(x,y,red,green,blue) {
-  const luma=(red*0.2126)+(green*0.7152)+(blue*0.0722);
-  const chroma=Math.max(red,green,blue)-Math.min(red,green,blue);
-  if (!(luma > 35 && luma < 235 && chroma < 48)) return false;
-  const visitorFaceguard=x>=430 && x<=620 && y>=88 && y<=268;
-  const homeFaceguard=x>=1115 && x<=1275 && y>=118 && y<=304;
-  return visitorFaceguard || homeFaceguard;
-}
-
-function compositeFridayMasks(masks,width,height) {
-  const layer=document.createElement("canvas");
-  layer.width=width; layer.height=height;
-  const ctx=layer.getContext("2d");
-  ctx.clearRect(0,0,width,height);
-  masks.forEach(mask=>ctx.drawImage(mask,0,0,width,height));
-  return layer;
-}
-
-function clipFridayDetailLayer(image,mask,width,height) {
-  const layer=document.createElement("canvas");
-  layer.width=width; layer.height=height;
-  const ctx=layer.getContext("2d");
-  ctx.clearRect(0,0,width,height);
-  ctx.drawImage(image,0,0,width,height);
-  ctx.globalCompositeOperation="destination-in";
-  ctx.drawImage(mask,0,0,width,height);
-  ctx.globalCompositeOperation="source-over";
-  return layer;
-}
-
-function colorizeFridayUniform(ctx,mask,color,width,height,alpha=.92) {
-  const tint=tintFridayMask(mask,color,width,height);
-  ctx.save();
-  ctx.globalCompositeOperation="color";
-  ctx.globalAlpha=alpha;
-  ctx.drawImage(tint,0,0,width,height);
-  ctx.restore();
-
-  const match=String(color || "").trim().match(/^#([0-9a-f]{6})$/i);
-  if (!match) return;
-  const value=parseInt(match[1],16);
-  const red=(value >> 16) & 255;
-  const green=(value >> 8) & 255;
-  const blue=value & 255;
-  const luma=(red*0.2126)+(green*0.7152)+(blue*0.0722);
-  const chroma=Math.max(red,green,blue)-Math.min(red,green,blue);
-  if (chroma < 36 && (luma > 165 || luma < 42)) {
-    const paintAlpha=Math.min(.58,Math.max(.24,alpha*.52));
-    ctx.save();
-    ctx.globalCompositeOperation="source-over";
-    ctx.globalAlpha=paintAlpha;
-    ctx.drawImage(tint,0,0,width,height);
-    ctx.restore();
-  }
-}
-
-const FRIDAY_PLAYER_PALETTE = Object.freeze([
-  Object.freeze({key:"scarlet",hex:"#C51F30"}),
-  Object.freeze({key:"maroon",hex:"#7A1832"}),
-  Object.freeze({key:"orange",hex:"#E46C0A"}),
-  Object.freeze({key:"gold",hex:"#D8A51D"}),
-  Object.freeze({key:"yellow",hex:"#F2D21B"}),
-  Object.freeze({key:"kelly-green",hex:"#18864B"}),
-  Object.freeze({key:"dark-green",hex:"#0D5D3A"}),
-  Object.freeze({key:"royal-blue",hex:"#2457C5"}),
-  Object.freeze({key:"navy",hex:"#152A4A"}),
-  Object.freeze({key:"columbia-blue",hex:"#5CA8D8"}),
-  Object.freeze({key:"purple",hex:"#6B3FA0"}),
-  Object.freeze({key:"black",hex:"#1A1A1A"}),
-  Object.freeze({key:"charcoal",hex:"#4A4A4A"}),
-  Object.freeze({key:"white",hex:"#E8E8E8"}),
-  Object.freeze({key:"black-gold",hex:"#221A08"})
-]);
-
-function fridayHexToRgb(value) {
-  const text=String(value || "").trim();
-  const m=text.match(/^#?([0-9a-f]{6})$/i);
-  if (m) {
-    const hex=m[1];
-    return [
-      parseInt(hex.slice(0,2),16),
-      parseInt(hex.slice(2,4),16),
-      parseInt(hex.slice(4,6),16)
-    ];
-  }
-  const short=text.match(/^#?([0-9a-f]{3})$/i);
-  if (short) {
-    return short[1].split("").map(ch=>parseInt(ch+ch,16));
-  }
-  return null;
-}
-
-function nearestFridayPaletteKey(value) {
-  const rgb=fridayHexToRgb(value) || [197,31,48];
-  let best=FRIDAY_PLAYER_PALETTE[0];
-  let bestDistance=Number.POSITIVE_INFINITY;
-  for (const candidate of FRIDAY_PLAYER_PALETTE) {
-    const target=fridayHexToRgb(candidate.hex);
-    const dr=rgb[0]-target[0];
-    const dg=rgb[1]-target[1];
-    const db=rgb[2]-target[2];
-    const distance=(dr*dr)+(dg*dg)+(db*db);
-    if (distance < bestDistance) {
-      bestDistance=distance;
-      best=candidate;
-    }
-  }
-  return best.key;
 }
 
 
@@ -2043,46 +1916,9 @@ async function paintFridayNightStandaloneFootballPlayers(root,alias,mode,state) 
 }
 
 async function paintFridayNightLayeredFootballClash(root,alias,mode,state) {
+  // Retained as a thin pass-through: the live Friday Night clash renderer is
+  // paintFridayNightStandaloneFootballPlayers (pre-rendered palette-v2 players).
   return paintFridayNightStandaloneFootballPlayers(root,alias,mode,state);
-  if (alias !== "friday_night_stadium" || mode !== "clash") return true;
-
-  const canvas=root.querySelector('.bl-fns-video-board > .bl-fns-clash[data-video-mode="clash"] .bl-fns-clash-art');
-  if (!canvas) throw new Error("Friday Night palette clash canvas missing.");
-
-  const visitorColor=fridayTeamColor(state.visitor && state.visitor.primary,"#2457C5");
-  const homeColor=fridayTeamColor(state.home && state.home.primary,"#C51F30");
-  const visitorKey=nearestFridayPaletteKey(visitorColor);
-  const homeKey=nearestFridayPaletteKey(homeColor);
-
-  const visitorUrl=`/static/friday-night-stadium/clash/palette-v1/visitor-${visitorKey}.png?v=19.0-r17`;
-  const homeUrl=`/static/friday-night-stadium/clash/palette-v1/home-${homeKey}.png?v=19.0-r17`;
-
-  const [visitorImage,homeImage]=await Promise.all([
-    loadFridayLayeredAsset(visitorUrl),
-    loadFridayLayeredAsset(homeUrl)
-  ]);
-
-  const width=Math.max(visitorImage.naturalWidth || visitorImage.width,homeImage.naturalWidth || homeImage.width);
-  const height=Math.max(visitorImage.naturalHeight || visitorImage.height,homeImage.naturalHeight || homeImage.height);
-  if (!width || !height) throw new Error("Friday Night palette player dimensions unavailable.");
-
-  if (canvas.width !== width) canvas.width=width;
-  if (canvas.height !== height) canvas.height=height;
-
-  const ctx=canvas.getContext("2d");
-  ctx.clearRect(0,0,width,height);
-  ctx.drawImage(visitorImage,0,0,width,height);
-  ctx.drawImage(homeImage,0,0,width,height);
-
-  canvas.dataset.layeredDynamic="false";
-  canvas.dataset.layeredSchema="friday-football-palette-v1";
-  canvas.dataset.visitorPrimary=visitorColor;
-  canvas.dataset.homePrimary=homeColor;
-  canvas.dataset.visitorPalette=visitorKey;
-  canvas.dataset.homePalette=homeKey;
-  root.dataset.productionLayeredClash="true";
-  root.dataset.fridayPalettePlayers="true";
-  return true;
 }
 
 async function ensureFridayNightDynamicClashReady(root, alias, mode, renderResult) {
@@ -2975,15 +2811,5 @@ window.CSRNProductionThemeRuntime = Object.freeze({
   deactivate
 });
 })();
-
-
-
-
-
-
-
-
-
-
 
 
