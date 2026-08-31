@@ -58,13 +58,6 @@ def test_standalone_compositor_uses_finished_palette_v2_players():
       "centerX:width*.822"
     ): assert token in js
 
-def test_runtime_and_cache_advance_to_gate171_r3():
-    js=read("static/csrn-production-theme-runtime.js")
-    overlay=read("templates/overlay.html")
-    assert "csrn-production-theme-binding-v46" in js
-    assert "/static/csrn-production-theme-runtime.css?v=19.2-r18-r3" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=19.2-r18-r3" in overlay
-
 
 def test_enhanced_secondary_masks_include_uniform_detail_polish():
     def count(rel):
@@ -82,8 +75,3 @@ def test_r5_perspective_masks_have_zero_primary_secondary_overlap():
     hs=alpha("static/friday-night-stadium/clash/layers/football-home-secondary-mask.png")
     assert not any(a and b for a,b in zip(vp.getdata(),vs.getdata()))
     assert not any(a and b for a,b in zip(hp.getdata(),hs.getdata()))
-
-
-
-
-

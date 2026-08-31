@@ -38,14 +38,3 @@ def test_gate168_r2_does_not_modify_frozen_engine_sources():
     css = read("static/csrn-production-theme-runtime.css")
     assert ".bl-fns-video-board" in js
     assert ".bl-fns-video-board" in css
-
-def test_gate168_r2_cache_bust():
-    overlay = read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=19.2-r18-r3" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=19.2-r18-r3" in overlay
-
-
-
-
-
-

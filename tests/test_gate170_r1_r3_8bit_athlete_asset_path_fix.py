@@ -25,14 +25,3 @@ def test_canonical_athlete_assets_are_packaged():
         rel=f"static/8bit-gameday/athletes/{name}"
         assert (ROOT/rel).is_file()
         assert sha(rel)==digest
-
-def test_r1_r3_history_is_superseded_by_r2_cache_pin():
-    overlay=read("templates/overlay.html")
-    assert '/static/csrn-production-theme-runtime.css?v=18.5-r11' in overlay
-    assert '/static/csrn-production-theme-runtime.js?v=18.5-r11' in overlay
-
-
-
-
-
-

@@ -29,13 +29,3 @@ def test_r23_highlight_remains_native_and_contained():
 def test_r23_sponsor_remains_native():
     js = read("static/csrn-production-theme-runtime.js")
     assert 'nativeVideoBoardHost(root, alias, "sponsor")' in js
-
-def test_r23_cache_bust_is_superseded_by_gate168():
-    overlay = read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-

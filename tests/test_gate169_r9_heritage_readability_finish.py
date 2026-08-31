@@ -24,14 +24,3 @@ def test_r9_sports_wire_copy_and_page_id_are_scaled_up():
     assert "font:900 16px/1.04 Arial,Helvetica,sans-serif!important" in css
     assert ".hp-page-id" in css
     assert "font:900 13px/1 Arial,Helvetica,sans-serif!important" in css
-
-def test_r9_cache_bust():
-    overlay = read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-
-

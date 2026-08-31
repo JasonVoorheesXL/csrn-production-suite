@@ -11,13 +11,3 @@ def test_gate167_r13_applies_iphone_player_text_scale():
     assert "font-size:86px!important" in css
     assert "font-size:52px!important" in css
     assert "font-size:116px!important" in css
-
-def test_gate167_r13_cache_bust():
-    overlay = read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-

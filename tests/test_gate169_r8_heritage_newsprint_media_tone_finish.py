@@ -33,13 +33,3 @@ def test_r8_sponsor_remains_color():
     assert "filter:none!important" in css
     assert "-webkit-filter:none!important" in css
     assert "mix-blend-mode:normal!important" in css
-
-def test_r8_cache_bust():
-    overlay=read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-

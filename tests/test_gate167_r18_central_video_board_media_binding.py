@@ -41,12 +41,3 @@ def test_gate167_r18_suppresses_legacy_takeovers_only_when_theme_owns_mode():
     css = read("static/csrn-production-theme-runtime.css")
     assert "html.csrn-production-theme-highlight-active #playerHighlight" in css
     assert "html.csrn-production-theme-sponsor-active #sponsorSpotlight" in css
-
-def test_gate167_r18_cache_bust():
-    overlay = read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-

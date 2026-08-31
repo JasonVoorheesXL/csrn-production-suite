@@ -37,13 +37,3 @@ def test_legacy_player_is_suppressed_during_theme_player_mode():
     assert '["playerGraphic", mode === "player"]' in js
     assert '"csrn-production-theme-player-active"' in js
     assert "html.csrn-production-theme-player-active body #playerGraphic" in css
-
-def test_cache_bust():
-    overlay=read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-

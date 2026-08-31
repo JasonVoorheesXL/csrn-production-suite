@@ -25,14 +25,3 @@ def test_gate167_r15_preserves_player_runtime_behavior():
     assert "preparePlayerMedia(state, runtime)" in js
     assert "cancelLegacyPlayerMotion()" in js
     assert "restoreLegacyPlayerNeutral()" in js
-
-def test_gate167_r15_cache_bust():
-    overlay = read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-
-

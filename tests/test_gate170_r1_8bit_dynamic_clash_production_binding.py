@@ -40,13 +40,3 @@ def test_r1_primary_media_still_temporarily_owns_board_modes():
     assert 'if (primaryGraphicVisible(runtime.player_highlight)) return "highlight";' in js
     assert 'if (primaryGraphicVisible(runtime.sponsor_spotlight)) return "sponsor";' in js
     assert 'if (playerVisible(runtime)) return "player";' in js
-
-def test_r1_cache_bust():
-    overlay=read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-

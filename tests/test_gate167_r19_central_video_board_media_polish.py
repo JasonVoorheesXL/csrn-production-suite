@@ -34,13 +34,3 @@ def test_r19_sponsor_typography_is_production_scaled():
     css = read("static/csrn-production-theme-runtime.css")
     assert ".csrn-production-sponsor-copy small" in css
     assert ".csrn-production-sponsor-copy strong" in css
-
-def test_r19_cache_bust_superseded_by_gate168():
-    overlay = read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-

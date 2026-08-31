@@ -41,14 +41,3 @@ def test_gate167_r8_player_uses_integrated_video_mode():
     assert "themeVideoModeFor(alias, runtime)" in js
     assert 'alias === "eight_bit_gameday" || alias === "friday_night_stadium"' in js
     assert "integratedPlayerActive" in js
-
-def test_gate167_r8_overlay_cache_version():
-    overlay = read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-
-

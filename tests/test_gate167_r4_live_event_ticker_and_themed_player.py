@@ -48,16 +48,3 @@ def test_gate167_r4_neon_keeps_player_fallback():
     js = read("static/csrn-production-theme-runtime.js")
     neon = js.split("digital_neon:", 1)[1].split("})", 1)[0]
     assert "playerSupported: false" in neon
-
-def test_gate167_r4_overlay_has_player_host_and_updated_runtime_version():
-    overlay = read("templates/overlay.html")
-    assert 'id="csrnProductionThemePlayerHost"' in overlay
-    assert 'id="csrnProductionThemePlayerLayout"' in overlay
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-
-

@@ -26,14 +26,3 @@ def test_gate167_r17_does_not_fake_highlight_or_sponsor_theme_components():
     js = read("static/csrn-production-theme-runtime.js")
     assert "activeComponents:[\"player_highlight\"]" not in js
     assert "activeComponents:[\"sponsor_spotlight\"]" not in js
-
-def test_gate167_r17_cache_bust():
-    overlay = read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-
-

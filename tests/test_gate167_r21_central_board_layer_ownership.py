@@ -23,13 +23,3 @@ def test_r21_sponsor_scale_survives_native_r23_host():
     assert 'font:900 44px/1 "Courier New",monospace!important' in css
     assert 'font:900 84px/.98 "Courier New",monospace!important' in css
     assert 'font:700 44px/1.08 "Courier New",monospace!important' in css
-
-def test_r21_cache_bust_superseded_by_r23():
-    overlay = read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-

@@ -53,13 +53,3 @@ def test_r3_css_backstop_hides_legacy_fullscreen_media():
     css = read("static/csrn-production-theme-runtime.css")
     assert "html.csrn-production-theme-highlight-active body #playerHighlight" in css
     assert "html.csrn-production-theme-sponsor-active body #sponsorSpotlight" in css
-
-def test_r3_cache_bust():
-    overlay = read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-

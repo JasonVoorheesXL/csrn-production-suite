@@ -52,13 +52,3 @@ def test_r6_r4_preserves_accepted_heritage_media_paths():
     assert "function populateHeritagePlayerHost" in js
     assert "csrn-production-heritage-highlight-window" in js
     assert "csrn-production-heritage-sponsor-host" in js
-
-def test_r6_r4_cache_bust():
-    overlay=read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-

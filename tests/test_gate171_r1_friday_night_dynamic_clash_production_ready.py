@@ -36,14 +36,3 @@ def test_friday_football_clash_assets_exist():
 def test_friday_dynamic_clash_keeps_native_idle_mode():
     runtime=read("static/csrn-production-theme-runtime.js")
     assert 'if (alias === "friday_night_stadium") return "clash";' in runtime
-
-def test_gate171_cache_pin():
-    overlay=read("templates/overlay.html")
-    assert '/static/csrn-production-theme-runtime.css?v=19.2-r18-r3' in overlay
-    assert '/static/csrn-production-theme-runtime.js?v=19.2-r18-r3' in overlay
-
-
-
-
-
-

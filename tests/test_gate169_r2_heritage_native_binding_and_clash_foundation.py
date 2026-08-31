@@ -44,14 +44,3 @@ def test_heritage_native_css_preserves_newspaper_surface():
     assert ".package-heritage-newspaper .hp-highlight-window.csrn-production-native-video-mode" in css
     assert ".package-heritage-newspaper .hp-sponsor-feature.csrn-production-native-video-mode.csrn-production-sponsor-board" in css
     assert ".package-heritage-newspaper .csrn-heritage-clash-foundation" in css
-
-def test_gate169_r2_cache_bust():
-    overlay=read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-
-

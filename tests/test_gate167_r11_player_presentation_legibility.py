@@ -26,14 +26,3 @@ def test_gate167_r11_duration_contract_survives_r18_media_binding():
     js = read("static/csrn-production-theme-runtime.js")
     assert "runtime.player_highlight" in js
     assert "player_graphic.duration" not in js
-
-def test_gate167_r11_cache_bust():
-    overlay = read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-
-

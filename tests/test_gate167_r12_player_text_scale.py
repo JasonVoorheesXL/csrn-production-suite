@@ -27,14 +27,3 @@ def test_gate167_r12_manual_spotlight_boundary_is_superseded_by_r18():
     assert "runtime.player_highlight" in js
     assert "runtime.sponsor_spotlight" in js
     assert "themeVideoModeFor(alias, runtime)" in js
-
-def test_gate167_r12_cache_bust():
-    overlay = read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-
-

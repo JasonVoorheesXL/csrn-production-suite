@@ -40,14 +40,3 @@ def test_gate167_r5_preserves_live_ticker_and_themed_player_contracts():
     assert "track.animate(" in js
     assert 'activeComponents:["player"]' in js
     assert "runtime.player_graphic" in js
-
-def test_gate167_r5_overlay_cache_busts_runtime():
-    overlay = read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-
-

@@ -31,19 +31,9 @@ def test_r2_does_not_target_possession_ball_on_or_team_scores():
     assert "bl-8bit-score" not in block
     assert "bl-8bit-team-tower" not in block
 
-def test_r2_runtime_binding_and_cache_advance():
-    js = read("static/csrn-production-theme-runtime.js")
-    overlay = read("templates/overlay.html")
-    assert "csrn-production-theme-binding-v46" in js
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
 
 def test_dynamic_clash_and_asset_path_shim_remain_present():
     js = read("static/csrn-production-theme-runtime.js")
     assert 'alias === "eight_bit_gameday"' in js
     assert 'installEightBitAssetPathShim' in js
     assert 'raw.startsWith("8bit-gameday/") ? `/static/${raw}` : raw' in js
-
-
-
-

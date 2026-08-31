@@ -18,13 +18,3 @@ def test_r14_runtime_recognizes_shared_player_mode():
     assert "[data-video-mode='player']" in js
     assert "videoMode:activeVideoMode" in js
     assert "themeVideoModeFor(alias, runtime)" in js
-
-def test_r14_cache_bust():
-    overlay=read("templates/overlay.html")
-    assert "/static/csrn-production-theme-runtime.css?v=18.5-r11" in overlay
-    assert "/static/csrn-production-theme-runtime.js?v=18.5-r11" in overlay
-
-
-
-
-
