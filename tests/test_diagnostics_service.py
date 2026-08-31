@@ -133,6 +133,22 @@ def test_diagnostics_uses_identity_fallbacks(tmp_path: Path) -> None:
     assert payload["build"] == "0007"
 
 
+def test_diagnostics_omits_logo_check_when_no_logo_is_configured(
+    tmp_path: Path,
+) -> None:
+    # Round 13 Task A: a fresh install with no branding logo should not fail
+    # a "Logo file" diagnostic for a hard-coded csrn-logo.png path.
+    service, _, _, _, _, _ = build_service(
+        tmp_path,
+        config={"organization": {"logo_path": ""}, "application": {}, "obs": {}},
+    )
+    names = [
+        row["name"]
+        for row in service.diagnostics().data["diagnostics"]["checks"]
+    ]
+    assert "Logo file" not in names
+
+
 def test_readiness_runs_venue_migration(tmp_path: Path) -> None:
     service, _, calls, _, _, _ = build_service(tmp_path)
     service.readiness()

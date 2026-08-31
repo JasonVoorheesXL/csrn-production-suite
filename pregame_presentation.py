@@ -743,10 +743,13 @@ def _organization_branding() -> dict[str, Any]:
         defaults = {}
 
     default_school = _school_by_id(str(defaults.get("home_school_id", "") or ""))
+    # Configured org logo only -- no hard-coded csrn-logo.png fallback
+    # (Round 13 Task A). Empty means the customer has not set a logo yet.
     logo = str(
-        organization.get("logo")
+        organization.get("logo_path")
+        or organization.get("logo")
         or organization.get("logo_url")
-        or "/static/csrn-logo.png"
+        or ""
     ).strip()
 
     social = cfg.get("social", {})

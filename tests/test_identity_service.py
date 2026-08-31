@@ -37,12 +37,28 @@ HISTORICAL_STREAMING = {
         "UCAZZRMpb3HnrSxCnDiQeH7Q/livestreaming"
     ),
 }
+# Round 13 Task A: former DEFAULT_STATE placeholder team/venue.
+HISTORICAL_STATE_DEFAULTS = {
+    "home_team": "Caledonia",
+    "venue": "Caledonia High School",
+}
 
 
 def test_legacy_seed_matches_the_historical_literals_exactly() -> None:
     assert identity_service.LEGACY_ORGANIZATION == HISTORICAL_ORGANIZATION
     assert identity_service.LEGACY_BROADCAST_DEFAULTS == HISTORICAL_BROADCAST_DEFAULTS
     assert identity_service.LEGACY_STREAMING == HISTORICAL_STREAMING
+    assert identity_service.LEGACY_STATE_DEFAULTS == HISTORICAL_STATE_DEFAULTS
+
+
+def test_branding_logo_never_falls_back_to_csrn_logo() -> None:
+    assert identity_service.branding_logo(
+        identity_service.LEGACY_ORGANIZATION
+    ) == "static/csrn-logo.png"
+    assert identity_service.branding_logo(identity_service.BLANK_ORGANIZATION) == ""
+    assert identity_service.branding_logo({"logo": "branding/net.png"}) == "branding/net.png"
+    assert identity_service.branding_logo({}) == ""
+    assert identity_service.branding_logo(None) == ""
 
 
 def test_existing_install_seeds_with_todays_exact_values(tmp_path) -> None:
@@ -59,6 +75,7 @@ def test_existing_install_seeds_with_todays_exact_values(tmp_path) -> None:
     assert profile["organization"] == HISTORICAL_ORGANIZATION
     assert profile["broadcast_defaults"] == HISTORICAL_BROADCAST_DEFAULTS
     assert profile["streaming"] == HISTORICAL_STREAMING
+    assert profile["state_defaults"] == HISTORICAL_STATE_DEFAULTS
 
 
 def test_fresh_install_seeds_blank_identity_not_caledonia(tmp_path) -> None:
@@ -77,9 +94,11 @@ def test_fresh_install_seeds_blank_identity_not_caledonia(tmp_path) -> None:
     # a sport default is still fine on a blank template
     assert profile["broadcast_defaults"]["sport"] == "Football"
     assert profile["streaming"] == {"facebook_live": "", "youtube_live": ""}
-    # nothing Caledonia-identifying leaked in
+    assert profile["state_defaults"] == {"home_team": "", "venue": ""}
+    # nothing Caledonia-identifying and no csrn-logo fallback leaked in
     blob = json.dumps(profile).lower()
     assert "caledonia" not in blob
+    assert "csrn-logo" not in blob
 
 
 def test_existing_profile_file_is_loaded_and_normalized(tmp_path) -> None:
@@ -119,9 +138,13 @@ def test_app_default_config_is_sourced_from_the_identity_profile() -> None:
     assert app.DEFAULT_CONFIG["organization"] == HISTORICAL_ORGANIZATION
     assert app.DEFAULT_CONFIG["broadcast_defaults"] == HISTORICAL_BROADCAST_DEFAULTS
     assert "streaming" not in app.DEFAULT_CONFIG
+    assert "state_defaults" not in app.DEFAULT_CONFIG
     resolved = app.load_config()
     assert resolved["organization"]["name"] == "Caledonia Sports Radio Network"
     assert resolved["broadcast_defaults"]["home_school_id"] == "caledonia"
+    # Round 13: DEFAULT_STATE placeholders now come from the profile, unchanged.
+    assert app.DEFAULT_STATE["home_team"] == "Caledonia"
+    assert app.DEFAULT_STATE["venue"] == "Caledonia High School"
 
 
 def test_launcher_streaming_links_endpoint_is_public_and_serves_the_profile() -> None:

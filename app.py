@@ -226,6 +226,7 @@ CONFIG_FILE = DATA_DIR / "Settings" / "config.json"
 # Evaluate "is this an existing install?" now, BEFORE any repository
 # auto-creates config.json -- the Identity Profile seeds itself from today's
 # exact Caledonia/CSRN literals for an existing install and blank for a new one.
+import identity_service
 from identity_service import load_identity_profile, save_identity_profile
 
 _EXISTING_INSTALL = STATE_FILE.exists() or CONFIG_FILE.exists()
@@ -367,13 +368,16 @@ DEFAULT_STATE: dict[str, Any] = {
     "sport": "Football",
     "level": "Varsity",
     "division": "Boys",
-    "home_team": "Caledonia",
+    # Placeholder identity shown before a broadcast is loaded -- from the
+    # Identity Profile (Round 13 Task A). Existing install: the former
+    # "Caledonia" / "Caledonia High School"; fresh install: blank.
+    "home_team": IDENTITY_PROFILE["state_defaults"]["home_team"],
     "visitor_team": "Visitor",
     "home_school_id": "",
     "visitor_school_id": "",
     "home_identity": {},
     "visitor_identity": {},
-    "venue": "Caledonia High School",
+    "venue": IDENTITY_PROFILE["state_defaults"]["venue"],
     "date": "",
     "scheduled_start": "",
     "home_score": 0,
@@ -1965,6 +1969,9 @@ def get_graphics_service() -> GraphicsService:
             build_identity=broadcast_identity,
             apply_sponsor=apply_sponsor_to_graphic,
             load_assets=load_assets,
+            organization_logo=lambda: identity_service.branding_logo(
+                load_config().get("organization", {})
+            ),
         )
 
     return GRAPHICS_SERVICE

@@ -53,6 +53,7 @@ class GraphicsService:
         apply_sponsor: SponsorApplier,
         load_assets: RecordLoader | None = None,
         clock: Clock | None = None,
+        organization_logo: Callable[[], str] | None = None,
     ) -> None:
         self._default_state = default_state
         self._load_rosters = load_rosters
@@ -62,6 +63,10 @@ class GraphicsService:
         self._apply_sponsor = apply_sponsor
         self._load_assets = load_assets or (lambda: [])
         self._clock = clock or time.time
+        # Fallback logo for a personnel graphic with no school assigned:
+        # the configured network/organization logo, or "" -- never a
+        # hard-coded csrn-logo.png (Round 13 Task A).
+        self._organization_logo = organization_logo or (lambda: "")
 
     def _graphic_default(self, key: str) -> Record:
         defaults = self._default_state()
@@ -691,7 +696,7 @@ class GraphicsService:
                         ),
                         "headshot": str(person.get("headshot", "")),
                         "logo": str(
-                            identity.get("logo") or "/static/csrn-logo.png"
+                            identity.get("logo") or self._organization_logo()
                         ),
                         "accent": str(
                             identity.get("primary_color") or "#C9203B"

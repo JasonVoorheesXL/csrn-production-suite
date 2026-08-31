@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+import identity_service
+
 
 Payload = dict[str, Any]
 LoadPayload = Callable[[], Payload]
@@ -78,9 +80,7 @@ class DiagnosticsService:
             config = {}
         organization = self._section(config, "organization")
         application = self._section(config, "application")
-        logo_path = str(
-            organization.get("logo_path") or "static/csrn-logo.png"
-        )
+        logo_path = identity_service.branding_logo(organization)
 
         required = {
             "Configuration": self._config_file,
@@ -88,7 +88,9 @@ class DiagnosticsService:
             "Schools folder": self._data_dir / "Schools",
             "Broadcasts folder": self._data_dir / "Broadcasts",
             "Backups folder": self._data_dir / "Backups",
-            "Logo file": self._base_dir / logo_path,
+            # Only a diagnostic when a logo is actually configured -- a fresh
+            # install with no branding yet should not fail this check.
+            **({"Logo file": self._base_dir / logo_path} if logo_path else {}),
             "School database": self._schools_file,
             "Broadcaster profiles": self._broadcasters_file,
             "Roster database": self._rosters_file,

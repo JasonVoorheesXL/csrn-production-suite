@@ -49,6 +49,12 @@ LEGACY_STREAMING: dict[str, Any] = {
         "UCAZZRMpb3HnrSxCnDiQeH7Q/livestreaming"
     ),
 }
+# Placeholder team/venue shown by DEFAULT_STATE before any broadcast is loaded
+# (Round 13 Task A -- same class of literal as the two blocks above).
+LEGACY_STATE_DEFAULTS: dict[str, Any] = {
+    "home_team": "Caledonia",
+    "venue": "Caledonia High School",
+}
 
 # --- Fresh-install template: identity fields blank, structural defaults kept. ---
 BLANK_ORGANIZATION: dict[str, Any] = {
@@ -71,8 +77,12 @@ BLANK_STREAMING: dict[str, Any] = {
     "facebook_live": "",
     "youtube_live": "",
 }
+BLANK_STATE_DEFAULTS: dict[str, Any] = {
+    "home_team": "",
+    "venue": "",
+}
 
-_SECTIONS = ("organization", "broadcast_defaults", "streaming")
+_SECTIONS = ("organization", "broadcast_defaults", "streaming", "state_defaults")
 
 
 def _template(existing_install: bool) -> dict[str, Any]:
@@ -81,12 +91,28 @@ def _template(existing_install: bool) -> dict[str, Any]:
             "organization": copy.deepcopy(LEGACY_ORGANIZATION),
             "broadcast_defaults": copy.deepcopy(LEGACY_BROADCAST_DEFAULTS),
             "streaming": copy.deepcopy(LEGACY_STREAMING),
+            "state_defaults": copy.deepcopy(LEGACY_STATE_DEFAULTS),
         }
     return {
         "organization": copy.deepcopy(BLANK_ORGANIZATION),
         "broadcast_defaults": copy.deepcopy(BLANK_BROADCAST_DEFAULTS),
         "streaming": copy.deepcopy(BLANK_STREAMING),
+        "state_defaults": copy.deepcopy(BLANK_STATE_DEFAULTS),
     }
+
+
+def branding_logo(organization: Mapping[str, Any] | None) -> str:
+    """The configured network/organization logo path, or "" -- never a
+    hard-coded csrn-logo.png fallback. Accepts any of the historical key
+    spellings (logo_path / logo / logo_url)."""
+    if not isinstance(organization, Mapping):
+        return ""
+    return str(
+        organization.get("logo_path")
+        or organization.get("logo")
+        or organization.get("logo_url")
+        or ""
+    ).strip()
 
 
 def _normalize(raw: Mapping[str, Any] | None, existing_install: bool) -> dict[str, Any]:
