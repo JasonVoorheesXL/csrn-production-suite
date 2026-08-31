@@ -219,8 +219,19 @@ OVERLAY_SCHEMA_REVISION = "gate6-logo-fallback-v1"
 PRODUCT_PATHS.ensure()
 STATE_FILE = PRODUCT_PATHS.state_file
 SECURITY_FILE = PRODUCT_PATHS.security_file
+IDENTITY_FILE = PRODUCT_PATHS.identity_file
 DATA_DIR = PRODUCT_PATHS.data_dir
 CONFIG_FILE = DATA_DIR / "Settings" / "config.json"
+
+# Evaluate "is this an existing install?" now, BEFORE any repository
+# auto-creates config.json -- the Identity Profile seeds itself from today's
+# exact Caledonia/CSRN literals for an existing install and blank for a new one.
+from identity_service import load_identity_profile, save_identity_profile
+
+_EXISTING_INSTALL = STATE_FILE.exists() or CONFIG_FILE.exists()
+IDENTITY_PROFILE = load_identity_profile(
+    IDENTITY_FILE, existing_install=_EXISTING_INSTALL
+)
 SCHOOLS_FILE = DATA_DIR / "Schools" / "schools.json"
 BROADCASTERS_FILE = DATA_DIR / "Settings" / "broadcasters.json"
 ROSTERS_FILE = DATA_DIR / "Rosters" / "rosters.json"
@@ -462,22 +473,13 @@ RUNTIME_BUILD = "V1.13A8F-SOURCE-ALIGNMENT"
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
-    "organization": {
-        "name": "Caledonia Sports Radio Network",
-        "short_name": "CSRN",
-        "logo_path": "static/csrn-logo.png",
-        "primary_color": "#C9203B",
-        "secondary_color": "#000000",
-        "accent_color": "#FFFFFF",
-    },
-    "broadcast_defaults": {
-        "venue": "Caledonia High School",
-        "sport": "Football",
-        "timezone": "America/Chicago",
-        "theme": "CSRN Dark",
-        "home_school_id": "caledonia",
-        "visual_mode": "graphic",
-    },
+    # Sourced from the external Identity Profile (identity_service.py) instead
+    # of inline literals -- see IDENTITY_PROFILE above. On the existing install
+    # these are exactly the former Caledonia/CSRN values; on a fresh install
+    # they are blank. (The streaming block stays out of config on purpose --
+    # it is a launcher concern, read straight from the profile in Task B.)
+    "organization": copy.deepcopy(IDENTITY_PROFILE["organization"]),
+    "broadcast_defaults": copy.deepcopy(IDENTITY_PROFILE["broadcast_defaults"]),
     "folders": {
         "graphics": "Graphics",
         "assets": "Assets",
@@ -800,9 +802,25 @@ def load_config() -> dict[str, Any]:
     return CONFIG_REPOSITORY.load()
 
 
+def _persist_identity_sections(config: Mapping[str, Any]) -> None:
+    """Mirror organization / broadcast_defaults edits into the external
+    Identity Profile so it stays the single identity document. The streaming
+    block (Task B) is preserved untouched."""
+    try:
+        current = load_identity_profile(IDENTITY_FILE, existing_install=True)
+        if isinstance(config.get("organization"), dict):
+            current["organization"] = dict(config["organization"])
+        if isinstance(config.get("broadcast_defaults"), dict):
+            current["broadcast_defaults"] = dict(config["broadcast_defaults"])
+        save_identity_profile(IDENTITY_FILE, current, existing_install=True)
+    except Exception:
+        pass
+
+
 def save_config(config: dict[str, Any]) -> None:
     ensure_data_architecture()
     CONFIG_REPOSITORY.save(config)
+    _persist_identity_sections(config)
 
 
 def update_config_values(

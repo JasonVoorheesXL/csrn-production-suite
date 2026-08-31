@@ -19,6 +19,7 @@ class ProductPaths:
     data_dir: Path
     state_file: Path
     security_file: Path
+    identity_file: Path
     logs_dir: Path
     exports_dir: Path
     updates_dir: Path
@@ -84,6 +85,11 @@ def resolve_product_paths(
         data_dir=data_dir,
         state_file=runtime_root / "state.json" if installed else base / "state.json",
         security_file=runtime_root / "security.json" if installed else base / "security.json",
+        identity_file=(
+            runtime_root / "identity_profile.json"
+            if installed
+            else base / "identity_profile.json"
+        ),
         logs_dir=runtime_root / "Logs" if installed else data_dir / "Logs",
         exports_dir=runtime_root / "Exports" if installed else base / "Exports",
         updates_dir=runtime_root / "Updates",

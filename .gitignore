@@ -8,6 +8,7 @@ __pycache__/
 # Runtime
 security.json
 state.json
+identity_profile.json
 *.log
 
 # User data
