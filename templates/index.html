@@ -205,11 +205,12 @@
       <h2>Game Classification and Pregame Records</h2>
       <div class="setup-grid">
         <label>Contest Type
-          <select id="contestType" onchange="updateRecordPolicyNotice()"><option value="official">Official game</option><option value="scrimmage">Scrimmage</option><option value="exhibition">Exhibition</option></select>
+          <select id="contestType" onchange="updateRecordPolicyNotice();refreshPlanningInheritedRecord()"><option value="official">Official game</option><option value="scrimmage">Scrimmage</option><option value="exhibition">Exhibition</option></select>
         </label>
         <label class="check-row planning-check"><input id="regionGame" type="checkbox"> Region game</label>
       </div>
       <div id="recordPolicyNotice" class="status">Select the teams and enter their records entering this game.</div>
+      <div id="planningRecordInheritanceNote" class="section-note hidden"></div>
       <div class="record-snapshot-grid">
         <section class="record-snapshot-card">
           <h3>Home Pregame Snapshot</h3>
@@ -2860,6 +2861,7 @@ async function createBroadcast() {
     home_pregame_region_record: readPlanningRecord('home','Region'),
     visitor_pregame_record: readPlanningRecord('visitor','Overall'),
     visitor_pregame_region_record: readPlanningRecord('visitor','Region'),
+    primary_record_source: planningRecordSourceHint(),
     crew: {
       play_by_play: document.getElementById('crewPlayByPlay').value,
       color_analyst: document.getElementById('crewColorAnalyst').value,
@@ -2871,7 +2873,7 @@ async function createBroadcast() {
     const createResult=editingBroadcastId?await api(`/api/broadcasts/${encodeURIComponent(editingBroadcastId)}`,broadcastPayload,'PUT'):await api('/api/create-broadcast',broadcastPayload);
     const savedBroadcastId=createResult?.broadcast?.broadcast_id||editingBroadcastId;
     await saveGamePregameStorylines(savedBroadcastId);
-    const wasEditing=Boolean(editingBroadcastId); editingBroadcastId=null; renderGamePregameStorylines([]); await loadGameManager(); setupPanel.classList.add('hidden'); saveBroadcastButton.textContent='Create Broadcast'; cancelEditBroadcastButton.classList.add('hidden');
+    const wasEditing=Boolean(editingBroadcastId); editingBroadcastId=null; planningInheritedRecord=null; planningRecordUserEdited=false; renderPlanningRecordInheritanceNote(); renderGamePregameStorylines([]); await loadGameManager(); setupPanel.classList.add('hidden'); saveBroadcastButton.textContent='Create Broadcast'; cancelEditBroadcastButton.classList.add('hidden');
     document.getElementById('gameManagerMessage').textContent=`Broadcast ${createResult.broadcast.broadcast_id} ${wasEditing?'updated':'created'}. ${(createResult.warnings||[]).join(' ')}`;
     showModule('games');
   } catch (err) {
@@ -6540,9 +6542,19 @@ function readPlanningRecord(side,scope){return {wins:planningCount(document.getE
 function writePlanningRecord(side,scope,record={}){for(const [field,key] of [['Wins','wins'],['Losses','losses'],['Ties','ties']])document.getElementById(`${side}${scope}${field}`).value=planningCount(record[key])}
 function readSpecialDesignations(){return Object.entries(planningDesignationFields).filter(([,id])=>document.getElementById(id).checked).map(([value])=>value)}
 function writeSpecialDesignations(values=[]){const selected=new Set(values||[]);for(const [value,id] of Object.entries(planningDesignationFields))document.getElementById(id).checked=selected.has(value)}
-function updatePlanningSchoolSnapshot(side){const select=document.getElementById(`${side}SchoolSelect`),school=schools.find(item=>item.id===select?.value);if(school){document.getElementById(`${side}ClassificationSnapshot`).value=school.classification||'';document.getElementById(`${side}RegionSnapshot`).value=school.region||''}else if(!editingBroadcastId){document.getElementById(`${side}ClassificationSnapshot`).value='';document.getElementById(`${side}RegionSnapshot`).value=''}updateRecordPolicyNotice()}
+function updatePlanningSchoolSnapshot(side){const select=document.getElementById(`${side}SchoolSelect`),school=schools.find(item=>item.id===select?.value);if(school){document.getElementById(`${side}ClassificationSnapshot`).value=school.classification||'';document.getElementById(`${side}RegionSnapshot`).value=school.region||''}else if(!editingBroadcastId){document.getElementById(`${side}ClassificationSnapshot`).value='';document.getElementById(`${side}RegionSnapshot`).value=''}updateRecordPolicyNotice();refreshPlanningInheritedRecord()}
 function updateRecordPolicyNotice(){const primaryId=currentConfig?.broadcast_defaults?.home_school_id||'',homeId=document.getElementById('homeSchoolSelect')?.value||'',visitorId=document.getElementById('visitorSchoolSelect')?.value||'',contest=document.getElementById('contestType')?.value||'official',side=primaryId&&primaryId===homeId?'Home':primaryId&&primaryId===visitorId?'Visitor':'';const notice=document.getElementById('recordPolicyNotice'),region=document.getElementById('regionGame'),planningCheck=region?.closest('.planning-check');if(region){if(contest!=='official'){region.checked=false;region.disabled=true;planningCheck?.classList.add('disabled')}else{region.disabled=false;planningCheck?.classList.remove('disabled')}}if(!notice)return;if(contest!=='official'){notice.textContent='Official overall and region win/loss/tie records will not be updated when this game is completed.'}else if(side){notice.textContent=`${side} is the configured primary team. CSRN will inherit its latest tracked record when available; the opponent record is a manual pregame snapshot.`}else{notice.textContent='The configured primary team is not in this broadcast. Both records are manual pregame snapshots.'}}
-function populateBroadcastPlanning(record={}){document.getElementById('contestType').value=record.contest_type||'official';document.getElementById('regionGame').checked=Boolean(record.region_game)&&(record.contest_type||'official')==='official';document.getElementById('homeClassificationSnapshot').value=record.home_classification||'';document.getElementById('homeRegionSnapshot').value=record.home_region||'';document.getElementById('visitorClassificationSnapshot').value=record.visitor_classification||'';document.getElementById('visitorRegionSnapshot').value=record.visitor_region||'';writePlanningRecord('home','Overall',record.home_pregame_record);writePlanningRecord('home','Region',record.home_pregame_region_record);writePlanningRecord('visitor','Overall',record.visitor_pregame_record);writePlanningRecord('visitor','Region',record.visitor_pregame_region_record);writeSpecialDesignations(record.special_designations);updateRecordPolicyNotice()}
+let planningInheritedRecord=null;
+let planningRecordUserEdited=false;
+function planningPrimarySide(){const primaryId=currentConfig?.broadcast_defaults?.home_school_id||'',homeId=document.getElementById('homeSchoolSelect')?.value||'',visitorId=document.getElementById('visitorSchoolSelect')?.value||'';if(primaryId&&primaryId===homeId)return 'home';if(primaryId&&primaryId===visitorId)return 'visitor';return ''}
+function planningRecordsEqual(a,b){a=a||{};b=b||{};return planningCount(a.wins)===planningCount(b.wins)&&planningCount(a.losses)===planningCount(b.losses)&&planningCount(a.ties)===planningCount(b.ties)}
+function planningRecordShort(r){r=r||{};const t=planningCount(r.ties);return `${planningCount(r.wins)}-${planningCount(r.losses)}${t?('-'+t):''}`}
+function renderPlanningRecordInheritanceNote(){const note=document.getElementById('planningRecordInheritanceNote');if(!note)return;const side=planningPrimarySide();if(editingBroadcastId||!side||!planningInheritedRecord||!planningInheritedRecord.available){note.classList.add('hidden');note.textContent='';return}note.classList.remove('hidden');const src=planningInheritedRecord.source_label?(' from '+planningInheritedRecord.source_label):' from the last completed game';if(planningRecordUserEdited){note.className='section-note warning';note.textContent=`Overriding the inherited ${planningRecordShort(planningInheritedRecord.overall)}${src}. This game will keep the record you entered.`}else{note.className='section-note';note.textContent=`Primary team record pre-filled to ${planningRecordShort(planningInheritedRecord.overall)} — inherited${src}. Edit any box to override.`}}
+function onPlanningRecordInput(){const side=planningPrimarySide();if(!side||!planningInheritedRecord||!planningInheritedRecord.available)return;const editedNow=!planningRecordsEqual(readPlanningRecord(side,'Overall'),planningInheritedRecord.overall)||!planningRecordsEqual(readPlanningRecord(side,'Region'),planningInheritedRecord.region);if(editedNow!==planningRecordUserEdited){planningRecordUserEdited=editedNow;renderPlanningRecordInheritanceNote()}}
+function wirePlanningRecordWatch(){if(wirePlanningRecordWatch.done)return;for(const side of ['home','visitor'])for(const scope of ['Overall','Region'])for(const f of ['Wins','Losses','Ties']){const el=document.getElementById(`${side}${scope}${f}`);if(el)el.addEventListener('input',onPlanningRecordInput)}wirePlanningRecordWatch.done=true}
+async function refreshPlanningInheritedRecord(){wirePlanningRecordWatch();const panel=document.getElementById('setupPanel');const side=planningPrimarySide();if(!panel||panel.classList.contains('hidden')||editingBroadcastId||!side){planningInheritedRecord=null;renderPlanningRecordInheritanceNote();return}const primaryId=currentConfig?.broadcast_defaults?.home_school_id||'',sport=document.getElementById('sport')?.value||'Football',season=document.getElementById('season')?.value||'';try{const data=await api(`/api/broadcasts/inherited-record?team=${encodeURIComponent(primaryId)}&sport=${encodeURIComponent(sport)}&season=${encodeURIComponent(season)}`);planningInheritedRecord=data;if(data&&data.available&&!planningRecordUserEdited){writePlanningRecord(side,'Overall',data.overall);writePlanningRecord(side,'Region',data.region)}}catch(e){planningInheritedRecord=null}renderPlanningRecordInheritanceNote()}
+function planningRecordSourceHint(){return planningRecordUserEdited?'manual':''}
+function populateBroadcastPlanning(record={}){document.getElementById('contestType').value=record.contest_type||'official';document.getElementById('regionGame').checked=Boolean(record.region_game)&&(record.contest_type||'official')==='official';document.getElementById('homeClassificationSnapshot').value=record.home_classification||'';document.getElementById('homeRegionSnapshot').value=record.home_region||'';document.getElementById('visitorClassificationSnapshot').value=record.visitor_classification||'';document.getElementById('visitorRegionSnapshot').value=record.visitor_region||'';writePlanningRecord('home','Overall',record.home_pregame_record);writePlanningRecord('home','Region',record.home_pregame_region_record);writePlanningRecord('visitor','Overall',record.visitor_pregame_record);writePlanningRecord('visitor','Region',record.visitor_pregame_region_record);writeSpecialDesignations(record.special_designations);planningInheritedRecord=null;planningRecordUserEdited=false;renderPlanningRecordInheritanceNote();updateRecordPolicyNotice()}
 function moveSetupPanelToGameManager(){
   const host=document.getElementById('gameCreationHost'); const panel=document.getElementById('setupPanel');
   if(host&&panel&&panel.parentElement!==host) host.appendChild(panel);
@@ -6551,7 +6563,7 @@ function toggleGameCreation(){
   moveSetupPanelToGameManager();
   const panel=document.getElementById('setupPanel'); panel.classList.toggle('hidden');
   if(!panel.classList.contains('hidden')){
-    if(!editingBroadcastId)renderGamePregameStorylines([]);
+    if(!editingBroadcastId){renderGamePregameStorylines([]);planningRecordUserEdited=false;refreshPlanningInheritedRecord();}
     panel.scrollIntoView({behavior:'smooth',block:'start'});
   }
 }
@@ -6574,7 +6586,7 @@ async function editGame(id){
   await loadGamePregameStorylines(id);
   saveBroadcastButton.textContent='Save Broadcast Changes'; cancelEditBroadcastButton.classList.remove('hidden'); p.scrollIntoView({behavior:'smooth'});
 }
-function cancelGameEdit(){editingBroadcastId=null;renderGamePregameStorylines([]);saveBroadcastButton.textContent='Create Broadcast';cancelEditBroadcastButton.classList.add('hidden');setupPanel.classList.add('hidden');}
+function cancelGameEdit(){editingBroadcastId=null;planningInheritedRecord=null;planningRecordUserEdited=false;renderPlanningRecordInheritanceNote();renderGamePregameStorylines([]);saveBroadcastButton.textContent='Create Broadcast';cancelEditBroadcastButton.classList.add('hidden');setupPanel.classList.add('hidden');}
 
 async function updateGameStatus(id,status){
   const updated=await api(`/api/broadcasts/${encodeURIComponent(id)}/status`,{status},'PUT');

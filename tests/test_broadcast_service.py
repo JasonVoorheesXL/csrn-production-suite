@@ -366,6 +366,119 @@ def test_create_falls_back_to_manual_when_only_scrimmages_are_completed() -> Non
     assert record["record_tracking"]["home_source"] == "manual"
 
 
+def test_inherited_record_reports_available_with_a_source_label() -> None:
+    harness = Harness()
+    harness.broadcasts = [
+        {
+            "broadcast_id": "FB-2026-4A-W01-001",
+            "status": "completed",
+            "completed_at": 100,
+            "sport": "Football",
+            "season": "2026",
+            "week": "1",
+            "record_policy": "official",
+            "record_tracking_applied": True,
+            "home_school_id": "new-hope",
+            "visitor_school_id": "caledonia",
+            "home_team": "New Hope",
+            "visitor_postgame_record": {"wins": 0, "losses": 1, "ties": 0},
+            "visitor_postgame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+        }
+    ]
+    payload = harness.service().inherited_record(
+        "caledonia", "Football", "2026"
+    ).data["inheritance"]
+    assert payload["available"] is True
+    assert payload["overall"] == {"wins": 0, "losses": 1, "ties": 0}
+    assert payload["source_broadcast_id"] == "FB-2026-4A-W01-001"
+    assert payload["source_label"] == "Week 1 vs New Hope"
+
+
+def test_inherited_record_reports_unavailable_when_nothing_official() -> None:
+    harness = Harness()
+    harness.broadcasts = [
+        {
+            "broadcast_id": "scrimmage",
+            "status": "completed",
+            "completed_at": 100,
+            "sport": "Football",
+            "season": "2026",
+            "record_policy": "non_record",
+            "record_tracking_applied": False,
+            "home_school_id": "new-hope",
+            "visitor_school_id": "caledonia",
+            "visitor_postgame_record": {"wins": 0, "losses": 0, "ties": 0},
+        }
+    ]
+    payload = harness.service().inherited_record(
+        "caledonia", "Football", "2026"
+    ).data["inheritance"]
+    assert payload["available"] is False
+    assert payload["overall"] == {"wins": 0, "losses": 0, "ties": 0}
+    assert payload["source_broadcast_id"] == ""
+    assert payload["source_label"] == ""
+
+
+def test_create_manual_override_is_respected_and_marked_manual() -> None:
+    harness = Harness()
+    harness.broadcasts = [
+        {
+            "broadcast_id": "official-loss",
+            "status": "completed",
+            "completed_at": 100,
+            "sport": "Football",
+            "season": "2026",
+            "record_policy": "official",
+            "record_tracking_applied": True,
+            "home_school_id": "new-hope",
+            "visitor_school_id": "caledonia",
+            "visitor_postgame_record": {"wins": 0, "losses": 1, "ties": 0},
+            "visitor_postgame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+        }
+    ]
+    record = harness.service().create(
+        {
+            "home_school_id": "caledonia",
+            "visitor_school_id": "new-hope",
+            "season": "2026",
+            "primary_record_source": "manual",
+            "home_pregame_record": {"wins": 2, "losses": 3, "ties": 0},
+        }
+    ).data["broadcast"]
+    # The operator's explicit entry wins and is marked so Task C leaves it be.
+    assert record["home_pregame_record"] == {"wins": 2, "losses": 3, "ties": 0}
+    assert record["record_tracking"]["home_source"] == "manual"
+
+
+def test_create_without_override_still_inherits_automatically() -> None:
+    harness = Harness()
+    harness.broadcasts = [
+        {
+            "broadcast_id": "official-loss",
+            "status": "completed",
+            "completed_at": 100,
+            "sport": "Football",
+            "season": "2026",
+            "record_policy": "official",
+            "record_tracking_applied": True,
+            "home_school_id": "new-hope",
+            "visitor_school_id": "caledonia",
+            "visitor_postgame_record": {"wins": 0, "losses": 1, "ties": 0},
+            "visitor_postgame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+        }
+    ]
+    record = harness.service().create(
+        {
+            "home_school_id": "caledonia",
+            "visitor_school_id": "new-hope",
+            "season": "2026",
+            "home_pregame_record": {"wins": 9, "losses": 9, "ties": 0},
+        }
+    ).data["broadcast"]
+    assert record["home_pregame_record"] == {"wins": 0, "losses": 1, "ties": 0}
+    assert record["record_tracking"]["home_source"] == "automatic"
+
+
 def test_completed_official_region_game_advances_primary_record_with_tie() -> None:
     harness = Harness()
     harness.broadcasts = [

@@ -76,6 +76,29 @@ class StubBroadcastService:
         self.calls.append(("set_status", (broadcast_id, status)))
         return self.status_result
 
+    def inherited_record(
+        self,
+        school_id: str,
+        sport: str = "",
+        season: str = "",
+    ) -> BroadcastResult:
+        self.calls.append(("inherited_record", (school_id, sport, season)))
+        return BroadcastResult(
+            "OK",
+            {
+                "inheritance": {
+                    "team": school_id,
+                    "sport": sport or "Football",
+                    "season": season,
+                    "available": True,
+                    "overall": {"wins": 0, "losses": 1, "ties": 0},
+                    "region": {"wins": 0, "losses": 0, "ties": 0},
+                    "source_broadcast_id": "FB-2026-4A-W01-001",
+                    "source_label": "Week 1 vs ITAWAMBA AHS",
+                }
+            },
+        )
+
     def delete(self, broadcast_id: str) -> BroadcastResult:
         self.calls.append(("delete", broadcast_id))
         return self.delete_result
@@ -141,6 +164,28 @@ def test_create_broadcast_preserves_payload_contract(broadcast_client) -> None:
         "warnings": ["warning"],
     }
     assert service.calls == [("create", payload)]
+
+
+def test_inherited_record_endpoint_returns_inheritance_payload(
+    broadcast_client,
+) -> None:
+    client, service = broadcast_client
+
+    response = client.get(
+        "/api/broadcasts/inherited-record"
+        "?team=caledonia&sport=Football&season=2026"
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["available"] is True
+    assert body["overall"] == {"wins": 0, "losses": 1, "ties": 0}
+    assert body["source_label"] == "Week 1 vs ITAWAMBA AHS"
+    assert service.calls == [
+        ("inherited_record", ("caledonia", "Football", "2026"))
+    ]
+    # The static path must not be captured by /api/broadcasts/<broadcast_id>.
+    assert ("read", "inherited-record") not in service.calls
 
 
 def test_update_broadcast_preserves_success_and_not_found_contracts(

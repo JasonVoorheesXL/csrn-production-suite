@@ -264,6 +264,15 @@ class BroadcastService:
             sport,
             season,
         )
+        # The planning form pre-fills the primary team's record from the
+        # auto-carry and sends primary_record_source="manual" only when the
+        # operator has deliberately edited it. An explicit manual entry is
+        # respected here and marked so Task C's forward-propagation never
+        # clobbers it.
+        manual_override = (
+            str(data.get("primary_record_source", "") or "").strip().lower()
+            == "manual"
+        )
         home_pregame = self.normalize_record(data.get("home_pregame_record"))
         home_region_pregame = self.normalize_record(
             data.get("home_pregame_region_record")
@@ -274,10 +283,11 @@ class BroadcastService:
         visitor_region_pregame = self.normalize_record(
             data.get("visitor_pregame_region_record")
         )
-        if primary_side == "home" and latest_primary:
+        inherited = bool(latest_primary) and not manual_override
+        if primary_side == "home" and inherited:
             home_pregame = copy.deepcopy(latest_primary["overall"])
             home_region_pregame = copy.deepcopy(latest_primary["region"])
-        elif primary_side == "visitor" and latest_primary:
+        elif primary_side == "visitor" and inherited:
             visitor_pregame = copy.deepcopy(latest_primary["overall"])
             visitor_region_pregame = copy.deepcopy(latest_primary["region"])
 
@@ -337,8 +347,8 @@ class BroadcastService:
             "record_tracking": {
                 "primary_school_id": primary_school_id,
                 "primary_side": primary_side,
-                "home_source": "automatic" if primary_side == "home" and latest_primary else "manual",
-                "visitor_source": "automatic" if primary_side == "visitor" and latest_primary else "manual",
+                "home_source": "automatic" if primary_side == "home" and inherited else "manual",
+                "visitor_source": "automatic" if primary_side == "visitor" and inherited else "manual",
             },
         }
 
@@ -462,18 +472,40 @@ class BroadcastService:
         primary_changed = (primary_side == "home" and home_changed) or (
             primary_side == "visitor" and visitor_changed
         )
-        if primary_side and primary_changed and latest_primary:
+        manual_override = (
+            str(data.get("primary_record_source", "") or "").strip().lower()
+            == "manual"
+        )
+        if primary_side and primary_changed and latest_primary and not manual_override:
             item[f"{primary_side}_pregame_record"] = copy.deepcopy(
                 latest_primary["overall"]
             )
             item[f"{primary_side}_pregame_region_record"] = copy.deepcopy(
                 latest_primary["region"]
             )
+        auto_home = (
+            primary_side == "home"
+            and primary_changed
+            and bool(latest_primary)
+            and not manual_override
+        )
+        auto_visitor = (
+            primary_side == "visitor"
+            and primary_changed
+            and bool(latest_primary)
+            and not manual_override
+        )
+        prior_home_source = str(tracking.get("home_source", "manual"))
+        prior_visitor_source = str(tracking.get("visitor_source", "manual"))
+        if manual_override and primary_side == "home":
+            prior_home_source = "manual"
+        if manual_override and primary_side == "visitor":
+            prior_visitor_source = "manual"
         item["record_tracking"] = {
             "primary_school_id": primary_school_id,
             "primary_side": primary_side,
-            "home_source": "automatic" if primary_side == "home" and primary_changed and latest_primary else str(tracking.get("home_source", "manual")),
-            "visitor_source": "automatic" if primary_side == "visitor" and primary_changed and latest_primary else str(tracking.get("visitor_source", "manual")),
+            "home_source": "automatic" if auto_home else prior_home_source,
+            "visitor_source": "automatic" if auto_visitor else prior_visitor_source,
         }
         self._save_broadcasts(items)
         self._write_detail(copy.deepcopy(item), False)
@@ -630,15 +662,19 @@ class BroadcastService:
             return "visitor"
         return ""
 
-    def _latest_primary_records(
+    def _latest_primary_detail(
         self,
         primary_school_id: str,
         sport: str,
         season: str,
-    ) -> dict[str, dict[str, int]] | None:
+    ) -> dict[str, Any] | None:
+        """Most recent official, record-applied broadcast for the primary
+        school, with the source row identified for a UI "inherited from ..."
+        label. Returns None when nothing is eligible to inherit.
+        """
         if not primary_school_id:
             return None
-        candidates: list[tuple[int, dict[str, int], dict[str, int]]] = []
+        candidates: list[tuple[int, Broadcast, str]] = []
         for row in self._load_broadcasts():
             if str(row.get("status", "")) != "completed":
                 continue
@@ -662,21 +698,93 @@ class BroadcastService:
             )
             if not side:
                 continue
-            overall_key = f"{side}_postgame_record"
-            region_key = f"{side}_postgame_region_record"
-            if not isinstance(row.get(overall_key), Mapping):
+            if not isinstance(row.get(f"{side}_postgame_record"), Mapping):
                 continue
             candidates.append(
                 (
                     int(row.get("completed_at", row.get("updated_at", 0)) or 0),
-                    self.normalize_record(row.get(overall_key)),
-                    self.normalize_record(row.get(region_key)),
+                    row,
+                    side,
                 )
             )
         if not candidates:
             return None
-        _, overall, region = max(candidates, key=lambda item: item[0])
-        return {"overall": overall, "region": region}
+        _, row, side = max(candidates, key=lambda item: item[0])
+        opponent_side = "home" if side == "visitor" else "visitor"
+        return {
+            "overall": self.normalize_record(row.get(f"{side}_postgame_record")),
+            "region": self.normalize_record(
+                row.get(f"{side}_postgame_region_record")
+            ),
+            "broadcast_id": str(row.get("broadcast_id", "")),
+            "week": str(row.get("week", "")),
+            "opponent_name": str(row.get(f"{opponent_side}_team", "")),
+        }
+
+    def _latest_primary_records(
+        self,
+        primary_school_id: str,
+        sport: str,
+        season: str,
+    ) -> dict[str, dict[str, int]] | None:
+        detail = self._latest_primary_detail(primary_school_id, sport, season)
+        if detail is None:
+            return None
+        return {"overall": detail["overall"], "region": detail["region"]}
+
+    def inherited_record(
+        self,
+        school_id: str,
+        sport: str = "",
+        season: str = "",
+    ) -> BroadcastResult:
+        """Read-only: what create() would currently inherit as the pregame
+        record for ``school_id`` (the primary-team auto-carry), for the
+        planning form to pre-fill and label.
+        """
+        school_id = str(school_id or "").strip()
+        config = self._load_config()
+        defaults = (
+            config.get("broadcast_defaults", {})
+            if isinstance(config, Mapping)
+            else {}
+        )
+        if not isinstance(defaults, Mapping):
+            defaults = {}
+        sport = str(sport or defaults.get("sport", "Football") or "Football")
+        season = str(season or self._year_provider() or "")
+        blank = {"wins": 0, "losses": 0, "ties": 0}
+        payload: dict[str, Any] = {
+            "team": school_id,
+            "sport": sport,
+            "season": season,
+            "available": False,
+            "overall": dict(blank),
+            "region": dict(blank),
+            "source_broadcast_id": "",
+            "source_label": "",
+        }
+        detail = self._latest_primary_detail(school_id, sport, season)
+        if detail is not None:
+            week = str(detail["week"]).strip()
+            opponent = str(detail["opponent_name"]).strip()
+            bits: list[str] = []
+            if week:
+                bits.append(
+                    week
+                    if week.lower().startswith("week")
+                    else f"Week {week}"
+                )
+            if opponent:
+                bits.append(f"vs {opponent}")
+            payload.update(
+                available=True,
+                overall=detail["overall"],
+                region=detail["region"],
+                source_broadcast_id=detail["broadcast_id"],
+                source_label=" ".join(bits),
+            )
+        return BroadcastResult("OK", {"inheritance": payload})
 
     @staticmethod
     def _advance_record(record: dict[str, int], outcome: str) -> dict[str, int]:

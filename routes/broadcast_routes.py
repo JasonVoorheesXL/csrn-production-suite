@@ -40,6 +40,16 @@ def create_broadcast_blueprint(
         )
         return jsonify(result.data["broadcasts"])
 
+    @routes.get("/api/broadcasts/inherited-record")
+    @dependencies.require_auth
+    def broadcast_inherited_record():
+        result = dependencies.get_broadcast_service().inherited_record(
+            request.args.get("team", ""),
+            request.args.get("sport", ""),
+            request.args.get("season", ""),
+        )
+        return jsonify(result.data["inheritance"])
+
     @routes.get("/api/broadcasts/<broadcast_id>")
     @dependencies.require_auth
     def get_broadcast_record(broadcast_id: str):
