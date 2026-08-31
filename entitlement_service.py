@@ -60,6 +60,9 @@ class EntitlementService:
         self._verifier = verifier
         self._clock = clock
         self._environment = dict(os.environ if environment is None else environment)
+        # (mtime_ns, signature_ok) for the on-disk license file, so status()
+        # re-verifies the signature only when the file actually changes.
+        self._disk_verification: tuple[int, bool] | None = None
         self.paths.ensure()
 
     @staticmethod
@@ -188,12 +191,37 @@ class EntitlementService:
             return None
         return {key: copy.deepcopy(value) for key, value in record.items() if key not in {"signature"}}
 
+    def _verified_disk_license(self) -> dict[str, Any] | None:
+        """The on-disk license, but only if its signature still verifies.
+
+        Round 15 Task B: install_license() verifies once, but a license file
+        hand-dropped into place never went through it. When a verifier is
+        wired, re-check the signature here (cached by file mtime) so a
+        forged / edited file is treated as no license at all.
+        """
+
+        record = self._read(self.paths.license_file, None)
+        if not isinstance(record, dict):
+            return None
+        if self._verifier is None:
+            return record  # legacy: no verifier -> trust the file as before
+        try:
+            stamp = self.paths.license_file.stat().st_mtime_ns
+        except OSError:
+            stamp = 0
+        cached = self._disk_verification
+        if cached is None or cached[0] != stamp:
+            ok, _reason = self._verifier(record)
+            cached = (stamp, bool(ok))
+            self._disk_verification = cached
+        return record if cached[1] else None
+
     def status(self) -> EntitlementResult:
         installation = self._installation()
         if not self.paths.installed_mode:
             license_record = self._development_license()
         else:
-            license_record = self._read(self.paths.license_file, None)
+            license_record = self._verified_disk_license()
         now = int(self._clock())
         valid = False
         reason = "UNLICENSED"

@@ -18,7 +18,7 @@ from threading import Lock
 from typing import Any, Callable, Mapping
 from urllib.parse import urlparse, quote
 
-from flask import Flask, current_app, jsonify, request, session
+from flask import Flask, current_app, jsonify, render_template, request, session
 from application_factory import create_application
 from werkzeug.security import check_password_hash, generate_password_hash
 from PIL import Image, ImageChops
@@ -294,6 +294,85 @@ def _install_internal_tools_gate(flask_app: Any) -> None:
                 404,
             )
         return None
+
+    flask_app.before_request(_gate)
+
+
+# --- License gate (Round 15). ---------------------------------------------
+# A source checkout is covered by EntitlementService._development_license()
+# and never reaches this gate. In an installed / frozen build with no valid
+# license, broadcast-control is held behind a "license required" screen;
+# health, licensing, diagnostics, static assets and the OBS overlay stay
+# reachable so the operator can install a license and support can help.
+_LICENSE_GATE_EXEMPT_EXACT = frozenset({"/api/health"})
+_LICENSE_GATE_EXEMPT_PREFIXES = (
+    "/static/",
+    "/api/licensing",
+    "/api/diagnostics",
+    "/api/runtime-diagnostics",
+    "/overlay",
+)
+
+
+def _installed_build() -> bool:
+    """Whether this is an installed / frozen build (vs. a source checkout).
+
+    A thin seam so the license gate's "only enforce in an installed build"
+    rule is independently testable without swapping the frozen ProductPaths.
+    """
+
+    return bool(PRODUCT_PATHS.installed_mode)
+
+
+def _current_licensing() -> dict[str, Any]:
+    """The licensing summary the gate decides on (seam for testing)."""
+
+    return dict(get_entitlement_service().status().data["licensing"])
+
+
+def _install_license_gate(flask_app: Any) -> None:
+    def _gate():
+        if not _installed_build():
+            return None
+        try:
+            licensing = _current_licensing()
+        except Exception:
+            # A licensing hiccup must never wedge the whole app.
+            return None
+        if licensing.get("valid"):
+            return None
+        path = request.path.rstrip("/") or "/"
+        if path == "/":
+            try:
+                organization = str(
+                    (load_config().get("organization") or {}).get("name") or ""
+                ).strip()
+            except Exception:
+                organization = ""
+            return (
+                render_template(
+                    "license_required.html",
+                    organization=organization,
+                    reason=str(licensing.get("reason") or "UNLICENSED"),
+                ),
+                200,
+            )
+        if path in _LICENSE_GATE_EXEMPT_EXACT or any(
+            path.startswith(prefix) for prefix in _LICENSE_GATE_EXEMPT_PREFIXES
+        ):
+            return None
+        return (
+            jsonify(
+                {
+                    "error": "LICENSE_REQUIRED",
+                    "message": (
+                        "This CSRN installation is not licensed. Install a "
+                        "license file to enable broadcast controls."
+                    ),
+                }
+            ),
+            402,
+        )
 
     flask_app.before_request(_gate)
 SCHOOLS_FILE = DATA_DIR / "Schools" / "schools.json"
@@ -3020,9 +3099,15 @@ ENTITLEMENT_SERVICE: EntitlementService | None = None
 def get_entitlement_service() -> EntitlementService:
     global ENTITLEMENT_SERVICE
     if ENTITLEMENT_SERVICE is None:
+        # Round 15: the offline Ed25519 verifier IS the provider verifier --
+        # a single source of truth for "is this app licensed" (no parallel
+        # gate). It checks only the signature; expiry/status stay in
+        # EntitlementService.status().
+        import license_service
+
         ENTITLEMENT_SERVICE = EntitlementService(
             paths=PRODUCT_PATHS,
-            verifier=None,
+            verifier=license_service.verify_license,
             clock=time.time,
         )
     return ENTITLEMENT_SERVICE
@@ -3609,6 +3694,11 @@ install_theme_public_state_cache(app)
 # Internal-only surface exclusion (Round 12 Task C). Off in a commercial /
 # installed build unless CSRN_INTERNAL_TOOLS is set; on for this dev checkout.
 _install_internal_tools_gate(app)
+
+# License gate (Round 15). No-op on a source checkout (development license);
+# in an installed build with no valid license it holds broadcast-control
+# behind the "license required" screen.
+_install_license_gate(app)
 
 # (pregame_presentation is now registered via APPLICATION_BLUEPRINTS above,
 # through the application factory -- no post-construction install needed.)

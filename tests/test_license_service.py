@@ -208,3 +208,23 @@ def test_signed_license_installs_and_grants_football_broadcast(tmp_path) -> None
     assert status["license"]["customer"] == "Caledonia Sports Radio Network"
     assert service.allows("core_broadcast", sport="football") is True
     assert service.allows("captions", sport="football") is True
+
+
+def test_forged_license_dropped_on_disk_is_rejected_by_status(tmp_path) -> None:
+    # Task B: install_license() verifies once; a hand-edited file must still
+    # be caught by status() re-verifying the on-disk signature.
+    import json
+
+    service = _installed_service(tmp_path)
+    signed = ls.sign_license(_payload(features=["core_broadcast"]), _TEST_SEED)
+    assert service.install_license(signed).ok
+    assert service.status().data["licensing"]["valid"] is True
+
+    record = json.loads(service.paths.license_file.read_text(encoding="utf-8"))
+    record["expires_at"] = 9_999_999_999
+    record["customer"] = "Pirate School"
+    service.paths.license_file.write_text(json.dumps(record), encoding="utf-8")
+
+    # A fresh service instance (no cached verification) reads the tampered file.
+    fresh = _installed_service(tmp_path)
+    assert fresh.status().data["licensing"]["valid"] is False
