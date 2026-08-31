@@ -267,6 +267,10 @@ def test_create_inherits_latest_primary_record_but_not_opponent_record() -> None
             "completed_at": 100,
             "sport": "Football",
             "season": "2026",
+            # Only an official game whose record was actually applied is
+            # eligible to be inherited (see the scrimmage-filter test below).
+            "record_policy": "official",
+            "record_tracking_applied": True,
             "home_school_id": "new-hope",
             "visitor_school_id": "caledonia",
             "visitor_postgame_record": {"wins": 5, "losses": 1, "ties": 1},
@@ -286,6 +290,80 @@ def test_create_inherits_latest_primary_record_but_not_opponent_record() -> None
     assert record["home_pregame_region_record"] == {"wins": 2, "losses": 0, "ties": 1}
     assert record["visitor_pregame_record"] == {"wins": 8, "losses": 0, "ties": 0}
     assert record["record_tracking"]["home_source"] == "automatic"
+
+
+def test_create_never_inherits_a_more_recent_scrimmage_placeholder_record() -> None:
+    # Round 11 Task B. Ordering that used to silently break: an official loss,
+    # then a later scrimmage. The scrimmage carries a placeholder
+    # visitor_postgame_record of 0-0-0 written at completion and, being the
+    # most recently finished broadcast, was inherited over the real 0-1.
+    harness = Harness()
+    harness.broadcasts = [
+        {
+            "broadcast_id": "official-loss",
+            "status": "completed",
+            "completed_at": 100,
+            "sport": "Football",
+            "season": "2026",
+            "record_policy": "official",
+            "record_tracking_applied": True,
+            "home_school_id": "new-hope",
+            "visitor_school_id": "caledonia",
+            "visitor_postgame_record": {"wins": 0, "losses": 1, "ties": 0},
+            "visitor_postgame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+        },
+        {
+            "broadcast_id": "later-scrimmage",
+            "status": "completed",
+            "completed_at": 200,  # more recent than the official game
+            "sport": "Football",
+            "season": "2026",
+            "record_policy": "non_record",
+            "record_tracking_applied": False,
+            "home_school_id": "new-hope",
+            "visitor_school_id": "caledonia",
+            "visitor_postgame_record": {"wins": 0, "losses": 0, "ties": 0},
+            "visitor_postgame_region_record": {"wins": 0, "losses": 0, "ties": 0},
+        },
+    ]
+    record = harness.service().create(
+        {
+            "home_school_id": "caledonia",
+            "visitor_school_id": "new-hope",
+            "season": "2026",
+        }
+    ).data["broadcast"]
+    assert record["home_pregame_record"] == {"wins": 0, "losses": 1, "ties": 0}
+    assert record["record_tracking"]["home_source"] == "automatic"
+
+
+def test_create_falls_back_to_manual_when_only_scrimmages_are_completed() -> None:
+    harness = Harness()
+    harness.broadcasts = [
+        {
+            "broadcast_id": "scrimmage-only",
+            "status": "completed",
+            "completed_at": 100,
+            "sport": "Football",
+            "season": "2026",
+            "record_policy": "non_record",
+            "record_tracking_applied": False,
+            "home_school_id": "new-hope",
+            "visitor_school_id": "caledonia",
+            "visitor_postgame_record": {"wins": 0, "losses": 0, "ties": 0},
+        }
+    ]
+    record = harness.service().create(
+        {
+            "home_school_id": "caledonia",
+            "visitor_school_id": "new-hope",
+            "season": "2026",
+            "home_pregame_record": {"wins": 3, "losses": 2, "ties": 0},
+        }
+    ).data["broadcast"]
+    # Nothing eligible to inherit -> the submitted manual snapshot stands.
+    assert record["home_pregame_record"] == {"wins": 3, "losses": 2, "ties": 0}
+    assert record["record_tracking"]["home_source"] == "manual"
 
 
 def test_completed_official_region_game_advances_primary_record_with_tie() -> None:

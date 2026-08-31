@@ -642,6 +642,15 @@ class BroadcastService:
         for row in self._load_broadcasts():
             if str(row.get("status", "")) != "completed":
                 continue
+            # Only games that actually moved a record are eligible to be
+            # inherited. A scrimmage (record_policy "non_record") still carries
+            # a placeholder *_postgame_record of 0-0-0 written at completion;
+            # without this gate the most-recently-finished scrimmage would be
+            # inherited as the "latest tracked record".
+            if str(row.get("record_policy", "")) != "official":
+                continue
+            if not bool(row.get("record_tracking_applied")):
+                continue
             if str(row.get("sport", "")).casefold() != str(sport).casefold():
                 continue
             if str(row.get("season", "")) != str(season):
