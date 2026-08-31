@@ -1,17 +1,96 @@
-# Overnight Session Summary — 2026-08-28 → 08-30
+# Overnight Session Summary — 2026-08-28 → 08-31
 
-Round 6 branch: **`round6-settings-audit-20260830`**. Round 7 branch:
-`round7-ruleset-engine-20260830`. **Round 8 branch:
-`round8-test-audit-20260830`** (off `round7-ruleset-engine-20260830` @
-`0c96780`, carries rounds 1-7).
+Round 7 branch: `round7-ruleset-engine-20260830`. Round 8 branch:
+`round8-test-audit-20260830`. **Round 9 branch:
+`round9-cleanup-20260831`** (off `round8-test-audit-20260830` @ `7c9fe14`,
+carries rounds 1-8).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
 Full test suite (deterministic, `-p no:randomly`, run with
-`.venv/Scripts/python.exe`) after **round 8**: **8 failed, 2293 passed**
-(down from the seven-round constant of 51 failed / 2291 passed). Round 8's
-whole job was to attack that 51. **35 obsolete tests removed, 3 stale
-assertions fixed, 0 production code changed, 0 real regressions.** The 8 that
-remain are all things that need your decision — see ROUND 8 below.
+`.venv/Scripts/python.exe`) after **round 9**: **0 failed, 2298 passed.**
+Round 8 took the seven-round 51-failure constant down to 8 owner-decision
+items; Round 9 cleared all 8. **0 real regressions across all nine rounds.**
+
+---
+
+## ROUND 9 — freeze re-pin, guard relax, factory fix, dead-code cleanup (2026-08-31)
+
+`templates/index.html` **not touched** (verified: 0 bytes changed
+`7c9fe14..HEAD`). `broadcaster_print_service.py` +
+`tests/test_broadcaster_print_service.py` (your roster-page WIP) **not
+touched**. One commit per task.
+
+| commit | task | suite |
+|---|---|---|
+| `86c1013` | **A** — re-pin Neon + Friday-Night renderer freeze SHA-256 | 8→3 failed |
+| `194b002` | **B** — relax gate166 to `{scorebug, captions}` | 3→2 failed |
+| `07fccf5` | **C** — register `pregame_presentation` via the app factory | 2→0 failed |
+| `05119a0` | **D** — delete the dead `layers-v10` Friday mask pipeline | 2301→2298 passed |
+
+### Task A — freeze re-pin
+
+Only the freeze *constants* and the BIBLE record moved — **no renderer code
+changed** (verified). New hashes:
+
+| file | new SHA-256 | why it moved |
+|---|---|---|
+| `csrn-broadcast-layout-engine.css` | `822755B7…A02C9` | Neon disabled as a selectable option (R6); shared engine extended for "Collegiate Tech" |
+| `csrn-broadcast-layout-engine.js` | `CE29D87B…B2A2` | same |
+| `csrn-friday-night-stadium-engine.js` | `E2B3872D…26CBB` | rebuilt for "Collegiate Tech" + `9064c67` |
+| `csrn-friday-night-stadium-engine.css` | `766686DA…E689AF` | same |
+
+8-Bit engine hashes + the 9 Friday-Night artwork hashes verified unchanged,
+left as-is. Files touched: `test_gate116/126/12/13/14`, plus `test_gate142`
+(its FROZEN dict pins the SHA-256 of `test_gate14` itself → re-pinned that
+meta-hash), plus `CSRN_PROJECT_BIBLE.md` Gate 11.6 / 12.6 sections.
+
+### Task B — gate166
+
+`test_gate166_scorebug_remains_scorebug_only` →
+`test_gate166_themed_scorebug_allows_only_scorebug_and_captions`. Assertions
+now match `9064c67`'s contract:
+`state.captionsActive ? ["scorebug","captions"] : ["scorebug"]` + a throw
+guard rejecting anything else. Confirmed sole consumer — every other
+reference to the old literals is under `Data/Backups` / `_gate184_*_rollback`.
+
+### Task C — factory registration of `pregame_presentation`
+
+`phase5_architecture.py` already expected it (`EXPECTED_BLUEPRINTS` +
+`PUBLIC_ENDPOINTS` both list it); only the registration was missing.
+
+- `pregame_presentation.py`: extracted
+  `build_pregame_presentation_blueprint() -> Blueprint`. **Dropped the
+  module-global `_INSTALLED` flag** — it permanently no-op'd every app after
+  the first, which is exactly what stopped a 2nd factory instance from
+  getting the blueprint. `install_pregame_presentation()` kept for legacy
+  callers, now idempotent per-app.
+- `app.py`: `APPLICATION_BLUEPRINTS.append(build_pregame_presentation_blueprint())`
+  alongside every other blueprint; removed the post-`create_app()`
+  `install_pregame_presentation(app)` call. No `@app.` decorators, no
+  `app.register_blueprint(` in `app.py` — the phase-5 source audit stays clean.
+- **Verified additive for both real launchers:** `app.py:app` and
+  `run_core_foundation.application` both still carry `pregame_presentation`,
+  with `.overlay` + `.status` public and the other 7 routes auth-required
+  (matches `PUBLIC_ENDPOINTS` exactly).
+
+### Task D — dead `layers-v10` pipeline
+
+Confirmed zero call sites, then deleted from `csrn-production-theme-runtime.js`:
+`FRIDAY_LAYERED_CLASH_ASSETS` (unread), `constrainFridayColorMask`,
+`deriveFridayUniformReliefLayer` (−88 lines; brace balance re-verified).
+Also removed `static/friday-night-stadium/clash/layers-v10/` (16 tracked
+files + 2 `.bak` leftovers) and `tests/test_gate172_r3_friday_neutral_uniform_base.py`
+(its 3 remaining tests only exercised this path).
+
+**Kept** (still asserted by passing `test_gate171_r2` / `test_gate172_r1`):
+the `paintFridayNightLayeredFootballClash` pass-through shim + its call site.
+
+**Known residual dead code, flagged for a later dedicated pass** (all now
+0–1 ref, unreachable, no runtime error): the post-`return` body of
+`paintFridayNightLayeredFootballClash` and the helpers
+`isFridayNeutralEquipmentPixel`, `compositeFridayMasks`,
+`clipFridayDetailLayer`, `colorizeFridayUniform`, `tintFridayMask`,
+`nearestFridayPaletteKey`, `FRIDAY_PLAYER_PALETTE`, `fridayHexToRgb`.
 
 ---
 
