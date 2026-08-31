@@ -6,7 +6,10 @@ ROOT = Path(__file__).resolve().parents[1]
 HERITAGE_OWNED_FROZEN = {
     'static/csrn-heritage-press-engine.js': '3441427236290045B2B63883845B91451788F191EE4D6C90DC6FBBC1DF85ED17',
     'static/csrn-heritage-press-engine.css': '853AE377981973840E534A6536444690C8E8C3F08C97555771DC77433EB46972',
-    'tests/test_gate14_heritage_press_engine.py': '7E22869DE54729D9EC82B43C4F716B9E891FFF2A82D3486F89B8C926131664C8',
+    # re-pinned Round 9 (2026-08-31): test_gate14 was edited only to re-pin the
+    # Neon / Friday-Night renderer SHA-256 constants to their shipped bytes
+    # (no Heritage assertion changed). See test_gate116 / test_gate126.
+    'tests/test_gate14_heritage_press_engine.py': 'CBAE2FB7B79EDC8BD14125AF7D2727BDCEF26BA98F217E029EDFFFF07D6AD3CA',
     'static/heritage/press-batter-1920s.png': 'F2D6174D757D36EDC2075A395FEEFC11ED0E970E12E5B4166EA3EFC3DD787DD6',
     'static/heritage/press-pitcher-1920s.png': 'AF9F23C6F9B15F3B10087B9D2D22C8CA1B26C0E7E29DD8521CA12C4905CAFBAF',
     'static/heritage/press-softball-batter-1920s.png': '0DDC8966DED0DCA3FDE396E2BF00C5BC4A2AFE22029FB1BA42D01C365BA24026',

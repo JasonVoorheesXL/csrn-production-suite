@@ -5,8 +5,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 FROZEN = {
-    "static/csrn-friday-night-stadium-engine.js": "454AE2B0A3C145D16E7C94816BEE2D66A459D67DDBF34C752CBAF03F10E32E39",
-    "static/csrn-friday-night-stadium-engine.css": "C3E6F2A90E7E6080454D5DDE75387EFC09FB1BE0E4FA31B9732910D69FE5845C",
+    # engine .js/.css re-pinned Round 9 (2026-08-31): rebuilt for the
+    # "Collegiate Tech" series and commit 9064c67 ("Friday Night Stadium
+    # test broadcast readiness"). The 9 artwork hashes below are unchanged.
+    "static/csrn-friday-night-stadium-engine.js": "E2B3872D6D70A47FB733794CA02A46ADC4C3D9BAABBE192E6A17B96748926CBB",
+    "static/csrn-friday-night-stadium-engine.css": "766686DAB90AABC40021919E65C01318FD426E86CB3E95A9B33CB72643E689AF",
     "static/friday-night-stadium/vs-lightning-silver.png": "2DF458CF70F4F891EA0FFEA84DD8DBA3DA74A9A2CBEEA7362BBA35FC382145D8",
     "static/friday-night-stadium/clash/football-athletes-keyed.png": "6355AA7C83095A9557134A0D413E65CE32354204C24EE1BA1D9E756D0092BBA9",
     "static/friday-night-stadium/clash/basketball-athletes-keyed.png": "0AA5470DF71548B1DB362B2899DBB4C8DDEA0F702E7AF7D03B9741A285D0FDA6",

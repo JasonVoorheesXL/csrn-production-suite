@@ -2328,10 +2328,17 @@ installed Gate 11.5 R3 baseline. Its approved renderer geometry, scorebug,
 sport-state presentation, support modules, typography, team-energy behavior,
 and phantom-glow correction must not change during work on another package.
 
-Frozen renderer fingerprints:
+Frozen renderer fingerprints (re-pinned 2026-08-31, Round 9 — the shared
+`csrn-broadcast-layout-engine.*` was intentionally rebuilt after this freeze:
+Neon was disabled as a selectable production-template option in Round 6, and
+the shared engine was extended for the "Collegiate Tech" package series. This
+is an authorized re-pin of the fingerprints to the shipped bytes; no Neon
+renderer behaviour was changed in Round 9. Prior fingerprints:
+`4641A675512EA8C92E1408E421B690F862B49EA509D1009903A5F0B5EFB655EF` /
+`961E39C83C94C1F12194E2D984247E576E96916FB8E5D35BBEC77EFF5B5EA68D`):
 
-- `static/csrn-broadcast-layout-engine.css`: `4641A675512EA8C92E1408E421B690F862B49EA509D1009903A5F0B5EFB655EF`
-- `static/csrn-broadcast-layout-engine.js`: `961E39C83C94C1F12194E2D984247E576E96916FB8E5D35BBEC77EFF5B5EA68D`
+- `static/csrn-broadcast-layout-engine.css`: `822755B7ABBA1F6D7439246904DB3AAEEFDE9649C617461457B73053672A02C9`
+- `static/csrn-broadcast-layout-engine.js`: `CE29D87BCB4DE6F5E21F00B8F61DBA76F18ABB5C340D2D5DF165BF8A6CD3B2A2`
 
 Future Neon changes require an explicit unfreeze decision, a new isolated
 checkpoint, visual comparison against the approved concept, the complete
@@ -2403,6 +2410,7 @@ No production migration is authorized by this gate.
 
 - User visual acceptance of Gate 12.5 authorizes the Friday Night Stadium freeze. The eleven frozen renderer and artwork files are the stadium JavaScript engine, stadium stylesheet, silver lightning VS asset, four keyed athlete masters, and four sport environment plates.
 - Every frozen file is protected by an authoritative SHA-256 contract. Any byte change fails the suite and is prohibited unless a later installer is explicitly designated as an explicit user-authorized unfreeze gate.
+- Re-pinned 2026-08-31 (Round 9): `csrn-friday-night-stadium-engine.js` / `.css` were rebuilt for the "Collegiate Tech" package series and commit `9064c67` ("Friday Night Stadium test broadcast readiness"). The SHA-256 contract in `tests/test_gate126_friday_night_stadium_visual_freeze.py` was re-pinned to the shipped bytes for those two files; the nine artwork fingerprints are unchanged. No renderer behaviour was changed in Round 9.
 - The approved frozen behavior includes all four full-display sport cabinets, top ticker, video-board-owned captions, five video modes, sport-specific backgrounds, runtime team-color athlete uniforms, corrected softball pitcher orientation, LED R/H/E, centered unlabeled base occupancy, full `QUARTER` wording, and the accepted sport label scales.
 - Layout Lab must load the frozen stadium engine and stylesheet once each at asset query `v=12.6`. The shared Layout Lab may evolve for other packages only while this route and all frozen hashes remain intact.
 - Friday Night Stadium remains a Layout Lab package. Production overlay and OBS remain on Gate 6; this freeze does not authorize production migration.

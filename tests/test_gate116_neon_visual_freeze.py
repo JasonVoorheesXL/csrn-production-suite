@@ -7,8 +7,13 @@ CSS_PATH = ROOT / "static" / "csrn-broadcast-layout-engine.css"
 JS_PATH = ROOT / "static" / "csrn-broadcast-layout-engine.js"
 BIBLE = (ROOT / "CSRN_PROJECT_BIBLE.md").read_text(encoding="utf-8")
 
-CSS_SHA256 = "4641A675512EA8C92E1408E421B690F862B49EA509D1009903A5F0B5EFB655EF"
-JS_SHA256 = "961E39C83C94C1F12194E2D984247E576E96916FB8E5D35BBEC77EFF5B5EA68D"
+# Re-pinned Round 9 (2026-08-31): the Neon renderer files were intentionally
+# evolved after the Gate 11.6 freeze (Neon disabled as a selectable option in
+# Round 6; shared broadcast-layout engine rebuilt for the "Collegiate Tech"
+# series). No renderer change in Round 9 -- these constants now match the
+# shipped bytes and the BIBLE record.
+CSS_SHA256 = "822755B7ABBA1F6D7439246904DB3AAEEFDE9649C617461457B73053672A02C9"
+JS_SHA256 = "CE29D87BCB4DE6F5E21F00B8F61DBA76F18ABB5C340D2D5DF165BF8A6CD3B2A2"
 
 
 def _digest(path: Path) -> str:

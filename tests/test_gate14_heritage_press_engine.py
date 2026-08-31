@@ -18,10 +18,12 @@ def _digest(relative: str) -> str:
 
 def test_gate14_isolated_engine_preserves_all_frozen_renderers() -> None:
     assert ENGINE.is_file() and CSS.is_file()
-    assert _digest("static/csrn-broadcast-layout-engine.css") == "4641A675512EA8C92E1408E421B690F862B49EA509D1009903A5F0B5EFB655EF"
-    assert _digest("static/csrn-broadcast-layout-engine.js") == "961E39C83C94C1F12194E2D984247E576E96916FB8E5D35BBEC77EFF5B5EA68D"
-    assert _digest("static/csrn-friday-night-stadium-engine.css") == "C3E6F2A90E7E6080454D5DDE75387EFC09FB1BE0E4FA31B9732910D69FE5845C"
-    assert _digest("static/csrn-friday-night-stadium-engine.js") == "454AE2B0A3C145D16E7C94816BEE2D66A459D67DDBF34C752CBAF03F10E32E39"
+    # Neon + Friday-Night renderer hashes re-pinned Round 9 (2026-08-31) --
+    # see test_gate116 / test_gate126. 8-Bit engine hashes are unchanged.
+    assert _digest("static/csrn-broadcast-layout-engine.css") == "822755B7ABBA1F6D7439246904DB3AAEEFDE9649C617461457B73053672A02C9"
+    assert _digest("static/csrn-broadcast-layout-engine.js") == "CE29D87BCB4DE6F5E21F00B8F61DBA76F18ABB5C340D2D5DF165BF8A6CD3B2A2"
+    assert _digest("static/csrn-friday-night-stadium-engine.css") == "766686DAB90AABC40021919E65C01318FD426E86CB3E95A9B33CB72643E689AF"
+    assert _digest("static/csrn-friday-night-stadium-engine.js") == "E2B3872D6D70A47FB733794CA02A46ADC4C3D9BAABBE192E6A17B96748926CBB"
     assert _digest("static/csrn-eight-bit-gameday-engine.css") == "6CFA49C22E2F9DE74E97E4BBA8FB9FE09E1F10F4AE64242066FBC9A728643BC4"
     assert _digest("static/csrn-eight-bit-gameday-engine.js") == "3830863DEE0B7424666096BD14D12B813D88BE6491394A85EE06162AAAC81206"
 
