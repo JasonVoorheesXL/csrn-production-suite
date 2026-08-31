@@ -1,15 +1,90 @@
 # Overnight Session Summary — 2026-08-28 → 08-31
 
-Round 8 branch: `round8-test-audit-20260830`. Round 9 branch:
-`round9-cleanup-20260831`. **Round 10 branch:
-`round10-report-fixes-20260831`** (off `round9-cleanup-20260831` @ `190cf64`,
-carries rounds 1-9).
+Round 9 branch: `round9-cleanup-20260831`. Round 10 branch:
+`round10-report-fixes-20260831`. **Round 11 branch:
+`round11-record-inheritance-20260831`** (off `round10-report-fixes-20260831`
+@ `57a1b9d`, carries rounds 1-10).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
 Full test suite (deterministic, `-p no:randomly`, run with
-`.venv/Scripts/python.exe`) after **round 10**: **0 failed, 2308 passed**
-(+10 new report-integrity tests since round 9). **0 real regressions across
-all ten rounds.**
+`.venv/Scripts/python.exe`) after **round 11**: **0 failed, 2317 passed**.
+**0 real regressions across all eleven rounds.**
+
+---
+
+## ROUND 11 — record inheritance UX + scrimmage filter + forward propagation (2026-08-31)
+
+Follows the Caledonia-vs-Itawamba investigation from Round 10: the
+primary-team pregame-record auto-carry works, but it only runs at broadcast
+*create* time, counts non-record scrimmages, and never revisits a game
+scheduled before the prior result is finalized — so operators re-type
+records by hand.
+
+**`templates/index.html` DID need editing this round** (Task A/C planning
+form). The known "Start Broadcast (Go Live)" WIP (the `commandStartBroadcastButton`
+button, `timeoutMs` 45000, `cmdStartButton`, `abort(),20000`) was isolated
+out hunk-by-hunk and verified byte-identical and still unstaged at the end.
+`broadcaster_print_service.py` + its test: 0 bytes changed.
+
+| commit | task | suite |
+|---|---|---|
+| `eee9c6d` | **B** — inherit records from official, record-applied games only | 2308 → 2310 |
+| `d452856` | **A** — pre-fill the planning form + inherited/override state | 2310 → 2315 |
+| `51a54bb` | **C** — forward-propagate a finalized record to future games | 2315 → 2317 |
+
+(Task B was done first — it is a prerequisite correctness fix that Task A's
+read endpoint must reflect.)
+
+### Task B — scrimmage filter
+
+`_latest_primary_records()` accepted any `completed` broadcast. A scrimmage
+(`record_policy: "non_record"`) is written a placeholder `*_postgame_record`
+of 0-0-0 at completion, so the most-recently-finished scrimmage was inherited
+over a real W/L. A candidate row now also needs `record_policy == "official"`
+**and** `record_tracking_applied` truthy. Regression test: official-loss then
+later-scrimmage still inherits the real 0-1.
+
+### Task A — planning-form pre-fill + override state
+
+- `broadcast_service.inherited_record(school_id, sport, season)` +
+  `GET /api/broadcasts/inherited-record` (auth, static path ordered before
+  `/api/broadcasts/<id>`): returns `{available, overall, region,
+  source_broadcast_id, source_label}` — the same thing `create()` would carry.
+- The form fetches it on school/contest change, pre-fills the primary side's
+  Overall/Region boxes, and shows *"Primary team record pre-filled to 0-1 —
+  inherited from Week 1 vs Itawamba. Edit any box to override."* Editing a box
+  flips it to an explicit *"Overriding the inherited 0-1 …"* warning and sends
+  `primary_record_source: "manual"` on save.
+- **Override decision (Task C disambiguated it):** an explicit manual edit
+  wins for that game and is remembered (`{side}_source = "manual"`);
+  auto-managed values stay refreshable. `create()`/`update()` honour the
+  `"manual"` hint; without it the existing automatic behaviour is unchanged.
+
+### Task C — forward propagation
+
+- `_propagate_record_forward()` runs after `update_linked_status` finalizes an
+  official game: every other **`planned`** broadcast for the same primary
+  school / sport / season whose primary-side source is `"automatic"` has its
+  pregame (overall + region) record refreshed to the just-finalized value and
+  a fresh detail write. `"manual"` rows are never touched; skipped if a later
+  official game already owns the latest record.
+- `create()` now marks the primary side `"automatic"` whenever the operator
+  didn't override it — **even with nothing to inherit yet** — so a game
+  created before the first official result is still caught by this later.
+  (The "only scrimmages completed" create test flipped from asserting
+  `"manual"` to `"automatic"` to match.)
+- Test: schedule week-2 (auto) + week-3 (manual) before week-1 is played,
+  finalize week-1, assert week-2 → 0-1 and week-3's manual 4-0 untouched;
+  plus a scrimmage-completion-propagates-nothing test.
+
+### Caledonia vs Itawamba — closed
+
+The record *was* applied correctly (official, `record_tracking_applied`,
+Caledonia 0-1). What the operator hit was: the Amory game's form showed a
+blank 0-0 with no indication CSRN would fill it, so they typed the 0-1 by
+hand — `create()`'s backend auto-carry then set the same 0-1 and tagged it
+`"automatic"`. Round 11 makes that inheritance visible and adds the two
+missing paths (scrimmage filter, forward propagation).
 
 ---
 
