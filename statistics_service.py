@@ -74,6 +74,29 @@ class StatisticsService:
             value = value.replace(bad, good)
         return value
 
+    # Shown in the Play Register (coach/film document) in place of the live
+    # overlay's mascot-name fallback for plays with no player recorded.
+    UNATTRIBUTED_PLAYER_LABEL = "Player not entered"
+
+    @staticmethod
+    def _is_unattributed_scrimmage_play(play: Mapping[str, Any]) -> bool:
+        """True when a run/pass play has no ball handler entered.
+
+        Matches the exact condition under which rules_service falls back to the
+        team-mascot name: for a run, no `player_*`; for a pass, no `passer_*`.
+        Kickoffs, punts, and other play types keep their rendered text.
+        """
+        kind = str(play.get("play_type", "")).strip().lower()
+        if kind == "run":
+            number_field, name_field = "player_number", "player_name"
+        elif kind == "pass":
+            number_field, name_field = "passer_number", "passer_name"
+        else:
+            return False
+        has_number = bool(str(play.get(number_field, "") or "").strip())
+        has_name = bool(str(play.get(name_field, "") or "").strip())
+        return not has_number and not has_name
+
     @staticmethod
     def _active_rows(rows: Any, broadcast_id: str) -> list[dict[str, Any]]:
         if not isinstance(rows, list):
@@ -303,6 +326,17 @@ class StatisticsService:
             for text_field in ("result", "description", "label"):
                 if text_field in play:
                     play[text_field] = self._repair_text(play[text_field])
+
+            # Report-only fallback. rules_service renders the ball handler as
+            # the opposing team's mascot name when a run/pass play is recorded
+            # with no player entered -- intentional for the broadcast overlay,
+            # but useless for a coach cross-referencing film. The overlay path
+            # (state events/plays) is left exactly as-is; only the report's
+            # Play Register text is overridden here.
+            if self._is_unattributed_scrimmage_play(play):
+                play["result"] = self.UNATTRIBUTED_PLAYER_LABEL
+                play["description"] = self.UNATTRIBUTED_PLAYER_LABEL
+
             normalized_plays.append(play)
 
             kind = str(play.get("play_type", "")).lower()
