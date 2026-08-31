@@ -25,6 +25,17 @@ packaging==26.2
 PyYAML==6.0.3
 setuptools==84.0.0
 typing-extensions==4.16.0
+# Roster name-pronunciation (roster_service.py imports `pronouncing`, which
+# pulls `cmudict`). These were installed in the working venv but never locked,
+# so a missing install used to surface only at first roster-service use --
+# never in tools/environment_check.py, which only verifies what this file
+# lists. The two importlib-* backports + zipp are cmudict's declared deps
+# (Requires-Dist); pinned here so `pip install -r` resolves one exact graph.
+pronouncing==0.3.0
+cmudict==1.1.3
+importlib-metadata==9.0.0
+importlib-resources==7.1.0
+zipp==4.1.0
 sounddevice==0.5.5
 av==18.0.0
 ctranslate2==4.8.1
