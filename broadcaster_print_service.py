@@ -337,10 +337,12 @@ class BroadcasterPrintService:
             home_logo,
         )
 
-        
-        home_is_caledonia = "caledonia" in str(broadcast.get("home_team", "") or "").casefold()
-        visitor_is_caledonia = "caledonia" in str(broadcast.get("visitor_team", "") or "").casefold()
-        if visitor_is_caledonia and not home_is_caledonia:
+        # The configured primary team's roster prints first (broadcaster
+        # convenience). Round 13 Task C: key off the broadcast's recorded
+        # primary side -- already resolved above from record_tracking -- rather
+        # than a hard-coded "caledonia" team-name match. No primary recorded
+        # (fresh install / legacy broadcast) -> the natural home-first order.
+        if primary_side == "visitor":
             first_roster_pages = visitor_pages
             second_roster_pages = home_pages
         else:

@@ -231,3 +231,43 @@ def test_roster_pages_mid_size_roster_still_uses_two_plain_pages() -> None:
     html = service._roster_pages(roster(players=players(72)), "Team", "")
     assert html.count('<section class="roster-page">') == 2
     assert "roster-columns" not in html
+
+
+def _doc_with_primary(primary_side: str | None, *, visitor_team: str = "Visitor Bears") -> str:
+    overrides = {"visitor_team": visitor_team}
+    if primary_side is not None:
+        overrides["record_tracking"] = {"primary_side": primary_side}
+    service = make_service()
+    return service._render_document(
+        broadcast(**overrides),
+        roster(
+            id="home-roster",
+            school_id="home-school",
+            players=[{"id": "h", "number": "1", "first_name": "HomeCaptain",
+                      "last_name": "X", "status": "active"}],
+        ),
+        roster(
+            id="visitor-roster",
+            school_id="visitor-school",
+            players=[{"id": "v", "number": "1", "first_name": "VisitorCaptain",
+                      "last_name": "X", "status": "active"}],
+        ),
+    )
+
+
+def test_roster_order_follows_recorded_primary_side_visitor_first() -> None:
+    # Round 13 Task C: was "caledonia" in visitor_team; now record_tracking.
+    doc = _doc_with_primary("visitor")
+    assert doc.index("VisitorCaptain") < doc.index("HomeCaptain")
+
+
+def test_roster_order_is_home_first_when_primary_side_is_home() -> None:
+    doc = _doc_with_primary("home")
+    assert doc.index("HomeCaptain") < doc.index("VisitorCaptain")
+
+
+def test_roster_order_defaults_home_first_and_no_longer_name_matches_caledonia() -> None:
+    # No record_tracking + "caledonia" in the visitor name: the old code put
+    # the visitor roster first on a name match; now it is plain home-first.
+    doc = _doc_with_primary(None, visitor_team="Caledonia Cavaliers")
+    assert doc.index("HomeCaptain") < doc.index("VisitorCaptain")
