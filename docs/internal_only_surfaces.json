@@ -1,8 +1,30 @@
 {
   "schema": "csrn-internal-only-surfaces-v1",
-  "purpose": "Groundwork for the eventual commercial packaging split. Lists the entry points and HTTP routes that Round 6's settings audit flagged as CSRN-internal-only (release QA / dev tooling) and NOT appropriate for a customer build. DOCUMENTATION ONLY as of Round 7 -- nothing here is removed, gated, or restricted yet.",
+  "purpose": "The entry points and HTTP routes that Round 6's settings audit flagged as CSRN-internal-only (release QA / dev tooling) and NOT appropriate for a customer build. As of Round 12 the HTTP routes are gated at runtime; run_core_foundation.py still has to be excluded from the bundle by the (future) packaging step.",
   "generated": "2026-08-30",
-  "source": "Round 6 Task A.6 + Round 7 Task C",
+  "updated": "2026-08-31",
+  "source": "Round 6 Task A.6 + Round 7 Task C + Round 12 Task C",
+
+  "runtime_enforcement": {
+    "flag": "CSRN_INTERNAL_TOOLS",
+    "resolver": "app.py:internal_tools_enabled()",
+    "behaviour": "Explicit CSRN_INTERNAL_TOOLS=1/0 wins. Unset -> enabled in a dev/source checkout, disabled in an installed/frozen build (product_paths.installed_mode). When disabled, app.py:_install_internal_tools_gate() answers 404 for the route paths below; the routes stay registered so the route manifest / phase-5 audit are unchanged.",
+    "gated_paths": [
+      "/api/diagnostics",
+      "/api/runtime-diagnostics",
+      "/api/runtime-diagnostics/export",
+      "/api/game-day/rehearsals*",
+      "/api/game-day/release-freeze",
+      "/api/game-day/release-unfreeze",
+      "/api/game-day/release-readiness",
+      "/api/game-day/release-manifest",
+      "/api/deployment/status",
+      "/api/deployment/update/validate",
+      "/api/deployment/update/prepare",
+      "/api/deployment/support-bundle"
+    ],
+    "not_gated": "run_core_foundation.py (a whole entry point -- exclude from the bundle), and the /api/licensing/* + commissioning + recovery routes (left for a separate decision, see explicitly_not_listed)."
+  },
 
   "entry_points": [
     {

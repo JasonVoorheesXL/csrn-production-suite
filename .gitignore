@@ -9,6 +9,7 @@ __pycache__/
 security.json
 state.json
 identity_profile.json
+Licensing/
 *.log
 
 # User data

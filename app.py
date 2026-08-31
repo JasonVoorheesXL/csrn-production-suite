@@ -18,7 +18,7 @@ from threading import Lock
 from typing import Any, Callable, Mapping
 from urllib.parse import urlparse, quote
 
-from flask import Flask, current_app, jsonify, session
+from flask import Flask, current_app, jsonify, request, session
 from application_factory import create_application
 from werkzeug.security import check_password_hash, generate_password_hash
 from PIL import Image, ImageChops
@@ -232,6 +232,69 @@ _EXISTING_INSTALL = STATE_FILE.exists() or CONFIG_FILE.exists()
 IDENTITY_PROFILE = load_identity_profile(
     IDENTITY_FILE, existing_install=_EXISTING_INSTALL
 )
+
+
+def internal_tools_enabled() -> bool:
+    """Whether CSRN's internal-only surfaces are live this run.
+
+    Internal-only = the diagnostics / rehearsal / release-freeze /
+    deployment-support-bundle routes catalogued in
+    docs/internal_only_surfaces.json. When disabled they answer 404.
+
+    - CSRN_INTERNAL_TOOLS explicitly set -> honoured (1/true/yes/on vs 0/...).
+    - otherwise: on in a dev/source checkout, off in an installed / frozen /
+      packaged build (the commercial default). A packaged build must ALSO
+      exclude run_core_foundation.py from the bundle entirely -- it is a
+      second Flask entry point with a debug server and cannot be gated here.
+    """
+    raw = str(os.environ.get("CSRN_INTERNAL_TOOLS", "")).strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    return not PRODUCT_PATHS.installed_mode
+
+
+INTERNAL_TOOLS_ENABLED = internal_tools_enabled()
+
+_INTERNAL_ONLY_EXACT = frozenset({"/api/diagnostics"})
+_INTERNAL_ONLY_PREFIXES = (
+    "/api/runtime-diagnostics",
+    "/api/game-day/rehearsals",
+    "/api/game-day/release-",
+    "/api/deployment/status",
+    "/api/deployment/update/",
+    "/api/deployment/support-bundle",
+)
+
+
+def _install_internal_tools_gate(flask_app: Any) -> None:
+    """404 the internal-only routes when internal tools are disabled. The
+    routes stay registered (route manifest unchanged) -- they just refuse to
+    serve outside a dev / explicitly-enabled build."""
+
+    def _gate():
+        if INTERNAL_TOOLS_ENABLED:
+            return None
+        path = request.path.rstrip("/") or "/"
+        if path in _INTERNAL_ONLY_EXACT or any(
+            path.startswith(prefix) for prefix in _INTERNAL_ONLY_PREFIXES
+        ):
+            return (
+                jsonify(
+                    {
+                        "error": "INTERNAL_TOOLS_DISABLED",
+                        "message": (
+                            "This surface is CSRN-internal and is not "
+                            "available in a commercial build."
+                        ),
+                    }
+                ),
+                404,
+            )
+        return None
+
+    flask_app.before_request(_gate)
 SCHOOLS_FILE = DATA_DIR / "Schools" / "schools.json"
 BROADCASTERS_FILE = DATA_DIR / "Settings" / "broadcasters.json"
 ROSTERS_FILE = DATA_DIR / "Rosters" / "rosters.json"
@@ -3529,6 +3592,10 @@ from runtime_state_cache import install_runtime_state_cache
 install_runtime_state_cache(app)
 from theme_public_state_cache import install_theme_public_state_cache
 install_theme_public_state_cache(app)
+
+# Internal-only surface exclusion (Round 12 Task C). Off in a commercial /
+# installed build unless CSRN_INTERNAL_TOOLS is set; on for this dev checkout.
+_install_internal_tools_gate(app)
 
 # (pregame_presentation is now registered via APPLICATION_BLUEPRINTS above,
 # through the application factory -- no post-construction install needed.)
