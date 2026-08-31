@@ -72,6 +72,7 @@ def system_client():
             SystemRoutesDependencies(
                 require_auth=lambda view: view,
                 get_configuration_service=lambda: None,
+                get_streaming_links=lambda: {},
                 diagnostic_status=lambda: {},
                 load_state=lambda: copy.deepcopy(state),
                 load_runtime_state=lambda: copy.deepcopy(state),

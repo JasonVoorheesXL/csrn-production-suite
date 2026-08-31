@@ -124,6 +124,37 @@ def test_app_default_config_is_sourced_from_the_identity_profile() -> None:
     assert resolved["broadcast_defaults"]["home_school_id"] == "caledonia"
 
 
+def test_launcher_streaming_links_endpoint_is_public_and_serves_the_profile() -> None:
+    import app
+
+    # existing install -> seeded with the launcher's former hard-coded URLs
+    assert app.identity_streaming_links() == {
+        "facebook_live": HISTORICAL_STREAMING["facebook_live"],
+        "youtube_live": HISTORICAL_STREAMING["youtube_live"],
+    }
+
+    app.app.config["TESTING"] = True
+    with app.app.test_client() as client:
+        response = client.get("/api/identity/streaming-links")  # no auth session
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body == {
+        "facebook_live": HISTORICAL_STREAMING["facebook_live"],
+        "youtube_live": HISTORICAL_STREAMING["youtube_live"],
+    }
+
+
+def test_launcher_script_no_longer_hardcodes_only_and_reads_the_endpoint() -> None:
+    from pathlib import Path
+
+    script = Path(__file__).resolve().parents[1] / "CSRN_GAME_DAY_LAUNCHER.ps1"
+    text = script.read_text(encoding="utf-8")
+    assert "/api/identity/streaming-links" in text
+    # the former literals remain only as the documented fallback
+    assert "target_id=100075470576573" in text
+    assert 'if ($streamLinks.facebook_live)' in text
+
+
 def test_save_identity_profile_round_trips(tmp_path) -> None:
     identity_file = tmp_path / "identity_profile.json"
     identity_service.load_identity_profile(identity_file, existing_install=True)

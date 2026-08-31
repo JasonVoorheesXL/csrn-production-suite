@@ -77,6 +77,9 @@ PUBLIC_ENDPOINTS = {
     "support_routes.roster_headshot_file",
     "system_routes.get_state",
     "system_routes.get_runtime_state",
+    # GET /api/identity/streaming-links: the game-day launcher (no operator
+    # session) reads its per-install Facebook/YouTube live URLs from here.
+    "system_routes.get_streaming_links",
     # GET /api/health: dependency-free liveness probe for
     # CSRN_GAME_DAY_LAUNCHER.ps1, which has no operator session and must be
     # able to reach it even when the state write path is stuck.

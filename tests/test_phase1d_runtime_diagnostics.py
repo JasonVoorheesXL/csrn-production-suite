@@ -161,6 +161,7 @@ def system_client(store: PlayStore):
             SystemRoutesDependencies(
                 require_auth=require_auth,
                 get_configuration_service=lambda: None,
+                get_streaming_links=lambda: {},
                 diagnostic_status=lambda: {},
                 load_state=store.load,
                 load_runtime_state=store.load,

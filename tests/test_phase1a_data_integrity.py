@@ -400,6 +400,7 @@ def test_cache_immediately_returns_committed_revision() -> None:
             SystemRoutesDependencies(
                 require_auth=lambda view: view,
                 get_configuration_service=lambda: None,
+                get_streaming_links=lambda: {},
                 diagnostic_status=lambda: {},
                 load_state=lambda: copy.deepcopy(state),
                 load_runtime_state=lambda: copy.deepcopy(state),
@@ -736,6 +737,7 @@ def test_cache_does_not_return_pre_mutation_revision_after_commit() -> None:
             SystemRoutesDependencies(
                 require_auth=lambda view: view,
                 get_configuration_service=lambda: None,
+                get_streaming_links=lambda: {},
                 diagnostic_status=lambda: {},
                 load_state=lambda: copy.deepcopy(state),
                 load_runtime_state=lambda: copy.deepcopy(state),

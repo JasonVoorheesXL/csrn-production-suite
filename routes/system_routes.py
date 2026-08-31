@@ -49,6 +49,7 @@ class SystemRoutesDependencies:
 
     require_auth: RouteDecorator
     get_configuration_service: Callable[[], Any]
+    get_streaming_links: Callable[[], Mapping[str, Any]]
     diagnostic_status: Callable[[], Mapping[str, Any]]
     load_state: Callable[[], Mapping[str, Any]]
     load_runtime_state: Callable[[], Mapping[str, Any]]
@@ -91,6 +92,19 @@ def create_system_blueprint(
     @dependencies.require_auth
     def diagnostics():
         return jsonify(dict(dependencies.diagnostic_status()))
+
+    @routes.get("/api/identity/streaming-links")
+    def get_streaming_links():
+        # Public: CSRN_GAME_DAY_LAUNCHER.ps1 (no operator session) reads this
+        # so each install opens its own Facebook/YouTube live destinations
+        # instead of CSRN's hard-coded ones.
+        links = dependencies.get_streaming_links() or {}
+        return jsonify(
+            {
+                "facebook_live": str(links.get("facebook_live", "") or ""),
+                "youtube_live": str(links.get("youtube_live", "") or ""),
+            }
+        )
 
     @routes.get("/api/health")
     def get_health():

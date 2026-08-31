@@ -96,6 +96,10 @@ def system_client():
             SystemRoutesDependencies(
                 require_auth=require_auth,
                 get_configuration_service=lambda: configuration,
+                get_streaming_links=lambda: {
+                    "facebook_live": "https://fb.example/live",
+                    "youtube_live": "https://yt.example/live",
+                },
                 diagnostic_status=diagnostic_status,
                 load_state=load_state,
                 load_runtime_state=load_runtime_state,
@@ -128,6 +132,19 @@ def test_blueprint_registers_preserved_system_urls(system_client) -> None:
     assert ("/api/readiness", ("GET",)) in rules
     assert ("/api/build-journal", ("GET",)) in rules
     assert ("/api/health", ("GET",)) in rules
+    assert ("/api/identity/streaming-links", ("GET",)) in rules
+
+
+def test_streaming_links_route_is_public_and_serves_the_injected_links(
+    system_client,
+) -> None:
+    client, _, _, _ = system_client
+    response = client.get("/api/identity/streaming-links")  # no auth session
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "facebook_live": "https://fb.example/live",
+        "youtube_live": "https://yt.example/live",
+    }
 
 
 def test_health_route_is_public_fast_and_never_reads_state(system_client) -> None:

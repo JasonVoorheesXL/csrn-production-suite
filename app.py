@@ -2440,10 +2440,25 @@ def readiness_payload() -> dict[str, Any]:
     return get_diagnostics_service().readiness().data["readiness"]
 
 
+def identity_streaming_links() -> dict[str, str]:
+    """Per-install Facebook/YouTube live destinations for the game-day launcher."""
+    try:
+        streaming = load_identity_profile(
+            IDENTITY_FILE, existing_install=True
+        ).get("streaming", {})
+    except Exception:
+        streaming = {}
+    return {
+        "facebook_live": str(streaming.get("facebook_live", "") or ""),
+        "youtube_live": str(streaming.get("youtube_live", "") or ""),
+    }
+
+
 SYSTEM_ROUTES_BLUEPRINT = create_system_blueprint(
     SystemRoutesDependencies(
         require_auth=require_auth,
         get_configuration_service=get_configuration_service,
+        get_streaming_links=identity_streaming_links,
         diagnostic_status=diagnostic_status,
         load_state=load_reconciled_state,
         load_runtime_state=load_state,

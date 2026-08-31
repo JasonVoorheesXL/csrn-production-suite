@@ -128,8 +128,17 @@ $chromeCandidates = @(
 
 $chrome = $chromeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 
+# Per-install live destinations come from CSRN's Identity Profile
+# (identity_service.py). The literals below are only the fallback and match
+# this install's seeded defaults exactly.
 $FacebookLive = "https://www.facebook.com/live/producer/v2/?target_id=100075470576573"
 $YouTubeLive = "https://studio.youtube.com/channel/UCAZZRMpb3HnrSxCnDiQeH7Q/livestreaming"
+try {
+    $streamLinks = Invoke-RestMethod -Uri "http://localhost:5050/api/identity/streaming-links" -TimeoutSec 5
+    if ($streamLinks.facebook_live) { $FacebookLive = $streamLinks.facebook_live }
+    if ($streamLinks.youtube_live)  { $YouTubeLive  = $streamLinks.youtube_live }
+}
+catch { }
 
 if ($chrome) {
     Start-Process -FilePath $chrome -ArgumentList "--new-window", $CommandCenter
