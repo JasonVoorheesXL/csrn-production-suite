@@ -7,9 +7,126 @@ branch: `round16-pywebview-license-handoff-20260831`** merges the two (off
 `round14` @ `55be4ea`, carries rounds 1–15).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
+Round 16 branch: `round16-pywebview-license-handoff-20260831`. **Round 17
+branch: `round17-gameday-backup-audit-20260831`** (off `round16` @
+`2bf64d3`; investigate-only, no code).
+
 Full test suite (deterministic, `-p no:randomly`, run with
 `.venv/Scripts/python.exe`) after **round 16**: **0 failed, 2411 passed**.
-**0 real regressions across all sixteen rounds.**
+Round 17 changes no code — count unchanged. **0 real regressions across
+all sixteen rounds.**
+
+---
+
+## ROUND 17 — GameDay backup audit (investigate only, 2026-08-31)
+
+`Data/Backups/GameDay/` is **8.3 GB inside the Drive-synced project
+folder**. No files deleted or moved this round. `templates/index.html` +
+`broadcaster_print_service.py` (owner WIP) not touched (0 bytes).
+
+### A — What writes it, and what a snapshot contains
+
+**`GameDaySafetyService.create_snapshot()`** (`game_day_safety_service.py`,
+Phase 6.1 game-day-safety-foundation). Called by:
+
+- `ensure_startup_snapshot()` ← `tools/game_day_preflight.py` ←
+  `RUN_CSRN_COMMAND_CENTER.bat` **on every launch** — makes a
+  `kind="startup"` snapshot when none `<12 h` old exists;
+- `RecoveryService.restore_snapshot()` / `rehearse_restore()` (Phase 6.2)
+  — makes a `pre-restore` snapshot before a rollback;
+- `DeploymentService` update flow.
+
+A snapshot = `<backup_root>/<YYYYMMDD-HHMMSS-startup>/` containing
+`manifest.json` (schema 1: per-file path + size + **SHA-256**) and
+`payload/` = **a full `shutil.copytree` of the entire `Data/` tree**, the
+only exclusion being `Data/Backups`, plus `state.json` / `security.json` /
+`VERSION.txt`. **It embeds all media** — `Data/Rosters/Headshots`
+(**892 MB** of player PNGs), `Data/Captions` (86 MB), `Data/Broadcasts`
+(24 MB), `Data/Assets` (24 MB), sponsor/logo/social media. Every startup
+also re-hashes all ~410 files (~1 GB of SHA-256) to build the manifest.
+
+**This is a different system from the Round 15C/16 recovery-marker path.**
+That path is `RecoveryService.mark_startup()` / `mark_clean_shutdown()` →
+writes/clears `Data/Backups/Recovery/active_session.json` (a few hundred
+bytes) + `STATE_REPOSITORY.flush()` (pushes `state.json` to the Drive
+mirror). No `Data/` copy. The pywebview SIGBREAK handler calls that
+lightweight path, **not** `create_snapshot`.
+
+### B — Retention
+
+There **is** a policy: `GameDaySafetyService(automatic_retention=10)` →
+`_prune_automatic_snapshots()` after each create deletes
+`kind ∈ {startup, preflight}` snapshots beyond the 10 newest **that have a
+readable schema-1 `manifest.json`**.
+
+Two eras on disk:
+
+| era | dirs | size each | manifest | pruned? |
+|---|---|---|---|---|
+| 2026-07-26 → 2026-08-19 | ~30 | 40–124 KB | **none** (pre-schema) | **never** — `list_snapshots()` skips manifest-less dirs, so they're invisible to retention |
+| 2026-08-20 → 2026-08-30 | 10 | 124 MB ×2, then **~1.06–1.09 GB** ×8 | schema 1 | yes — exactly 10 kept |
+
+Plus 2 orphaned `.tmp-*-startup` stages (~160 KB) and one
+`_r1121-emergency-pre-restore-*.json` (7 MB). **~8.2 GB of the 8.3 GB is
+the 10 retained schema-1 startup snapshots**; the pre-schema orphans total
+only ~2–3 MB.
+
+Cadence is **per app-startup, gated to ≤1 / 12 h — not per game**. ~43
+launches over ~35 days. So "8.3 GB for N games" is a category error: it is
+"10 daily full-`Data/`-tree copies, each now ~1 GB because the headshot
+library grew (bulk headshot upload/re-encode, mid-August)."
+
+**Verdict: working as designed, but the design copies ~99 % ballast.** Not
+a code bug — a scope problem. The genuinely live-broadcast-critical
+payload (`state.json`, `Data/Broadcasts/`, `Data/Rosters/rosters.json`,
+`Data/Schools/`, `Data/Settings/`, canonical + runtime state) is well
+under ~15 MB; the other ~1 GB is headshots / media / transcripts that do
+not change during a game and are re-uploadable.
+
+### C — Still load-bearing?
+
+**Yes.** `RUN_CSRN_COMMAND_CENTER.bat` **blocks startup** if
+`game_day_preflight.py` (which calls `ensure_startup_snapshot()`) exits
+non-zero, and `RecoveryService.restore_snapshot()` restores live from
+these. Round 15/16's recovery-marker path did **not** replace it — the two
+are complementary (marker = "did we crash?", snapshot = "verified full
+copy to roll back to"). Deleting the *recent* schema-1 snapshots would
+remove the actual rollback safety net. The **pre-schema orphans** and
+`.tmp-*` stages are read by nothing and are safe to remove, but they are
+negligible.
+
+`verify_snapshot()` hash-checks every manifested file before a restore, so
+you cannot thin an *existing* snapshot's payload — a smaller snapshot has
+to be produced by `create_snapshot` writing less.
+
+### D — Proposed fix (NOT implemented — needs owner confirmation)
+
+Mirror the Round 5 Core-backup pattern (`_core_backup_root()` →
+`%LOCALAPPDATA%\PossumFrog\CSRN Production Suite\Backups`, keeping recent
+copies local for real safety):
+
+1. **Stop snapshotting media.** Give `create_snapshot` an exclude set
+   beyond `Data/Backups` — `Data/Rosters/Headshots`, `Data/Personnel`
+   headshots, `Data/Assets`, `Data/Sponsors`, `Data/School Logos`,
+   `Data/Logos`, `Data/Social`, `Data/Captions/Transcripts` (or all of
+   `Data/Captions`), `Data/Recaps`, `Data/TestFixtures`. Snapshot drops
+   from ~1 GB to ~10–15 MB; 10 retained ≈ ~150 MB. This alone fixes 99 %
+   of it. (Round 6.7's `build_release_package` already keeps a similar
+   "what's safe to snapshot" exclusion list to copy from.)
+2. **Move `backup_root` out of the Drive-synced tree** to the same
+   `%LOCALAPPDATA%\PossumFrog\CSRN Production Suite\GameDay\` root Core
+   backups already use (dev checkout keeps the repo-local path). Stops
+   every snapshot round-tripping through Google Drive.
+3. **One-time migration** of the 10 existing schema-1 snapshots to the new
+   root (copy, verify, then the owner deletes the Drive copies), and a
+   sweep of the ~30 pre-schema orphans + 2 `.tmp-*` stages +
+   `_r1121-*.json`.
+4. Optionally tighten `automatic_retention` (10 → 5) and add a
+   size/age cap.
+
+**Do not proceed to implementation without the owner's OK** — this is the
+same safety-critical area as the original live-broadcast crisis. Suggested
+as its own round after Round 18 (the frozen build).
 
 ---
 
