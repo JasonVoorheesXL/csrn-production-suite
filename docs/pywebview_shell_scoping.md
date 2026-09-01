@@ -488,15 +488,40 @@ changed.
 >   no-license gate (`license_required.html` + `402`), and the **Caledonia
 >   license unlocks the frozen build** (`GET /` → normal panel,
 >   `/api/state` 200). No state corruption across launch cycles.
-> - **NOT fixed — architectural:** the Round 15C clean-shutdown wiring
->   (`csrn_desktop.request_graceful_shutdown` → `CTRL_BREAK_EVENT`) **does
->   not work with a `console=False` frozen exe** — a windowless process has
->   no console to receive the event, so `_record_clean_shutdown_and_stop`
->   (recovery marker + state flush) never runs on window close; the server
->   only stops on a force-kill. Needs a shell process-model change (run
->   Waitress in-process + stop the server object on close, a
->   `POST /api/shutdown`, or a console for the serve child) — its own round.
+> - **Found broken — architectural:** the Round 15C clean-shutdown wiring
+>   (`csrn_desktop.request_graceful_shutdown` → `CTRL_BREAK_EVENT`) did not
+>   work with a `console=False` frozen exe — a windowless process has no
+>   console to receive the event, so the clean-shutdown handler never ran
+>   on window close; the server only stopped on a force-kill.
+>
+> **Round 20** (`round20-shutdown-architecture-20260901`, investigate only)
+> traced the exact failure (two compounding no-console problems — the
+> shell can't *send* the console event, the child can't *receive* it) and
+> confirmed dev-mode (`python app.py` + Ctrl+C) was never at risk. Evaluated
+> three fixes; recommended running Waitress in-process.
+>
+> **Round 21** (`round21-inprocess-shutdown-20260901`) **built and verified
+> the fix — RESOLVED.** The shell no longer spawns a child process at all:
+> `app.build_command_center_server()` returns a `waitress.create_server()`
+> handle; the shell runs `server.run()` on a daemon thread and owns the
+> pywebview window on the main thread. Window close calls
+> `app.command_center_clean_shutdown()` (marker + Drive-mirror flush, split
+> out of the old signal handler so it's callable directly, no
+> `SystemExit`) then `server.close()` — **no OS signals, no subprocess, no
+> re-exec.** `run_server_only()`, `server_command()`, `start_server()`,
+> `request_graceful_shutdown()`, `--serve-only`, and the
+> `CREATE_NEW_PROCESS_GROUP` plumbing were deleted outright (no dead
+> "just in case" code). Rebuilt the frozen exe and confirmed the server
+> now runs **in-process** (`/api/health`'s `pid` matches the launched exe's
+> pid, not a distinct child) and, headless, that a real
+> `build_command_center_server()` + real `command_center_clean_shutdown()`
+> + real `server.close()` cycle returns `rc == 0`, removes a planted
+> `active_session.json`, and releases `:5050` — with only the pywebview
+> *window* faked (this automation session has no interactive window
+> station, so a hands-on click-to-close was not possible here; that check
+> is on the owner). `pywebview` + its Windows backend are now locked in
+> `requirements.txt`; `pyinstaller` in `requirements-dev.txt`.
 >
 > **Still deferred:** 15E onboarding wizard; whisper model + Chromium
-> bundling (env vars + assets, +~650 MB); the frozen clean-shutdown fix
-> above; code signing.
+> bundling (env vars + assets, +~650 MB); code signing; the owner's
+> hands-on window-close confirmation on a real desktop.

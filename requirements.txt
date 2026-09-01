@@ -47,3 +47,15 @@ protobuf==7.35.1
 tokenizers==0.23.1
 tqdm==4.70.0
 playwright==1.62.0
+# Desktop shell (csrn_desktop.py). pywebview runs Waitress in-process and
+# owns the native window; a packaged build needs it at runtime. Round 21
+# locked this in. Transitive on Windows: pythonnet -> clr-loader -> cffi
+# -> pycparser, plus bottle + proxy-tools; pinned for one exact graph.
+pywebview==6.2.1
+bottle==0.13.4
+proxy-tools==0.1.0
+pythonnet==3.1.0
+clr-loader==0.3.1
+cffi==2.1.1
+pycparser==3.0
+pywin32-ctypes==0.2.3

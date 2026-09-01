@@ -36,6 +36,18 @@ def test_runtime_and_development_requirements_are_exactly_pinned() -> None:
     assert development["pytest"] == "9.1.1"
 
 
+def test_desktop_shell_and_build_deps_are_locked() -> None:
+    # Round 21: the pywebview shell is a first-class part of the product;
+    # pyinstaller is the frozen-build tool. Both must be in the locks so
+    # tools/environment_check.py catches a missing install.
+    runtime = profile_pins("runtime")
+    development = profile_pins("development")
+    assert runtime.get("pywebview")            # shell runtime dep
+    assert runtime.get("pythonnet")            # its Windows backend
+    assert development.get("pyinstaller")      # build-time only
+    assert "pyinstaller" not in runtime        # not a runtime dep
+
+
 def test_roster_pronunciation_deps_are_locked_so_envcheck_catches_them() -> None:
     # Round 15A: roster_service.py imports `pronouncing` (-> `cmudict`), but
     # neither was in requirements.txt, so tools/environment_check.py -- which

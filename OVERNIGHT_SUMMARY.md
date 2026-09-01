@@ -7,14 +7,95 @@ branch: `round16-pywebview-license-handoff-20260831`** merges the two (off
 `round14` @ `55be4ea`, carries rounds 1–15).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
-Round 19 branch: `round19-gameday-fix-and-cleanup-20260901` (off `round18`
-@ `7ed88c3`). **Round 20 branch: `round20-shutdown-architecture-20260901`**
-(off `round19` @ `efeae3f`; investigate-only, no code).
+Round 20 branch: `round20-shutdown-architecture-20260901` (off `round19` @
+`efeae3f`; investigate-only). **Round 21 branch:
+`round21-inprocess-shutdown-20260901`** (off `round20` @ `cdee3f6`).
 
 Full test suite (deterministic, `-p no:randomly`, run with
-`.venv/Scripts/python.exe`) after **round 19**: **0 failed, 2429 passed**.
-Round 20 changes no code. **0 real regressions across all nineteen
-rounds.**
+`.venv/Scripts/python.exe`) after **round 21**: **0 failed, 2430 passed**.
+**0 real regressions across all twenty-one rounds.**
+
+---
+
+## ROUND 21 — in-process shell shutdown fix (2026-09-01)
+
+Builds Round 20's recommended fix (#1, Waitress in-process). Decision:
+go in-process-only everywhere, delete the child-process model entirely.
+`templates/index.html` + `broadcaster_print_service.py` not touched.
+
+| commit | task |
+|---|---|
+| `f25bdc5` | **21A+B** — `app.build_command_center_server()` + `app.command_center_clean_shutdown()` |
+| `5c09e30` | **21C** — rewrite `csrn_desktop.run()` to the in-process model |
+| `dd71631` | **21D** — drop `--serve-only`; re-verify the frozen build |
+| (this)    | **21E** — lock `pywebview`/`pyinstaller`; doc cleanup |
+
+### 21A/B — the shared server + a signal-free shutdown
+
+`app.build_command_center_server()` does the one-time setup (data dirs,
+config, the isolated media server on :5051, startup banners) and returns
+a **socket-bound `waitress.create_server(app, host="0.0.0.0", port=5050,
+threads=16)`** — not the blocking `serve()` wrapper, so the caller can
+hold the handle and `.close()` it. `run_command_center()`
+(`python app.py` / the `.bat`) is now `server = build_command_center_
+server(); register SIGINT/SIGTERM/SIGBREAK; server.run()` — confirmed
+unchanged behaviourally (server still binds :5050 identically).
+`app.command_center_clean_shutdown()` is the marker-write +
+`STATE_REPOSITORY.flush()` half **without** `raise SystemExit`, so it's
+callable directly from any thread; the Ctrl+C signal handler now calls it
+then raises.
+
+### 21C — the shell, rewritten
+
+`csrn_desktop.run()` no longer spawns a child process. When it needs to
+start the server: `import app`, `server = app.build_command_center_
+server()`, run `server.run()` on a **daemon thread**, open the pywebview
+window on the **main thread**. On window close: `app.command_center_
+clean_shutdown()` then `server.close()` — directly in Python, no OS
+signals, no subprocess, no re-exec. Deleted outright (no dead "just in
+case" code): `run_server_only()`, `server_command()`, `start_server()`,
+`request_graceful_shutdown()`, the `CTRL_BREAK_EVENT` / process-group
+plumbing, `--serve-only`. The HEALTHY/attach case is unchanged — opens a
+window at a server already running, never starts or stops anything.
+
+### 21D — dropped `--serve-only`; re-verified the real frozen build
+
+Rebuilt (33 s, 545 MB, exit 0, same benign warnings as Round 18).
+**Confirmed the frozen exe now runs the server in-process** —
+`/api/health`'s reported `pid` is the *same* pid as the launched exe
+(Round 18 showed a distinct child pid). No child process ⇒ no orphan risk
+by construction.
+
+**Real close-and-verify (headless):** a new test drives the *actual*
+`csrn_desktop.run()` against a *real* `build_command_center_server()` on
+a real daemon thread, with a real bound `:5050`, a real planted
+`active_session.json`, and real `command_center_clean_shutdown()` +
+`server.close()` — only the pywebview *window* is faked (`start()`
+returns, i.e. "the user closed it"). Result: `rc == 0`, `/api/health` 200
+while the window was "open", `active_session.json` **removed**, `:5050`
+**released**. 7/7 in a standalone scratch run; the distilled version is
+in-suite.
+
+**One thing this session genuinely could not verify:** physically closing
+a real EdgeWebView2 window by hand — this automation session has no
+interactive window station (`FindWindow` for "CSRN Command Center"
+returned null). **The owner should do one hands-on check**: launch
+`dist\CSRNProductionSuite\CSRNProductionSuite.exe`, wait for the window,
+click the window's close button (not Task Manager), and confirm the
+process exits on its own within a couple of seconds. Everything upstream
+of the physical click is proven; the click itself needs a real desktop.
+
+### 21E — version locks + doc cleanup
+
+`requirements.txt` += `pywebview==6.2.1` and its Windows-backend closure
+(`pythonnet`, `clr-loader`, `cffi`, `pycparser`, `bottle`, `proxy-tools`,
+`pywin32-ctypes`) — the shell is a first-class runtime dependency now.
+`requirements-dev.txt` += `pyinstaller==6.22.2` + its closure
+(`pyinstaller-hooks-contrib`, `altgraph`, `pefile`) — build-time only,
+confirmed absent from the runtime lock. Both `environment_check.py`
+profiles verify clean. `docs/pywebview_shell_scoping.md` and
+`docs/licensing.md` updated to describe the in-process model and mark the
+Round 18 gap **resolved**.
 
 ---
 

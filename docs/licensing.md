@@ -169,11 +169,11 @@ import scope (right after `_install_internal_tools_gate(app)`), so it is
 installed no matter which entry point loads `app`:
 
 - `python app.py` -> `__main__` -> `run_command_center()` (dev / `.bat`);
-- `csrn_desktop.py --serve-only` -> `run_server_only()` -> `import app` ->
-  `app.run_command_center()` (frozen build's re-exec, Round 15D);
-- the pywebview shell's child process, same path as above.
+- the frozen pywebview shell -> `import app` ->
+  `app.build_command_center_server()` (Round 21: runs Waitress
+  in-process on a daemon thread -- no child process, no re-exec).
 
-In every case `serve(app, ...)` serves the already-gated app. A frozen
+In every case the already-gated `app` object is what gets served. A frozen
 build resolves `ProductPaths.installed_mode = True` (`sys.frozen`), so
 `_installed_build()` is True and the gate enforces: no valid license ->
 `GET /` shows `templates/license_required.html`, broadcast APIs `402`,

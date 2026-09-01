@@ -6,3 +6,10 @@ iniconfig==2.3.0
 packaging==26.2
 pluggy==1.6.0
 Pygments==2.20.0
+
+# Frozen-build tooling (packaging/windows/CSRNProductionSuite.spec). Build
+# time only -- not a runtime dependency. Round 21 locked this in.
+pyinstaller==6.22.2
+pyinstaller-hooks-contrib==2026.7
+altgraph==0.17.5
+pefile==2024.8.26
