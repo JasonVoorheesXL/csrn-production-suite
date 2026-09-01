@@ -1,9 +1,16 @@
-"""CSRN Production Suite -- pywebview desktop shell (Round 15C).
+"""CSRN Production Suite -- pywebview desktop shell.
 
 Opens ONE native window at ``http://127.0.0.1:5050/?module=pregame``.
-Waitress still serves everything underneath: this shell launches the
-existing ``app.py`` as a child process (or, in a frozen build, re-execs
-itself in ``--serve-only`` mode -- see Round 15D) and just owns the window.
+
+**In-process model (Round 21).** When this shell needs to start the
+server it does so *in the same process*: it imports ``app``, builds the
+Waitress server with ``app.build_command_center_server()``, and runs it on
+a daemon thread while the pywebview window owns the main thread. On window
+close it calls ``app.command_center_clean_shutdown()`` (recovery marker +
+Drive state-mirror flush) and then ``server.close()`` -- **directly in
+Python, with no OS signals, no subprocess, and no re-exec**. This replaces
+the old child-process + ``CTRL_BREAK_EVENT`` scheme, which could not
+deliver a signal to a windowed (``console=False``) frozen build.
 
 What this shell deliberately does NOT change:
   * OBS browser sources keep hitting ``http://127.0.0.1:5050/overlay`` (and
@@ -12,16 +19,10 @@ What this shell deliberately does NOT change:
   * Phone / tablet / iPad statistician access over the LAN keeps working
     because the server still binds ``0.0.0.0:5050`` (``app.py`` unchanged);
     this shell only points a *local* window at ``127.0.0.1``.
+  * ``python app.py`` / RUN_CSRN_COMMAND_CENTER.bat + Ctrl+C is untouched.
 
-What this shell owns:
-  * Health-gated window open -- the DOWN / HEALTHY / HUNG triage the
-    PowerShell launcher already does, then wait for ``/api/health`` to
-    answer ``{"status": "ok"}`` before showing the window.
-  * Clean-shutdown-on-window-close -- a window close delivers no signal, so
-    on close we send the child ``CTRL_BREAK_EVENT`` (Windows) / ``SIGTERM``
-    (POSIX), which ``app.py`` routes through the same recovery-marker +
-    Drive-mirror-flush path as Ctrl+C. If we merely *attached* to a server
-    that was already running, closing the window leaves it running.
+If a healthy server is already running, this shell just opens a window at
+it and never starts or stops anything.
 """
 
 from __future__ import annotations
@@ -29,11 +30,8 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
-import signal
 import socket
-import subprocess
-import sys
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -55,7 +53,7 @@ WINDOW_MIN_WIDTH = 1280
 WINDOW_MIN_HEIGHT = 800
 
 HEALTH_TIMEOUT_SECONDS = 60
-GRACEFUL_SHUTDOWN_SECONDS = 20.0
+SERVER_JOIN_SECONDS = 10.0
 
 _LOGGER = logging.getLogger("csrn.desktop")
 
@@ -104,45 +102,6 @@ def current_state() -> str:
     return triage(listening, healthy)
 
 
-# --------------------------------------------------------------------------
-# Child server process
-# --------------------------------------------------------------------------
-
-
-def server_command(python_executable: str | None = None) -> list[str]:
-    """Argv for the underlying Waitress server.
-
-    Frozen build: re-exec this same executable in ``--serve-only`` mode so
-    the packaged app needs no ``.ps1`` / ``.bat`` chain (Round 15D wires the
-    ``--serve-only`` branch into ``app.py``'s ``__main__``). Source checkout:
-    run ``app.py`` with the active interpreter.
-    """
-
-    if getattr(sys, "frozen", False):
-        return [sys.executable, "--serve-only"]
-    return [python_executable or sys.executable, str(BASE_DIR / "app.py")]
-
-
-def start_server(command: list[str] | None = None) -> subprocess.Popen:
-    """Launch the child server in its own process group.
-
-    A new process group is required so we can later deliver
-    ``CTRL_BREAK_EVENT`` to the child alone without also signalling this
-    shell.
-    """
-
-    command = command or server_command()
-    creationflags = 0
-    if os.name == "nt":
-        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
-    _LOGGER.info("Starting CSRN server: %s", " ".join(command))
-    return subprocess.Popen(  # noqa: S603 -- fixed argv, no shell
-        command,
-        cwd=str(BASE_DIR),
-        creationflags=creationflags,
-    )
-
-
 def wait_until_healthy(
     deadline_seconds: int = HEALTH_TIMEOUT_SECONDS,
     *,
@@ -158,46 +117,6 @@ def wait_until_healthy(
             return True
         sleep(1.0)
     return health_check()
-
-
-def request_graceful_shutdown(
-    process: subprocess.Popen,
-    *,
-    timeout: float = GRACEFUL_SHUTDOWN_SECONDS,
-) -> int | None:
-    """Ask the child to shut down cleanly, then hard-stop if it will not.
-
-    ``CTRL_BREAK_EVENT`` (Windows) / ``SIGTERM`` (POSIX) both land on
-    ``app.py``'s ``_record_clean_shutdown_and_stop`` handler, which writes
-    the clean-shutdown recovery marker and flushes the Drive state mirror
-    before exiting -- so a shell close is never read as an unclean exit.
-    """
-
-    if process.poll() is not None:
-        return process.returncode
-
-    try:
-        if os.name == "nt":
-            process.send_signal(signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined]
-        else:
-            process.send_signal(signal.SIGTERM)
-    except (ProcessLookupError, OSError) as exc:  # pragma: no cover
-        _LOGGER.warning("Could not signal the CSRN server: %s", exc)
-
-    try:
-        return process.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        _LOGGER.warning(
-            "CSRN server did not exit within %.0fs of the shutdown request; "
-            "terminating.",
-            timeout,
-        )
-        process.terminate()
-        try:
-            return process.wait(timeout=5.0)
-        except subprocess.TimeoutExpired:  # pragma: no cover
-            process.kill()
-            return process.wait(timeout=5.0)
 
 
 # --------------------------------------------------------------------------
@@ -217,13 +136,11 @@ def _create_window(webview):
 
 
 def run(*, health_timeout: int = HEALTH_TIMEOUT_SECONDS) -> int:
-    """Start (or attach to) the server, then run the pywebview loop."""
+    """Start (or attach to) the server in-process, then run the pywebview
+    loop; on window close, shut a shell-started server down cleanly."""
 
     state = current_state()
     _LOGGER.info("CSRN server state: %s", state)
-
-    server: subprocess.Popen | None = None
-    started_by_shell = False
 
     if state == "HUNG":
         _LOGGER.error(
@@ -233,9 +150,16 @@ def run(*, health_timeout: int = HEALTH_TIMEOUT_SECONDS) -> int:
         )
         return 1
 
+    server = None            # the in-process Waitress server, if we own one
+    server_thread = None
     if state == "DOWN":
-        server = start_server()
-        started_by_shell = True
+        import app  # noqa: PLC0415 -- heavy import; only when we own the server
+
+        server = app.build_command_center_server()
+        server_thread = threading.Thread(
+            target=server.run, name="csrn-command-center", daemon=True
+        )
+        server_thread.start()
 
     if not wait_until_healthy(health_timeout):
         _LOGGER.error(
@@ -243,69 +167,46 @@ def run(*, health_timeout: int = HEALTH_TIMEOUT_SECONDS) -> int:
             PORT,
             health_timeout,
         )
-        if server is not None and started_by_shell:
-            request_graceful_shutdown(server)
+        if server is not None:
+            server.close()
         return 1
 
     try:
         import webview  # noqa: PLC0415 -- optional GUI dependency, imported late
     except ImportError:
         _LOGGER.error(
-            "pywebview is not installed. `pip install pywebview` (it is in "
-            "requirements.txt for a packaged build)."
+            "pywebview is not installed (it is pinned in requirements.txt "
+            "for a packaged build)."
         )
-        if server is not None and started_by_shell:
-            request_graceful_shutdown(server)
+        if server is not None:
+            server.close()
         return 1
 
     _create_window(webview)
-
-    def _on_closed() -> None:
-        # Only tear down a server THIS shell started; never kill one we just
-        # attached to (another operator may be using it, OBS may be pulling
-        # overlays from it).
-        if server is not None and started_by_shell:
-            _LOGGER.info("Window closed -- shutting the CSRN server down cleanly.")
-            request_graceful_shutdown(server)
-
-    webview.start(
-        func=None,
-        gui=None,
-        debug=False,
-    )
+    webview.start(func=None, gui=None, debug=False)
     # webview.start() blocks until every window is closed.
-    _on_closed()
-    return 0
 
+    if server is not None:
+        # Only tear down a server THIS shell started; an attached-to server
+        # (another operator may be using it, OBS may be pulling overlays)
+        # is left running.
+        _LOGGER.info("Window closed -- clean shutdown of the in-process server.")
+        import app  # noqa: PLC0415 -- already imported above; cheap
 
-def run_server_only() -> int:
-    """Run just the Waitress Command Center server (no window).
-
-    This is how a frozen build serves: the double-clicked executable starts
-    in shell mode, and ``start_server()`` re-execs the SAME executable with
-    ``--serve-only`` (see ``server_command``) so the packaged app needs no
-    ``.ps1`` / ``.bat`` chain. In a source checkout the child is plain
-    ``python app.py`` and this path is unused.
-    """
-
-    import app  # noqa: PLC0415 -- heavy import, only for the server child
-
-    app.run_command_center()
+        try:
+            app.command_center_clean_shutdown()
+        finally:
+            server.close()
+            if server_thread is not None:
+                server_thread.join(timeout=SERVER_JOIN_SECONDS)
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    raw = list(sys.argv[1:] if argv is None else argv)
-
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-
-    # Frozen re-exec: `<exe> --serve-only` -> be the server, not the shell.
-    if "--serve-only" in raw:
-        return run_server_only()
-
     parser = argparse.ArgumentParser(
         description="CSRN Production Suite desktop shell (pywebview)."
     )
@@ -315,14 +216,7 @@ def main(argv: list[str] | None = None) -> int:
         default=HEALTH_TIMEOUT_SECONDS,
         help="Seconds to wait for /api/health before giving up.",
     )
-    parser.add_argument(
-        "--serve-only",
-        action="store_true",
-        help="Run only the Waitress server (used by the frozen shell's re-exec).",
-    )
-    args = parser.parse_args(raw)
-    if args.serve_only:  # pragma: no cover -- handled above, kept for --help
-        return run_server_only()
+    args = parser.parse_args(argv)
     return run(health_timeout=args.health_timeout)
 
 

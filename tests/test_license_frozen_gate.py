@@ -129,19 +129,20 @@ def test_frozen_flag_makes_product_paths_installed_and_gate_enforced(monkeypatch
     assert app_module._installed_build() is True
 
 
-def test_frozen_serve_path_installs_the_license_gate(monkeypatch) -> None:
-    # csrn_desktop --serve-only -> run_server_only() -> import app ->
-    # module scope runs _install_license_gate(app). So the frozen serve path
-    # gets the gate for free. Assert the wiring is at import scope.
+def test_frozen_inprocess_path_installs_the_license_gate() -> None:
+    # Round 21: the shell runs the server in-process --
+    # csrn_desktop.run() -> import app -> module scope runs
+    # _install_license_gate(app). Assert the wiring is at import scope so
+    # the frozen build gets the gate for free, and that build_command_center_
+    # server() is what the shell drives.
     src = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "\n_install_license_gate(app)\n" in src
 
-    served = {}
-    monkeypatch.setattr(app_module, "run_command_center", lambda: served.setdefault("ran", True))
-    monkeypatch.setattr(csrn_desktop, "run", lambda **k: pytest.fail("serve-only must not open a window"))
-    assert csrn_desktop.main(["--serve-only"]) == 0
-    assert served == {"ran": True}
-    # the app object the serve path uses carries before_request gates
+    shell_src = (ROOT / "csrn_desktop.py").read_text(encoding="utf-8")
+    assert "app.build_command_center_server()" in shell_src
+    assert "--serve-only" not in shell_src
+
+    # `import app` already ran for this test module -> the gate is on the app.
     gate_names = {
         getattr(fn, "__name__", "")
         for fn in app_module.app.before_request_funcs.get(None, [])
