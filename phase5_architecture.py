@@ -29,6 +29,9 @@ EXPECTED_BLUEPRINTS = {
     "logo_routes",
     "mhsaa_division_routes",
     "obs_routes",
+    # First-run onboarding wizard (Round 22): thin wrappers over the Identity
+    # Profile write path, SchoolService, and the organization-logo handler.
+    "onboarding_routes",
     "page_routes",
     "personnel_routes",
     # The halftime/pregame/delay overlay (pregame_universal_overlay.html) --
@@ -58,6 +61,12 @@ PUBLIC_ENDPOINTS = {
     "caption_routes.caption_overlay_state",
     "live_game_routes.statistics_overlay_state",
     "logo_routes.school_logo_file",
+    # First-run onboarding wizard (Round 22): a fresh install has no operator
+    # PIN configured yet, so these cannot be @require_auth. Each route is inert
+    # once identity_profile.onboarding_complete is set.
+    "onboarding_routes.onboarding_complete",
+    "onboarding_routes.onboarding_context",
+    "onboarding_routes.onboarding_logo",
     "page_routes.control_panel",
     "page_routes.overlay",
     "personnel_routes.personnel_headshot_file",

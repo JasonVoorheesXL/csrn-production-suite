@@ -93,6 +93,10 @@ from routes.school_routes import (
     SchoolRoutesDependencies,
     create_school_blueprint,
 )
+from routes.onboarding_routes import (
+    OnboardingRoutesDependencies,
+    create_onboarding_blueprint,
+)
 from routes.association_routes import (
     AssociationRoutesDependencies,
     create_association_blueprint,
@@ -405,6 +409,89 @@ def _onboarding_incomplete() -> bool:
     except Exception:
         return False
     return not identity_service.onboarding_complete(profile)
+
+
+def _onboarding_sports() -> list[dict[str, str]]:
+    """Distinct sports from the ruleset registry, for the wizard's optional
+    sport picker."""
+    try:
+        import ruleset_service
+
+        sports = sorted(
+            {str(r.get("sport", "")).strip().lower() for r in ruleset_service.available_rulesets()}
+            - {""}
+        )
+    except Exception:
+        sports = ["football"]
+    return [{"value": s, "label": s.replace("-", " ").title()} for s in sports]
+
+
+def _default_onboarding_sport() -> str:
+    profile = load_identity_profile(IDENTITY_FILE, existing_install=_EXISTING_INSTALL)
+    return str((profile.get("broadcast_defaults") or {}).get("sport") or "").strip().lower()
+
+
+def _onboarding_save_logo(upload: Any) -> tuple[int, dict[str, Any]]:
+    """Reuse the Identity Profile's existing organization-logo handler."""
+    from pregame_presentation import save_organization_logo
+
+    return save_organization_logo(upload)
+
+
+def _complete_onboarding(payload: Mapping[str, Any]) -> tuple[bool, str, str]:
+    """Apply the wizard's fields through the existing Identity Profile /
+    SchoolService paths and set onboarding_complete. Returns
+    ``(ok, error_code, message)``."""
+
+    skip = bool(payload.get("skip"))
+    org_name = str(payload.get("org_name") or "").strip()
+    if not skip and not org_name:
+        return False, "ORG_NAME_REQUIRED", "Organization / team name is required."
+
+    profile = load_identity_profile(IDENTITY_FILE, existing_install=_EXISTING_INSTALL)
+    organization = dict(profile.get("organization") or {})
+    broadcast_defaults = dict(profile.get("broadcast_defaults") or {})
+
+    if org_name:
+        organization["name"] = org_name[:240]
+        if not str(organization.get("short_name") or "").strip():
+            organization["short_name"] = org_name[:40]
+
+    logo_path = str(payload.get("logo_path") or "").strip()
+    if logo_path:
+        organization["logo_path"] = logo_path[:500]
+
+    sport = str(payload.get("sport") or "").strip()
+    if sport:
+        broadcast_defaults["sport"] = sport.title()
+
+    school_name = str(payload.get("school_name") or "").strip()
+    if school_name:
+        result = get_school_service().create(
+            {"official_name": school_name, "broadcast_name": school_name}
+        )
+        if result.code != "OK":
+            return (
+                False,
+                result.code,
+                "Could not create the first school record.",
+            )
+        school_id = str(result.data.get("school", {}).get("id") or "")
+        if school_id:
+            broadcast_defaults["home_school_id"] = school_id
+            if not str(broadcast_defaults.get("venue") or "").strip():
+                broadcast_defaults["venue"] = school_name
+
+    profile["organization"] = organization
+    profile["broadcast_defaults"] = broadcast_defaults
+    profile["onboarding_complete"] = True
+    save_identity_profile(IDENTITY_FILE, profile, existing_install=_EXISTING_INSTALL)
+
+    global IDENTITY_PROFILE
+    IDENTITY_PROFILE = load_identity_profile(
+        IDENTITY_FILE, existing_install=_EXISTING_INSTALL
+    )
+    return True, "", ""
 
 
 def _install_onboarding_gate(flask_app: Any) -> None:
@@ -2564,6 +2651,17 @@ SCHOOL_ROUTES_BLUEPRINT = create_school_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(SCHOOL_ROUTES_BLUEPRINT)
+
+ONBOARDING_ROUTES_BLUEPRINT = create_onboarding_blueprint(
+    OnboardingRoutesDependencies(
+        onboarding_incomplete=_onboarding_incomplete,
+        available_sports=_onboarding_sports,
+        default_sport=_default_onboarding_sport,
+        complete_onboarding=_complete_onboarding,
+        save_logo=_onboarding_save_logo,
+    )
+)
+APPLICATION_BLUEPRINTS.append(ONBOARDING_ROUTES_BLUEPRINT)
 
 ASSOCIATION_ROUTES_BLUEPRINT = create_association_blueprint(
     AssociationRoutesDependencies(

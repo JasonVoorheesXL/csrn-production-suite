@@ -19,6 +19,40 @@ from flask import Blueprint, Response, jsonify, request
 _LOCK = threading.RLock()
 _NWS_CACHE: dict[str, Any] = {"key": "", "at": 0, "periods": []}
 
+# --- Organization logo: one asset location, one validator ---------------
+# Reused by the settings screen (/api/pregame-presentation/organization-logo)
+# and the first-run onboarding wizard (/api/onboarding/logo). The Identity
+# Profile stores the returned logo_path as organization.logo_path.
+_ORG_LOGO_ALLOWED_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+_ORG_LOGO_MAX_BYTES = 8 * 1024 * 1024
+
+
+def save_organization_logo(upload: Any) -> tuple[int, dict[str, Any]]:
+    """Validate file type/size and persist to
+    ``static/organization/organization-logo.<ext>`` (replacing any prior).
+    Returns ``(http_status, json_body)``."""
+    if upload is None or not getattr(upload, "filename", ""):
+        return 400, {"error": "NO_LOGO", "message": "Choose a PNG, JPG, or WebP image."}
+    suffix = Path(upload.filename).suffix.lower()
+    if suffix not in _ORG_LOGO_ALLOWED_SUFFIXES:
+        return 400, {"error": "INVALID_LOGO_TYPE", "message": "Organization logo must be PNG, JPG, or WebP."}
+    upload.stream.seek(0, 2)
+    size = upload.stream.tell()
+    upload.stream.seek(0)
+    if size > _ORG_LOGO_MAX_BYTES:
+        return 400, {"error": "LOGO_TOO_LARGE", "message": "Organization logo must be 8 MB or smaller."}
+    static_dir = Path(__file__).resolve().parent / "static" / "organization"
+    static_dir.mkdir(parents=True, exist_ok=True)
+    target = static_dir / f"organization-logo{suffix}"
+    for old in static_dir.glob("organization-logo.*"):
+        try:
+            if old != target:
+                old.unlink()
+        except OSError:
+            pass
+    upload.save(target)
+    return 200, {"ok": True, "logo_path": f"/static/organization/{target.name}"}
+
 # Eyebrows the automatic/statistician spotlight paths actually use
 # (rules_service.py's _show_player_spotlight() and event_service.py's
 # automatic branch). "PLAYER PROFILE" is the graphic's idle/manual default,
@@ -891,35 +925,8 @@ def build_pregame_presentation_blueprint() -> Blueprint:
     @bp.post("/api/pregame-presentation/organization-logo")
     @require_auth
     def upload_organization_logo():
-        upload = request.files.get("logo")
-        if upload is None or not upload.filename:
-            return jsonify({"error": "NO_LOGO", "message": "Choose a PNG, JPG, or WebP image."}), 400
-
-        suffix = Path(upload.filename).suffix.lower()
-        allowed = {".png", ".jpg", ".jpeg", ".webp"}
-        if suffix not in allowed:
-            return jsonify({"error": "INVALID_LOGO_TYPE", "message": "Organization logo must be PNG, JPG, or WebP."}), 400
-
-        upload.stream.seek(0, 2)
-        size = upload.stream.tell()
-        upload.stream.seek(0)
-        if size > 8 * 1024 * 1024:
-            return jsonify({"error": "LOGO_TOO_LARGE", "message": "Organization logo must be 8 MB or smaller."}), 400
-
-        static_dir = Path(__file__).resolve().parent / "static" / "organization"
-        static_dir.mkdir(parents=True, exist_ok=True)
-        target = static_dir / f"organization-logo{suffix}"
-        for old in static_dir.glob("organization-logo.*"):
-            try:
-                if old != target:
-                    old.unlink()
-            except OSError:
-                pass
-        upload.save(target)
-        return jsonify({
-            "ok": True,
-            "logo_path": f"/static/organization/{target.name}",
-        })
+        status, body = save_organization_logo(request.files.get("logo"))
+        return jsonify(body), status
 
     @bp.get("/api/pregame-presentation/<broadcast_id>/settings")
     @require_auth
