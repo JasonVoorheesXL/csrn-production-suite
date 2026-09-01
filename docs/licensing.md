@@ -37,8 +37,17 @@ is **not signed** and does not affect verification.
 ## One-time setup: generate the keypair
 
 ```bash
-.venv/Scripts/python.exe tools/issue_license.py --genkey --out-key ~/csrn_license_key.hex
+.venv/Scripts/python.exe tools/issue_license.py --genkey            # local default
+.venv/Scripts/python.exe tools/issue_license.py --genkey --out-key E:\csrn_license_key.hex
 ```
+
+With no `--out-key`, `--genkey` writes to a **local, non-synced** path
+(`%LOCALAPPDATA%\PossumFrog\CSRN Production Suite\csrn_license_private_key.hex`,
+or `~/.possumfrog/…` off Windows) -- never the repo (which is Drive-synced
+in practice). It **refuses** to use a default that resolves inside a
+cloud-sync folder (My Drive / Google Drive / OneDrive / Dropbox / iCloud /
+`.driveupload`), and **warns loudly** if you point `--out-key` at one
+anyway. An external / USB drive is the ideal home; move it offline after.
 
 This prints the **public** key (64 hex chars). Paste that value -- and only
 that value, the public half is safe to commit and to bundle -- into

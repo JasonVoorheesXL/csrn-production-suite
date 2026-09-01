@@ -36,7 +36,43 @@ if str(ROOT) not in sys.path:
 
 import license_service as ls  # noqa: E402
 from entitlement_service import EntitlementService  # noqa: E402
-from product_paths import PRODUCT_ID  # noqa: E402
+from product_paths import PRODUCT_ID, PRODUCT_NAME, PRODUCT_VENDOR  # noqa: E402
+
+
+# Path components that mean "this folder is continuously uploaded somewhere".
+_SYNCED_MARKERS = (
+    "my drive",
+    "google drive",
+    "googledrive",
+    "onedrive",
+    "dropbox",
+    "icloud drive",
+    "cloudstorage",
+    ".driveupload",
+)
+
+
+def _looks_synced(path: Path) -> str | None:
+    """Return the matching marker if `path` appears to sit inside a
+    cloud-sync folder, else None."""
+    parts = [p.casefold() for p in Path(path).expanduser().resolve().parts]
+    joined = "/".join(parts)
+    for marker in _SYNCED_MARKERS:
+        if marker in parts or marker in joined:
+            return marker
+    return None
+
+
+def _default_key_path() -> Path:
+    """A local, non-synced home for the owner's private signing key --
+    NEVER the repo (which is Drive-synced in practice)."""
+    root = os.environ.get("LOCALAPPDATA", "").strip()
+    base = (
+        Path(root).expanduser() / PRODUCT_VENDOR / PRODUCT_NAME
+        if root
+        else Path.home() / ".possumfrog"
+    )
+    return base / "csrn_license_private_key.hex"
 
 
 def _load_seed(args) -> bytes:
@@ -78,9 +114,29 @@ def _parse_list(value: str) -> list[str]:
 def do_genkey(args) -> int:
     seed = secrets.token_bytes(32)
     public_hex = ls.ed25519_publickey(seed).hex()
-    out_key = Path(args.out_key).expanduser() if args.out_key else ROOT / "csrn_license_private_key.hex"
+    out_key = (
+        Path(args.out_key).expanduser() if args.out_key else _default_key_path()
+    )
+
+    marker = _looks_synced(out_key)
+    if marker and not args.out_key:
+        # Never write the key into a synced folder by DEFAULT.
+        raise SystemExit(
+            f"Refusing to write the private key to {out_key} -- that path is "
+            f"inside a cloud-sync folder ('{marker}'). Pass --out-key with a "
+            "local, non-synced location (an external/USB drive is ideal)."
+        )
+    if marker:
+        print("!" * 70)
+        print(f"!! WARNING: {out_key}")
+        print(f"!! is inside a cloud-sync folder ('{marker}'). The PRIVATE signing")
+        print("!! key must NOT be continuously uploaded anywhere. Move it to a")
+        print("!! local-only / offline location immediately after this runs.")
+        print("!" * 70)
+
     if out_key.exists() and not args.force:
         raise SystemExit(f"{out_key} exists. Use --force to overwrite (careful).")
+    out_key.parent.mkdir(parents=True, exist_ok=True)
     out_key.write_text(seed.hex() + "\n", encoding="utf-8")
     try:
         os.chmod(out_key, 0o600)
@@ -126,6 +182,13 @@ def do_issue(args) -> int:
 
     slug = "".join(c if c.isalnum() else "-" for c in args.org.strip().lower()).strip("-") or "customer"
     out = Path(args.out).expanduser() if args.out else ROOT / f"license-{slug}.json"
+    marker = _looks_synced(out)
+    if marker:
+        print(
+            f"[warn] writing the license file to {out}, which is inside a "
+            f"cloud-sync folder ('{marker}'). The signed file is not secret, "
+            "but hand it to the customer directly rather than syncing it."
+        )
     out.write_text(json.dumps(signed, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     ok, reason = ls.verify_license(signed, public_key_hex=ls.ed25519_publickey(seed).hex())
@@ -210,7 +273,12 @@ def do_verify(args) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Issue a signed CSRN license (owner only).")
     parser.add_argument("--genkey", action="store_true", help="Generate a new Ed25519 keypair.")
-    parser.add_argument("--out-key", help="Where --genkey writes the private key (hex).")
+    parser.add_argument(
+        "--out-key",
+        help="Where --genkey writes the private key (hex). Default: a local, "
+        "non-synced path under %%LOCALAPPDATA%% / ~/.possumfrog. --genkey "
+        "refuses to use a default inside a cloud-sync folder.",
+    )
     parser.add_argument("--force", action="store_true", help="Overwrite an existing key file.")
 
     parser.add_argument(

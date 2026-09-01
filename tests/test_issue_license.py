@@ -163,3 +163,49 @@ def test_verify_can_use_the_private_keys_public_half(tmp_path, capsys) -> None:
 def test_verify_missing_file_exits_nonzero(tmp_path) -> None:
     with pytest.raises(SystemExit):
         issue_license.main(["--verify", str(tmp_path / "nope.json")])
+
+
+# --- Round 19 Task B: safe default for --genkey ---
+
+
+def test_looks_synced_detects_common_cloud_folders() -> None:
+    assert issue_license._looks_synced(Path(r"C:\Users\x\My Drive\proj\key.hex")) == "my drive"
+    assert issue_license._looks_synced(Path(r"C:\Users\x\OneDrive\key.hex")) == "onedrive"
+    assert issue_license._looks_synced(Path("/home/x/Dropbox/key.hex")) == "dropbox"
+    assert issue_license._looks_synced(Path(r"C:\Users\x\AppData\Local\PossumFrog\key.hex")) is None
+
+
+def test_default_key_path_is_local_appdata_not_the_repo(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "LocalAppData"))
+    p = issue_license._default_key_path()
+    assert issue_license._looks_synced(p) is None
+    assert "PossumFrog" in p.parts
+    assert p.name == "csrn_license_private_key.hex"
+    # must not be inside the repo working tree
+    assert issue_license.ROOT not in p.parents
+
+
+def test_genkey_refuses_a_synced_default(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        issue_license, "_default_key_path",
+        lambda: tmp_path / "My Drive" / "csrn_license_private_key.hex",
+    )
+    with pytest.raises(SystemExit, match="cloud-sync"):
+        issue_license.main(["--genkey"])
+    assert not (tmp_path / "My Drive").exists()
+
+
+def test_genkey_warns_but_proceeds_for_an_explicit_synced_out_key(tmp_path, capsys) -> None:
+    synced = tmp_path / "Google Drive" / "key.hex"
+    rc = issue_license.main(["--genkey", "--out-key", str(synced)])
+    assert rc == 0
+    assert synced.is_file()
+    out = capsys.readouterr().out
+    assert "WARNING" in out and "cloud-sync" in out
+
+
+def test_genkey_default_writes_to_the_local_path(monkeypatch, tmp_path) -> None:
+    target = tmp_path / "local" / "csrn_license_private_key.hex"
+    monkeypatch.setattr(issue_license, "_default_key_path", lambda: target)
+    assert issue_license.main(["--genkey"]) == 0
+    assert len(bytes.fromhex(target.read_text().strip())) == 32
