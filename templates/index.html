@@ -1308,6 +1308,7 @@
       <section class="panel settings-panel">
         <h1>Configuration Manager</h1>
         <p class="section-note">Changes are saved to <strong>Data/Settings/config.json</strong>.</p>
+        <p class="section-note" id="licenseBadge" hidden>Licensed to: <strong id="licenseBadgeOrg"></strong><span id="licenseBadgeState"></span></p>
 
         <h2>Organization</h2>
         <div class="setup-grid">
@@ -4847,6 +4848,27 @@ async function loadConfig() {
   document.getElementById('cfgAutoSave').value = String(c.application.auto_save);
   document.getElementById('cfgSessionHours').value = c.application.operator_timeout_hours || 12;
   populateBroadcastTeamDropdowns();
+  updateLicenseBadge();
+}
+
+async function updateLicenseBadge() {
+  // Soft social deterrent (Round 15 Task C): a shared/copied install
+  // visibly says who it is really licensed to. Not a technical control.
+  const badge = document.getElementById('licenseBadge');
+  if (!badge) return;
+  try {
+    const res = await fetch('/api/licensing/status', { headers: { 'Accept': 'application/json' } });
+    const data = await res.json();
+    const lic = (data && data.licensing) || {};
+    const org = (lic.license && lic.license.customer) || '';
+    if (!org) { badge.hidden = true; return; }
+    document.getElementById('licenseBadgeOrg').textContent = org;
+    document.getElementById('licenseBadgeState').textContent =
+      lic.valid ? '' : ` — ${lic.reason || 'unlicensed'}`;
+    badge.hidden = false;
+  } catch (_) {
+    badge.hidden = true;
+  }
 }
 
 async function saveConfig() {
