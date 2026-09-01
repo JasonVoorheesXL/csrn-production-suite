@@ -242,3 +242,67 @@ def test_automatic_retention_does_not_delete_manual_snapshots(
     )
 
 
+
+# --- Round 19: media exclusion + tighter retention ---
+
+
+def test_snapshot_excludes_media_directories(tmp_path: Path) -> None:
+    service, _ = build_service(tmp_path)
+    data = tmp_path / "Data"
+    for rel, blob in (
+        ("Rosters/Headshots/p1.png", b"img"),
+        ("Personnel/Headshots/c1.png", b"img"),
+        ("Assets/clip.mp4", b"vid"),
+        ("Sponsors/logo.png", b"img"),
+        ("Logos/x.png", b"img"),
+        ("School Logos/y.png", b"img"),
+        ("Social/card.png", b"img"),
+        ("Captions/caption_state.json", b"{}"),
+        ("Recaps/r.json", b"{}"),
+        ("TestFixtures/f.json", b"{}"),
+        ("Rosters/rosters.json", b"{}"),  # kept
+    ):
+        p = data / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(blob)
+
+    result = service.create_snapshot(kind="manual")
+    assert result.code == "SNAPSHOT_CREATED"
+    payload = Path(result.data["path"]) / "payload" / "Data"
+    for excluded in ("Rosters/Headshots", "Personnel/Headshots", "Assets",
+                     "Sponsors", "Logos", "School Logos", "Social", "Captions",
+                     "Recaps", "TestFixtures"):
+        assert not (payload / excluded).exists(), excluded
+    assert (payload / "Rosters" / "rosters.json").exists()
+    manifest_paths = {f["path"] for f in result.data["snapshot"]["files"]}
+    assert not any("Headshots" in p or p.startswith("Data/Assets/") for p in manifest_paths)
+
+
+def test_automatic_retention_default_is_five(tmp_path: Path) -> None:
+    # Round 19 tightened the automatic-snapshot cap from 10 to 5.
+    import inspect
+
+    from game_day_safety_service import GameDaySafetyService
+
+    default = inspect.signature(GameDaySafetyService.__init__).parameters[
+        "automatic_retention"
+    ].default
+    assert default == 5
+
+    clock = Clock()
+    service = GameDaySafetyService(
+        base_dir=tmp_path, data_dir=tmp_path / "Data",
+        backup_root=tmp_path / "bk", state_file=tmp_path / "state.json",
+        security_file=tmp_path / "sec.json", config_file=tmp_path / "Data" / "Settings" / "config.json",
+        version_file=tmp_path / "VERSION.txt", clock=clock, minimum_free_bytes=0,
+    )
+    (tmp_path / "Data" / "Settings").mkdir(parents=True)
+    (tmp_path / "Data" / "Settings" / "config.json").write_text('{"application":{"version":"t"}}', encoding="utf-8")
+    (tmp_path / "state.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "sec.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "VERSION.txt").write_text("t\n", encoding="utf-8")
+    for _ in range(8):
+        clock.advance(1)
+        service.create_snapshot(kind="startup")
+    startups = [s for s in service.list_snapshots().data["snapshots"] if s["kind"] == "startup"]
+    assert len(startups) == 5

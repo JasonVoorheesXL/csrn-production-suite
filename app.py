@@ -400,7 +400,32 @@ BROADCAST_INDEX_FILE = DATA_DIR / "Broadcasts" / "broadcasts.json"
 PACKAGES_FILE = DATA_DIR / "Packages" / "broadcast_packages.json"
 BUILD_JOURNAL_FILE = DATA_DIR / "Logs" / "build_journal.json"
 VERSION_FILE = BASE_DIR / "VERSION.txt"
-GAME_DAY_BACKUP_DIR = DATA_DIR / "Backups" / "GameDay"
+LEGACY_GAME_DAY_BACKUP_DIR = DATA_DIR / "Backups" / "GameDay"
+
+
+def _game_day_backup_root() -> Path:
+    """Local, non-synced home for game-day safety snapshots (Round 19).
+
+    GameDaySafetyService.create_snapshot writes a verified copy of game
+    state on every launch. In a dev/Drive layout that folder lives inside
+    the Google-Drive-synced project, where the sync client then uploads
+    every ~1 GB snapshot. Disaster-recovery snapshots do not need cloud
+    redundancy; keep them beside the local state authority, same as
+    CORE_BACKUP_ROOT (Round 5).
+
+    Override with CSRN_GAME_DAY_BACKUP_ROOT. Falls back to the old in-Data
+    location only when there is no LOCALAPPDATA (non-Windows dev).
+    """
+    explicit = os.environ.get("CSRN_GAME_DAY_BACKUP_ROOT", "").strip()
+    if explicit:
+        return Path(explicit).expanduser()
+    root = os.environ.get("LOCALAPPDATA", "").strip()
+    if root:
+        return Path(root).expanduser() / PRODUCT_VENDOR / PRODUCT_NAME / "GameDay"
+    return LEGACY_GAME_DAY_BACKUP_DIR
+
+
+GAME_DAY_BACKUP_DIR = _game_day_backup_root()
 GAME_DAY_RECOVERY_DIR = DATA_DIR / "Backups" / "Recovery"
 COMMISSIONING_FILE = DATA_DIR / "Settings" / "hardware_commissioning.json"
 CAPTION_PROFILE_FILE = DATA_DIR / "Settings" / "caption_profile.json"
@@ -776,6 +801,34 @@ def legacy_core_backup_notice() -> str | None:
             f"[note] {total / (1024 * 1024):.0f} MB of old core backups remain in "
             f"{LEGACY_CORE_BACKUP_ROOT} (Drive-synced). New snapshots now go to "
             f"{CORE_BACKUP_ROOT}. Run tools/migrate_core_backups.py --apply to relocate the old ones."
+        )
+    except OSError:
+        return None
+
+
+def legacy_game_day_backup_notice() -> str | None:
+    """One-line startup notice if old GameDay snapshots still sit in the
+    synced tree. Relocation is NOT automatic -- run
+    tools/migrate_gameday_backups.py --apply. New snapshots already go to
+    GAME_DAY_BACKUP_DIR.
+    """
+    try:
+        if GAME_DAY_BACKUP_DIR.resolve() == LEGACY_GAME_DAY_BACKUP_DIR.resolve():
+            return None
+        if not LEGACY_GAME_DAY_BACKUP_DIR.is_dir():
+            return None
+        total = sum(
+            f.stat().st_size
+            for f in LEGACY_GAME_DAY_BACKUP_DIR.rglob("*")
+            if f.is_file()
+        )
+        if total <= 0:
+            return None
+        return (
+            f"[note] {total / (1024 * 1024):.0f} MB of old game-day snapshots "
+            f"remain in {LEGACY_GAME_DAY_BACKUP_DIR} (Drive-synced). New "
+            f"snapshots now go to {GAME_DAY_BACKUP_DIR}. Run "
+            f"tools/migrate_gameday_backups.py --apply to relocate the old ones."
         )
     except OSError:
         return None
@@ -3779,6 +3832,9 @@ def run_command_center() -> None:
     _legacy_backup_notice = legacy_core_backup_notice()
     if _legacy_backup_notice:
         print(_legacy_backup_notice)
+    _legacy_gameday_notice = legacy_game_day_backup_notice()
+    if _legacy_gameday_notice:
+        print(_legacy_gameday_notice)
     print("Laptop: http://127.0.0.1:5050")
     print(f"Phone/iPad: http://{ip}:5050")
     print("OBS overlay: http://127.0.0.1:5050/overlay")

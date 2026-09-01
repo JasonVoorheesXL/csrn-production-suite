@@ -9,7 +9,36 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
+
+
+# Round 19: re-derivable media the game-day safety snapshot does NOT copy.
+# A snapshot is a full copy of Data/ taken on every launch; dragging ~1 GB of
+# headshots / assets / transcripts through it (and, in a dev/Drive layout,
+# through the sync uploader) is pure ballast. Only game *state* needs the
+# fast, verified rollback path. Matched by basename (like "Backups").
+SNAPSHOT_MEDIA_EXCLUDE_NAMES: tuple[str, ...] = (
+    "Headshots",       # Data/Rosters/Headshots + Data/Personnel/Headshots
+    "Assets",
+    "Sponsors",
+    "Logos",
+    "School Logos",
+    "Social",
+    "Captions",
+    "Recaps",
+    "TestFixtures",
+)
+# For RecoveryService.restore_snapshot: top-level Data/ dirs a state rollback
+# must leave in place (the snapshot no longer carries them, so wiping them
+# would silently delete the live media library). "Headshots" is nested and is
+# held aside separately.
+RESTORE_PRESERVE_TOP_NAMES: tuple[str, ...] = tuple(
+    name for name in SNAPSHOT_MEDIA_EXCLUDE_NAMES if name != "Headshots"
+)
+RESTORE_PRESERVE_NESTED: tuple[str, ...] = (
+    "Rosters/Headshots",
+    "Personnel/Headshots",
+)
 
 
 @dataclass(frozen=True)
@@ -50,9 +79,10 @@ class GameDaySafetyService:
         version_file: Path,
         clock: Callable[[], float] = time.time,
         minimum_free_bytes: int = 512 * 1024 * 1024,
-        automatic_retention: int = 10,
+        automatic_retention: int = 5,  # Round 19: was 10
         publish_attempts: int = 4,
         publish_retry_delay: float = 0.05,
+        media_exclude_names: Iterable[str] | None = None,
     ) -> None:
         self._base_dir = Path(base_dir)
         self._data_dir = Path(data_dir)
@@ -64,6 +94,11 @@ class GameDaySafetyService:
         self._clock = clock
         self._minimum_free_bytes = max(0, int(minimum_free_bytes))
         self._automatic_retention = max(1, int(automatic_retention))
+        self._media_exclude_names = tuple(
+            media_exclude_names
+            if media_exclude_names is not None
+            else SNAPSHOT_MEDIA_EXCLUDE_NAMES
+        )
         self._publish_attempts = max(1, int(publish_attempts))
         self._publish_retry_delay = max(0.0, float(publish_retry_delay))
 
@@ -343,7 +378,9 @@ class GameDaySafetyService:
             shutil.copytree(
                 self._data_dir,
                 payload_root / "Data",
-                ignore=shutil.ignore_patterns("Backups"),
+                ignore=shutil.ignore_patterns(
+                    "Backups", *self._media_exclude_names
+                ),
             )
             for source in (
                 self._state_file,

@@ -10,6 +10,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, ContextManager
 
+from game_day_safety_service import (
+    RESTORE_PRESERVE_NESTED,
+    RESTORE_PRESERVE_TOP_NAMES,
+)
+
 
 @dataclass(frozen=True)
 class RecoveryResult:
@@ -226,22 +231,50 @@ class RecoveryService:
             raise RuntimeError("Snapshot payload does not contain Data.")
 
         self._data_dir.mkdir(parents=True, exist_ok=True)
-        for child in tuple(self._data_dir.iterdir()):
-            if child.name == "Backups":
-                continue
-            self._remove_path(child)
-        for child in staged_data.iterdir():
-            destination = self._data_dir / child.name
-            if child.is_dir():
-                shutil.copytree(child, destination)
-            else:
-                shutil.copy2(child, destination)
 
-        for target in (self._state_file, self._security_file):
-            source = payload_root / target.name
-            if source.is_file():
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source, target)
+        # Round 19: game-day snapshots no longer carry the re-derivable media
+        # libraries (headshots / assets / transcripts / ...). A state rollback
+        # must therefore LEAVE those in place -- top-level dirs are simply
+        # skipped, and the nested Headshots dirs are held aside across the
+        # wipe (their parents Rosters/ and Personnel/ ARE restored).
+        preserved_top = {"Backups", *RESTORE_PRESERVE_TOP_NAMES}
+        holding = self._data_dir / ".restore-preserve"
+        self._remove_path(holding)
+        held: list[tuple[Path, Path]] = []
+        for relative in RESTORE_PRESERVE_NESTED:
+            live = self._data_dir / relative
+            if live.exists():
+                stash = holding / relative
+                stash.parent.mkdir(parents=True, exist_ok=True)
+                live.rename(stash)
+                held.append((stash, live))
+
+        try:
+            for child in tuple(self._data_dir.iterdir()):
+                if child.name in preserved_top or child == holding:
+                    continue
+                self._remove_path(child)
+            for child in staged_data.iterdir():
+                if child.name in preserved_top:
+                    continue
+                destination = self._data_dir / child.name
+                if child.is_dir():
+                    shutil.copytree(child, destination)
+                else:
+                    shutil.copy2(child, destination)
+
+            for target in (self._state_file, self._security_file):
+                source = payload_root / target.name
+                if source.is_file():
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source, target)
+        finally:
+            for stash, live in held:
+                if live.exists():
+                    self._remove_path(live)
+                live.parent.mkdir(parents=True, exist_ok=True)
+                stash.rename(live)
+            self._remove_path(holding)
 
     def rehearse_restore(self, snapshot_id: str) -> RecoveryResult:
         verification = self._safety_service.verify_snapshot(snapshot_id)

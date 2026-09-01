@@ -194,3 +194,90 @@ def test_corrupt_snapshot_cannot_be_rehearsed_or_restored(tmp_path: Path) -> Non
     assert recovery.restore_snapshot(snapshot_id, confirmation=snapshot_id).code == "SNAPSHOT_CORRUPT"
 
 
+
+
+# --- Round 19: trimmed snapshots + relocated backup_root ---
+
+
+def _relocated_services(tmp_path: Path):
+    """Services with backup_root OUTSIDE data_dir (mirrors the Round 19 move
+    to %LOCALAPPDATA%\...\GameDay) and a data_dir that carries media."""
+    data = tmp_path / "proj" / "Data"
+    (data / "Settings").mkdir(parents=True)
+    (data / "Settings" / "config.json").write_text(json.dumps({"v": "orig"}), encoding="utf-8")
+    (data / "Schools").mkdir()
+    (data / "Schools" / "schools.json").write_text(json.dumps([{"id": "a"}]), encoding="utf-8")
+    (data / "Rosters").mkdir()
+    (data / "Rosters" / "rosters.json").write_text(json.dumps({"players": 1}), encoding="utf-8")
+    (data / "Rosters" / "Headshots").mkdir()
+    (data / "Rosters" / "Headshots" / "p1.png").write_bytes(b"PNGDATA-1")
+    (data / "Assets").mkdir()
+    (data / "Assets" / "clip.mp4").write_bytes(b"VIDEO" * 100)
+    (data / "Captions").mkdir()
+    (data / "Captions" / "caption_state.json").write_text(json.dumps({"live": True}), encoding="utf-8")
+    state_file = tmp_path / "proj" / "state.json"
+    state_file.write_text(json.dumps({"status": "planned"}), encoding="utf-8")
+    security_file = tmp_path / "proj" / "security.json"
+    security_file.write_text(json.dumps({"secret_key": "s"}), encoding="utf-8")
+    version_file = tmp_path / "proj" / "VERSION.txt"
+    version_file.write_text("1.13.0-test", encoding="utf-8")
+
+    backup_root = tmp_path / "LOCALAPPDATA" / "PossumFrog" / "CSRN Production Suite" / "GameDay"
+    recovery_root = tmp_path / "LOCALAPPDATA" / "PossumFrog" / "CSRN Production Suite" / "GameDay" / "Recovery"
+    clock = Clock()
+    safety = GameDaySafetyService(
+        base_dir=tmp_path / "proj", data_dir=data, backup_root=backup_root,
+        state_file=state_file, security_file=security_file,
+        config_file=data / "Settings" / "config.json", version_file=version_file,
+        clock=clock, minimum_free_bytes=0,
+    )
+    recovery = RecoveryService(
+        safety_service=safety, data_dir=data, backup_root=backup_root,
+        recovery_root=recovery_root, state_file=state_file, security_file=security_file,
+        version_file=version_file, load_state=lambda: json.loads(state_file.read_text()),
+        clock=clock,
+    )
+    return recovery, safety, data, state_file
+
+
+def test_snapshot_is_trimmed_of_media(tmp_path: Path) -> None:
+    _, safety, _, _ = _relocated_services(tmp_path)
+    result = safety.create_snapshot(kind="manual")
+    assert result.code == "SNAPSHOT_CREATED"
+    payload = Path(result.data["path"]) / "payload" / "Data"
+    # game state IS captured
+    assert (payload / "Schools" / "schools.json").exists()
+    assert (payload / "Rosters" / "rosters.json").exists()
+    # re-derivable media is NOT
+    assert not (payload / "Rosters" / "Headshots").exists()
+    assert not (payload / "Assets").exists()
+    assert not (payload / "Captions").exists()
+
+
+def test_restore_from_relocated_root_rolls_back_state_and_preserves_media(tmp_path: Path) -> None:
+    recovery, safety, data, state_file = _relocated_services(tmp_path)
+    snap = safety.create_snapshot(kind="manual")
+    snapshot_id = snap.data["snapshot"]["snapshot_id"]
+
+    # drift the live tree AFTER the snapshot
+    (data / "Schools" / "schools.json").write_text(json.dumps([{"id": "b"}]), encoding="utf-8")
+    (data / "Rosters" / "rosters.json").write_text(json.dumps({"players": 99}), encoding="utf-8")
+    (data / "Rosters" / "Headshots" / "p2.png").write_bytes(b"PNGDATA-2")  # new headshot
+    (data / "Assets" / "clip.mp4").write_bytes(b"EDITED-VIDEO")
+    (data / "Captions" / "caption_state.json").write_text(json.dumps({"live": False}), encoding="utf-8")
+    state_file.write_text(json.dumps({"status": "planned", "changed": True}), encoding="utf-8")
+
+    result = recovery.restore_snapshot(snapshot_id, confirmation=snapshot_id)
+    assert result.code == "SNAPSHOT_RESTORED", result.data
+
+    # game state rolled back
+    assert json.loads((data / "Schools" / "schools.json").read_text()) == [{"id": "a"}]
+    assert json.loads((data / "Rosters" / "rosters.json").read_text()) == {"players": 1}
+    assert "changed" not in json.loads(state_file.read_text())
+    # media preserved as it was at restore time (NOT wiped, NOT rolled back)
+    assert (data / "Rosters" / "Headshots" / "p1.png").read_bytes() == b"PNGDATA-1"
+    assert (data / "Rosters" / "Headshots" / "p2.png").read_bytes() == b"PNGDATA-2"
+    assert (data / "Assets" / "clip.mp4").read_bytes() == b"EDITED-VIDEO"
+    assert json.loads((data / "Captions" / "caption_state.json").read_text()) == {"live": False}
+    # no holding dir left behind
+    assert not (data / ".restore-preserve").exists()
