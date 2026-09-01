@@ -40,17 +40,24 @@ is **not signed** and does not affect verification.
 .venv/Scripts/python.exe tools/issue_license.py --genkey --out-key ~/csrn_license_key.hex
 ```
 
-This prints the **public** key. Paste it into `license_service.py`:
+This prints the **public** key (64 hex chars). Paste that value -- and only
+that value, the public half is safe to commit and to bundle -- into
+`license_service.py`:
 
 ```python
-LICENSE_PUBLIC_KEY_HEX = "35f6...<64 hex chars>..."
+LICENSE_PUBLIC_KEY_HEX = "fd748ce7...<64 hex chars>..."
 ```
 
-Until a real key is embedded, `LICENSE_PUBLIC_KEY_HEX` is an all-zero
-placeholder and `verify_license()` fails closed
-(`LICENSE_PUBLIC_KEY_NOT_CONFIGURED`) -- an installed build without a
-configured key stays in the "license required" state; a source checkout is
-unaffected (see "The existing Caledonia install" below).
+**As of Round 16 the real owner-supplied key is embedded**
+(`fd748ce76657e3339844bdd4046240ee5a22ac34eb0962647c84f66918b9f2fe`).
+`verify_license()` verifies every license against *that* key: a license
+signed by any other keypair is rejected with `LICENSE_SIGNATURE_INVALID`
+(not merely "signature present"). The all-zero string is still recognised
+as the "not configured" placeholder and fails closed
+(`LICENSE_PUBLIC_KEY_NOT_CONFIGURED`) if it is ever re-embedded.
+
+To rotate the key (private key lost / compromised): `--genkey` a new pair,
+replace `LICENSE_PUBLIC_KEY_HEX`, ship an app update, re-issue customers.
 
 ### Keeping the private key safe
 
@@ -120,17 +127,59 @@ no-expiry license once, the same as any customer:
 (`--org` should match the Identity Profile `organization.name` so the
 badge reads correctly.)
 
-## Round 16 (pywebview shell) note
+## Round 16 -- pywebview shell + license, merged
 
-The gate is **not dev-only** -- it must survive PyInstaller packaging. The
-frozen build:
+`round16-pywebview-license-handoff-20260831` merged the pywebview shell
+(`round15-pywebview-shell-20260831`, commits 15A-15G) with the license
+foundation (`round15-license-foundation-20260831`). The only file both
+branches touched was `app.py`, in disjoint regions -- clean merge.
 
-- includes `license_service.py` (pure Python, no extra dependency -- the
-  Ed25519 is vendored on purpose so nothing native is added to the bundle);
-- **excludes** `tools/issue_license.py` (like `run_core_foundation.py` --
-  add it to the `.spec` `excludes`);
-- must ship with a **real** `LICENSE_PUBLIC_KEY_HEX` embedded (not the
-  placeholder), or every installed launch shows "license required";
-- resolves the license file at `ProductPaths.license_file`
-  (`%LOCALAPPDATA%\PossumFrog\CSRN Production Suite\Licensing\license.json`),
-  which already works under `installed_mode`.
+**How the two coexist.** `_install_license_gate(app)` runs at `app.py`
+import scope (right after `_install_internal_tools_gate(app)`), so it is
+installed no matter which entry point loads `app`:
+
+- `python app.py` -> `__main__` -> `run_command_center()` (dev / `.bat`);
+- `csrn_desktop.py --serve-only` -> `run_server_only()` -> `import app` ->
+  `app.run_command_center()` (frozen build's re-exec, Round 15D);
+- the pywebview shell's child process, same path as above.
+
+In every case `serve(app, ...)` serves the already-gated app. A frozen
+build resolves `ProductPaths.installed_mode = True` (`sys.frozen`), so
+`_installed_build()` is True and the gate enforces: no valid license ->
+`GET /` shows `templates/license_required.html`, broadcast APIs `402`,
+while health / licensing / diagnostics / static / overlay stay reachable.
+(`tests/test_license_frozen_gate.py`.)
+
+**Packaging (`.spec`, Round 16 Task B).**
+
+- `license_service.py` + `entitlement_service.py` are pinned as
+  `hiddenimports` (license_service is a function-local import inside
+  `app.get_entitlement_service()`).
+- `tools.issue_license` / `issue_license` are in `excludes` -- the
+  owner-only signer never ships. Nothing in the app import graph reaches
+  it; `test_license_frozen_gate.py` asserts no signer / private-key token
+  (`sign_license(`, `ed25519_sign(`, `CSRN_LICENSE_PRIVATE_KEY`,
+  `--genkey`, `secret_expand`) appears in any shipped module. The app is
+  verify-only and never holds a private key.
+- The **real public key is embedded** (see "one-time setup" above), so an
+  installed launch does not sit on the "license required" screen once a
+  valid license is present.
+- License file lives at `ProductPaths.license_file`
+  (`%LOCALAPPDATA%\PossumFrog\CSRN Production Suite\Licensing\license.json`).
+
+**Still deferred (unchanged):**
+
+- **15E** first-run onboarding wizard -- its own future round.
+- Windows-box **build verification** of the `.spec` / `.iss` -- PyInstaller
+  is not installed in the dev environment; a real onedir build must
+  confirm the ctranslate2 / onnxruntime imports and that
+  `/api/diagnostics` 404s / `/api/health` 200s from the frozen exe.
+- **Code signing** -- no Authenticode cert this round; unsigned artefacts
+  must not be presented as signed releases.
+
+**Owner's remaining one-time check:** issue a license with the real
+private key on your own machine
+(`tools/issue_license.py --key <your key> --org "..." --sports football
+--expires never`) and confirm it validates against the embedded
+`LICENSE_PUBLIC_KEY_HEX` -- the one link the test suite can't close here
+because it (correctly) has no private key.

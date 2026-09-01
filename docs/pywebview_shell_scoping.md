@@ -459,15 +459,24 @@ changed.
 
 > **Note (schedule change):** the pywebview shell above shipped as its own
 > branch `round15-pywebview-shell-20260831` (commits 15A–15G; 15E onboarding
-> deferred) and is now slated as **Round 16**, unchanged. The redefined
-> **Round 15** built the license-enforcement foundation instead
-> (`round15-license-foundation-20260831`, see `docs/licensing.md`).
+> deferred). The redefined **Round 15** built the license-enforcement
+> foundation (`round15-license-foundation-20260831`, see
+> `docs/licensing.md`).
 >
-> **Round 16 must carry the license gate through packaging** — it is not
-> dev-only. The frozen build has to: bundle `license_service.py` (pure
-> Python, no new dependency — the Ed25519 is vendored on purpose); **exclude
-> `tools/issue_license.py`** from the `.spec` `excludes` list alongside
-> `run_core_foundation.py`; embed a **real** `LICENSE_PUBLIC_KEY_HEX` (the
-> committed placeholder is all-zero and fails closed, so an installed launch
-> would sit on the "license required" screen); and rely on
-> `ProductPaths.license_file` under `installed_mode` (already correct).
+> **Round 16** (`round16-pywebview-license-handoff-20260831`) merged the
+> two — clean merge, `app.py` the only shared file, disjoint regions. Done
+> in Round 16:
+> - `.spec` pins `license_service` + `entitlement_service` as hidden
+>   imports and **excludes `tools.issue_license`** (owner-only signer);
+>   `test_license_frozen_gate.py` asserts no signer / private-key code path
+>   is reachable from any shipped module (the frozen app verifies only);
+> - the **real owner-supplied `LICENSE_PUBLIC_KEY_HEX` is embedded** and
+>   proven to be what runtime verification checks (wrong-keypair licenses
+>   → `LICENSE_SIGNATURE_INVALID`);
+> - the `sys.frozen` serve path (15D) is confirmed to reach the same gate
+>   as dev "installed" mode — frozen + no license → `license_required.html`
+>   + `402` on broadcast APIs.
+>
+> **Still deferred:** 15E onboarding wizard; a real Windows-box PyInstaller
+> build to verify ctranslate2/onnxruntime imports and the frozen
+> `/api/health` 200 / `/api/diagnostics` 404; code signing.

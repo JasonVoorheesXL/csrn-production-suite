@@ -1,19 +1,91 @@
 # Overnight Session Summary — 2026-08-28 → 08-31
 
-Round 13 branch: `round13-dehardcode-cleanup-20260831`. Round 14 branch:
-`round14-pywebview-scoping-20260831`. **Round 15 branch:
-`round15-license-foundation-20260831`** (off `round14-pywebview-scoping-20260831`
-@ `55be4ea`, carries rounds 1-14).
+Round 14 branch: `round14-pywebview-scoping-20260831`. Round 15 branches:
+`round15-pywebview-shell-20260831` (the shell, 15A–15G) and
+`round15-license-foundation-20260831` (the license gate). **Round 16
+branch: `round16-pywebview-license-handoff-20260831`** merges the two (off
+`round14` @ `55be4ea`, carries rounds 1–15).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
 Full test suite (deterministic, `-p no:randomly`, run with
-`.venv/Scripts/python.exe`) after **round 15**: **0 failed, 2370 passed**.
-**0 real regressions across all fifteen rounds.**
+`.venv/Scripts/python.exe`) after **round 16**: **0 failed, 2411 passed**.
+**0 real regressions across all sixteen rounds.**
 
-> The pywebview desktop-shell work drafted first (branch
-> `round15-pywebview-shell-20260831`, commits 15A–15G, 15E onboarding
-> deferred) is **reslotted as Round 16, unchanged**, per the owner. Round 15
-> below is the redefined license-enforcement foundation.
+---
+
+## ROUND 16 — pywebview shell + license integration (2026-08-31)
+
+Merge `round15-pywebview-shell-20260831` (the built shell: 15A–15G) with
+`round15-license-foundation-20260831` (the license gate) so both work
+together in a frozen build. **15E (first-run onboarding) stays deferred.**
+
+`templates/index.html` + `broadcaster_print_service.py` (owner WIP) **not
+touched** (0 bytes — index.html carries the license-branch Task C hunks
+already committed; Round 16 added nothing to either).
+
+| commit | task |
+|---|---|
+| `<merge>` | **A** — merge the two branches |
+| `e0b4b56` | **B** — `.spec`: pin `license_service`/`entitlement_service`, exclude `tools.issue_license` |
+| `b29076b` | (addendum) embed the owner-supplied real license public key |
+| `00b4016` | **C** — `tests/test_license_frozen_gate.py` |
+| `<this>` | **D** — docs consolidation |
+
+### Task A — merge
+
+Both branches fork from `round14` @ `55be4ea`. **The only file both
+touched is `app.py`, in disjoint regions** — pywebview at
+`__main__` / `run_command_center` / SIGBREAK (~3643–3697); license at the
+flask import, `_install_license_gate` (~296), `get_entitlement_service`
+verifier (~3020), and the `_install_license_gate(app)` call (~3610).
+**Clean merge, no conflicts.** Startup order verified: the license gate is
+installed at `app.py` **import scope** (after the internal-tools gate), so
+it applies to every entry path — `python app.py`, the frozen
+`csrn_desktop --serve-only` re-exec (15D), and the shell's child process
+— all of which `import app` then `serve(app)`. Suite green post-merge
+(2402).
+
+### Task B — `.spec` bundling
+
+`hiddenimports += license_service, entitlement_service` (license_service is
+a function-local import inside `get_entitlement_service()`).
+`excludes += tools.issue_license, issue_license` — the owner-only signer
+never ships. `test_license_frozen_gate.py` asserts no signer /
+private-key token (`sign_license(`, `ed25519_sign(`,
+`CSRN_LICENSE_PRIVATE_KEY`, `--genkey`, `secret_expand`) appears in any
+shipped module: **the frozen app is verify-only and never holds a private
+key.**
+
+### Embed the owner public key
+
+`LICENSE_PUBLIC_KEY_HEX` = `fd748ce7…b9f2fe` (owner-generated; public half
+only, safe to commit/bundle). Verified: (1) sign→verify pipeline holds for
+a matching keypair (the owner completes the literal end-to-end with the
+real private key — the suite has none by design); (2) not cosmetic —
+`!= "0"*64`, `license_public_key_configured()` True, decompresses to a
+real Ed25519 point, and `verify_license()` routes through
+`ed25519_verify` against it; (3) a license signed by a **different**
+keypair (signature present) → `LICENSE_SIGNATURE_INVALID`, proving the
+embedded key is what's checked, not mere signature presence. The all-zero
+string is still the fail-closed placeholder if re-embedded.
+
+### Task C — frozen-build gate verification
+
+New `tests/test_license_frozen_gate.py`: `resolve_product_paths(frozen=
+True).installed_mode` → `_installed_build()` True → gate enforces;
+`csrn_desktop.main(["--serve-only"])` → `import app` installs the gate;
+frozen + missing license → `license_required.html` + `402` on broadcast
+APIs, health/licensing/overlay still open; frozen + wrong-keypair license
+→ rejected.
+
+### Task D — docs
+
+[`docs/licensing.md`](docs/licensing.md) "Round 16" section and
+[`docs/pywebview_shell_scoping.md`](docs/pywebview_shell_scoping.md) note
+updated for the merged picture. **Still deferred:** 15E onboarding; a
+real Windows-box PyInstaller build to verify ctranslate2/onnxruntime
+imports + frozen `/api/health` 200 / `/api/diagnostics` 404; code
+signing.
 
 ---
 
