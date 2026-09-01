@@ -179,13 +179,16 @@ def ed25519_verify(public: bytes, msg: bytes, signature: bytes) -> bool:
 # CSRN license layer
 # ===========================================================================
 
-# Embedded PUBLIC verification key (Ed25519, 32 bytes, hex). The matching
-# PRIVATE key is the owner's alone -- it must never appear in this repo or in
-# any build. Generate the real keypair once with:
-#     .venv/Scripts/python.exe tools/issue_license.py --genkey
-# and paste the printed public key here. Until then this all-zero placeholder
-# makes verify_license() fail closed ("public key not configured").
-LICENSE_PUBLIC_KEY_HEX = "0000000000000000000000000000000000000000000000000000000000000000"
+# Embedded PUBLIC verification key (Ed25519, 32 bytes, hex). This is the
+# public half only -- safe to commit and to bundle. The matching PRIVATE key
+# is the owner's alone and must never appear in this repo or any build; it is
+# used only by tools/issue_license.py on the owner's own machine.
+#
+# An all-zero value here is the "not configured" placeholder and makes
+# verify_license() fail closed. The real key below was supplied by the owner
+# (Round 16); regenerate with `tools/issue_license.py --genkey` and rotate
+# this constant if the private key is ever lost or compromised.
+LICENSE_PUBLIC_KEY_HEX = "fd748ce76657e3339844bdd4046240ee5a22ac34eb0962647c84f66918b9f2fe"
 
 SIGNATURE_FIELD = "signature"
 

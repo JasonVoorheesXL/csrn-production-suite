@@ -165,14 +165,57 @@ def test_verify_reports_missing_and_malformed_signatures() -> None:
     assert ls.verify_license("nope", public_key_hex=_TEST_PUB_HEX) == (False, "LICENSE_NOT_AN_OBJECT")
 
 
-def test_placeholder_public_key_fails_closed() -> None:
+def test_all_zero_key_is_the_documented_fail_closed_placeholder() -> None:
+    # The all-zero sentinel still fails closed if it were ever re-embedded or
+    # passed explicitly. (The shipped LICENSE_PUBLIC_KEY_HEX is a real key --
+    # see test_embedded_public_key_* below.)
+    zero = "0" * 64
+    assert ls.license_public_key_configured(zero) is False
     signed = ls.sign_license(_payload(), _TEST_SEED)
-    # Default embedded key is the all-zero placeholder.
-    ok, reason = ls.verify_license(signed)
+    assert ls.verify_license(signed, public_key_hex=zero) == (
+        False,
+        "LICENSE_PUBLIC_KEY_NOT_CONFIGURED",
+    )
+
+
+# --- Round 16: the owner's real embedded public key ---------------------
+
+# Public half only; the private key never leaves the owner's machine.
+_OWNER_PUBLIC_KEY_HEX = "fd748ce76657e3339844bdd4046240ee5a22ac34eb0962647c84f66918b9f2fe"
+
+
+def test_embedded_public_key_is_the_owner_real_key_not_the_placeholder() -> None:
+    assert ls.LICENSE_PUBLIC_KEY_HEX == _OWNER_PUBLIC_KEY_HEX
+    assert ls.LICENSE_PUBLIC_KEY_HEX != "0" * 64
+    assert ls.license_public_key_configured() is True  # module global
+    # it is a decodable Ed25519 point, so real licenses can verify against it
+    assert ls._point_decompress(bytes.fromhex(ls.LICENSE_PUBLIC_KEY_HEX)) is not None
+
+
+def test_runtime_verification_uses_the_embedded_key_not_just_sig_presence() -> None:
+    # A license signed by a DIFFERENT keypair must be rejected as an invalid
+    # SIGNATURE (not "no key" and not "no signature") -- proving verify_license
+    # actually checks against the embedded key.
+    other_seed = bytes(range(100, 132))
+    forged = ls.sign_license(_payload(customer="Impostor"), other_seed)
+    assert "signature" in forged and len(forged["signature"]) > 40  # a signature IS present
+    ok, reason = ls.verify_license(forged)  # module global = the owner's key
     assert ok is False
-    assert reason == "LICENSE_PUBLIC_KEY_NOT_CONFIGURED"
-    assert ls.license_public_key_configured() is False
-    assert ls.license_public_key_configured(_TEST_PUB_HEX) is True
+    assert reason == "LICENSE_SIGNATURE_INVALID"
+
+
+def test_verify_pipeline_accepts_a_license_from_the_matching_private_key() -> None:
+    # We do not have the owner's private key (by design), so this proves the
+    # sign->verify pipeline end to end with a stand-in keypair: whatever key
+    # verify_license is pointed at, a license signed by THAT key's private
+    # half validates. The owner runs the same check with the real private key
+    # + tools/issue_license.py against LICENSE_PUBLIC_KEY_HEX.
+    seed = bytes(range(7, 39))
+    pub_hex = ls.ed25519_publickey(seed).hex()
+    signed = ls.sign_license(_payload(customer="Matching Key School"), seed)
+    assert ls.verify_license(signed, public_key_hex=pub_hex) == (True, "")
+    # ...and that exact file is rejected against the owner's embedded key.
+    assert ls.verify_license(signed)[0] is False
 
 
 # --------------------------------------------------------------------------
