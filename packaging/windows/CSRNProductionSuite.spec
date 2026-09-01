@@ -18,6 +18,16 @@
 #   * run_core_foundation.py (a second, debug Flask entry point that cannot
 #     be runtime-gated) and pytest are excluded.
 #
+# Round 16 (pywebview + license handoff):
+#   * license_service.py + entitlement_service.py are pinned into the bundle
+#     as hidden imports (license_service is a function-local import inside
+#     app.get_entitlement_service(), so make it explicit);
+#   * tools.issue_license is EXCLUDED -- it is the owner-only signer that
+#     must never ship in a customer build. Nothing in the app import graph
+#     reaches it, and license_service's signing helpers have no caller and
+#     no key in the frozen app (verify-only). test_license_frozen_gate.py
+#     asserts both.
+#
 # Code signing is deliberately deferred this round -- unsigned artefacts
 # must not be represented as signed production releases.
 
@@ -48,7 +58,9 @@ def _env_tree(var: str, target: str):
 
 datas = []
 binaries = []
-hiddenimports = ["webview"]
+# license_service is imported lazily inside app.get_entitlement_service();
+# pin it (and entitlement_service) so PyInstaller definitely bundles them.
+hiddenimports = ["webview", "license_service", "entitlement_service"]
 
 for package in (
     "ctranslate2",
@@ -92,7 +104,7 @@ analysis = Analysis(
     runtime_hooks=[
         str(ROOT / "packaging" / "windows" / "rthook_bundled_runtime.py"),
     ],
-    excludes=["pytest", "run_core_foundation"],
+    excludes=["pytest", "run_core_foundation", "tools.issue_license", "issue_license"],
     noarchive=False,
 )
 pyz = PYZ(analysis.pure)

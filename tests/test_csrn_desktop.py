@@ -328,8 +328,10 @@ def test_run_core_foundation_is_not_a_packaging_entry_point() -> None:
     spec = (root / "packaging/windows/CSRNProductionSuite.spec").read_text(encoding="utf-8")
     # Round 14 finding: run_core_foundation.py is a second Flask entry point
     # with a debug server and CANNOT be runtime-gated -- it must simply never
-    # be a bundled entry point.
-    assert 'excludes=["pytest", "run_core_foundation"]' in spec
+    # be a bundled entry point. (Round 16 also excludes tools.issue_license.)
+    excludes_line = spec.split("excludes=", 1)[1].split("\n", 1)[0]
+    assert '"pytest"' in excludes_line
+    assert '"run_core_foundation"' in excludes_line
 
 
 # --------------------------------------------------------------------------
