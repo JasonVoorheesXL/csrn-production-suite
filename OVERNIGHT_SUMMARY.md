@@ -8,12 +8,120 @@ branch: `round16-pywebview-license-handoff-20260831`** merges the two (off
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
 Round 20 branch: `round20-shutdown-architecture-20260901` (off `round19` @
-`efeae3f`; investigate-only). **Round 21 branch:
-`round21-inprocess-shutdown-20260901`** (off `round20` @ `cdee3f6`).
+`efeae3f`; investigate-only). Round 21 branch:
+`round21-inprocess-shutdown-20260901` (off `round20` @ `cdee3f6`).
+**Round 22 branch: `round22-first-run-onboarding-20260901`** (off
+`round21` @ `d59a513`).
 
 Full test suite (deterministic, `-p no:randomly`, run with
-`.venv/Scripts/python.exe`) after **round 21**: **0 failed, 2430 passed**.
-**0 real regressions across all twenty-one rounds.**
+`.venv/Scripts/python.exe`) after **round 22**: **0 failed, 2452 passed**.
+**0 real regressions across all twenty-two rounds.**
+
+---
+
+## ROUND 22 — first-run onboarding wizard (2026-09-01)
+
+The last major packaging gap from the pywebview/licensing arc (Rounds
+14–21). A fresh install used to land straight on a blank
+`/?module=pregame`. Round 22 builds the missing first-run wizard, plus a
+"Choose License File" control on the license gate screen.
+`templates/index.html` + `broadcaster_print_service.py` (+ its test) not
+touched — verified byte-identical to round start.
+
+| commit | task |
+|---|---|
+| `61a403d` | **22A+B** — first-run detection + onboarding gate, wizard UI |
+| `c29e2f4` | **22C** — wire the wizard to the existing service paths |
+| `781fc59` | **22D** — "Choose License File" on the license gate screen |
+| (this)    | **22E** — golden tests + docs |
+
+### 22A/B — the onboarding gate + the wizard page
+
+`identity_service` gained a persisted scalar flag **`onboarding_complete`**
+— seeded `True` in the existing-install template (so Caledonia and every
+current install never see the wizard), `False` on a blank seed, normalised
+back through `save_identity_profile` so a later section-only write can't
+clobber it. `identity_service.onboarding_complete(profile)` is the reader.
+
+`app.py` installs **`_install_onboarding_gate(app)`** at import scope,
+right after `_install_license_gate(app)` (license first: an unlicensed
+fresh install sees the license screen, *then* the wizard once licensed).
+`_onboarding_incomplete()` reads the Identity Profile **fresh per request**
+(mirrors `_current_licensing()`), so Finish/Skip take effect with no
+restart. While incomplete: `GET /` → `templates/onboarding.html`; other
+routes → `409 ONBOARDING_REQUIRED`; exempt = `/api/health`, `/static/`,
+`/api/onboarding`, `/api/licensing`, `/api/diagnostics`,
+`/api/runtime-diagnostics`, `/overlay`.
+
+`templates/onboarding.html` `<link>`s the real app stylesheet
+(`/static/style.css`) and has: **org / team name (required)**, primary
+sport (`<select>`, optional, from the ruleset registry), primary school
+(inline `<input>`, optional — creates the first record, no dropdown against
+an empty DB), logo (file picker, optional). **"Finish"** and **"Skip for
+now"** both complete onboarding.
+
+### 22C — backend wiring (no parallel writers)
+
+- `routes/onboarding_routes.py` (new, blueprint `onboarding_routes`, **not
+  `@require_auth`** — a fresh install has no operator PIN, and every route
+  is inert once `onboarding_complete`): `GET /api/onboarding/context`
+  (sports list + default + status), `POST /api/onboarding/logo`,
+  `POST /api/onboarding/complete` (`409 ALREADY_ONBOARDED` once done).
+- `pregame_presentation.save_organization_logo(upload)` extracted to
+  module scope (type/size validation, writes
+  `static/organization/organization-logo.<ext>`, replacing any prior) —
+  the existing settings route now calls it; `_ORG_LOGO_DIR` is a
+  module-level seam so tests don't touch the repo's static tree.
+- `app._complete_onboarding(payload)` applies org/team name (+ derives
+  `short_name` when unset), optional sport, optional logo path, and an
+  optional inline school via **`SchoolService.create`** (real id, real
+  duplicate check) wired in as `broadcast_defaults.home_school_id`, then
+  writes the whole profile through the **Round 12/13
+  `save_identity_profile` path** and sets `onboarding_complete=True`.
+- `phase5_architecture.py` allowlists `onboarding_routes` + its three
+  public endpoints.
+
+### 22D — "Choose License File" on the gate screen
+
+`templates/license_required.html` got a file picker + **Install license**
+button + inline aria-live result line + a small vanilla-JS handler that
+POSTs the file and reloads on `LICENSE_INSTALLED`.
+
+New route **`POST /api/licensing/install-file`** in its **own**
+`routes/licensing_public_routes.py` (blueprint `licensing_public_routes`),
+**unauthenticated** — the gate screen is shown before any operator PIN
+exists, and the Ed25519 signature check in
+`EntitlementService.install_license()` is the real boundary. Kept out of
+`deployment_routes` on purpose: that blueprint has an "every route
+authenticated" invariant with two tests. Accepts multipart `license`,
+parses JSON (`400 LICENSE_FILE_UNREADABLE` / `LICENSE_FILE_REQUIRED` up
+front), reuses the authed route's code→HTTP mapping (`400` malformed,
+`409` signature/verifier/installation, `200` + `LICENSE_INSTALLED`), and
+adds operator-facing `message` wording. One control now covers first-run
+activation **and** every later renewal, since the gate page shows whenever
+there's no valid license. `phase5_architecture.py` allowlists the
+blueprint + endpoint.
+
+### 22E — golden tests + docs
+
+`tests/test_onboarding.py` grew from 9 to 21 tests: blank profile → wizard;
+`_complete_onboarding` with **org-name-only** completes; **org name
+required unless Skip**; **Skip** completes; **inline school name creates a
+real `SchoolService` record** and wires it as the home default; sport
+recorded; `POST /api/onboarding/complete` twice → `409`; **logo lands at
+`static/organization/organization-logo.<ext>`** (redirected dir) + rejects
+a non-image; and — reusing the Round 15/16 test-keypair pattern — **a real
+Ed25519-signed license uploaded through `/api/licensing/install-file`
+lifts the gate** (`/api/state` no longer `402`, no restart), while a
+non-JSON file → `400`, no file → `400`, and a wrong-key signature →
+`409 SIGNATURE_INVALID` with the gate still held.
+
+Docs: `docs/pywebview_shell_scoping.md` C.5 marked **RESOLVED** (+ a Round
+22 note in the schedule block); `docs/licensing.md` gained a **"Round 22"**
+section on the gate-screen control and updated the install instructions.
+
+**Full suite: 0 failed, 2452 passed** (+12 from round 21's 2440). WIP
+files byte-identical to round start.
 
 ---
 

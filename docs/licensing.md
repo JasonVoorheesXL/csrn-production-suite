@@ -90,10 +90,12 @@ replace `LICENSE_PUBLIC_KEY_HEX`, ship an app update, re-issue customers.
 ```
 
 Writes a single `license-<org-slug>.json`. Hand it to the customer by any
-means (email, USB, ...). They install it with
-`POST /api/licensing/install` (the file contents as the JSON body) or by
-dropping it at the path you tell them; the "license required" screen clears
-on reload once the signature and expiry check out.
+means (email, USB, ...). They install it the easy way -- the **"Choose
+License File" control on the "license required" screen itself** (Round 22,
+see below) -- or, for scripted installs, `POST /api/licensing/install`
+with the file contents as the JSON body, or by dropping it at
+`ProductPaths.license_file`. The screen clears on reload once the
+signature and expiry check out.
 
 - `--expires never` (or omit) → no expiry (`expires_at: 0`).
 - `--features` defaults to every feature scope; pass a comma-separated
@@ -199,7 +201,7 @@ while health / licensing / diagnostics / static / overlay stay reachable.
 
 **Still deferred (unchanged):**
 
-- **15E** first-run onboarding wizard -- its own future round.
+- **15E** first-run onboarding wizard -- **done in Round 22** (see below).
 - Windows-box **build verification** of the `.spec` / `.iss` -- PyInstaller
   is not installed in the dev environment; a real onedir build must
   confirm the ctranslate2 / onnxruntime imports and that
@@ -213,3 +215,37 @@ private key on your own machine
 --expires never`) and confirm it validates against the embedded
 `LICENSE_PUBLIC_KEY_HEX` -- the one link the test suite can't close here
 because it (correctly) has no private key.
+
+## Round 22 -- "Choose License File" on the gate screen
+
+`templates/license_required.html` gained a file picker + **"Install
+license"** button + inline result line. It posts the chosen file (as
+multipart `license`) to a new **unauthenticated** route,
+`POST /api/licensing/install-file`
+(`routes/licensing_public_routes.py`, blueprint `licensing_public_routes`).
+
+Why unauthenticated, and why its own blueprint:
+
+- The gate screen is shown *before* any operator PIN exists on a fresh
+  install, so `@require_auth` (which 403s with `PIN_NOT_CONFIGURED` when no
+  PIN is set) can't guard it. The Ed25519 signature check inside
+  `EntitlementService.install_license()` is the real boundary; the effect
+  -- a valid license unlocks the app -- is benign.
+- `deployment_routes` has an "every route authenticated" invariant with
+  two tests asserting it, so the open route lives in a separate blueprint
+  rather than weakening that check. `phase5_architecture.py` allowlists
+  `licensing_public_routes` + its one public endpoint.
+- Both the license gate and the Round 22 onboarding gate already exempt
+  the `/api/licensing` path prefix, so the route is reachable while the
+  rest of the app is held.
+
+The route reuses the same result-code -> HTTP-status mapping as the authed
+`/api/licensing/install` (`400` for a malformed license object, `409` for
+signature / verifier / installation-binding problems, `200` +
+`LICENSE_INSTALLED` on success) and adds operator-facing `message`
+wording for the screen. A non-JSON upload is caught up front
+(`400 LICENSE_FILE_UNREADABLE`); no file is `400 LICENSE_FILE_REQUIRED`.
+On `LICENSE_INSTALLED` the page reloads and the gate is gone -- no
+restart. One control covers both first-run activation and later renewals,
+since the gate page is shown whenever there is no valid license, not just
+at unboxing. (`tests/test_onboarding.py`.)

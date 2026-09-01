@@ -25,6 +25,9 @@ _NWS_CACHE: dict[str, Any] = {"key": "", "at": 0, "periods": []}
 # Profile stores the returned logo_path as organization.logo_path.
 _ORG_LOGO_ALLOWED_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 _ORG_LOGO_MAX_BYTES = 8 * 1024 * 1024
+# The one asset location the Identity Profile expects. Module-level so tests
+# can redirect it without touching the repo's static tree.
+_ORG_LOGO_DIR = Path(__file__).resolve().parent / "static" / "organization"
 
 
 def save_organization_logo(upload: Any) -> tuple[int, dict[str, Any]]:
@@ -41,7 +44,7 @@ def save_organization_logo(upload: Any) -> tuple[int, dict[str, Any]]:
     upload.stream.seek(0)
     if size > _ORG_LOGO_MAX_BYTES:
         return 400, {"error": "LOGO_TOO_LARGE", "message": "Organization logo must be 8 MB or smaller."}
-    static_dir = Path(__file__).resolve().parent / "static" / "organization"
+    static_dir = _ORG_LOGO_DIR
     static_dir.mkdir(parents=True, exist_ok=True)
     target = static_dir / f"organization-logo{suffix}"
     for old in static_dir.glob("organization-logo.*"):

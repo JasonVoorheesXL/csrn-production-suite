@@ -325,17 +325,40 @@ Options (owner decision):
   fallback in Round 15 so captions are not strictly GPU-gated for smaller
   customers *(owner decision)*.
 
-### C.5 First-run / onboarding flow — UNDEFINED
+### C.5 First-run / onboarding flow — RESOLVED in Round 22
 
 Round 12/13 built the Identity Profile **file** (blank-seeds on a fresh
 install) and made it editable via `POST /api/config` /
-`ConfigurationService`. There is **no first-run screen**. A fresh customer
-double-clicking the icon today lands on `/?module=pregame` with a blank org
-name, no schools, no logo. Round 15 needs a detect-blank-profile check →
-route to a setup view (org name / short name / logo / colors, home venue,
-timezone, primary school) that writes through the existing `/api/config`
-surface, then continues to the normal control surface. **This is the single
-biggest UX gap for a commercial build.**
+`ConfigurationService`, but there was **no first-run screen** — a fresh
+customer double-clicking the icon landed on `/?module=pregame` with a
+blank org name, no schools, no logo.
+
+**Round 22** (`round22-first-run-onboarding-20260901`) closed this. A new
+`_install_onboarding_gate(app)` (installed at `app.py` import scope,
+straight after `_install_license_gate`) detects an unconfigured Identity
+Profile via a persisted `identity_service` flag — `onboarding_complete`,
+seeded `True` for an existing install so Caledonia never sees the wizard,
+`False` on a blank seed — and routes `GET /` to `templates/onboarding.html`
+until the flag is set. The rest of the app returns
+`409 ONBOARDING_REQUIRED`; health, static, `/api/onboarding/*`,
+`/api/licensing/*`, diagnostics and the overlay stay reachable.
+
+The wizard collects **org / team name (the only required field)**, an
+optional primary sport (from the ruleset registry), an optional primary
+school (a plain text field that creates the first record via
+`SchoolService.create` — no dropdown against an empty DB), and an optional
+logo (a file picker; the file is copied to the one asset location the
+Identity Profile expects, `static/organization/organization-logo.<ext>`).
+**"Finish"** and **"Skip for now"** both persist `onboarding_complete` and
+hand off to the normal control surface. Submitted fields write through the
+Round 12/13 Identity Profile save path — not a parallel writer. The gate
+reads the flag fresh per request, so completion takes effect without a
+restart. (`routes/onboarding_routes.py`, `tests/test_onboarding.py`.)
+
+The **license file** is deliberately *not* in this wizard — see
+`docs/licensing.md` "Round 22": the "license required" gate screen got a
+"Choose License File" control instead, so one build covers first-run
+activation and every later renewal.
 
 ### C.6 `CSRN_INTERNAL_TOOLS` OFF in a frozen build — confirmed correct
 
@@ -522,6 +545,14 @@ changed.
 > is on the owner). `pywebview` + its Windows backend are now locked in
 > `requirements.txt`; `pyinstaller` in `requirements-dev.txt`.
 >
-> **Still deferred:** 15E onboarding wizard; whisper model + Chromium
-> bundling (env vars + assets, +~650 MB); code signing; the owner's
-> hands-on window-close confirmation on a real desktop.
+> **Round 22** (`round22-first-run-onboarding-20260901`) built the
+> **first-run onboarding wizard** (the old 15E / C.5 gap — see C.5 above,
+> now RESOLVED) and added a **"Choose License File"** control to the
+> license gate screen (`docs/licensing.md` "Round 22"): an unauthenticated
+> `POST /api/licensing/install-file` in its own `licensing_public_routes`
+> blueprint, so the gate page covers first-run activation *and* renewals
+> without a separate flow. Full suite green (2452); WIP files untouched.
+>
+> **Still deferred:** whisper model + Chromium bundling (env vars +
+> assets, +~650 MB); code signing; the owner's hands-on window-close
+> confirmation on a real desktop.
