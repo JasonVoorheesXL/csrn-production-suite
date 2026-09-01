@@ -36,6 +36,17 @@ def test_runtime_and_development_requirements_are_exactly_pinned() -> None:
     assert development["pytest"] == "9.1.1"
 
 
+def test_roster_pronunciation_deps_are_locked_so_envcheck_catches_them() -> None:
+    # Round 15A: roster_service.py imports `pronouncing` (-> `cmudict`), but
+    # neither was in requirements.txt, so tools/environment_check.py -- which
+    # only verifies what the lock lists -- could not catch a missing install;
+    # it surfaced at first roster-service use instead. Keep them locked so the
+    # .bat env-check step fails loudly before app.py launches.
+    runtime = profile_pins("runtime")
+    assert runtime.get("pronouncing")
+    assert runtime.get("cmudict")
+
+
 def test_requirement_parser_rejects_floating_versions(tmp_path: Path) -> None:
     requirements = tmp_path / "requirements.txt"
     requirements.write_text("Pillow>=12.0\n", encoding="utf-8")

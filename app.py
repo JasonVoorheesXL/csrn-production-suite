@@ -3733,7 +3733,16 @@ def _record_clean_shutdown_and_stop(signum, frame):
     raise SystemExit(0)
 
 
-if __name__ == "__main__":
+def run_command_center() -> None:
+    """Start the Waitress Command Center server and block until a shutdown
+    signal.
+
+    Single game-day server entry point: invoked by ``python app.py`` (the
+    developer / RUN_CSRN_COMMAND_CENTER.bat path) and by the frozen desktop
+    shell's ``--serve-only`` re-exec (``csrn_desktop.py``). Both must behave
+    identically.
+    """
+
     ensure_data_architecture()
     load_config()
     from waitress import serve
@@ -3741,6 +3750,12 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, _record_clean_shutdown_and_stop)
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, _record_clean_shutdown_and_stop)
+    if hasattr(signal, "SIGBREAK"):
+        # The pywebview desktop shell (csrn_desktop.py) closes this child
+        # with CTRL_BREAK_EVENT on window close -- route it through the same
+        # clean shutdown (recovery marker + Drive state-mirror flush) as
+        # Ctrl+C so a shell close is never read as an unclean exit.
+        signal.signal(signal.SIGBREAK, _record_clean_shutdown_and_stop)
 
     ip = local_ip()
     media_directory = ASSET_UPLOAD_DIR.parent / "SponsorAdvertisements"
@@ -3770,6 +3785,10 @@ if __name__ == "__main__":
     print(f"Media server: http://127.0.0.1:{media_port} — READY")
     print("Server: Waitress production server — READY\n")
     serve(app, host="0.0.0.0", port=5050, threads=16)
+
+
+if __name__ == "__main__":
+    run_command_center()
 
 
 
