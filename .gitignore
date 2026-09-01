@@ -12,6 +12,12 @@ identity_profile.json
 Licensing/
 *.log
 
+# License issuance (tools/issue_license.py, owner-run). The PRIVATE signing
+# key and issued license files must never be committed.
+csrn_license_private_key.hex
+*license*key*.hex
+license-*.json
+
 # User data
 Data/Broadcasts/
 Data/Rosters/
