@@ -146,11 +146,79 @@ def do_issue(args) -> int:
     return 0
 
 
+def do_verify(args) -> int:
+    """Sanity-check a license file the way the running app does before it
+    goes out to a customer. Exit 0 iff it validates."""
+
+    path = Path(args.verify).expanduser()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"Could not read {path}: {exc}")
+
+    # Which key to check against:
+    #   default          -> license_service.LICENSE_PUBLIC_KEY_HEX (what the
+    #                        shipped app verifies against);
+    #   --key/--key-hex   -> the public half of that private key;
+    #   --public-key-hex  -> an explicit public key.
+    if args.public_key_hex:
+        public_hex = args.public_key_hex.strip()
+        key_src = "explicit --public-key-hex"
+    elif args.key or args.key_hex:
+        public_hex = ls.ed25519_publickey(_load_seed(args)).hex()
+        key_src = "public half of the supplied private key"
+    else:
+        public_hex = ls.LICENSE_PUBLIC_KEY_HEX
+        key_src = "embedded license_service.LICENSE_PUBLIC_KEY_HEX"
+
+    ok, reason = ls.verify_license(payload, public_key_hex=public_hex)
+
+    expires_at = int(payload.get("expires_at", 0) or 0)
+    now = int(time.time())
+    expired = bool(expires_at and expires_at <= now)
+    expiry = (
+        "never"
+        if expires_at == 0
+        else datetime.fromtimestamp(expires_at, tz=timezone.utc).strftime("%Y-%m-%d")
+        + (" (EXPIRED)" if expired else "")
+    )
+
+    print(f"file       : {path}")
+    print(f"checked vs : {key_src}")
+    print(f"           : {public_hex}")
+    print(f"customer   : {payload.get('customer', '')}")
+    print(f"product_id : {payload.get('product_id', '')}")
+    print(f"license_id : {payload.get('license_id', '')}")
+    print(f"status     : {payload.get('status', '')}")
+    print(f"sports     : {', '.join(payload.get('sports', []))}")
+    print(f"features   : {', '.join(payload.get('features', []))}")
+    print(f"expires    : {expiry}")
+    if payload.get("note"):
+        print(f"note       : {payload['note']}  (owner metadata only)")
+    print()
+
+    if ok and not expired:
+        print("RESULT     : PASS -- signature valid, not expired.")
+        return 0
+    if ok and expired:
+        print("RESULT     : FAIL -- signature valid but the license is EXPIRED.")
+        return 1
+    print(f"RESULT     : FAIL -- {reason}")
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Issue a signed CSRN license (owner only).")
     parser.add_argument("--genkey", action="store_true", help="Generate a new Ed25519 keypair.")
     parser.add_argument("--out-key", help="Where --genkey writes the private key (hex).")
     parser.add_argument("--force", action="store_true", help="Overwrite an existing key file.")
+
+    parser.add_argument(
+        "--verify",
+        help="Sanity-check an existing license file (vs the embedded public "
+        "key, or --key/--public-key-hex). Prints PASS/FAIL.",
+    )
+    parser.add_argument("--public-key-hex", help="Verify against this explicit public key (hex).")
 
     parser.add_argument("--org", help="Customer / organization name (the 'Licensed to' value).")
     parser.add_argument("--sports", help="Comma-separated licensed sports, e.g. football,hockey.")
@@ -165,8 +233,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.genkey:
         return do_genkey(args)
+    if args.verify:
+        return do_verify(args)
     if not args.org:
-        parser.error("issue mode needs --org (or use --genkey)")
+        parser.error("need --org (issue), --genkey, or --verify <file>")
     return do_issue(args)
 
 

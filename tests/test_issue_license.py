@@ -106,3 +106,60 @@ def test_issue_rejects_unknown_feature_and_missing_sports(tmp_path: Path) -> Non
 def test_issuer_file_is_marked_never_to_ship() -> None:
     src = Path(issue_license.__file__).read_text(encoding="utf-8")
     assert "DO NOT SHIP THIS FILE IN ANY BUILD" in src
+
+
+# --- --verify <file> -------------------------------------------------------
+
+
+def _issue(tmp_path: Path, **kw) -> Path:
+    key_file, public_hex = _genkey(tmp_path)
+    out = tmp_path / "lic.json"
+    argv = ["--key", str(key_file), "--org", kw.get("org", "S"),
+            "--sports", kw.get("sports", "football"),
+            "--expires", kw.get("expires", "never"), "--out", str(out)]
+    assert issue_license.main(argv) == 0
+    return out, key_file, public_hex
+
+
+def test_verify_passes_against_the_matching_public_key(tmp_path, capsys) -> None:
+    out, _key, public_hex = _issue(tmp_path)
+    rc = issue_license.main(["--verify", str(out), "--public-key-hex", public_hex])
+    assert rc == 0
+    assert "RESULT     : PASS" in capsys.readouterr().out
+
+
+def test_verify_fails_against_the_wrong_key(tmp_path, capsys) -> None:
+    out, _key, _pub = _issue(tmp_path)
+    # default = the embedded license_service key, which did NOT sign this file
+    rc = issue_license.main(["--verify", str(out)])
+    assert rc == 1
+    assert "RESULT     : FAIL" in capsys.readouterr().out
+
+
+def test_verify_detects_a_tampered_file(tmp_path, capsys) -> None:
+    out, _key, public_hex = _issue(tmp_path)
+    record = json.loads(out.read_text(encoding="utf-8"))
+    record["customer"] = "Someone Else"
+    out.write_text(json.dumps(record), encoding="utf-8")
+    rc = issue_license.main(["--verify", str(out), "--public-key-hex", public_hex])
+    assert rc == 1
+    assert "LICENSE_SIGNATURE_INVALID" in capsys.readouterr().out
+
+
+def test_verify_flags_an_expired_license(tmp_path, capsys) -> None:
+    out, _key, public_hex = _issue(tmp_path, expires="2000-01-01")
+    rc = issue_license.main(["--verify", str(out), "--public-key-hex", public_hex])
+    assert rc == 1
+    assert "EXPIRED" in capsys.readouterr().out
+
+
+def test_verify_can_use_the_private_keys_public_half(tmp_path, capsys) -> None:
+    out, key_file, _pub = _issue(tmp_path)
+    rc = issue_license.main(["--verify", str(out), "--key", str(key_file)])
+    assert rc == 0
+    assert "public half of the supplied private key" in capsys.readouterr().out
+
+
+def test_verify_missing_file_exits_nonzero(tmp_path) -> None:
+    with pytest.raises(SystemExit):
+        issue_license.main(["--verify", str(tmp_path / "nope.json")])

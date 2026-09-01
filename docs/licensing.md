@@ -93,6 +93,27 @@ on reload once the signature and expiry check out.
   ticket, ...). It is written into the file but is **not signed** and is
   **not read by the app** -- it plays no role in enforcement.
 
+## Verifying a license before it goes out
+
+`tools/issue_license.py --verify <file>` runs the file through
+`license_service.verify_license()` exactly as the shipped app does and
+prints `PASS` / `FAIL` (exit 0 / 1) plus the decoded fields.
+
+```bash
+# against the embedded LICENSE_PUBLIC_KEY_HEX (what customers' apps use)
+.venv/Scripts/python.exe tools/issue_license.py --verify license-truhous-media.json
+
+# against a specific keypair (e.g. before the key is embedded, or to
+# confirm which key signed a file)
+.venv/Scripts/python.exe tools/issue_license.py --verify license.json --key ~/csrn_license_key.hex
+.venv/Scripts/python.exe tools/issue_license.py --verify license.json --public-key-hex <64 hex>
+```
+
+`FAIL` reasons: `LICENSE_SIGNATURE_INVALID` (wrong key or tampered file),
+`LICENSE_SIGNATURE_MISSING` / `_MALFORMED` / `_WRONG_LENGTH`,
+`LICENSE_PUBLIC_KEY_NOT_CONFIGURED` (checked against the all-zero
+placeholder), or "signature valid but the license is EXPIRED".
+
 ## What happens on expiry
 
 `EntitlementService.status()` compares `expires_at` to now. Past expiry:
