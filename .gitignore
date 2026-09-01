@@ -60,6 +60,10 @@ Data/Weather/weather_state.json
 # Local release output
 dist-release/
 
+# PyInstaller frozen-build output (Round 18)
+/build/
+/dist/
+
 # Manual/automated backup, rollback, and audit-log scratch.
 # These are point-in-time snapshots and generated log dumps from ad hoc
 # repair/audit tooling, not maintained source or documentation.

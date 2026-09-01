@@ -34,7 +34,7 @@
 import os
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all, collect_data_files
+from PyInstaller.utils.hooks import collect_all, collect_data_files, copy_metadata
 
 ROOT = Path(SPECPATH).parents[1]
 
@@ -77,6 +77,10 @@ for package in (
 
 datas += collect_data_files("cmudict")  # ships cmudict.dict as package data
 datas += collect_data_files("pronouncing")
+# Round 18: cmudict/__init__.py runs `metadata.version("cmudict")` at import
+# time, so its .dist-info must be in the bundle or `import app` crashes with
+# PackageNotFoundError. (pronouncing imports cmudict; no metadata of its own.)
+datas += copy_metadata("cmudict")
 
 # Repo assets the app resolves relative to its module root.
 for entry in (

@@ -477,6 +477,26 @@ changed.
 >   as dev "installed" mode — frozen + no license → `license_required.html`
 >   + `402` on broadcast APIs.
 >
-> **Still deferred:** 15E onboarding wizard; a real Windows-box PyInstaller
-> build to verify ctranslate2/onnxruntime imports and the frozen
-> `/api/health` 200 / `/api/diagnostics` 404; code signing.
+> **Round 18** (`round18-frozen-build-verification-20260831`) did the real
+> build (PyInstaller 6.22.2):
+> - **Build succeeds**; 545 MB onedir (no model/Chromium yet).
+>   ctranslate2 + onnxruntime bundle and `import app` loads them clean.
+> - **Fixed:** `datas += copy_metadata("cmudict")` in the `.spec` — without
+>   it `cmudict/__init__.py`'s import-time `metadata.version()` crashes
+>   every launch (`PackageNotFoundError`).
+> - **Verified frozen:** `/api/health` 200, `/api/diagnostics` 404,
+>   no-license gate (`license_required.html` + `402`), and the **Caledonia
+>   license unlocks the frozen build** (`GET /` → normal panel,
+>   `/api/state` 200). No state corruption across launch cycles.
+> - **NOT fixed — architectural:** the Round 15C clean-shutdown wiring
+>   (`csrn_desktop.request_graceful_shutdown` → `CTRL_BREAK_EVENT`) **does
+>   not work with a `console=False` frozen exe** — a windowless process has
+>   no console to receive the event, so `_record_clean_shutdown_and_stop`
+>   (recovery marker + state flush) never runs on window close; the server
+>   only stops on a force-kill. Needs a shell process-model change (run
+>   Waitress in-process + stop the server object on close, a
+>   `POST /api/shutdown`, or a console for the serve child) — its own round.
+>
+> **Still deferred:** 15E onboarding wizard; whisper model + Chromium
+> bundling (env vars + assets, +~650 MB); the frozen clean-shutdown fix
+> above; code signing.

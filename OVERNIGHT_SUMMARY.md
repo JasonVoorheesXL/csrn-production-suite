@@ -7,14 +7,106 @@ branch: `round16-pywebview-license-handoff-20260831`** merges the two (off
 `round14` @ `55be4ea`, carries rounds 1–15).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
-Round 16 branch: `round16-pywebview-license-handoff-20260831`. **Round 17
-branch: `round17-gameday-backup-audit-20260831`** (off `round16` @
-`2bf64d3`; investigate-only, no code).
+Round 17 branch: `round17-gameday-backup-audit-20260831` (off `round16` @
+`2bf64d3`; investigate-only). **Round 18 branch:
+`round18-frozen-build-verification-20260831`** (off `round17` @ `0b70034`).
 
 Full test suite (deterministic, `-p no:randomly`, run with
 `.venv/Scripts/python.exe`) after **round 16**: **0 failed, 2411 passed**.
-Round 17 changes no code — count unchanged. **0 real regressions across
-all sixteen rounds.**
+Rounds 17–18 change no application code — count unchanged (Round 18 edits
+only `packaging/windows/CSRNProductionSuite.spec` + `.gitignore`). **0 real
+regressions across all sixteen rounds.**
+
+---
+
+## ROUND 18 — real PyInstaller build verification (2026-08-31)
+
+First actual frozen build + end-to-end launch check. `templates/index.html`
++ `broadcaster_print_service.py` (owner WIP) not touched (0 bytes).
+Installed `pyinstaller==6.22.2` + `pywebview==6.2.1` into `.venv` (approved).
+
+### A — Build: **succeeds**
+
+`pyinstaller packaging/windows/CSRNProductionSuite.spec` → **32 s**,
+`dist/CSRNProductionSuite/` (onedir) = **545 MB**. That is **without** the
+whisper model or Playwright Chromium — the `.spec`'s `_env_tree` correctly
+skipped them (`CSRN_WHISPER_MODEL_DIR` / `CSRN_BUNDLED_CHROMIUM_DIR` unset).
+With both a real release is ~1.2 GB (still in Round 14's estimate).
+
+Biggest bundle parts: `_internal/static` 174 MB (CSRN's own assets),
+`playwright` 102 MB (the Python pkg, not the browser), `av.libs` 63 MB
+(ffmpeg), **`ctranslate2` 60 MB**, **`onnxruntime` 40 MB**, `numpy.libs`
+21 MB. **The two flagged pain points bundle and `import app` loads them
+clean** — only benign warnings (`onnxruntime.quantization` wants `onnx`
+[quant tooling, unused]; `sounddevice not a package`; the usual
+`numpy._core.*` / `collections.abc` false positives).
+
+### Bug 1 — `cmudict` metadata (FIXED, 1 line)
+
+The first build produced an exe that **crashed on every launch**:
+
+```
+importlib.metadata.PackageNotFoundError: No package metadata was found for cmudict
+  cmudict/__init__.py line 13:  __version__ = metadata.version("cmudict")
+```
+
+`cmudict` reads its own dist metadata at import time; `collect_data_files`
+does not include `.dist-info`. Fix in the `.spec`:
+`datas += copy_metadata("cmudict")`. Rebuilt → boots. (`pronouncing`
+imports `cmudict` but has no metadata of its own.)
+
+### B/C — Launch verification (`--serve-only`, throwaway `CSRN_RUNTIME_ROOT`)
+
+| check | result |
+|---|---|
+| frozen exe boots, `/api/health` 200 | **PASS** (~1 s; native stack imported) |
+| `/api/diagnostics` → 404 (internal tools excluded when frozen) | **PASS** |
+| no license → `GET /` = `license_required.html` | **PASS** |
+| no license → `/api/state` → 402 `LICENSE_REQUIRED` | **PASS** |
+| **Caledonia license present → `GET /` = normal control panel** | **PASS** |
+| **Caledonia license present → `/api/state` → 200 (unlocked)** | **PASS** — Task C verified on the frozen build |
+| frozen app builds its full `%RUNTIME_ROOT%` tree (Data/, Licensing/, …) | **PASS** |
+| runtime `*.json` all parse after 2 launch/kill cycles | **PASS** (no corruption) |
+
+(`/api/licensing/status` returned 403 to the probe — that route needs
+auth; not a frozen issue. Licensing behaviour is proven by the `GET /` and
+`/api/state` gate transitions above.)
+
+### Bug 2 — frozen clean-shutdown DOES NOT WORK (architectural, NOT fixed)
+
+The `.spec` builds **`console=False`** (`runw.exe`, windowed). A windowless
+Windows process **has no console**, so
+`GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT)` — exactly what Round 15C's
+`csrn_desktop.request_graceful_shutdown()` sends on window close — **cannot
+be delivered**. The frozen `--serve-only` server ignored `CTRL_BREAK_EVENT`
+and had to be force-killed (`rc=1`); `_record_clean_shutdown_and_stop`
+(recovery marker + `STATE_REPOSITORY.flush()` + `SystemExit(0)`) **never
+ran**.
+
+- State was **not corrupted** by the force-kill and no process was left
+  hung, so the failure mode is "no clean flush", not "破". `SIGINT` /
+  `SIGTERM` / `SIGBREAK` handlers still work where the process can receive
+  them (dev `python app.py`; a `console=True` build).
+- This is a **shell process-model decision, not a one-liner** — options:
+  run Waitress in-process on a background thread and stop the server object
+  directly on window close (the standard pywebview pattern; no child, no
+  signals); a localhost `POST /api/shutdown`; or give the serve child its
+  own console. **Deferred to a dedicated shell round** per "stop and report
+  on architectural problems, don't push through."
+
+### D — cleanup + still-assumed
+
+- `build/` and `dist/` were **not gitignored** — added `/build/` `/dist/`.
+  `dist/` + `build/` (~1.5 GB) were removed from the working tree after
+  verification.
+- **CPU caption fallback:** `caption_worker` (Round 15B fallback) bundles
+  and imports frozen; `ctranslate2`/`onnxruntime` present. This machine has
+  CUDA (RTX 4050) so "no CUDA" can't be tested by absence, and
+  `--serve-only` never loads `faster_whisper.WhisperModel` (lazy). Logic is
+  covered by dev-mode tests; not crash-verified end-to-end frozen.
+- **Still assumed / deferred:** whisper model + Chromium bundling (need the
+  env vars + assets, +~650 MB); code signing; the frozen clean-shutdown
+  fix above; 15E onboarding.
 
 ---
 
