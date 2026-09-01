@@ -7,13 +7,166 @@ branch: `round16-pywebview-license-handoff-20260831`** merges the two (off
 `round14` @ `55be4ea`, carries rounds 1–15).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
-Round 18 branch: `round18-frozen-build-verification-20260831` (off
-`round17` @ `0b70034`). **Round 19 branch:
-`round19-gameday-fix-and-cleanup-20260901`** (off `round18` @ `7ed88c3`).
+Round 19 branch: `round19-gameday-fix-and-cleanup-20260901` (off `round18`
+@ `7ed88c3`). **Round 20 branch: `round20-shutdown-architecture-20260901`**
+(off `round19` @ `efeae3f`; investigate-only, no code).
 
 Full test suite (deterministic, `-p no:randomly`, run with
 `.venv/Scripts/python.exe`) after **round 19**: **0 failed, 2429 passed**.
-**0 real regressions across all nineteen rounds.**
+Round 20 changes no code. **0 real regressions across all nineteen
+rounds.**
+
+---
+
+## ROUND 20 — frozen-build clean-shutdown investigation (investigate only, 2026-09-01)
+
+Round 18 found a frozen (`console=False`) build cannot receive
+`CTRL_BREAK_EVENT`, so window-close never runs Round 15C's clean-shutdown
+/ recovery-marker path. No code this round. `templates/index.html` +
+`broadcaster_print_service.py` not touched.
+
+### A — Current architecture (precise)
+
+**The server is always a child OS process, never in-process.**
+`csrn_desktop.run()` → `current_state()` DOWN → `start_server()` →
+`subprocess.Popen(server_command(), creationflags=CREATE_NEW_PROCESS_GROUP)`.
+`server_command()`: frozen → `[sys.executable, "--serve-only"]` (re-exec
+the *same* exe); dev → `[python, "app.py"]`. Parent then
+`wait_until_healthy()` → `import webview` → `_create_window()` →
+`webview.start()` (blocks). Window close → `webview.start()` returns →
+`_on_closed()` → `request_graceful_shutdown(server)`.
+
+`request_graceful_shutdown()` on Windows does
+`process.send_signal(signal.CTRL_BREAK_EVENT)` → `os.kill(pid,
+CTRL_BREAK_EVENT)` → Win32 `GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT,
+pid)`; on POSIX `SIGTERM`. On a 20 s timeout it escalates to
+`process.terminate()` (`TerminateProcess`, an uncatchable hard kill).
+`app.run_command_center()` registers `SIGINT` / `SIGTERM` / `SIGBREAK` →
+`_record_clean_shutdown_and_stop` (removes the `active_session.json`
+recovery marker, `STATE_REPOSITORY.flush()` to the Drive mirror,
+`SystemExit(0)`).
+
+**Why it fails in a windowed frozen build — two compounding reasons:**
+
+1. **The shell has no console.** The `.spec` builds `console=False` →
+   GUI-subsystem `runw.exe` bootloader → the shell is attached to no
+   console. `GenerateConsoleCtrlEvent` is a *console* API; from a
+   process with no console it is a silent no-op (Round 18 saw exactly
+   this — the call returned, nothing happened).
+2. **The `--serve-only` child also has no console** — it is a second copy
+   of the same `console=False` exe. `CTRL_BREAK_EVENT` / `SIGBREAK` can
+   only reach a process attached to a console; `CREATE_NEW_PROCESS_GROUP`
+   makes a group but allocates no console. Python's `SIGBREAK` handler
+   can never fire.
+
+Net: `send_signal` no-ops → `wait(20 s)` times out → `TerminateProcess`
+→ `_record_clean_shutdown_and_stop` never runs → `active_session.json` is
+left behind (next launch reports `UNCLEAN_SHUTDOWN_DETECTED`) and the last
+state mutations may not be flushed to the Drive mirror. `rc = 1`. (The
+hard kill did not *corrupt* state in Round 18 — it just skipped the clean
+path.)
+
+Also confirmed: `waitress.serve()` builds `create_server(app, **kw)`
+internally and calls `server.run()` **without returning the server** — so
+there is no in-process stop handle today.
+
+**Dev-mode is not at risk — the gap is frozen-`console=False`-only:**
+
+| path | console? | window-close / Ctrl+C shutdown |
+|---|---|---|
+| `RUN_CSRN_COMMAND_CENTER.bat` → `python app.py` + Ctrl+C (the primary dev path) | real `cmd.exe` console | **works** — `CTRL_C_EVENT` → SIGINT handler → clean; `.bat` then runs `game_day_recovery.py shutdown`. No `csrn_desktop`, no child-signalling involved. |
+| `python csrn_desktop.py` from a terminal (dev) | inherits the terminal console; child `python app.py` is a **console** exe sharing it | **works** — `CTRL_BREAK_EVENT` to the child group is delivered → `SIGBREAK` handler → clean. |
+| **frozen `CSRNProductionSuite.exe`** (`console=False` shell + `console=False` child) | **none / none** | **broken** — the case above. |
+
+The only broken combination is no-console parent + no-console child =
+exactly and only the frozen build. Nothing about dev-mode reliability
+depends on the fix.
+
+*(Side note, not the topic: `csrn_desktop.py`'s docstring says pywebview
+"is in requirements.txt for a packaged build" — it is **not** in
+`requirements.txt` / `requirements-dev.txt`; Round 18 installed
+`pywebview` / `pyinstaller` ad hoc.)*
+
+### B — the three candidate fixes
+
+**1. Run Waitress in-process (no child).** `csrn_desktop` imports `app`,
+builds `waitress.create_server(app, host="0.0.0.0", port=5050,
+threads=16)`, runs `server.run()` on a daemon thread, opens the window on
+the main thread; on window close calls the marker+flush directly in
+Python then `server.close()`. No OS signals, no console, no re-exec, no
+orphan-server risk.
+*Feasibility: high* (supported waitress API). *Complexity: moderate* —
+split `run_command_center()` into "one-time setup + build server" (shared)
+vs. "serve + signal handlers" (standalone only). *Risk: low–moderate* —
+shell now imports full `app` (frozen bundle already contains it);
+`webview.start()` must own the main thread, `server.run()` on a daemon
+thread is the standard pywebview pattern. Net **simpler than today**
+(deletes `--serve-only`, the frozen `server_command` branch, the signal
+path, the process-group plumbing).
+
+**2. `POST /api/shutdown`, localhost-gated.** Shell POSTs to the route on
+window close instead of signalling. **Must** be protected — there is a
+proven in-repo pattern at `routes/social_routes.py:94-95`
+(`request.remote_addr not in {"127.0.0.1","::1"}` → reject); add a
+per-launch random token the shell passes and the route also requires, so
+it is never a bare localhost kill vector. *But:* stopping `serve()` from
+inside a request handler still needs the `create_server()` handle (same
+refactor as #1) or `os._exit()` (abrupt). So #2 is #1's refactor **plus**
+a new security-sensitive HTTP surface, for no added benefit — the shell
+already knows the window closed; it doesn't need to ask over HTTP.
+*Feasibility: high. Complexity: moderate. Risk: moderate* (a bug in the
+loopback/token check is a remote-kill bug on a customer machine).
+
+**3. Give the serve child a console.** `CREATE_NEW_CONSOLE` → a second
+console window visible all session = unacceptable polish regression.
+`CREATE_NO_WINDOW` (console allocated, not shown) is promising, but
+`GenerateConsoleCtrlEvent` must still be *called from a process sharing
+that console* — the `console=False` shell would have to
+`FreeConsole()`/`AttachConsole(child_pid)`/generate/`FreeConsole()` via
+`ctypes`, a fragile Win32 dance that is version-dependent and can still
+flash a console on some Windows builds. Leaves the child-process model
+(orphan-on-shell-crash) in place. *Feasibility: low–moderate / fragile.
+Complexity: high. Risk: high* (works on the dev box, flashes a console on
+a customer's Win10 Home).
+
+### Recommendation: **#1 — Waitress in-process.**
+
+It removes the entire failure class with a contained, supported-API
+refactor and ends up simpler than the current code. #2 needs the same
+refactor plus a new gated route. #3 fights Windows console semantics and
+risks a visible-console regression on customer machines.
+
+### C — scope check
+
+**#1 does not change the dev-mode launch path.**
+`RUN_CSRN_COMMAND_CENTER.bat` → `python app.py` → `run_command_center()` →
+`waitress.serve(...)` + SIGINT/SIGTERM/SIGBREAK handlers + the
+`game_day_recovery.py startup/shutdown` calls all stay exactly as they
+are; Ctrl+C in the terminal still works. The refactor only *extracts* a
+shared "build the configured server + one-time setup" helper that both
+`run_command_center()` (standalone) and the in-process shell path call.
+`python csrn_desktop.py` in dev switches to the in-process path too — it
+already works today and in-process is simpler. **If the Round 21
+implementation finds it cannot avoid changing `serve()`/signalling for
+the `python app.py` path, that is a flag to stop and re-scope.**
+
+### D — proposed Round 21 breakdown
+
+Branch off round20's tip. WIP protection as always; one task per commit;
+suite green after each.
+
+| Task | Scope |
+|---|---|
+| **21A** | `app.build_command_center_server()` → does the one-time setup currently inline in `run_command_center()` (`ensure_data_architecture`, `load_config`, isolated media server on :5051, banners/notices) and returns a configured `waitress.create_server(app, host="0.0.0.0", port=5050, threads=16)`. `run_command_center()` becomes `srv = build_command_center_server(); register SIGINT/SIGTERM/SIGBREAK; srv.run()`. Pure refactor — `python app.py` / `--serve-only` behave identically. Test: the helper returns a live server bound to 5050 and `.close()` stops it; existing safety/recovery/preflight suites green. |
+| **21B** | `app.command_center_clean_shutdown()` = the marker + `STATE_REPOSITORY.flush()` half of `_record_clean_shutdown_and_stop`, **without** `raise SystemExit`, so the shell thread can call it. `_record_clean_shutdown_and_stop` calls it then raises. Test: removes `active_session.json`, flushes, idempotent. |
+| **21C** | Rewrite `csrn_desktop.run()` to the in-process model (DOWN → `import app`; `server = app.build_command_center_server()`; `server.run` on a daemon thread; `wait_until_healthy`; `_create_window`; `webview.start()`; on return `app.command_center_clean_shutdown()` then `server.close()`). HEALTHY/attach path unchanged. Delete `run_server_only()`, the frozen branch of `server_command()`, and `request_graceful_shutdown()`'s signal path + `CREATE_NEW_PROCESS_GROUP` plumbing. Update `tests/test_csrn_desktop.py`. |
+| **21D** | Remove `--serve-only` from `csrn_desktop.main()` and the `.spec` (no longer re-exec'd); remove or inert-ify `app.py --serve-only`. Re-run the Round 18 frozen build + automated launch check, now asserting **window-close → clean shutdown → `active_session.json` gone, `rc == 0`, state flushed, no orphan process**. |
+| **21E** | Lock the shell deps: `pywebview==<pin>` → `requirements.txt`, `pyinstaller==<pin>` → `requirements-dev.txt`; correct the `csrn_desktop.py` docstring. Mark the gap resolved in `docs/pywebview_shell_scoping.md`. |
+
+**Open question for the owner:** keep a non-frozen `python csrn_desktop.py`
+child-process path at all? If dev never uses the shell (dev = `python
+app.py` + Ctrl+C), 21C/21D can delete the child-process machinery
+entirely and the shell becomes in-process-only — the cleanest end state.
 
 ---
 
