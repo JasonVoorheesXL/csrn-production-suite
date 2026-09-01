@@ -3756,22 +3756,23 @@ _install_license_gate(app)
 # (pregame_presentation is now registered via APPLICATION_BLUEPRINTS above,
 # through the application factory -- no post-construction install needed.)
 
-def _record_clean_shutdown_and_stop(signum, frame):
-    """Handle a deliberate SIGINT/SIGTERM (e.g. Ctrl+C) by writing the clean
-    shutdown marker before the process exits.
+def command_center_clean_shutdown() -> None:
+    """Write the clean-shutdown recovery marker and flush the Drive state
+    mirror.
 
-    This intentionally does NOT run on a force-kill (e.g. `taskkill /F`,
-    which delivers no catchable signal) or on an unhandled crash — those
-    cases must still leave the marker in place so the next startup reports
+    Callable directly -- the pywebview desktop shell (csrn_desktop.py) runs
+    the server in-process and calls this on its own thread when the window
+    closes. It does NOT raise SystemExit, so it never tears the process
+    down; the caller decides how the process ends. The signal-handler path
+    (_record_clean_shutdown_and_stop, for `python app.py` + Ctrl+C) calls
+    this and then exits.
+
+    A force-kill (`taskkill /F`) or an unhandled crash never reaches here,
+    so those still leave the marker in place -> next startup reports
     UNCLEAN_SHUTDOWN_DETECTED.
     """
     try:
-        signal_name = signal.Signals(signum).name
-    except ValueError:
-        signal_name = str(signum)
-    try:
         get_recovery_service().mark_clean_shutdown()
-        print(f"\nReceived {signal_name} — recording clean application shutdown...")
     except Exception as exc:
         print(f"[WARN] Could not record clean shutdown marker: {exc}")
     # Push the final state to the throttled Drive mirror before exit so the
@@ -3781,34 +3782,37 @@ def _record_clean_shutdown_and_stop(signum, frame):
             STATE_REPOSITORY.flush()
     except Exception as exc:
         print(f"[WARN] Could not flush state mirror on shutdown: {exc}")
+
+
+def _record_clean_shutdown_and_stop(signum, frame):
+    """Signal handler for `python app.py` / RUN_CSRN_COMMAND_CENTER.bat:
+    a deliberate SIGINT / SIGTERM / SIGBREAK (Ctrl+C) records a clean
+    shutdown, then exits."""
+    try:
+        signal_name = signal.Signals(signum).name
+    except ValueError:
+        signal_name = str(signum)
+    print(f"\nReceived {signal_name} — recording clean application shutdown...")
+    command_center_clean_shutdown()
     # Re-raise so Waitress's own (SystemExit, KeyboardInterrupt) handling in
     # server.run() still gets a chance to close its sockets cleanly.
     raise SystemExit(0)
 
 
-def run_command_center() -> None:
-    """Start the Waitress Command Center server and block until a shutdown
-    signal.
+def build_command_center_server():
+    """Do the one-time Command Center setup and return a configured,
+    socket-bound Waitress server.
 
-    Single game-day server entry point: invoked by ``python app.py`` (the
-    developer / RUN_CSRN_COMMAND_CENTER.bat path) and by the frozen desktop
-    shell's ``--serve-only`` re-exec (``csrn_desktop.py``). Both must behave
-    identically.
+    Shared by ``run_command_center()`` (the ``python app.py`` /
+    RUN_CSRN_COMMAND_CENTER.bat path) and the pywebview desktop shell
+    (``csrn_desktop.py``), which runs the returned server on a daemon
+    thread in the same process as the window. Call ``server.run()`` to
+    serve and ``server.close()`` to stop it.
     """
 
     ensure_data_architecture()
     load_config()
-    from waitress import serve
-
-    signal.signal(signal.SIGINT, _record_clean_shutdown_and_stop)
-    if hasattr(signal, "SIGTERM"):
-        signal.signal(signal.SIGTERM, _record_clean_shutdown_and_stop)
-    if hasattr(signal, "SIGBREAK"):
-        # The pywebview desktop shell (csrn_desktop.py) closes this child
-        # with CTRL_BREAK_EVENT on window close -- route it through the same
-        # clean shutdown (recovery marker + Drive state-mirror flush) as
-        # Ctrl+C so a shell close is never read as an unclean exit.
-        signal.signal(signal.SIGBREAK, _record_clean_shutdown_and_stop)
+    from waitress import create_server
 
     ip = local_ip()
     media_directory = ASSET_UPLOAD_DIR.parent / "SponsorAdvertisements"
@@ -3840,7 +3844,21 @@ def run_command_center() -> None:
     print("OBS overlay: http://127.0.0.1:5050/overlay")
     print(f"Media server: http://127.0.0.1:{media_port} — READY")
     print("Server: Waitress production server — READY\n")
-    serve(app, host="0.0.0.0", port=5050, threads=16)
+    return create_server(app, host="0.0.0.0", port=5050, threads=16)
+
+
+def run_command_center() -> None:
+    """Blocking Command Center server for ``python app.py`` /
+    RUN_CSRN_COMMAND_CENTER.bat. Ctrl+C (SIGINT / SIGTERM / SIGBREAK)
+    records a clean shutdown and exits."""
+
+    server = build_command_center_server()
+    signal.signal(signal.SIGINT, _record_clean_shutdown_and_stop)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, _record_clean_shutdown_and_stop)
+    if hasattr(signal, "SIGBREAK"):
+        signal.signal(signal.SIGBREAK, _record_clean_shutdown_and_stop)
+    server.run()
 
 
 if __name__ == "__main__":

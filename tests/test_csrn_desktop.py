@@ -305,11 +305,14 @@ def test_app_exposes_run_command_center_as_the_single_server_entry() -> None:
     from pathlib import Path
 
     assert callable(app_module.run_command_center)
+    assert callable(app_module.build_command_center_server)
     source = Path(app_module.__file__).read_text(encoding="utf-8")
     assert "def run_command_center()" in source
     assert 'if __name__ == "__main__":\n    run_command_center()' in source
-    # The refactor must not have left a second serve() call behind.
-    assert source.count('serve(app, host="0.0.0.0", port=5050') == 1
+    # Round 21: exactly one place builds the server (create_server, so the
+    # shell can hold the handle and .close() it in-process).
+    assert source.count('create_server(app, host="0.0.0.0", port=5050') == 1
+    assert 'serve(app, host="0.0.0.0"' not in source  # no blocking serve() wrapper
 
 
 def test_frozen_build_launches_via_the_desktop_shell_not_the_bat_chain(monkeypatch) -> None:
