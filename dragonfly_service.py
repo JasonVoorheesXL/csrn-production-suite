@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 import httpx
-from playwright.sync_api import sync_playwright
 
 
 Record = dict[str, Any]
@@ -29,9 +28,6 @@ class DragonFlyService:
     API_BASE = "https://maxinfosite-api-live.dragonflyathletics.com"
     SITE_BASE = "https://go.dragonflyathletics.com"
 
-    ROSTER_TABLE_SELECTOR = "team-roster table.roster-table"
-    ROSTER_ROW_SELECTOR = "tr.table-rows"
-
     SPORT_CODES = {
         "football": "FB",
         "fb": "FB",
@@ -41,6 +37,22 @@ class DragonFlyService:
         "soccer": "SC",
         "volleyball": "VB",
     }
+
+    # DragonFly's public JSON API tags each team with an `ncaaSportCode`
+    # (e.g. "MFB" for football). Map CSRN's short sport code onto the
+    # DragonFly code(s) that count as the same sport for roster import.
+    NCAA_SPORT_CODES = {
+        "FB": {"MFB"},
+        "BB": {"MBB", "WBB"},
+        "BA": {"MBA"},
+        "SB": {"WSB"},
+        "SC": {"MSO", "WSO"},
+        "VB": {"MVB", "WVB"},
+    }
+
+    # Team levels CSRN pulls into a high-school program roster (Varsity + JV;
+    # Junior High / 7th-8th grade / Freshman are excluded by default).
+    ROSTER_LEVELS = {"varsity", "jv", "junior varsity"}
 
     def __init__(
         self,
@@ -67,6 +79,25 @@ class DragonFlyService:
         if not value:
             return "FB"
         return cls.SPORT_CODES.get(value.casefold(), value.upper())
+
+    @staticmethod
+    def _format_height(height: Any) -> str:
+        """DragonFly gives height as ``{"feet": 6, "inches": 0}``; CSRN wants
+        the ``6' 0"`` string the roster importer already parses. Empty/partial
+        data -> "" (downstream raises MISSING_HEIGHT, same as before)."""
+        if not isinstance(height, dict):
+            return ""
+        feet = height.get("feet")
+        inches = height.get("inches")
+        try:
+            feet_int = int(feet)
+        except (TypeError, ValueError):
+            return ""
+        try:
+            inches_int = int(inches)
+        except (TypeError, ValueError):
+            inches_int = 0
+        return f"{feet_int}' {inches_int}\""
 
     @staticmethod
     def _split_name(full_name: str) -> tuple[str, str]:
@@ -393,103 +424,104 @@ class DragonFlyService:
         if not school_code:
             return DragonFlyResult("DRAGONFLY_SCHOOL_CODE_REQUIRED")
 
+        # Public site URL (kept for source attribution / operator reference).
         url = (
             f"{self.SITE_BASE}/sites/{association}/"
             f"{school_code}/roster?sport={sport_code}"
         )
+        # The rosters are read from DragonFly's public JSON API, not scraped
+        # off the Angular site (which stopped rendering an HTML <table> in
+        # 2026 -- the old Playwright scrape now returns an empty roster for
+        # every school). `schools/<code>/summary` already carries every
+        # team's full roster with height / weight / grade / number / position.
+        summary_url = f"{self.API_BASE}/schools/{school_code}/summary"
+        accepted_codes = self.NCAA_SPORT_CODES.get(sport_code, set()) | {
+            sport_code
+        }
+        sport_word = ""
+        for word, code in self.SPORT_CODES.items():
+            if code == sport_code and not word.isupper():
+                sport_word = word
+                break
 
         try:
-            with sync_playwright() as playwright:
-                browser = playwright.chromium.launch(headless=True)
-                page = browser.new_page(
-                    viewport={"width": 1400, "height": 1000}
-                )
-
-                page.goto(
-                    url,
-                    wait_until="networkidle",
-                    timeout=60000,
-                )
-
-                tables = page.locator(self.ROSTER_TABLE_SELECTOR)
-
-                if tables.count() == 0:
-                    page.get_by_text(
-                        "SCHEDULES",
-                        exact=True,
-                    ).last.click(timeout=15000)
-
-                    page.wait_for_timeout(2500)
-
-                    page.get_by_text(
-                        "ROSTER",
-                        exact=True,
-                    ).last.click(timeout=15000)
-
-                    try:
-                        page.wait_for_selector(
-                            self.ROSTER_TABLE_SELECTOR,
-                            timeout=20000,
-                        )
-                    except Exception:
-                        pass
-
-                tables = page.locator(self.ROSTER_TABLE_SELECTOR)
-
-                raw_entries: list[dict[str, Any]] = []
-                available_levels: list[str] = []
-
-                for table_index in range(tables.count()):
-                    table = tables.nth(table_index)
-
-                    heading = table.evaluate(
-                        """table => {
-                            const prev = table.previousElementSibling;
-                            return prev ? (prev.innerText || '').trim() : '';
-                        }"""
-                    )
-
-                    heading = str(heading or "").strip()
-                    if heading:
-                        available_levels.append(heading)
-
-                    heading_upper = heading.upper()
-
-                    # CSRN high-school program roster:
-                    # include Varsity and JV; exclude Junior High by default.
-                    if not (
-                        heading_upper.startswith("VARSITY ")
-                        or heading_upper.startswith("JV ")
-                        or heading_upper.startswith("JUNIOR VARSITY ")
-                    ):
-                        continue
-
-                    rows = table.locator(self.ROSTER_ROW_SELECTOR)
-
-                    for index in range(rows.count()):
-                        cells = rows.nth(index).locator("td")
-                        values = [
-                            cells.nth(cell_index).inner_text().strip()
-                            for cell_index in range(cells.count())
-                        ]
-
-                        raw_entries.append(
-                            {
-                                "level": heading,
-                                "values": values,
-                            }
-                        )
-
-                browser.close()
-
-        except Exception as exc:
+            with self._client() as client:
+                response = client.get(summary_url)
+                response.raise_for_status()
+                payload = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
             return DragonFlyResult(
                 "DRAGONFLY_ROSTER_FETCH_FAILED",
-                {
-                    "source_url": url,
-                    "detail": str(exc),
-                },
+                {"source_url": summary_url, "detail": str(exc)},
             )
+
+        if not isinstance(payload, dict):
+            return DragonFlyResult(
+                "DRAGONFLY_ROSTER_FETCH_FAILED",
+                {"source_url": summary_url, "detail": "summary payload not an object"},
+            )
+
+        teams = payload.get("teams")
+        teams = teams if isinstance(teams, list) else []
+
+        raw_entries: list[dict[str, Any]] = []
+        available_levels: list[str] = []
+
+        for team in teams:
+            if not isinstance(team, dict):
+                continue
+
+            team_code = str(team.get("ncaaSportCode", "")).strip().upper()
+            team_name = str(team.get("name", "")).strip()
+            level = str(team.get("level", "")).strip()
+
+            is_sport = (
+                team_code in accepted_codes
+                or (bool(sport_word) and sport_word in team_name.casefold())
+            )
+            if not is_sport:
+                continue
+
+            source_level = " ".join(part for part in (level, team_name) if part)
+            if source_level:
+                available_levels.append(source_level)
+
+            # CSRN high-school program roster: Varsity + JV only.
+            if level.casefold() not in self.ROSTER_LEVELS:
+                continue
+
+            roster = team.get("roster")
+            roster = roster if isinstance(roster, list) else []
+
+            for member in roster:
+                if not isinstance(member, dict):
+                    continue
+
+                info = member.get("rosterInfo")
+                info = info if isinstance(info, dict) else {}
+
+                name = " ".join(
+                    part
+                    for part in (
+                        str(member.get("firstName", "")).strip(),
+                        str(member.get("lastName", "")).strip(),
+                    )
+                    if part
+                )
+
+                raw_entries.append(
+                    {
+                        "level": source_level,
+                        "values": [
+                            name,
+                            str(info.get("number", "")).strip(),
+                            str(info.get("position", "")).strip(),
+                            self._format_height(info.get("height")),
+                            str(info.get("weight", "")).strip(),
+                            str(info.get("grade", "")).strip(),
+                        ],
+                    }
+                )
 
         players: list[Record] = []
         warnings: list[Record] = []
