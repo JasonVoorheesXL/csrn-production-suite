@@ -46,6 +46,32 @@
       font-size: 0.86em;
     }
     .foot { margin-top: 20px; font-size: 0.82rem; color: #6b7280; }
+    .install {
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .install h2 { margin: 0 0 10px; font-size: 0.95rem; }
+    .install-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    button, .file-btn {
+      font: inherit;
+      color: #e8eaed;
+      background: #232733;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: default; }
+    button.primary { background: #2f6f4f; border-color: #2f6f4f; }
+    #licenseName { color: #a6adbb; font-size: 0.86rem; }
+    #installResult {
+      margin-top: 12px;
+      font-size: 0.88rem;
+      min-height: 1.2em;
+    }
+    #installResult.ok { color: #7ee2a8; }
+    #installResult.err { color: #f2a4a4; }
   </style>
 </head>
 <body>
@@ -68,16 +94,72 @@
 
     <ol>
       <li>Obtain a license file from the software owner.</li>
-      <li>Install it: <code>POST /api/licensing/install</code> with the file
-        contents, or place it at the path the owner specifies.</li>
+      <li>Choose it below &mdash; the same control handles first-run activation
+        and later renewals.</li>
       <li>Reload this page &mdash; broadcast controls return automatically once
         the signature and expiry check out.</li>
     </ol>
+
+    <section class="install">
+      <h2>Choose License File</h2>
+      <div class="install-row">
+        <label class="file-btn" for="licenseFile">Browse&hellip;</label>
+        <input id="licenseFile" type="file" accept=".json,.lic,application/json" hidden>
+        <span id="licenseName">No file chosen</span>
+        <button id="installBtn" type="button" class="primary" disabled>Install license</button>
+      </div>
+      <div id="installResult" role="status" aria-live="polite"></div>
+    </section>
 
     <p class="foot">
       A shared or copied installation still shows who it is really licensed
       to. This is a courtesy gate, not a technical restriction.
     </p>
   </main>
+  <script>
+    (function () {
+      var fileInput = document.getElementById("licenseFile");
+      var nameEl = document.getElementById("licenseName");
+      var btn = document.getElementById("installBtn");
+      var out = document.getElementById("installResult");
+
+      fileInput.addEventListener("change", function () {
+        var f = fileInput.files && fileInput.files[0];
+        nameEl.textContent = f ? f.name : "No file chosen";
+        btn.disabled = !f;
+        out.textContent = "";
+        out.className = "";
+      });
+
+      btn.addEventListener("click", function () {
+        var f = fileInput.files && fileInput.files[0];
+        if (!f) { return; }
+        btn.disabled = true;
+        out.className = "";
+        out.textContent = "Installing…";
+        var data = new FormData();
+        data.append("license", f);
+        fetch("/api/licensing/install-file", { method: "POST", body: data })
+          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+          .then(function (res) {
+            var msg = (res.body && res.body.message) || (res.body && res.body.status) || "Unknown response.";
+            if (res.ok && res.body && res.body.status === "LICENSE_INSTALLED") {
+              out.className = "ok";
+              out.textContent = msg + " Reloading…";
+              setTimeout(function () { window.location.reload(); }, 1200);
+            } else {
+              out.className = "err";
+              out.textContent = msg;
+              btn.disabled = false;
+            }
+          })
+          .catch(function () {
+            out.className = "err";
+            out.textContent = "Could not reach the server. Check that CSRN is still running.";
+            btn.disabled = false;
+          });
+      });
+    })();
+  </script>
 </body>
 </html>

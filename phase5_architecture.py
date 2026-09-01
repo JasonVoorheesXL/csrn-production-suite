@@ -32,6 +32,9 @@ EXPECTED_BLUEPRINTS = {
     # First-run onboarding wizard (Round 22): thin wrappers over the Identity
     # Profile write path, SchoolService, and the organization-logo handler.
     "onboarding_routes",
+    # Unauthenticated license-file install for the gate screen (Round 22),
+    # kept out of the authed-only deployment_routes blueprint.
+    "licensing_public_routes",
     "page_routes",
     "personnel_routes",
     # The halftime/pregame/delay overlay (pregame_universal_overlay.html) --
@@ -59,6 +62,10 @@ PUBLIC_ENDPOINTS = {
     "asset_routes.sponsor_ad_file",
     "caption_routes.caption_overlay",
     "caption_routes.caption_overlay_state",
+    # POST /api/licensing/install-file: the license gate screen is shown
+    # before any operator PIN exists (fresh install) and for renewals; the
+    # Ed25519 signature check is the real boundary. Round 22.
+    "licensing_public_routes.install_license_file",
     "live_game_routes.statistics_overlay_state",
     "logo_routes.school_logo_file",
     # First-run onboarding wizard (Round 22): a fresh install has no operator

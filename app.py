@@ -187,6 +187,10 @@ from routes.deployment_routes import (
     DeploymentRoutesDependencies,
     create_deployment_blueprint,
 )
+from routes.licensing_public_routes import (
+    LicensingPublicRoutesDependencies,
+    create_licensing_public_blueprint,
+)
 from routes.theme_routes import (
     ThemeRoutesDependencies,
     create_theme_blueprint,
@@ -3342,6 +3346,13 @@ DEPLOYMENT_ROUTES_BLUEPRINT = create_deployment_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(DEPLOYMENT_ROUTES_BLUEPRINT)
+
+LICENSING_PUBLIC_ROUTES_BLUEPRINT = create_licensing_public_blueprint(
+    LicensingPublicRoutesDependencies(
+        get_entitlement_service=lambda: get_entitlement_service(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(LICENSING_PUBLIC_ROUTES_BLUEPRINT)
 
 
 THEME_SERVICE: GraphicsThemeService | None = None
