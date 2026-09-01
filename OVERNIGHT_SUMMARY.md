@@ -7,15 +7,93 @@ branch: `round16-pywebview-license-handoff-20260831`** merges the two (off
 `round14` @ `55be4ea`, carries rounds 1–15).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
-Round 17 branch: `round17-gameday-backup-audit-20260831` (off `round16` @
-`2bf64d3`; investigate-only). **Round 18 branch:
-`round18-frozen-build-verification-20260831`** (off `round17` @ `0b70034`).
+Round 18 branch: `round18-frozen-build-verification-20260831` (off
+`round17` @ `0b70034`). **Round 19 branch:
+`round19-gameday-fix-and-cleanup-20260901`** (off `round18` @ `7ed88c3`).
 
 Full test suite (deterministic, `-p no:randomly`, run with
-`.venv/Scripts/python.exe`) after **round 16**: **0 failed, 2411 passed**.
-Rounds 17–18 change no application code — count unchanged (Round 18 edits
-only `packaging/windows/CSRNProductionSuite.spec` + `.gitignore`). **0 real
-regressions across all sixteen rounds.**
+`.venv/Scripts/python.exe`) after **round 19**: **0 failed, 2429 passed**.
+**0 real regressions across all nineteen rounds.**
+
+---
+
+## ROUND 19 — GameDay backup fix + small cleanup batch (2026-09-01)
+
+`templates/index.html` + `broadcaster_print_service.py` (owner WIP) not
+touched (0 bytes).
+
+| commit | task |
+|---|---|
+| `1a2b7bc` | **A** — GameDay snapshots: trim media, move off Drive, retention 10→5, migrate |
+| `3539f4f` | **B** — `issue_license.py --genkey` won't default into a synced folder |
+| (this)    | **C** — layers-v10 residual sweep: **already done** (Round 10), nothing to remove |
+
+### Task A — GameDay safety snapshot fix (Round 17 proposal, approved)
+
+1. **`GameDaySafetyService.create_snapshot()` no longer copies media.**
+   `SNAPSHOT_MEDIA_EXCLUDE_NAMES` = `Headshots` (Rosters/ + Personnel/),
+   `Assets`, `Sponsors`, `Logos`, `School Logos`, `Social`, `Captions`,
+   `Recaps`, `TestFixtures` — basename-matched like `Backups`. A snapshot
+   goes from ~1 GB to ~10–15 MB.
+2. **`RecoveryService._apply_payload()` preserves those on restore** — the
+   top-level dirs are skipped, and `Rosters/Headshots` +
+   `Personnel/Headshots` are held aside across the wipe (their parents are
+   still rolled back). A state restore never silently deletes the live
+   media library.
+3. **`GAME_DAY_BACKUP_DIR` → `%LOCALAPPDATA%\PossumFrog\CSRN Production
+   Suite\GameDay`** via `app._game_day_backup_root()` (override
+   `CSRN_GAME_DAY_BACKUP_ROOT`; repo-local fallback with no `LOCALAPPDATA`)
+   — the same Round 5 pattern as `CORE_BACKUP_ROOT`. That path is also
+   where the live state-authority `state.json` already sits — the two are
+   deliberately co-located as one non-synced game-day root.
+   `legacy_game_day_backup_notice()` nudges on startup while old snapshots
+   remain in the synced tree.
+4. **`automatic_retention` default 10 → 5.**
+5. **`tools/migrate_gameday_backups.py`** — dry-run by default; `--apply`
+   `shutil.move`s each real schema-1 snapshot then re-verifies its hashes
+   at the new root (rolls the move back + aborts on any verify failure),
+   and sweeps `.tmp-*` stages / manifest-less pre-schema orphans / loose
+   files.
+
+**Ran on this machine (`--apply`):** all **10 real snapshots (8.3 GB)**
+migrated to `%LOCALAPPDATA%` and re-verified `SNAPSHOT_VERIFIED`.
+`Data/Backups/GameDay` **8.3 GB → 2.7 MB**. The `_r1121` loose file was
+swept; the **33 pre-schema orphan dirs could not be deleted**
+(`[WinError 5]` — Google Drive holding locks on
+`payload/Data/Assets/Files/…`). They are inert (no manifest → invisible to
+the service, never pruned, never restorable). Re-run `--apply` once Drive
+releases them, or delete by hand.
+
+Golden tests: `restore_snapshot()` from a `backup_root` **outside**
+`data_dir` rolls back state JSON and **preserves media** (incl. a headshot
+added after the snapshot); snapshot payload is trimmed; retention default
+is 5; the migration tool's classify / `--apply` / dry-run.
+
+### Task B — `--genkey` safe default
+
+`--genkey` default output moves from the Drive-synced repo to
+`_default_key_path()` (`%LOCALAPPDATA%\PossumFrog\CSRN Production
+Suite\csrn_license_private_key.hex`, or `~/.possumfrog/…`). `--genkey`
+**refuses** a default that resolves inside a cloud-sync folder
+(`_looks_synced`: my drive / google drive / onedrive / dropbox / icloud /
+`.driveupload`) and prints a loud **WARNING** if `--out-key` is explicitly
+pointed at one. `do_issue()` warns (does not block) on a synced license
+output path. `docs/licensing.md` updated.
+
+### Task C — layers-v10 residual sweep: nothing to do
+
+All eight named symbols (`isFridayNeutralEquipmentPixel`,
+`compositeFridayMasks`, `clipFridayDetailLayer`, `colorizeFridayUniform`,
+`tintFridayMask`, `nearestFridayPaletteKey`, `FRIDAY_PLAYER_PALETTE`,
+`fridayHexToRgb`) are **absent from the live tree** — present only in
+`.bak` / `.pre-*` / `.csrn-backups/` copies. `git log -S` shows they were
+removed from `csrn-production-theme-runtime.js` in **`1c606e4` Round 10
+Task A**. `paintFridayNightLayeredFootballClash` is already a clean
+4-line pass-through shim with **no unreachable post-return body**. No code
+change — editing this SHA-256-frozen file (hashed by
+`test_collegiate_theme_field_scorebug` + `test_gate170_r1_r3…`, read by
+~50 gate tests) for a cleanup that is already complete would be inventing
+work.
 
 ---
 
