@@ -375,6 +375,60 @@ def _install_license_gate(flask_app: Any) -> None:
         )
 
     flask_app.before_request(_gate)
+
+
+# --- First-run onboarding gate (Round 22). -------------------------------
+# A fresh install (blank Identity Profile) is routed to the onboarding
+# wizard until Finish or Skip persists identity_service's
+# `onboarding_complete` flag. An existing install seeds that flag True and
+# never sees the wizard. Independent of frozen/dev -- it is about the
+# Identity Profile being unconfigured, not the packaging.
+_ONBOARDING_GATE_EXEMPT_EXACT = frozenset({"/api/health"})
+_ONBOARDING_GATE_EXEMPT_PREFIXES = (
+    "/static/",
+    "/api/onboarding",
+    "/api/licensing",
+    "/api/diagnostics",
+    "/api/runtime-diagnostics",
+    "/overlay",
+)
+
+
+def _onboarding_incomplete() -> bool:
+    """True while first-run onboarding still needs to happen (seam for
+    testing; reads the Identity Profile fresh so a Finish/Skip in this
+    process takes effect immediately)."""
+    try:
+        profile = load_identity_profile(
+            IDENTITY_FILE, existing_install=_EXISTING_INSTALL
+        )
+    except Exception:
+        return False
+    return not identity_service.onboarding_complete(profile)
+
+
+def _install_onboarding_gate(flask_app: Any) -> None:
+    def _gate():
+        if not _onboarding_incomplete():
+            return None
+        path = request.path.rstrip("/") or "/"
+        if path == "/":
+            return render_template("onboarding.html"), 200
+        if path in _ONBOARDING_GATE_EXEMPT_EXACT or any(
+            path.startswith(prefix) for prefix in _ONBOARDING_GATE_EXEMPT_PREFIXES
+        ):
+            return None
+        return (
+            jsonify(
+                {
+                    "error": "ONBOARDING_REQUIRED",
+                    "message": "Finish first-run setup before using the app.",
+                }
+            ),
+            409,
+        )
+
+    flask_app.before_request(_gate)
 SCHOOLS_FILE = DATA_DIR / "Schools" / "schools.json"
 BROADCASTERS_FILE = DATA_DIR / "Settings" / "broadcasters.json"
 ROSTERS_FILE = DATA_DIR / "Rosters" / "rosters.json"
@@ -3752,6 +3806,12 @@ _install_internal_tools_gate(app)
 # in an installed build with no valid license it holds broadcast-control
 # behind the "license required" screen.
 _install_license_gate(app)
+
+# First-run onboarding gate (Round 22). Routes a fresh install to the setup
+# wizard until identity_service's onboarding_complete flag is set. Runs
+# after the license gate: an unlicensed fresh install sees the license
+# screen first, then the wizard once a license is installed.
+_install_onboarding_gate(app)
 
 # (pregame_presentation is now registered via APPLICATION_BLUEPRINTS above,
 # through the application factory -- no post-construction install needed.)

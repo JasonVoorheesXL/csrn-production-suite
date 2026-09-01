@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Welcome &mdash; CSRN Production Suite</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    /* Layout-only additions; all colours/controls come from style.css. */
+    body { display:flex; align-items:flex-start; justify-content:center; padding:40px 20px; }
+    .onboarding-card { max-width:620px; width:100%; }
+    .onboarding-card h1 { margin:0 0 4px; }
+    .onboarding-card .lede { color:var(--muted); margin:0 0 22px; }
+    .onboarding-logo-row { display:flex; gap:14px; align-items:center; }
+    .onboarding-logo-row img {
+      width:88px; height:66px; object-fit:contain; border:1px solid #444b56;
+      border-radius:9px; background:#111318; padding:4px; display:none;
+    }
+    .onboarding-actions { display:flex; gap:12px; margin-top:8px; }
+    .onboarding-actions button { flex:1; }
+    #onboardingError { color:#ff8f8f; font-weight:700; margin:12px 0 0; min-height:1.2em; }
+    .req { color:var(--accent2); }
+  </style>
+</head>
+<body>
+  <main class="panel onboarding-card">
+    <h1>Welcome to CSRN Production Suite</h1>
+    <p class="lede">
+      A few basics to get started. Only the organization / team name is
+      required &mdash; everything else can be set later from Configuration.
+    </p>
+
+    <label>
+      Organization / team name <span class="req">*</span>
+      <input id="orgName" class="wide" autocomplete="off" placeholder="e.g. TruHous Media">
+    </label>
+
+    <div class="setup-grid">
+      <label>
+        Primary sport
+        <select id="sport"><option value="">(choose later)</option></select>
+      </label>
+      <label>
+        Primary school
+        <input id="schoolName" class="wide" autocomplete="off"
+               placeholder="Creates the first school record">
+      </label>
+    </div>
+
+    <label>
+      Organization logo
+      <span class="onboarding-logo-row">
+        <button type="button" id="logoPick">Choose image&hellip;</button>
+        <img id="logoPreview" alt="logo preview">
+        <small id="logoStatus" class="section-note" style="margin:0"></small>
+      </span>
+    </label>
+    <input id="logoFile" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+    <input id="logoPath" type="hidden">
+
+    <p id="onboardingError"></p>
+
+    <div class="onboarding-actions">
+      <button type="button" id="skipBtn">Skip for now</button>
+      <button type="button" id="finishBtn" class="primary">Finish</button>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      const $ = (id) => document.getElementById(id);
+      const err = $("onboardingError");
+      const setBusy = (b) => { $("finishBtn").disabled = b; $("skipBtn").disabled = b; };
+
+      fetch("/api/onboarding/context", { credentials: "same-origin" })
+        .then((r) => r.json())
+        .then((data) => {
+          const sel = $("sport");
+          (data.sports || []).forEach((s) => {
+            const o = document.createElement("option");
+            o.value = s.value; o.textContent = s.label;
+            if (s.value === (data.default_sport || "")) o.selected = true;
+            sel.appendChild(o);
+          });
+        })
+        .catch(() => {});
+
+      $("logoPick").addEventListener("click", () => $("logoFile").click());
+      $("logoFile").addEventListener("change", async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        $("logoStatus").textContent = "Uploading…";
+        const form = new FormData();
+        form.append("logo", file);
+        try {
+          const res = await fetch("/api/onboarding/logo", { method: "POST", body: form, credentials: "same-origin" });
+          const data = await res.json();
+          if (!res.ok) { $("logoStatus").textContent = data.message || "Upload failed."; return; }
+          $("logoPath").value = data.logo_path || "";
+          const img = $("logoPreview");
+          img.src = data.logo_path; img.style.display = "inline-block";
+          $("logoStatus").textContent = "";
+        } catch (_) {
+          $("logoStatus").textContent = "Upload failed.";
+        }
+      });
+
+      async function complete(payload) {
+        err.textContent = "";
+        setBusy(true);
+        try {
+          const res = await fetch("/api/onboarding/complete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) { err.textContent = data.message || "Could not finish setup."; setBusy(false); return; }
+          window.location.href = "/";
+        } catch (_) {
+          err.textContent = "Could not reach the server.";
+          setBusy(false);
+        }
+      }
+
+      $("finishBtn").addEventListener("click", () => {
+        const org = $("orgName").value.trim();
+        if (!org) { err.textContent = "Organization / team name is required."; $("orgName").focus(); return; }
+        complete({
+          org_name: org,
+          sport: $("sport").value || "",
+          school_name: $("schoolName").value.trim(),
+          logo_path: $("logoPath").value || "",
+        });
+      });
+
+      $("skipBtn").addEventListener("click", () => complete({ skip: true, org_name: $("orgName").value.trim() }));
+    })();
+  </script>
+</body>
+</html>

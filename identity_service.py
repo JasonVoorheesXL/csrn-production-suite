@@ -84,6 +84,12 @@ BLANK_STATE_DEFAULTS: dict[str, Any] = {
 
 _SECTIONS = ("organization", "broadcast_defaults", "streaming", "state_defaults")
 
+# Round 22: scalar flags carried alongside the sections. `onboarding_complete`
+# gates the first-run wizard -- an existing install is never onboarded (it
+# already has its identity), a fresh one is, and the wizard's Finish/Skip
+# writes True so it never re-triggers.
+_FLAG_DEFAULTS: dict[str, Any] = {"onboarding_complete": False}
+
 
 def _template(existing_install: bool) -> dict[str, Any]:
     if existing_install:
@@ -92,13 +98,20 @@ def _template(existing_install: bool) -> dict[str, Any]:
             "broadcast_defaults": copy.deepcopy(LEGACY_BROADCAST_DEFAULTS),
             "streaming": copy.deepcopy(LEGACY_STREAMING),
             "state_defaults": copy.deepcopy(LEGACY_STATE_DEFAULTS),
+            "onboarding_complete": True,
         }
     return {
         "organization": copy.deepcopy(BLANK_ORGANIZATION),
         "broadcast_defaults": copy.deepcopy(BLANK_BROADCAST_DEFAULTS),
         "streaming": copy.deepcopy(BLANK_STREAMING),
         "state_defaults": copy.deepcopy(BLANK_STATE_DEFAULTS),
+        "onboarding_complete": False,
     }
+
+
+def onboarding_complete(profile: Mapping[str, Any] | None) -> bool:
+    """True once first-run onboarding has been finished or skipped."""
+    return bool(isinstance(profile, Mapping) and profile.get("onboarding_complete"))
 
 
 def branding_logo(organization: Mapping[str, Any] | None) -> str:
@@ -124,6 +137,9 @@ def _normalize(raw: Mapping[str, Any] | None, existing_install: bool) -> dict[st
                 base[section] = {**base[section], **{
                     str(k): v for k, v in value.items()
                 }}
+        for flag in _FLAG_DEFAULTS:
+            if flag in raw:
+                base[flag] = bool(raw[flag])
     return base
 
 
