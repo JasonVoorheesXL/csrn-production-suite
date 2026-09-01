@@ -102,3 +102,58 @@ def test_run_command_center_registers_handlers_before_serving() -> None:
     assert 'if __name__ == "__main__":\n    run_command_center()' in src
     # dev path builds the SAME server the shell will
     assert "build_command_center_server()" in body
+
+
+def _port_free(port: int = 5050) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex(("127.0.0.1", port)) != 0
+
+
+@pytest.mark.skipif(not _port_free(), reason=":5050 already in use")
+def test_shell_run_real_server_clean_shutdown_on_window_close(monkeypatch, tmp_path) -> None:
+    """Round 21D headless: real csrn_desktop.run() + real in-process server
+    on a daemon thread + real command_center_clean_shutdown() + real
+    server.close(); only the pywebview window is faked (start() returns ==
+    the user closed it)."""
+    import urllib.request
+
+    import csrn_desktop
+
+    rec = tmp_path / "Data" / "Backups" / "Recovery"
+    rec.mkdir(parents=True)
+    marker = rec / "active_session.json"
+    marker.write_text('{"pid": 1}', encoding="utf-8")
+    monkeypatch.setenv("CSRN_RUNTIME_ROOT", str(tmp_path))
+    monkeypatch.setenv("CSRN_DATA_ROOT", str(tmp_path / "Data"))
+    # point the recovery service's session marker at our planted file
+    import app as app_module
+    monkeypatch.setattr(app_module, "GAME_DAY_RECOVERY_DIR", rec, raising=False)
+    monkeypatch.setattr(app_module, "RECOVERY_SERVICE", None, raising=False)
+
+    seen = {}
+
+    class _FakeWebview:
+        @staticmethod
+        def create_window(*a, **k):
+            return object()
+
+        @staticmethod
+        def start(**k):
+            try:
+                with urllib.request.urlopen("http://127.0.0.1:5050/api/health", timeout=3) as r:
+                    seen["health"] = r.status
+            except Exception as e:  # noqa: BLE001
+                seen["health"] = repr(e)
+
+    monkeypatch.setitem(__import__("sys").modules, "webview", _FakeWebview)
+
+    try:
+        rc = csrn_desktop.run(health_timeout=60)
+    finally:
+        app_module.RECOVERY_SERVICE = None  # next real use rebuilds cleanly
+
+    assert rc == 0
+    assert seen.get("health") == 200          # server really served, in-process
+    assert not marker.exists()                # command_center_clean_shutdown() ran
+    assert _port_free()                        # server.close() released :5050

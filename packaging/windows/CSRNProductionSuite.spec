@@ -1,8 +1,10 @@
 # PyInstaller specification for the commercial Windows runtime.
 #
 # Round 15F changes vs. the original scaffold:
-#   * entry point is csrn_desktop.py (the pywebview shell), not app.py --
-#     the shell re-execs itself `--serve-only` to run Waitress (Round 15D);
+#   * entry point is csrn_desktop.py (the pywebview shell), not app.py.
+#     Round 21: the shell runs Waitress IN-PROCESS on a daemon thread
+#     (app.build_command_center_server()) -- no child process, no
+#     `--serve-only` re-exec, no console-signal shutdown.
 #   * console=False (GUI shell);
 #   * bundle rulesets/ (Round 14 found it was missing -> the Round 7
 #     ruleset engine silently fell back to literals in a frozen build);
