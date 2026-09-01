@@ -456,3 +456,18 @@ changed.
 | **15F** | Playwright Chromium strategy per the owner's C.3 decision (post-install `playwright install` + `PLAYWRIGHT_BROWSERS_PATH`, or bundled Chromium, or graceful-degrade). Test the degrade path. |
 | **15G** | Update `csrn-production-suite.iss`: shortcut → the shell exe (still `--installed`), version wiring from `VERSION.txt`, WebView2 bootstrapper `[Run]` step for old Win10, firewall rule for 5050/5051. Document (do not implement) code-signing + the external updater. |
 | **15H** | Docs: keep `CSRN_GAME_DAY_LAUNCHER.ps1` / `RUN_CSRN_COMMAND_CENTER.bat` as the *developer* run path; the shell is the *customer* path. Update `OVERNIGHT_SUMMARY.md` + memory. |
+
+> **Note (schedule change):** the pywebview shell above shipped as its own
+> branch `round15-pywebview-shell-20260831` (commits 15A–15G; 15E onboarding
+> deferred) and is now slated as **Round 16**, unchanged. The redefined
+> **Round 15** built the license-enforcement foundation instead
+> (`round15-license-foundation-20260831`, see `docs/licensing.md`).
+>
+> **Round 16 must carry the license gate through packaging** — it is not
+> dev-only. The frozen build has to: bundle `license_service.py` (pure
+> Python, no new dependency — the Ed25519 is vendored on purpose); **exclude
+> `tools/issue_license.py`** from the `.spec` `excludes` list alongside
+> `run_core_foundation.py`; embed a **real** `LICENSE_PUBLIC_KEY_HEX` (the
+> committed placeholder is all-zero and fails closed, so an installed launch
+> would sit on the "license required" screen); and rely on
+> `ProductPaths.license_file` under `installed_mode` (already correct).

@@ -1,15 +1,112 @@
 # Overnight Session Summary — 2026-08-28 → 08-31
 
-Round 12 branch: `round12-identity-profile-20260831`. Round 13 branch:
-`round13-dehardcode-cleanup-20260831`. **Round 14 branch:
-`round14-pywebview-scoping-20260831`** (off `round13-dehardcode-cleanup-20260831`
-@ `d2498f8`, carries rounds 1-13).
+Round 13 branch: `round13-dehardcode-cleanup-20260831`. Round 14 branch:
+`round14-pywebview-scoping-20260831`. **Round 15 branch:
+`round15-license-foundation-20260831`** (off `round14-pywebview-scoping-20260831`
+@ `55be4ea`, carries rounds 1-14).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
 Full test suite (deterministic, `-p no:randomly`, run with
-`.venv/Scripts/python.exe`) after **round 14**: **0 failed, 2341 passed**
-(unchanged — Round 14 is investigate-only, no application code touched).
-**0 real regressions across all fourteen rounds.**
+`.venv/Scripts/python.exe`) after **round 15**: **0 failed, 2370 passed**.
+**0 real regressions across all fifteen rounds.**
+
+> The pywebview desktop-shell work drafted first (branch
+> `round15-pywebview-shell-20260831`, commits 15A–15G, 15E onboarding
+> deferred) is **reslotted as Round 16, unchanged**, per the owner. Round 15
+> below is the redefined license-enforcement foundation.
+
+---
+
+## ROUND 15 — license enforcement foundation (2026-08-31)
+
+An **offline, server-free** license gate: a signed JSON file validated
+entirely against a public key embedded in the app. **No machine locking,
+no phone-home.** Issuance is **manual, owner-run only**. Threat model is a
+**soft social deterrent**, not a hard control. Full guide:
+[`docs/licensing.md`](docs/licensing.md).
+
+`templates/index.html` carries the owner's "Go Live" button + emergency
+timeout WIP; Task C edited it, isolated the 2 hunks against `HEAD`, and the
+WIP is verified byte-identical to the round start (only `@@` line numbers
+shift). `broadcaster_print_service.py` **not touched** (0 bytes).
+
+| commit | task | suite |
+|---|---|---|
+| `179cf38` | **A** — `license_service.py`: vendored Ed25519 (RFC 8032) + signed-license format | 2341 → 2356 |
+| `23bc557` | **B** — feed the Ed25519 verifier into `EntitlementService`; gate broadcast-control | 2356 → 2362 |
+| `9f83d17` | **C** — "Licensed to: &lt;org&gt;" badge in the settings screen | 2362 → 2364 |
+| `5340e10` | **D** — `tools/issue_license.py` owner CLI + `docs/licensing.md` | 2364 → 2370 |
+
+**E** — this summary section + the Round 16 handoff note in
+`docs/pywebview_shell_scoping.md` (docs only; suite stays 2370).
+
+### Task A — signed license format + vendored signer
+
+`license_service.py`: the **RFC 8032 §6 reference Ed25519** (public domain)
+is vendored verbatim — no `cryptography` / `pynacl` / native crypto
+dependency added to the bundle (owner decision 1). `verify_license(payload)
+-> (ok, reason)` matches `EntitlementService`'s `Verifier` slot. The
+signature covers a canonical JSON of exactly
+`SIGNED_FIELDS = (product_id, license_id, status, customer, issued_at,
+expires_at, features, sports)` — so `EntitlementService` stamping /
+re-sorting the stored record, and the owner's un-signed `note`, never break
+re-verification. `LICENSE_PUBLIC_KEY_HEX` is an all-zero placeholder that
+**fails closed** until the owner embeds a real key.
+
+**Correctness check (owner-requested):** the vendored Ed25519 reproduces
+**every RFC 8032 §7.1 test vector exactly** — public-key derivation,
+byte-identical signature output, and verification — for TEST 1 (empty
+message), TEST 2 (1 byte), TEST 3 (2 bytes), and TEST SHA(abc) (64 bytes).
+Tamper tests confirm a flipped signature / message / public key is
+rejected. (`tests/test_license_service.py`.)
+
+### Task B — single source of truth + the gate
+
+`get_entitlement_service()` now wires `verifier=license_service.verify_license`
+(owner decision 2 — no parallel gate). `EntitlementService.status()` reads
+the installed-mode license through a new `_verified_disk_license()` that
+re-runs the verifier on the on-disk file (cached by mtime), closing the
+hand-dropped-file gap. `app.py:_install_license_gate(app)` (mirrors the
+internal-tools gate): installed build + no valid license → `GET /` renders
+`templates/license_required.html`, broadcast APIs return `402
+LICENSE_REQUIRED`; `/api/health`, `/api/licensing/*`, `/api/diagnostics`,
+`/static`, `/overlay` stay reachable; a licensing exception fails open.
+
+**Caledonia reconciliation (owner-requested):** a source checkout
+(`installed_mode == False`) is already granted everything by
+`EntitlementService._development_license()` and **never reaches the gate**,
+so **no runtime auto-seed was added** — it would be redundant, and a
+runtime seed cannot hold the private key to sign anyway. A frozen Caledonia
+(or any customer) gets a real license via `tools/issue_license.py`. Golden
+tests: source checkout never gated; installed + valid license behaves
+exactly as today; installed + no license shows the screen but keeps
+essentials open.
+
+### Task C — visible badge
+
+A hidden `<p id="licenseBadge">` under the Configuration Manager heading,
+filled by `updateLicenseBadge()` from `/api/licensing/status` when the
+settings screen loads. Shows the licensed customer name (and reason if not
+valid). Nothing overlay-facing.
+
+### Task D — owner issuance tool
+
+`tools/issue_license.py` (**never shipped**): `--genkey` makes the Ed25519
+keypair (prints the public key to embed; writes the private seed `0600`);
+issue mode signs `license-<org>.json` from `--org` / `--sports` /
+`--expires YYYY-MM-DD|never` / `--features` / `--note`. `--note` is written
+to the file but **not signed and not read by the app**. `.gitignore` now
+excludes `*.hex` keys and `license-*.json`. `docs/licensing.md` covers
+keypair setup, key safety / rotation, issuing, install, and expiry.
+
+### Task E — Round 16 handoff
+
+The license gate is **not dev-only** and must survive PyInstaller: Round 16
+bundles `license_service.py` (pure Python, no new dep), **excludes
+`tools/issue_license.py`**, and must embed a **real**
+`LICENSE_PUBLIC_KEY_HEX` (the placeholder fails closed). Noted in
+[`docs/pywebview_shell_scoping.md`](docs/pywebview_shell_scoping.md) and
+`docs/licensing.md`.
 
 ---
 
