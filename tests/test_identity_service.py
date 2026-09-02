@@ -36,6 +36,12 @@ HISTORICAL_STREAMING = {
         "https://studio.youtube.com/channel/"
         "UCAZZRMpb3HnrSxCnDiQeH7Q/livestreaming"
     ),
+    # Round 23 quick-launch fields -- blank on the existing install, so the
+    # "existing install sees no change" guarantee still holds (the launcher
+    # only reads facebook_live / youtube_live).
+    "broadcast_software_path": "",
+    "youtube_url": "",
+    "facebook_url": "",
 }
 # Round 13 Task A: former DEFAULT_STATE placeholder team/venue.
 HISTORICAL_STATE_DEFAULTS = {
@@ -93,7 +99,13 @@ def test_fresh_install_seeds_blank_identity_not_caledonia(tmp_path) -> None:
     assert profile["broadcast_defaults"]["home_school_id"] == ""
     # a sport default is still fine on a blank template
     assert profile["broadcast_defaults"]["sport"] == "Football"
-    assert profile["streaming"] == {"facebook_live": "", "youtube_live": ""}
+    assert profile["streaming"] == {
+        "facebook_live": "",
+        "youtube_live": "",
+        "broadcast_software_path": "",
+        "youtube_url": "",
+        "facebook_url": "",
+    }
     assert profile["state_defaults"] == {"home_team": "", "venue": ""}
     # nothing Caledonia-identifying and no csrn-logo fallback leaked in
     blob = json.dumps(profile).lower()
@@ -137,7 +149,10 @@ def test_app_default_config_is_sourced_from_the_identity_profile() -> None:
     # load_config() must still resolve the Caledonia identity unchanged.
     assert app.DEFAULT_CONFIG["organization"] == HISTORICAL_ORGANIZATION
     assert app.DEFAULT_CONFIG["broadcast_defaults"] == HISTORICAL_BROADCAST_DEFAULTS
-    assert "streaming" not in app.DEFAULT_CONFIG
+    # Round 23: streaming is now in DEFAULT_CONFIG (Configuration Manager edits
+    # it); seeded from the profile, so on the existing install it is exactly
+    # the historical launcher URLs plus the blank quick-launch fields.
+    assert app.DEFAULT_CONFIG["streaming"] == HISTORICAL_STREAMING
     assert "state_defaults" not in app.DEFAULT_CONFIG
     resolved = app.load_config()
     assert resolved["organization"]["name"] == "Caledonia Sports Radio Network"

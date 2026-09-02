@@ -48,6 +48,12 @@ LEGACY_STREAMING: dict[str, Any] = {
         "https://studio.youtube.com/channel/"
         "UCAZZRMpb3HnrSxCnDiQeH7Q/livestreaming"
     ),
+    # Round 23 quick-launch toolbar (Command Center). Blank even on the
+    # existing install -- new per-install operator conveniences, never
+    # hard-coded anywhere before.
+    "broadcast_software_path": "",
+    "youtube_url": "",
+    "facebook_url": "",
 }
 # Placeholder team/venue shown by DEFAULT_STATE before any broadcast is loaded
 # (Round 13 Task A -- same class of literal as the two blocks above).
@@ -76,6 +82,9 @@ BLANK_BROADCAST_DEFAULTS: dict[str, Any] = {
 BLANK_STREAMING: dict[str, Any] = {
     "facebook_live": "",
     "youtube_live": "",
+    "broadcast_software_path": "",
+    "youtube_url": "",
+    "facebook_url": "",
 }
 BLANK_STATE_DEFAULTS: dict[str, Any] = {
     "home_team": "",

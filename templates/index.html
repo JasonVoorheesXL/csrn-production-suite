@@ -1395,6 +1395,21 @@
           <label>Default Alert Radius (miles)<input id="cfgRadius" type="number"></label>
         </div>
 
+        <h2>Quick Launch</h2>
+        <p class="section-note">Optional shortcuts for the Command Center toolbar. All three are per-install; leave any blank to hide that button.</p>
+        <div class="setup-grid">
+          <label class="span-2">Broadcast Software
+            <div class="button-row">
+              <input id="cfgBroadcastSoftware" placeholder="C:\Program Files\obs-studio\bin\64bit\obs64.exe">
+              <input id="cfgBroadcastSoftwareFile" type="file" class="hidden" onchange="pickBroadcastSoftware(this)">
+              <button type="button" onclick="document.getElementById('cfgBroadcastSoftwareFile').click()">Choose…</button>
+            </div>
+            <small class="section-note">Pick your streaming software's program file (OBS, vMix, Streamlabs, …). If only the filename appears, paste the full path.</small>
+          </label>
+          <label>YouTube URL<input id="cfgYoutubeUrl" placeholder="https://studio.youtube.com/…"></label>
+          <label>Facebook URL<input id="cfgFacebookUrl" placeholder="https://www.facebook.com/…"></label>
+        </div>
+
         <h2>CSRN Social Media</h2>
         <div class="setup-grid">
           <label>Facebook
@@ -4792,6 +4807,17 @@ function useBuiltInOrganizationLogo(){
   if(status)status.textContent='Using the same built-in logo as Command Center. Click Save Configuration.';
 }
 
+function pickBroadcastSoftware(input){
+  const file=input&&input.files&&input.files[0];
+  if(!file)return;
+  // A plain browser only exposes file.name; a desktop webview may also give
+  // a real path. Take whatever is fuller and let the operator finish it.
+  const field=document.getElementById('cfgBroadcastSoftware');
+  field.value=file.path||field.value||file.name;
+  configDirty=true;
+  input.value='';
+}
+
 function updateOrganizationLogoPreview(){
   const input=document.getElementById('cfgOrgLogo'),preview=document.getElementById('cfgOrgLogoPreview');
   if(!preview)return;
@@ -4844,6 +4870,10 @@ async function loadConfig() {
   document.getElementById('cfgYoutube').value = c.social.youtube || '';
   document.getElementById('cfgX').value = c.social.x || '';
   document.getElementById('cfgWebsite').value = c.social.website || '';
+  const streaming = c.streaming || {};
+  document.getElementById('cfgBroadcastSoftware').value = streaming.broadcast_software_path || '';
+  document.getElementById('cfgYoutubeUrl').value = streaming.youtube_url || '';
+  document.getElementById('cfgFacebookUrl').value = streaming.facebook_url || '';
   document.getElementById('cfgAutoBackup').value = String(c.application.automatic_backup);
   document.getElementById('cfgAutoSave').value = String(c.application.auto_save);
   document.getElementById('cfgSessionHours').value = c.application.operator_timeout_hours || 12;
@@ -4926,6 +4956,11 @@ async function saveConfig() {
       youtube: document.getElementById('cfgYoutube').value.trim(),
       x: document.getElementById('cfgX').value.trim(),
       website: document.getElementById('cfgWebsite').value.trim()
+    },
+    streaming: {
+      broadcast_software_path: document.getElementById('cfgBroadcastSoftware').value.trim(),
+      youtube_url: document.getElementById('cfgYoutubeUrl').value.trim(),
+      facebook_url: document.getElementById('cfgFacebookUrl').value.trim()
     },
     application: {
       automatic_backup: document.getElementById('cfgAutoBackup').value === 'true',

@@ -792,10 +792,13 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Sourced from the external Identity Profile (identity_service.py) instead
     # of inline literals -- see IDENTITY_PROFILE above. On the existing install
     # these are exactly the former Caledonia/CSRN values; on a fresh install
-    # they are blank. (The streaming block stays out of config on purpose --
-    # it is a launcher concern, read straight from the profile in Task B.)
+    # they are blank. The streaming block is included so the Configuration
+    # Manager can edit it (Round 23 added the Command Center quick-launch
+    # fields); save_config() mirrors it straight back to the profile, which
+    # the game-day launcher still reads.
     "organization": copy.deepcopy(IDENTITY_PROFILE["organization"]),
     "broadcast_defaults": copy.deepcopy(IDENTITY_PROFILE["broadcast_defaults"]),
+    "streaming": copy.deepcopy(IDENTITY_PROFILE["streaming"]),
     "folders": {
         "graphics": "Graphics",
         "assets": "Assets",
@@ -1150,15 +1153,24 @@ def load_config() -> dict[str, Any]:
 
 
 def _persist_identity_sections(config: Mapping[str, Any]) -> None:
-    """Mirror organization / broadcast_defaults edits into the external
-    Identity Profile so it stays the single identity document. The streaming
-    block (Task B) is preserved untouched."""
+    """Mirror organization / broadcast_defaults / streaming edits from the
+    Configuration Manager into the external Identity Profile so it stays the
+    single identity document. The game-day launcher reads the streaming block
+    straight from the profile, so a Configuration Manager save keeps it in
+    sync (Round 23)."""
     try:
         current = load_identity_profile(IDENTITY_FILE, existing_install=True)
         if isinstance(config.get("organization"), dict):
             current["organization"] = dict(config["organization"])
         if isinstance(config.get("broadcast_defaults"), dict):
             current["broadcast_defaults"] = dict(config["broadcast_defaults"])
+        if isinstance(config.get("streaming"), dict):
+            # merge, so a form that only sends the quick-launch fields never
+            # wipes the launcher's facebook_live / youtube_live URLs
+            current["streaming"] = {
+                **(current.get("streaming") or {}),
+                **dict(config["streaming"]),
+            }
         save_identity_profile(IDENTITY_FILE, current, existing_install=True)
     except Exception:
         pass
