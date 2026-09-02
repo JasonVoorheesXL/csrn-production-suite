@@ -132,10 +132,14 @@ def _fake_app(server: _FakeServer, events: list[str]):
     )
 
 
-def _fake_webview(events: list[str]):
+def _fake_webview(events: list[str], captured: dict | None = None):
+    def _start(**k):
+        events.append("loop")
+        if captured is not None:
+            captured.update(k)
     return types.SimpleNamespace(
         create_window=lambda *a, **k: events.append("window"),
-        start=lambda **k: events.append("loop"),
+        start=_start,
     )
 
 
@@ -282,6 +286,54 @@ def test_pyinstaller_spec_targets_the_shell_and_fixes_round14_gaps() -> None:
     assert "CSRN_WHISPER_MODEL_DIR" in spec
     assert "CSRN_BUNDLED_CHROMIUM_DIR" in spec
     assert "rthook_bundled_runtime.py" in spec
+
+
+# --------------------------------------------------------------------------
+# Window / taskbar icon (the running app must show the CSRN badge)
+# --------------------------------------------------------------------------
+
+
+def test_window_icon_resolves_to_the_bundled_csrn_ico() -> None:
+    icon = csrn_desktop._window_icon()
+    assert icon is not None
+    assert Path(icon).name == "csrn-logo.ico"
+    assert Path(icon).is_file()
+
+
+def test_run_passes_the_window_icon_to_pywebview_start(monkeypatch) -> None:
+    events: list[str] = []
+    captured: dict = {}
+    server = _FakeServer()
+    monkeypatch.setattr(csrn_desktop, "current_state", lambda: "DOWN")
+    monkeypatch.setattr(csrn_desktop, "wait_until_healthy", lambda *a, **k: True)
+    monkeypatch.setitem(sys.modules, "app", _fake_app(server, events))
+    monkeypatch.setitem(sys.modules, "webview", _fake_webview(events, captured))
+
+    assert csrn_desktop.run(health_timeout=1) == 0
+    assert Path(captured["icon"]).name == "csrn-logo.ico"
+
+
+def test_shipped_csrn_logo_ico_is_transparent_and_multi_resolution() -> None:
+    # Regression guard for the 2026-09-02 fix: the .ico must not carry an
+    # opaque white box, and must ship the standard icon sizes.
+    from PIL import Image
+
+    path = Path(csrn_desktop.__file__).resolve().parent / "static" / "csrn-logo.ico"
+    im = Image.open(path)
+    sizes = {s[0] for s in im.ico.sizes()}
+    assert {16, 32, 48, 256} <= sizes
+    im.size = (256, 256)
+    im.load()
+    rgba = im.convert("RGBA")
+    assert rgba.getpixel((0, 0))[3] == 0          # transparent corner, not white
+    assert rgba.getpixel((2, 128))[3] == 0        # transparent outside the circle
+    assert rgba.getpixel((128, 128))[3] == 255    # opaque logo centre
+
+
+def test_pyinstaller_spec_embeds_the_window_icon() -> None:
+    root = Path(csrn_desktop.__file__).resolve().parent
+    spec = (root / "packaging/windows/CSRNProductionSuite.spec").read_text(encoding="utf-8")
+    assert 'icon=str(ROOT / "static" / "csrn-logo.ico")' in spec
 
 
 def test_bundled_runtime_hook_wires_playwright_and_hf_offline() -> None:

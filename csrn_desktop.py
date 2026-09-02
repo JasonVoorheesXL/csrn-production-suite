@@ -135,6 +135,14 @@ def _create_window(webview):
     )
 
 
+def _window_icon() -> str | None:
+    """The CSRN badge shown on the running window / taskbar entry. Windows
+    otherwise falls back to a generic icon here -- the frozen exe's embedded
+    icon (set in the .spec) only covers the exe, not the pywebview window.
+    Returns None if the asset is missing so the shell never fails to open."""
+    return str(WINDOW_ICON) if WINDOW_ICON.is_file() else None
+
+
 def run(*, health_timeout: int = HEALTH_TIMEOUT_SECONDS) -> int:
     """Start (or attach to) the server in-process, then run the pywebview
     loop; on window close, shut a shell-started server down cleanly."""
@@ -183,7 +191,7 @@ def run(*, health_timeout: int = HEALTH_TIMEOUT_SECONDS) -> int:
         return 1
 
     _create_window(webview)
-    webview.start(func=None, gui=None, debug=False)
+    webview.start(func=None, gui=None, debug=False, icon=_window_icon())
     # webview.start() blocks until every window is closed.
 
     if server is not None:
