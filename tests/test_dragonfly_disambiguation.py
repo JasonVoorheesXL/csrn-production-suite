@@ -388,3 +388,39 @@ def test_preview_route_forwards_dragonfly_school_code(route_client):
     )
     assert response.status_code == 200
     assert df.last_kwargs["dragonfly_school_code"] == "CCMH5Z"
+
+
+# --------------------------------------------------------------------------
+# D -- the picker UI wiring in templates/index.html
+# --------------------------------------------------------------------------
+
+
+def _index_html() -> str:
+    from pathlib import Path
+
+    return (Path(__file__).resolve().parents[1] / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_index_html_has_the_school_picker_wiring():
+    html = _index_html()
+    # the picker renderer + its "Use this school" action
+    assert "function renderDragonFlySchoolPicker(" in html
+    assert "function dragonflyUsePickedSchool(" in html
+    assert "association-team-picker" in html  # reuses the existing picker style
+    # both panels catch DRAGONFLY_SCHOOL_AMBIGUOUS and show the picker
+    assert html.count("DRAGONFLY_SCHOOL_AMBIGUOUS") >= 2
+    assert "renderDragonFlySchoolPicker(\n        document.getElementById('dragonflyRosterResults')" in html
+    assert "renderDragonFlySchoolPicker(\n        document.getElementById('dragonflySchoolInfoResults')" in html
+    # the pick is resubmitted as dragonfly_school_code
+    assert "dragonfly_school_code: dragonflyRosterSchoolCode" in html
+    assert "dragonfly_school_code: dragonflySchoolInfoSchoolCode" in html
+    # radio-select, mirroring the "ambiguous players" review affordance
+    assert 'name="dfSchoolPick"' in html
+    assert "'✓ fields Football'" in html and "'✗ no Football team'" in html
+
+
+def test_index_html_clears_the_pick_when_the_roster_changes():
+    html = _index_html()
+    assert "dragonflyRosterSchoolCode='';document.getElementById('rosterEmpty')" in html
