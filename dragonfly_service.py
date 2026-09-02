@@ -169,6 +169,51 @@ class DragonFlyService:
                 cache[code] = None
         return cache[code]
 
+    @classmethod
+    def _ambiguity_candidates(cls, matches: list[Record]) -> list[Record]:
+        """The operator-facing picker list for a DRAGONFLY_SCHOOL_AMBIGUOUS
+        result: name / city / MHSAA class / shortCode / does-it-field-the-sport
+        for each plausible directory record."""
+        out: list[Record] = []
+        for match in matches[:6]:
+            if not isinstance(match, dict):
+                continue
+            tier = match.get("fields_requested_sport")
+            out.append(
+                {
+                    "name": str(match.get("name", "")),
+                    "city": str(match.get("city", "")),
+                    "class": cls._mhsaa_class(match.get("competitionLevels")) or None,
+                    "shortCode": str(match.get("shortCode", "")),
+                    "level": str(match.get("dragonfly_level", "")),
+                    "match_score": int(match.get("match_score", 0) or 0),
+                    # None -> unknown (no sport signal); else True if the school
+                    # fields the sport at any level.
+                    "fields_sport": None if tier is None else int(tier) >= 2,
+                }
+            )
+        return out
+
+    @staticmethod
+    def _summary_as_directory_record(summary: Mapping[str, Any]) -> Record:
+        """Shape a `/schools/<code>/summary` payload like a state-directory
+        record so `normalize_school_record` can consume it when the operator
+        supplied a DragonFly code directly (the `dragonfly_school_code`
+        bypass) and `resolve_school` was never called."""
+        address = summary.get("address")
+        address = address if isinstance(address, dict) else {}
+        return {
+            "name": str(summary.get("name", "")),
+            "shortCode": str(summary.get("shortCode", "")),
+            "stateCode": str(summary.get("stateCode", "")),
+            "city": str(summary.get("city") or address.get("city", "")),
+            "orgId": str(summary.get("orgId") or summary.get("id", "")),
+            "address": str(address.get("address1", "")),
+            "competitionLevels": summary.get("competitionLevels", {}),
+            "heraldry": summary.get("heraldry", {}),
+            "media": summary.get("media", []),
+        }
+
     def __init__(
         self,
         *,
@@ -416,6 +461,23 @@ class DragonFlyService:
                         - int(candidates[1].get("_match_score", 0))
                         >= self._CONFIDENCE_MARGIN
                     )
+
+                # Round 25: an ambiguous result goes to the operator as a
+                # picker, so make sure every candidate shown carries a
+                # "fields the sport" signal even when the task-B tiebreak
+                # only scored the near-tie set.
+                if not resolved_confidently and sport_code:
+                    backfill_cache: dict[str, Any] = {}
+                    for candidate in candidates[:6]:
+                        if "_sport_tier" not in candidate:
+                            candidate["_sport_tier"] = self._sport_fielding_tier(
+                                self._cached_summary(
+                                    candidate.get("shortCode", ""),
+                                    backfill_cache,
+                                    client,
+                                ),
+                                sport_code,
+                            )
 
                 def _bare(item: Record) -> Record:
                     return {
@@ -920,28 +982,64 @@ class DragonFlyService:
         city: str = "",
         state: str = "MS",
         sport: str = "FB",
+        dragonfly_school_code: str = "",
     ) -> DragonFlyResult:
-        resolution = self.resolve_school(
-            school_name,
-            association=association,
-            city=city,
-            state=state,
-            sport=sport,
-        )
-        if not resolution.ok:
-            return resolution
+        code = self._clean_code(dragonfly_school_code)
 
-        directory_record = resolution.data["school"]
-        school_code = str(
-            directory_record.get("shortCode", "")
-        ).strip()
+        if code:
+            # Bypass: the operator picked the exact DragonFly school (or a
+            # previous pick was persisted on the CSRN record). Skip the
+            # directory search entirely.
+            summary_result = self.get_school_summary(code)
+            if not summary_result.ok:
+                return summary_result
+            summary = summary_result.data.get("summary", {})
+            directory_record = self._summary_as_directory_record(summary)
+            school_code = code
+            resolution_data: dict[str, Any] = {
+                "school": directory_record,
+                "resolved_confidently": True,
+                "dragonfly_school_code": code,
+                "bypassed_directory_search": True,
+            }
+        else:
+            resolution = self.resolve_school(
+                school_name,
+                association=association,
+                city=city,
+                state=state,
+                sport=sport,
+            )
+            if not resolution.ok:
+                return resolution
 
-        summary_result = self.get_school_summary(school_code)
-        summary = (
-            summary_result.data.get("summary", {})
-            if summary_result.ok
-            else {}
-        )
+            if not resolution.data.get("resolved_confidently", True):
+                return DragonFlyResult(
+                    "DRAGONFLY_SCHOOL_AMBIGUOUS",
+                    {
+                        "candidates": self._ambiguity_candidates(
+                            resolution.data.get("matches", [])
+                        ),
+                        "query": {
+                            "school_name": school_name,
+                            "city": city,
+                            "state": str(state or "").strip().upper(),
+                            "association": association,
+                            "sport": self.normalize_sport(sport) if sport else "",
+                        },
+                    },
+                )
+
+            resolution_data = resolution.data
+            directory_record = resolution.data["school"]
+            school_code = str(directory_record.get("shortCode", "")).strip()
+
+            summary_result = self.get_school_summary(school_code)
+            summary = (
+                summary_result.data.get("summary", {})
+                if summary_result.ok
+                else {}
+            )
 
         roster_result = self.get_roster(
             school_code,
@@ -958,7 +1056,7 @@ class DragonFlyService:
                         summary,
                         association=association,
                     ),
-                    "resolution": resolution.data,
+                    "resolution": resolution_data,
                     "roster_error": roster_result.data,
                 },
             )
@@ -974,7 +1072,7 @@ class DragonFlyService:
                 "players": roster_result.data["players"],
                 "player_count": roster_result.data["player_count"],
                 "warnings": roster_result.data["warnings"],
-                "resolution": resolution.data,
+                "resolution": resolution_data,
                 "source": roster_result.data["source"],
                 "database_modified": False,
             },

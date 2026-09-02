@@ -39,6 +39,9 @@ def association_error_status(code: str) -> int:
         "IMPORT_APPROVAL_REQUIRED",
         "SOURCE_PREVIEW_REQUIRED",
         "SOURCE_CHANGED_SINCE_PREVIEW",
+        # Round 25: bare school name matched >1 DragonFly record and none
+        # won confidently -- the operator must pick one (picker UI).
+        "DRAGONFLY_SCHOOL_AMBIGUOUS",
     }:
         return 409
     if code in {"SOURCE_FETCH_FAILED", "SOURCE_HOST_UNRESOLVED"}:
@@ -69,6 +72,25 @@ def create_association_blueprint(
 
     def error_response(code: str):
         return jsonify({"error": code}), association_error_status(code)
+
+    def dragonfly_response(result: Any):
+        """DragonFly service result -> HTTP. A DRAGONFLY_SCHOOL_AMBIGUOUS
+        result carries the candidate list the picker UI needs, so pass its
+        data through instead of collapsing to {"error": code}."""
+        if result.ok:
+            return jsonify(result.data)
+        if result.code == "DRAGONFLY_SCHOOL_AMBIGUOUS":
+            return (
+                jsonify(
+                    {
+                        "error": result.code,
+                        "candidates": result.data.get("candidates", []),
+                        "query": result.data.get("query", {}),
+                    }
+                ),
+                409,
+            )
+        return error_response(result.code)
 
     def request_payload():
         supplied_content: bytes | str | None = None
@@ -237,12 +259,12 @@ def create_association_blueprint(
             city=str(payload.get("city", "")).strip(),
             state=str(payload.get("state", "MS")).strip() or "MS",
             sport=str(payload.get("sport", "FB")).strip() or "FB",
+            dragonfly_school_code=str(
+                payload.get("dragonfly_school_code", "")
+            ).strip(),
         )
 
-        if not result.ok:
-            return error_response(result.code)
-
-        return jsonify(result.data)
+        return dragonfly_response(result)
 
     @routes.post("/api/imports/dragonfly/sync-preview")
     @dependencies.require_auth
@@ -272,12 +294,12 @@ def create_association_blueprint(
             division=str(
                 payload.get("division", "Boys")
             ).strip() or "Boys",
+            dragonfly_school_code=str(
+                payload.get("dragonfly_school_code", "")
+            ).strip(),
         )
 
-        if not result.ok:
-            return error_response(result.code)
-
-        return jsonify(result.data)
+        return dragonfly_response(result)
 
     @routes.post("/api/imports/dragonfly/replace-roster")
     @dependencies.require_auth
@@ -308,12 +330,12 @@ def create_association_blueprint(
             division=str(
                 payload.get("division", "Boys")
             ).strip() or "Boys",
+            dragonfly_school_code=str(
+                payload.get("dragonfly_school_code", "")
+            ).strip(),
         )
 
-        if not result.ok:
-            return error_response(result.code)
-
-        return jsonify(result.data)
+        return dragonfly_response(result)
 
     @routes.post("/api/imports/dragonfly/school-info-preview")
     @dependencies.require_auth
@@ -334,12 +356,12 @@ def create_association_blueprint(
             ).strip() or "MHSAA",
             city=str(payload.get("city", "")).strip(),
             state=str(payload.get("state", "MS")).strip() or "MS",
+            dragonfly_school_code=str(
+                payload.get("dragonfly_school_code", "")
+            ).strip(),
         )
 
-        if not result.ok:
-            return error_response(result.code)
-
-        return jsonify(result.data)
+        return dragonfly_response(result)
 
     @routes.post("/api/imports/dragonfly/school-info-apply")
     @dependencies.require_auth
@@ -362,12 +384,12 @@ def create_association_blueprint(
             city=str(payload.get("city", "")).strip(),
             state=str(payload.get("state", "MS")).strip() or "MS",
             school_service=dependencies.get_school_service(),
+            dragonfly_school_code=str(
+                payload.get("dragonfly_school_code", "")
+            ).strip(),
         )
 
-        if not result.ok:
-            return error_response(result.code)
-
-        return jsonify(result.data)
+        return dragonfly_response(result)
 
     @routes.get("/api/imports/mhsaa/5A/analyze")
     @dependencies.require_auth

@@ -52,11 +52,46 @@ class DragonFlySyncService:
         load_schools: RecordLoader,
         load_rosters: RecordLoader,
         save_rosters: RecordSaver,
+        save_schools: RecordSaver | None = None,
     ) -> None:
         self.dragonfly_service = dragonfly_service
         self._load_schools = load_schools
         self._load_rosters = load_rosters
         self._save_rosters = save_rosters
+        # Round 25: used to persist the operator's DragonFly school pick so a
+        # later sync never has to re-resolve (and never flips).
+        self._save_schools = save_schools
+
+    @staticmethod
+    def _stored_dragonfly_code(school: Record | None) -> str:
+        if not isinstance(school, dict):
+            return ""
+        source = school.get("source_data")
+        source = source if isinstance(source, dict) else {}
+        return str(source.get("dragonfly_school_code", "") or "").strip()
+
+    def _stamp_dragonfly_code(self, school_id: str, code: str) -> None:
+        """Write the chosen DragonFly shortCode onto the CSRN school record's
+        source_data so future syncs use the bypass. Best-effort."""
+        code = str(code or "").strip()
+        school_id = str(school_id or "").strip()
+        if not code or not school_id or self._save_schools is None:
+            return
+        schools = self._load_schools()
+        changed = False
+        for school in schools:
+            if str(school.get("id", "")) != school_id:
+                continue
+            source = school.get("source_data")
+            if not isinstance(source, dict):
+                source = {}
+                school["source_data"] = source
+            if str(source.get("dragonfly_school_code", "") or "").strip() != code:
+                source["dragonfly_school_code"] = code
+                changed = True
+            break
+        if changed:
+            self._save_schools(schools)
 
     @staticmethod
     def _norm(value: Any) -> str:
@@ -299,6 +334,7 @@ class DragonFlySyncService:
         season: str = "2026",
         level: str = "Varsity",
         division: str = "Boys",
+        dragonfly_school_code: str = "",
     ) -> DragonFlySyncResult:
         if not approved:
             return DragonFlySyncResult(
@@ -317,6 +353,7 @@ class DragonFlySyncService:
             season=season,
             level=level,
             division=division,
+            dragonfly_school_code=dragonfly_school_code,
         )
 
         if not preview_result.ok:
@@ -435,6 +472,13 @@ class DragonFlySyncService:
                 },
             )
 
+        # Round 25: lock in the operator's DragonFly school pick so the next
+        # sync of this roster uses the bypass and never re-resolves.
+        if str(dragonfly_school_code or "").strip():
+            self._stamp_dragonfly_code(
+                str(target.get("school_id", "")), dragonfly_school_code
+            )
+
         return DragonFlySyncResult(
             "OK",
             {
@@ -443,6 +487,7 @@ class DragonFlySyncService:
                 "player_count": len(new_players),
                 "school_metadata_modified": False,
                 "database_modified": True,
+                "dragonfly_school_code": str(dragonfly_school_code or "").strip(),
                 "source_warnings": copy.deepcopy(
                     preview_result.data.get(
                         "source_warnings",
@@ -466,13 +511,26 @@ class DragonFlySyncService:
         association: str = "MHSAA",
         city: str = "",
         state: str = "MS",
+        dragonfly_school_code: str = "",
     ) -> DragonFlySyncResult:
+        schools = self._load_schools()
+        existing = self._find_school(
+            schools,
+            school_id=school_id,
+            school_name=school_name,
+        )
+
+        code = str(dragonfly_school_code or "").strip() or self._stored_dragonfly_code(
+            existing
+        )
+
         source = self.dragonfly_service.preview_school(
             school_name,
             association=association,
             city=city,
             state=state,
             sport="FB",
+            dragonfly_school_code=code,
         )
 
         if not source.ok:
@@ -480,13 +538,6 @@ class DragonFlySyncService:
                 source.code,
                 copy.deepcopy(source.data),
             )
-
-        schools = self._load_schools()
-        existing = self._find_school(
-            schools,
-            school_id=school_id,
-            school_name=school_name,
-        )
 
         if existing is None:
             return DragonFlySyncResult(
@@ -679,6 +730,7 @@ class DragonFlySyncService:
         city: str = "",
         state: str = "MS",
         school_service: Any = None,
+        dragonfly_school_code: str = "",
     ) -> DragonFlySyncResult:
         if not approved:
             return DragonFlySyncResult(
@@ -698,6 +750,7 @@ class DragonFlySyncService:
             association=association,
             city=city,
             state=state,
+            dragonfly_school_code=dragonfly_school_code,
         )
 
         if not preview.ok:
@@ -769,21 +822,8 @@ class DragonFlySyncService:
         season: str = "2026",
         level: str = "Varsity",
         division: str = "Boys",
+        dragonfly_school_code: str = "",
     ) -> DragonFlySyncResult:
-        source = self.dragonfly_service.preview_school(
-            school_name,
-            association=association,
-            city=city,
-            state=state,
-            sport=sport,
-        )
-
-        if not source.ok:
-            return DragonFlySyncResult(
-                source.code,
-                copy.deepcopy(source.data),
-            )
-
         schools = self._load_schools()
 
         existing_school = self._find_school(
@@ -791,6 +831,27 @@ class DragonFlySyncService:
             school_id=school_id,
             school_name=school_name,
         )
+
+        # Use the operator's explicit pick, else a pick persisted on the CSRN
+        # school record from a previous sync (so it never has to re-resolve).
+        code = str(dragonfly_school_code or "").strip() or self._stored_dragonfly_code(
+            existing_school
+        )
+
+        source = self.dragonfly_service.preview_school(
+            school_name,
+            association=association,
+            city=city,
+            state=state,
+            sport=sport,
+            dragonfly_school_code=code,
+        )
+
+        if not source.ok:
+            return DragonFlySyncResult(
+                source.code,
+                copy.deepcopy(source.data),
+            )
 
         if existing_school is None:
             return DragonFlySyncResult(

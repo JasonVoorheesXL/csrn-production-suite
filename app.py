@@ -1568,6 +1568,7 @@ def get_dragonfly_sync_service() -> DragonFlySyncService:
             load_schools=load_schools,
             load_rosters=load_rosters,
             save_rosters=save_rosters,
+            save_schools=save_schools,
         )
 
     return DRAGONFLY_SYNC_SERVICE
