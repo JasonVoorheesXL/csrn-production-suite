@@ -75,6 +75,13 @@ running `CSRN_GAME_DAY_LAUNCHER.ps1` by hand.
    - Stream URLs: the literals in the script are fallbacks only — it first
      does `GET http://localhost:5050/api/identity/streaming-links` (5 s
      timeout) and overrides from the Identity Profile (Round 12).
+   - The Identity Profile's `streaming` block also feeds the in-app
+     **Command Center → Quick Launch** toolbar (Round 23): `broadcast_
+     software_path` (fire-and-forget `POST /api/launch/broadcast-software`),
+     `youtube_url`, `facebook_url` (plain `target="_blank"` links). All
+     three are editable in the Configuration Manager (Settings → Quick
+     Launch); `save_config()` mirrors the block back to the profile so the
+     launcher keeps reading it.
 
 ### A.2 Runtime dependency inventory (what the app needs to function)
 
@@ -83,7 +90,7 @@ running `CSRN_GAME_DAY_LAUNCHER.ps1` by hand.
 | **Python 3.13.14 exactly** | `environment_check.SUPPORTED_PYTHON=(3,13,14)`. 3.14 breaks collection (missing `pronouncing`). |
 | **`requirements.txt` (all pinned)** | Flask 3.0.3 / Werkzeug / Jinja2 / itsdangerous / click / blinker / MarkupSafe; **waitress 3.0.0**; **websocket-client 1.8.0** (OBS WebSocket, `obs_client.py`); **Pillow 12.3.0**; **numpy 2.5.2**; PyYAML; httpx/httpcore/h11/anyio/idna/certifi (weather NWS, Facebook, HF downloads). |
 | **Live-caption ASR stack** | **sounddevice 0.5.5** (+ bundled PortAudio, `_sounddevice_data`) for capture; **faster-whisper 1.2.1 + ctranslate2 4.8.1 + onnxruntime 1.28.0 + tokenizers + huggingface-hub + hf-xet + av 18.0.0 (PyAV — bundles ffmpeg libs) + flatbuffers + protobuf + tqdm**. |
-| **`playwright 1.62.0`** | Python package only. Used by `broadcaster_print_service.py` (roster print sheet → PDF via headless `page.pdf()`) and `dragonfly_service.py` (headless render/capture). |
+| **`playwright 1.62.0`** | Python package only. Used by `broadcaster_print_service.py` (roster print sheet → PDF via headless `page.pdf()`). `dragonfly_service.py` **no longer uses it** — the 2026-09-01 hotfix switched roster import to DragonFly's JSON API. |
 | **Playwright Chromium browser** | **Separate ~150 MB download** (`playwright install chromium` → `%LOCALAPPDATA%\ms-playwright`), *not* a pip package. Feature-scoped: only the print-sheet and dragonfly features touch it. |
 | **`pronouncing` 0.3.0 + `cmudict` 1.1.3** | Imported by `roster_service.py` (name pronunciation). **NOT in `requirements.txt`** — installed in the venv but unpinned/unlisted. `cmudict` ships a ~3.5 MB `cmudict.dict` data file. |
 | **NVIDIA CUDA GPU + CUDA 12 cuBLAS + cuDNN 9** | `caption_worker._load_model()` loads faster-whisper with `device="cuda", compute_type="float16"` and **hard-errors** if CUDA / the DLLs (`cublas64_12.dll`, `cudnn_ops64_9.dll`) are absent. **Live captions are GPU-only — there is no CPU fallback in the current code.** |
@@ -552,6 +559,18 @@ changed.
 > `POST /api/licensing/install-file` in its own `licensing_public_routes`
 > blueprint, so the gate page covers first-run activation *and* renewals
 > without a separate flow. Full suite green (2452); WIP files untouched.
+>
+> **Round 23** (`round23-quick-launch-buttons-20260901`) added the
+> **Command Center → Quick Launch** toolbar: an "Open Broadcast Software"
+> button (fire-and-forget `POST /api/launch/broadcast-software` →
+> `subprocess.Popen` on the operator-configured `.exe`, non-blocking, graceful
+> "not configured" / "file missing" failures) plus `target="_blank"` "Open
+> YouTube" / "Open Facebook" links. The three fields
+> (`broadcast_software_path`, `youtube_url`, `facebook_url`) live in the
+> Identity Profile's `streaming` block and are edited through the existing
+> Configuration Manager (`/api/config`, now carrying `streaming`); an unset
+> field disables its button with a "not configured yet" tooltip. Suite
+> 2495; WIP files untouched.
 >
 > **Still deferred:** whisper model + Chromium bundling (env vars +
 > assets, +~650 MB); code signing; the owner's hands-on window-close

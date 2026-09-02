@@ -7,15 +7,136 @@ branch: `round16-pywebview-license-handoff-20260831`** merges the two (off
 `round14` @ `55be4ea`, carries rounds 1–15).
 Nothing deployed. Running CSRN process not touched. Review and merge is yours.
 
-Round 20 branch: `round20-shutdown-architecture-20260901` (off `round19` @
-`efeae3f`; investigate-only). Round 21 branch:
-`round21-inprocess-shutdown-20260901` (off `round20` @ `cdee3f6`).
-**Round 22 branch: `round22-first-run-onboarding-20260901`** (off
-`round21` @ `d59a513`).
+Round 22 branch: `round22-first-run-onboarding-20260901` (off `round21` @
+`d59a513`). After Round 22 the repo was split: the production folder
+(`C:\Users\Darth\My Drive\CSRN\Development\CSRN-Production-Suite`) stays on
+a stable tip for the owner's Desktop shortcut, and round work happens in a
+non-synced git worktree at `C:\Users\Darth\CSRN-RoundWork\`. Chained off
+Round 22's tip `722a8ca`: **`hotfix-dragonfly-roster-20260901`** (`5df3905`)
+→ **`round24-resolve-school-disambiguation-20260901`** (`3d40084`) →
+**`round23-quick-launch-buttons-20260901`**. Production is currently on
+`round24` (`3d40084`); Round 23 is not yet promoted.
 
-Full test suite (deterministic, `-p no:randomly`, run with
-`.venv/Scripts/python.exe`) after **round 22**: **0 failed, 2452 passed**.
-**0 real regressions across all twenty-two rounds.**
+Full test suite (deterministic, `-p no:randomly`, `.venv/Scripts/
+python.exe`, worktree env vars `CSRN_GAME_DAY_LOCAL_STATE=1` +
+`CSRN_STATE_AUTHORITY_FILE`) after **round 23**: **0 failed, 2495 passed,
+1 skipped**. **0 real regressions.**
+
+---
+
+## ROUND 23 — Command Center quick-launch toolbar (2026-09-01)
+
+Three buttons on the Command Center control surface: **Open Broadcast
+Software**, **Open YouTube**, **Open Facebook** — all per-install, nothing
+hard-coded (this retires the last of the hard-coded Facebook/YouTube IDs
+the Round 16 git audit flagged in `CSRN_GAME_DAY_LAUNCHER.ps1` /
+`identity_service.py`).
+
+| commit | task |
+|---|---|
+| `fa6ec5a` | **23A** — settings storage (Identity Profile `streaming` block) |
+| `c0a13eb` | **23B+C** — launch route + toolbar UI |
+| (this)    | **23D** — docs + `OVERNIGHT_SUMMARY` |
+
+### 23A — storage rides the existing `/api/config` write path
+
+`identity_service` gained `broadcast_software_path`, `youtube_url`,
+`facebook_url` on `BLANK_STREAMING` + `LEGACY_STREAMING` (all blank, even
+on the existing install — new operator conveniences, never hard-coded, so
+the "existing install sees no change" guarantee holds; `_normalize`'s
+section merge back-fills the keys onto older profiles). `streaming` is now
+part of `DEFAULT_CONFIG` (seeded from the profile), so the **existing
+Configuration Manager** reads and writes it — no new settings endpoint.
+`_persist_identity_sections` also mirrors `streaming` back to the profile
+(merge, so a partial save never wipes the launcher's `facebook_live` /
+`youtube_live`); the game-day launcher keeps reading the profile
+unchanged. New "Quick Launch" section in Settings with a "Choose…" file
+picker for the software path (best-effort full path; the operator
+completes it in a plain browser).
+
+### 23B — launch mechanics
+
+`app._launch_broadcast_software()` reads the configured path, then
+**fire-and-forget** `subprocess.Popen([path], cwd=<exe dir>,
+close_fds=True)` — `Popen` returns immediately, the Waitress worker thread
+is never held. Never raises: `""` → `400 NOT_CONFIGURED`, path missing →
+`400 NOT_FOUND` (names the file), `OSError` → `500 LAUNCH_FAILED`,
+otherwise `200 {ok, launched}`. Route `POST /api/launch/broadcast-software`
+(`@require_auth`) in `system_routes`; the new
+`SystemRoutesDependencies.launch_broadcast_software` field is defaulted so
+existing constructions/fixtures need no change. Authed route → no phase5 /
+route-manifest change. **YouTube / Facebook get no backend route** — plain
+links.
+
+### 23C — the toolbar
+
+A "Quick Launch" panel in `#controlPanel` beside the Active Broadcast
+selector. "Open Broadcast Software" is a `<button>` that POSTs the route
+and shows the result inline; "Open YouTube" / "Open Facebook" are
+`target="_blank"` anchors whose `href` comes from
+`currentConfig.streaming`. `renderQuickLaunch()` (called from
+`loadConfig()`, so it refreshes after a settings save) **disables** any
+button whose field is blank and sets a *"not configured yet"* tooltip
+rather than letting it fail silently.
+
+### 23D — tests + docs
+
+`tests/test_quick_launch.py` (11): streaming templates carry the keys;
+`ConfigurationService` merges the `streaming` section without wiping the
+launcher URLs; `_persist_identity_sections` mirrors it to the profile;
+launch route requires auth; unconfigured → 400; missing path → 400 naming
+the file; a real (stub) `.exe` → `Popen` called once with `[path]` + `cwd`
+and **never waited on** (the test hangs if the handler blocks); `OSError`
+→ 500; toolbar + settings markup present. Golden `test_identity_service`
+updates re-verify the existing-install "no change" guarantee with the new
+blank keys. `docs/pywebview_shell_scoping.md` updated (§A.1 launcher /
+streaming, §A.2 corrected the stale dragonfly-playwright note).
+
+**Suite: 0 failed, 2495 passed, 1 skipped** (2452 → +6 quick-launch, +37
+from the earlier hotfix / Round 24 that this branch is based on). Worktree
+WIP files: N/A — the owner's `index.html` / `broadcaster_print_service.py`
+WIP lives only in the production folder; the worktree edits committed
+code.
+
+---
+
+## HOTFIX (2026-09-01) — DragonFly roster import returned empty for every school
+
+`hotfix-dragonfly-roster-20260901` (`5df3905`, off Round 22 `722a8ca`;
+**promoted to production**). DragonFly rebuilt `go.dragonflyathletics.com`
+on Angular — `<team-roster>` no longer renders an HTML `<table>`, so the
+Playwright scrape in `DragonFlyService.get_roster()` matched zero rows for
+**every** school (`DRAGONFLY_ROSTER_EMPTY`). Fix: read rosters from
+DragonFly's public JSON API (`schools/<code>/summary`, already used by
+`get_school_summary`) instead of scraping — picks the football team(s) at
+Varsity/JV, builds the same rows the existing merge/dedup logic consumes,
+drops Playwright from the module. Verified live: Amory HS `CCMH5Z` → 77
+players, Itawamba `NRPGPA` → 83, West Point `APYP6S` → 92.
+`tests/test_dragonfly_roster_json_api.py` (offline). Broad regression, not
+school-specific.
+
+---
+
+## ROUND 24 — resolve_school wrong-match disambiguation, A+B (2026-09-01)
+
+`round24-resolve-school-disambiguation-20260901` (`3d40084`, off the
+hotfix; **promoted to production**). Flagged during the hotfix:
+`resolve_school` matched "Caledonia" → "Caledonia **Elementary** School",
+"Amory" → "Amory **Career Technical Center**" — a bare town name tied
+every "<Town> * School" record in DragonFly's ~1150-row directory and
+returned whichever paged first. **A** — scoring rework: `_classify_level`
+(hs / secondary / other from name tokens + `mhsaaClass` backstop),
+weighted score (HS +400, exact +200, class +80, city-exact +160,
+substring +50, Junior-High −150), `resolved_confidently` (leader beats
+runner-up by ≥150). **B** — when >1 candidate is within the margin, fetch
+`schools/<code>/summary` per near-top candidate (memoised) and rank by
+whether it fields the requested sport at Varsity → any level → has a
+class → name. `preview_school` (used by the roster panel **and** the
+DragonFly branding panel — one resolution path) threads its sport
+through. Verified live: Caledonia/Amory/Starkville/Corinth/Bogue Chitto
+all resolve to the varsity high school, confidently, by bare town name.
+`tests/test_dragonfly_resolve_school.py` (31, offline). C/D/E (the
+`DRAGONFLY_SCHOOL_AMBIGUOUS` picker UI) deferred pending review.
 
 ---
 
