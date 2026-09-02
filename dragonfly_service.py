@@ -54,6 +54,121 @@ class DragonFlyService:
     # Junior High / 7th-8th grade / Freshman are excluded by default).
     ROSTER_LEVELS = {"varsity", "jv", "junior varsity"}
 
+    # --- resolve_school() level classification + scoring (Round 24) ---------
+    # DragonFly's state directory lists ~1150 records per association, most of
+    # them elementary / middle / vocational / district entities that never
+    # field a varsity team. A bare town-name search ("Caledonia", "Amory")
+    # used to tie every "<Town> * School" record and return whichever paged
+    # first. These weights make the varsity high school win.
+    _LEVEL_OTHER_TOKENS = (
+        "elementary", "intermediate school", "primary school",
+        "career technical", "technical center", "vocational", "voc comp",
+        "voc tech", "voc school", "alternative", "learning center",
+        "school district", "head start", "early childhood", "pre-k",
+        "prekindergarten", "kindergarten",
+    )
+    _JUNIOR_HIGH_TOKENS = ("junior high", "jr high", "jr. high")
+    _LEVEL_HS_TOKENS = ("high school", "high and middle", "senior high")
+
+    _LEVEL_SCORES = {"hs": 400, "secondary": 120, "other": 0}
+    _JUNIOR_HIGH_PENALTY = 150
+    _EXACT_NAME_BONUS = 200
+    _SUBSTRING_BONUS = 50
+    _MHSAA_CLASS_BONUS = 80
+    # An exact city match is a strong cross-town disambiguator (two towns can
+    # both have a "<Name> Attendance Center"), so it alone clears the margin.
+    # It applies equally to same-town siblings, so it never distorts the
+    # level ranking within one town.
+    _CITY_EXACT_BONUS = 160
+    _CITY_PARTIAL_BONUS = 40
+    _STATE_BONUS = 10
+    # A leader must beat the runner-up by at least this to be "confident";
+    # otherwise the sport/level check (task B) breaks the tie.
+    _CONFIDENCE_MARGIN = 150
+
+    @staticmethod
+    def _mhsaa_class(competition_levels: Any) -> str:
+        if not isinstance(competition_levels, dict):
+            return ""
+        value = str(competition_levels.get("mhsaaClass") or "").strip().lower()
+        return "" if value in {"", "undefined", "none", "n/a"} else value
+
+    @classmethod
+    def _classify_level(
+        cls, name: Any, competition_levels: Any = None
+    ) -> str:
+        """Rough school-level from the directory record: "hs" (varsity high
+        school), "secondary" (junior high / middle / attendance center /
+        academy / classified-but-unnamed), or "other" (elementary / vo-tech /
+        district / etc.)."""
+        text = cls._normalize_text(name)
+        if any(token in text for token in cls._LEVEL_OTHER_TOKENS):
+            return "other"
+        if any(token in text for token in cls._JUNIOR_HIGH_TOKENS):
+            return "secondary"
+        if any(token in text for token in cls._LEVEL_HS_TOKENS):
+            return "hs"
+        if "middle school" in text:
+            return "secondary"
+        if cls._mhsaa_class(competition_levels):
+            return "secondary"
+        if "attendance center" in text or "academy" in text:
+            return "secondary"
+        return "other"
+
+    @classmethod
+    def _sport_fielding_tier(cls, summary: Any, sport_code: str) -> int:
+        """How strongly a school's /schools/<code>/summary says it fields the
+        requested sport: 4 = Varsity team with athletes, 3 = Varsity team,
+        2 = the sport at any level, 1 = has an MHSAA classification, 0 = no
+        signal. Used only to break a near-tie (task B)."""
+        if not isinstance(summary, dict):
+            return 0
+        accepted = cls.NCAA_SPORT_CODES.get(sport_code, set()) | {sport_code}
+        teams = summary.get("teams")
+        teams = teams if isinstance(teams, list) else []
+        any_level = varsity = varsity_with_athletes = False
+        for team in teams:
+            if not isinstance(team, dict):
+                continue
+            if str(team.get("ncaaSportCode", "")).strip().upper() not in accepted:
+                continue
+            any_level = True
+            if str(team.get("level", "")).strip().casefold() == "varsity":
+                varsity = True
+                try:
+                    if int(team.get("totalAthleteCount") or 0) > 0:
+                        varsity_with_athletes = True
+                except (TypeError, ValueError):
+                    pass
+        if varsity_with_athletes:
+            return 4
+        if varsity:
+            return 3
+        if any_level:
+            return 2
+        if cls._mhsaa_class(summary.get("competitionLevels")):
+            return 1
+        return 0
+
+    def _cached_summary(
+        self, short_code: Any, cache: dict[str, Any], client: httpx.Client
+    ) -> Any:
+        """Best-effort GET /schools/<code>/summary, memoised per resolve_school
+        call. Never raises -- a failed lookup just yields no sport signal."""
+        code = self._clean_code(short_code)
+        if not code:
+            return None
+        if code not in cache:
+            try:
+                response = client.get(f"{self.API_BASE}/schools/{code}/summary")
+                response.raise_for_status()
+                payload = response.json()
+                cache[code] = payload if isinstance(payload, dict) else None
+            except Exception:
+                cache[code] = None
+        return cache[code]
+
     def __init__(
         self,
         *,
@@ -125,11 +240,13 @@ class DragonFlyService:
         association: str = "MHSAA",
         city: str = "",
         state: str = "MS",
+        sport: str = "",
     ) -> DragonFlyResult:
         association = self._clean_code(association).upper()
         target_name = self._normalize_text(school_name)
         target_city = self._normalize_text(city)
         target_state = str(state or "").strip().upper()
+        sport_code = self.normalize_sport(sport) if str(sport or "").strip() else ""
 
         if not target_name:
             return DragonFlyResult("SCHOOL_NAME_REQUIRED")
@@ -193,26 +310,42 @@ class DragonFlyService:
                         if not (name_exact or name_contains):
                             continue
 
-                        score = 0
+                        competition = record.get("competitionLevels")
+                        level = self._classify_level(
+                            record.get("name"), competition
+                        )
+
+                        score = self._LEVEL_SCORES.get(level, 0)
+
                         if name_exact:
-                            score += 100
+                            score += self._EXACT_NAME_BONUS
                         elif name_contains:
-                            score += 50
+                            score += self._SUBSTRING_BONUS
+
+                        if self._mhsaa_class(competition):
+                            score += self._MHSAA_CLASS_BONUS
 
                         if target_city:
                             if record_city == target_city:
-                                score += 25
+                                score += self._CITY_EXACT_BONUS
                             elif (
                                 target_city in record_city
                                 or record_city in target_city
                             ):
-                                score += 10
+                                score += self._CITY_PARTIAL_BONUS
 
                         if target_state and record_state == target_state:
-                            score += 10
+                            score += self._STATE_BONUS
+
+                        if any(
+                            token in record_name
+                            for token in self._JUNIOR_HIGH_TOKENS
+                        ):
+                            score -= self._JUNIOR_HIGH_PENALTY
 
                         candidate = copy.deepcopy(record)
                         candidate["_match_score"] = score
+                        candidate["_level"] = level
                         candidates.append(candidate)
 
                 if not candidates:
@@ -229,28 +362,84 @@ class DragonFlyService:
                     )
 
                 candidates.sort(
-                    key=lambda item: int(
-                        item.get("_match_score", 0)
-                    ),
+                    key=lambda item: int(item.get("_match_score", 0)),
                     reverse=True,
                 )
 
-                best = candidates[0]
-                best.pop("_match_score", None)
+                # --- Task B: break a near-tie by which candidate actually
+                #     fields the requested sport (Varsity, then any level,
+                #     then MHSAA classification, then the name-based level).
+                sport_checked = False
+                if sport_code and len(candidates) > 1:
+                    top_score = int(candidates[0].get("_match_score", 0))
+                    near_top = [
+                        candidate
+                        for candidate in candidates
+                        if top_score - int(candidate.get("_match_score", 0))
+                        <= self._CONFIDENCE_MARGIN
+                    ]
+                    if len(near_top) > 1:
+                        sport_checked = True
+                        summary_cache: dict[str, Any] = {}
+                        for candidate in near_top:
+                            candidate["_sport_tier"] = self._sport_fielding_tier(
+                                self._cached_summary(
+                                    candidate.get("shortCode", ""),
+                                    summary_cache,
+                                    client,
+                                ),
+                                sport_code,
+                            )
+                        near_top.sort(
+                            key=lambda c: (
+                                int(c.get("_sport_tier", 0)),
+                                int(c.get("_match_score", 0)),
+                            ),
+                            reverse=True,
+                        )
+                        near_ids = {id(c) for c in near_top}
+                        candidates = near_top + [
+                            candidate
+                            for candidate in candidates
+                            if id(candidate) not in near_ids
+                        ]
+
+                if len(candidates) == 1:
+                    resolved_confidently = True
+                elif sport_checked and int(
+                    candidates[0].get("_sport_tier", 0)
+                ) > int(candidates[1].get("_sport_tier", 0)):
+                    resolved_confidently = True
+                else:
+                    resolved_confidently = (
+                        int(candidates[0].get("_match_score", 0))
+                        - int(candidates[1].get("_match_score", 0))
+                        >= self._CONFIDENCE_MARGIN
+                    )
+
+                def _bare(item: Record) -> Record:
+                    return {
+                        key: value
+                        for key, value in item.items()
+                        if not key.startswith("_")
+                    }
+
+                def _public(item: Record) -> Record:
+                    out = _bare(item)
+                    out["dragonfly_level"] = item.get("_level", "")
+                    out["match_score"] = int(item.get("_match_score", 0))
+                    if "_sport_tier" in item:
+                        out["fields_requested_sport"] = int(item["_sport_tier"])
+                    return out
 
                 return DragonFlyResult(
                     "OK",
                     {
-                        "school": best,
-                        "matches": [
-                            {
-                                key: value
-                                for key, value in item.items()
-                                if key != "_match_score"
-                            }
-                            for item in candidates[:10]
-                        ],
+                        "school": _bare(candidates[0]),
+                        "matches": [_public(item) for item in candidates[:10]],
                         "association": association,
+                        "requested_sport": sport_code,
+                        "resolved_confidently": resolved_confidently,
                     },
                 )
 
@@ -737,6 +926,7 @@ class DragonFlyService:
             association=association,
             city=city,
             state=state,
+            sport=sport,
         )
         if not resolution.ok:
             return resolution
