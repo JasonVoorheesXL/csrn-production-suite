@@ -275,6 +275,16 @@
           </div>
         </div>
       </section>
+      <section class="panel compact live-operator-controls command-quick-launch">
+        <style id="csrn-quick-launch-r23">.command-quick-launch .quick-launch-buttons{flex-wrap:wrap}.command-quick-launch a.button.disabled,.command-quick-launch button:disabled{opacity:.45;pointer-events:none}</style>
+        <div class="section-heading compact"><div><h3>Quick Launch</h3><p class="section-note">Open your streaming software and the platform dashboards. Set these in Settings → Quick Launch; an unset button is disabled.</p></div></div>
+        <div class="button-row quick-launch-buttons">
+          <button id="qlBroadcastBtn" type="button" onclick="launchBroadcastSoftware()">Open Broadcast Software</button>
+          <a id="qlYoutubeLink" class="button" target="_blank" rel="noopener">Open YouTube</a>
+          <a id="qlFacebookLink" class="button" target="_blank" rel="noopener">Open Facebook</a>
+        </div>
+        <div id="qlStatus" class="status"></div>
+      </section>
       <section class="panel compact live-operator-controls command-caption-panel">
         <div class="section-heading compact"><div><h3>Live Captions</h3><p class="section-note">Start or stop the active caption feed during the broadcast.</p></div><span id="commandCaptionStateBadge" class="phase-badge">OFF</span></div>
         <div class="button-row">
@@ -4879,6 +4889,65 @@ async function loadConfig() {
   document.getElementById('cfgSessionHours').value = c.application.operator_timeout_hours || 12;
   populateBroadcastTeamDropdowns();
   updateLicenseBadge();
+  renderQuickLaunch();
+}
+
+function setQuickLaunchLink(el, url, label){
+  if(!el) return;
+  const value = String(url || '').trim();
+  if(value){
+    el.href = value;
+    el.classList.remove('disabled');
+    el.removeAttribute('aria-disabled');
+    el.tabIndex = 0;
+    el.title = 'Open ' + label;
+  } else {
+    el.removeAttribute('href');
+    el.classList.add('disabled');
+    el.setAttribute('aria-disabled', 'true');
+    el.tabIndex = -1;
+    el.title = label + ' not configured yet — set it in Settings → Quick Launch';
+  }
+}
+
+function renderQuickLaunch(){
+  const streaming = (currentConfig && currentConfig.streaming) || {};
+  const btn = document.getElementById('qlBroadcastBtn');
+  if(!btn) return;
+  setQuickLaunchLink(document.getElementById('qlYoutubeLink'), streaming.youtube_url, 'YouTube');
+  setQuickLaunchLink(document.getElementById('qlFacebookLink'), streaming.facebook_url, 'Facebook');
+  const hasSoftware = !!String(streaming.broadcast_software_path || '').trim();
+  btn.disabled = !hasSoftware;
+  btn.title = hasSoftware
+    ? 'Launch your configured streaming software'
+    : 'Broadcast software not configured yet — set it in Settings → Quick Launch';
+}
+
+async function launchBroadcastSoftware(){
+  const status = document.getElementById('qlStatus');
+  const btn = document.getElementById('qlBroadcastBtn');
+  btn.disabled = true;
+  status.textContent = 'Launching…';
+  status.className = 'status';
+  try {
+    const res = await fetch('/api/launch/broadcast-software', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' }
+    });
+    const body = await res.json().catch(() => ({}));
+    if(res.ok){
+      status.textContent = 'Broadcast software launched.';
+      status.className = 'status success';
+    } else {
+      status.textContent = body.message || 'Could not launch broadcast software.';
+      status.className = 'status error';
+    }
+  } catch(_) {
+    status.textContent = 'Could not reach the server.';
+    status.className = 'status error';
+  } finally {
+    renderQuickLaunch();
+  }
 }
 
 async function updateLicenseBadge() {

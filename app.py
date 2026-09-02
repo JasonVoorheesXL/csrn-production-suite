@@ -2827,6 +2827,55 @@ def identity_streaming_links() -> dict[str, str]:
     }
 
 
+def _launch_broadcast_software() -> tuple[int, dict[str, Any]]:
+    """Fire-and-forget launch of the configured broadcast-software executable
+    (Round 23 Command Center quick-launch). Non-blocking -- Popen returns
+    immediately; the Waitress worker thread is never held. Fails with a
+    clear message rather than raising."""
+    try:
+        path = str(
+            (load_config().get("streaming") or {}).get("broadcast_software_path")
+            or ""
+        ).strip()
+    except Exception:
+        path = ""
+
+    if not path:
+        return 400, {
+            "error": "NOT_CONFIGURED",
+            "message": (
+                "No broadcast software is set. Add its program file in "
+                "Configuration → Quick Launch."
+            ),
+        }
+
+    target = Path(path)
+    if not target.is_file():
+        return 400, {
+            "error": "NOT_FOUND",
+            "message": (
+                f"No file at {path}. The broadcast software may have moved or "
+                "been uninstalled — fix the path in Configuration."
+            ),
+        }
+
+    try:
+        import subprocess
+
+        subprocess.Popen(  # noqa: S603 - operator-configured local path, no shell
+            [str(target)],
+            cwd=str(target.parent),
+            close_fds=True,
+        )
+    except OSError as exc:
+        return 500, {
+            "error": "LAUNCH_FAILED",
+            "message": f"Could not start {target.name}: {exc}",
+        }
+
+    return 200, {"ok": True, "launched": str(target)}
+
+
 SYSTEM_ROUTES_BLUEPRINT = create_system_blueprint(
     SystemRoutesDependencies(
         require_auth=require_auth,
@@ -2839,6 +2888,7 @@ SYSTEM_ROUTES_BLUEPRINT = create_system_blueprint(
         runtime_state=runtime_state,
         readiness_payload=readiness_payload,
         load_build_journal=load_build_journal,
+        launch_broadcast_software=_launch_broadcast_software,
     )
 )
 APPLICATION_BLUEPRINTS.append(SYSTEM_ROUTES_BLUEPRINT)

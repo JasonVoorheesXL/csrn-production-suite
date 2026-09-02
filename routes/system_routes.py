@@ -57,6 +57,17 @@ class SystemRoutesDependencies:
     runtime_state: Callable[[Mapping[str, Any]], Mapping[str, Any]]
     readiness_payload: Callable[[], Mapping[str, Any]]
     load_build_journal: Callable[[], Any]
+    # Round 23: fire-and-forget launch of the operator-configured broadcast
+    # software. Defaulted so existing constructions/fixtures need no change.
+    launch_broadcast_software: Callable[[], tuple[int, Mapping[str, Any]]] = (
+        lambda: (
+            500,
+            {
+                "error": "LAUNCH_NOT_WIRED",
+                "message": "Broadcast-software launch is not available.",
+            },
+        )
+    )
 
 
 def create_system_blueprint(
@@ -105,6 +116,15 @@ def create_system_blueprint(
                 "youtube_live": str(links.get("youtube_live", "") or ""),
             }
         )
+
+    @routes.post("/api/launch/broadcast-software")
+    @dependencies.require_auth
+    def launch_broadcast_software():
+        # Round 23 Command Center quick-launch: start the operator-configured
+        # streaming software (OBS/vMix/...). Fire-and-forget in the dependency;
+        # this handler never blocks and never crashes on a bad path.
+        status, body = dependencies.launch_broadcast_software()
+        return jsonify(body), status
 
     @routes.get("/api/health")
     def get_health():
