@@ -91,7 +91,7 @@ running `CSRN_GAME_DAY_LAUNCHER.ps1` by hand.
 | **`requirements.txt` (all pinned)** | Flask 3.0.3 / Werkzeug / Jinja2 / itsdangerous / click / blinker / MarkupSafe; **waitress 3.0.0**; **websocket-client 1.8.0** (OBS WebSocket, `obs_client.py`); **Pillow 12.3.0**; **numpy 2.5.2**; PyYAML; httpx/httpcore/h11/anyio/idna/certifi (weather NWS, Facebook, HF downloads). |
 | **Live-caption ASR stack** | **sounddevice 0.5.5** (+ bundled PortAudio, `_sounddevice_data`) for capture; **faster-whisper 1.2.1 + ctranslate2 4.8.1 + onnxruntime 1.28.0 + tokenizers + huggingface-hub + hf-xet + av 18.0.0 (PyAV — bundles ffmpeg libs) + flatbuffers + protobuf + tqdm**. |
 | **`playwright 1.62.0`** | Python package only. Used by `broadcaster_print_service.py` (roster print sheet → PDF via headless `page.pdf()`). `dragonfly_service.py` **no longer uses it** — the 2026-09-01 hotfix switched roster import to DragonFly's JSON API. |
-| **Playwright Chromium browser** | **Separate ~150 MB download** (`playwright install chromium` → `%LOCALAPPDATA%\ms-playwright`), *not* a pip package. Feature-scoped: only the print-sheet and dragonfly features touch it. |
+| **Playwright Chromium browser** | **Separate ~150 MB download** (`playwright install chromium` → `%LOCALAPPDATA%\ms-playwright`), *not* a pip package. Feature-scoped: **only the roster print-sheet** touches it now (the 2026-09-01 DragonFly hotfix moved roster/school import onto the JSON API — no browser). |
 | **`pronouncing` 0.3.0 + `cmudict` 1.1.3** | Imported by `roster_service.py` (name pronunciation). **NOT in `requirements.txt`** — installed in the venv but unpinned/unlisted. `cmudict` ships a ~3.5 MB `cmudict.dict` data file. |
 | **NVIDIA CUDA GPU + CUDA 12 cuBLAS + cuDNN 9** | `caption_worker._load_model()` loads faster-whisper with `device="cuda", compute_type="float16"` and **hard-errors** if CUDA / the DLLs (`cublas64_12.dll`, `cudnn_ops64_9.dll`) are absent. **Live captions are GPU-only — there is no CPU fallback in the current code.** |
 | **faster-whisper model weights** | `CaptionWorkerSettings.model_name = "small.en"` (override: config `caption_model`). A bare name is downloaded from HuggingFace (`Systran/faster-whisper-small.en`, ~480 MB) into the HF cache on first caption start unless given a local directory. |
@@ -315,9 +315,10 @@ Options (owner decision):
 - **(b)** *(most reliable offline)* bundle a pinned Chromium as installer
   `[Files]` and point `PLAYWRIGHT_BROWSERS_PATH` at `{app}` (~150 MB added to
   the installer);
-- **(c)** graceful-degrade the two dependent features (roster print-sheet
-  PDF, dragonfly capture) with a "Chromium component not installed" message +
-  an in-app "Install now" button.
+- **(c)** graceful-degrade the one dependent feature (roster print-sheet
+  PDF — DragonFly import no longer uses Chromium as of the 2026-09-01
+  hotfix) with a "Chromium component not installed" message + an in-app
+  "Install now" button.
 
 ### C.4 Live-caption model + CUDA
 

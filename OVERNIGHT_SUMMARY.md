@@ -11,16 +11,94 @@ Round 22 branch: `round22-first-run-onboarding-20260901` (off `round21` @
 `d59a513`). After Round 22 the repo was split: the production folder
 (`C:\Users\Darth\My Drive\CSRN\Development\CSRN-Production-Suite`) stays on
 a stable tip for the owner's Desktop shortcut, and round work happens in a
-non-synced git worktree at `C:\Users\Darth\CSRN-RoundWork\`. Chained off
-Round 22's tip `722a8ca`: **`hotfix-dragonfly-roster-20260901`** (`5df3905`)
-→ **`round24-resolve-school-disambiguation-20260901`** (`3d40084`) →
-**`round23-quick-launch-buttons-20260901`**. Production is currently on
-`round24` (`3d40084`); Round 23 is not yet promoted.
+non-synced git worktree at `C:\Users\Darth\CSRN-RoundWork\`. Branch chain
+off Round 22's tip `722a8ca`:
+**`hotfix-dragonfly-roster-20260901`** (`5df3905`, **promoted**) →
+**`round24-resolve-school-disambiguation-20260901`** (`3d40084`,
+**promoted**) →
+**`round23-quick-launch-buttons-20260901`** (`8a4a206`, **promoted** via a
+`git switch --merge` that combined it with the owner's uncommitted Go
+Live / timeout WIP in `index.html` — owner hunks verified byte-identical)
+→ **`round25-dragonfly-disambiguation-picker-20260901`**. Production is on
+`round23` (`8a4a206`); Round 25 is not yet promoted.
 
 Full test suite (deterministic, `-p no:randomly`, `.venv/Scripts/
 python.exe`, worktree env vars `CSRN_GAME_DAY_LOCAL_STATE=1` +
-`CSRN_STATE_AUTHORITY_FILE`) after **round 23**: **0 failed, 2495 passed,
-1 skipped**. **0 real regressions.**
+`CSRN_STATE_AUTHORITY_FILE`) after **round 25**: **0 failed, 2508 passed**.
+**0 real regressions.**
+
+---
+
+## ROUND 25 — DragonFly school disambiguation picker (C/D/E) (2026-09-01)
+
+The scope deferred from Round 24: when a bare school name matches more than
+one DragonFly record and Round 24's scoring can't pick one confidently,
+stop guessing and let the operator choose.
+
+| commit | task |
+|---|---|
+| `3e3252f` | **25C** — `DRAGONFLY_SCHOOL_AMBIGUOUS` + `dragonfly_school_code` bypass |
+| `7430610` | **25D** — the picker UI in both DragonFly panels |
+| (this)    | **25E** — docs |
+
+### New resolution order (per DragonFly lookup)
+
+1. **`dragonfly_school_code` supplied** (operator picked it, or a previous
+   pick is persisted on the CSRN school's `source_data.dragonfly_school_code`)
+   → skip the directory search entirely, `GET /schools/<code>/summary`,
+   synth a directory-record shape for `normalize_school_record`, go
+   straight to the roster.
+2. **else `resolve_school`** (Round 24 scoring). If
+   `resolved_confidently` → proceed as before.
+3. **else** → `DRAGONFLY_SCHOOL_AMBIGUOUS`: `preview_school` returns
+   `{candidates: [{name, city, class, shortCode, level, match_score,
+   fields_sport}], query}` and the route answers **409**. `resolve_school`
+   backfills the sport-fielding tier on the top ~6 candidates so every
+   picker row shows "✓ / ✗ fields Football".
+
+### C — backend
+
+- `dragonfly_service.preview_school(…, dragonfly_school_code="")` — the
+  bypass + the ambiguous return.
+- `dragonfly_sync_service` — `preview` / `replace_roster` /
+  `preview_school_info` / `apply_safe_school_info` all take and forward
+  `dragonfly_school_code`; `preview` & `preview_school_info` also fall back
+  to a code already stored on the CSRN school record. `replace_roster`
+  stamps the operator's pick onto `source_data.dragonfly_school_code` on a
+  successful apply (new `save_schools` dep, wired in `app.py`); the
+  school-info apply path already persists it through
+  `school_service.update`. **One-time choice — the school never
+  re-resolves or flips on a later sync.**
+- `routes/association_routes.py` — the four preview routes + `school-info-
+  apply` accept `dragonfly_school_code`; `dragonfly_response()` returns
+  `409 {error, candidates, query}` for `DRAGONFLY_SCHOOL_AMBIGUOUS`
+  (added to `association_error_status`).
+
+### D — picker UI (`templates/index.html`)
+
+On the 409, `dragonflyRosterPanel` and `dragonflySchoolInfoPanel` render a
+radio-select candidate list (reusing the `association-team-picker` style)
+into their existing results area with a **"Use this school"** button —
+mirroring the "ambiguous players block Apply" affordance. Picking a row
+resubmits Preview with `dragonfly_school_code`; the Preview→Apply payload
+builders carry it so Apply persists it. All edits are in the DragonFly JS
+(lines ~3900–5750), clear of the owner's Go Live WIP hunks — a promotion
+merge stays clean like Round 23.
+
+### E — docs
+
+`docs/pywebview_shell_scoping.md` — corrected the two stale rows that
+still listed DragonFly among the Playwright-Chromium features (the
+2026-09-01 hotfix moved import onto the JSON API; only the roster
+print-sheet PDF needs Chromium now).
+
+Verified live: `preview_school("Central")` → `DRAGONFLY_SCHOOL_AMBIGUOUS`
+with six real "\* Central High School" candidates (class / code / fields-FB
+all populated); `preview_school(dragonfly_school_code="CCMH5Z")` → Amory HS
+roster with **0 directory GETs**. Tests:
+`tests/test_dragonfly_disambiguation.py` (12, offline). Suite **2508
+passed**; the owner's `index.html` / `broadcaster_print_service.py` WIP is
+in the production folder only, untouched.
 
 ---
 
