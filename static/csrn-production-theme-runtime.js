@@ -2711,7 +2711,12 @@ async function renderSelected() {
     setHostState(scoreHost(), true, alias, packageId, "rendered");
     document.documentElement.classList.add(SCORE_ACTIVE_CLASS);
 
-    activateThemeTicker(scoreTarget, alias, spec, runtime, true);
+    // Capture the result: renderSelected() reports it as
+    // CSRNProductionThemeBindingState.tickerActive below. Referencing an
+    // undeclared `tickerActive` there threw a ReferenceError that the catch
+    // swallowed as "theme binding blocked" -> the overlay stayed a white
+    // screen. (2026-09-02 hotfix.)
+    const tickerActive = activateThemeTicker(scoreTarget, alias, spec, runtime, true);
     // Own the ticker slot whenever the theme rendered, same as SCORE_ACTIVE_CLASS
     // above -- a dark theme ticker must not hand the slot back to the legacy
     // #eventTicker. Released only by deactivate().
