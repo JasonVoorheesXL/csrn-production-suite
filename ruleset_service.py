@@ -36,6 +36,8 @@ _CATALOG: tuple[tuple[tuple[str | None, str | None, str | None, str], str], ...]
     (("US", "MS", "MHSAA", "football"), "football/us-ms-mhsaa"),
     (("US", None, "NFHS", "football"), "football/us-nfhs"),
     (("US", None, None, "football"), "football/us-nfhs"),
+    (("CA", "ON", "CJFL", "football"), "football/ca-cjfl-ofc"),
+    (("CA", None, None, "football"), "football/ca-base"),
 )
 
 # What resolve() falls back to when nothing in the catalogue matches. Keep

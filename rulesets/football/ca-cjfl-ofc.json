@@ -1,0 +1,19 @@
+{
+  "id": "football/ca-cjfl-ofc",
+  "extends": "football/ca-base",
+  "label": "CJFL / Ontario Football Conference",
+  "sport": "football",
+  "jurisdiction": {
+    "country": "CA",
+    "region": "ON",
+    "association": "CJFL"
+  },
+  "defaults": {
+    "timezone": "America/Toronto",
+    "association": "CJFL"
+  },
+  "_source_notes": {
+    "scope": "CJFL clubs in the Ontario Football Conference play under Football Canada rules with OFC competition bylaws. This document pins only jurisdiction + timezone on top of ca-base; any OFC-specific deviation (game length, roster size, tie-break, No Yards enforcement, convert yardage) must be taken from the current OFC bylaws before a live broadcast.",
+    "inherited_placeholders": "Every value ca-base flags as unverified (try_spot, no_yards_halo_yards, kickoff / free-kick / touchback spots, quarter length, penalty yardages) is inherited here unchanged and is still unverified. Confirm against Football Canada + OFC sources."
+  }
+}

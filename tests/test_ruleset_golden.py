@@ -272,5 +272,80 @@ def test_base_nfhs_ruleset_carries_no_mississippi_specifics() -> None:
 
 def test_extends_chain_and_fallback() -> None:
     assert ruleset_service.resolve(country="US", sport="football")["id"] == "football/us-nfhs"
-    # unknown jurisdiction -> generic base, never the MS document
-    assert ruleset_service.resolve(country="CA", region="ON", sport="football")["id"] == "football/us-nfhs"
+    # an unknown US jurisdiction -> generic US base, never the MS document
+    assert (
+        ruleset_service.resolve(country="US", region="AL", sport="football")["id"]
+        == "football/us-nfhs"
+    )
+    # a wholly unknown country still falls back to the generic US base
+    assert (
+        ruleset_service.resolve(country="MX", region="DIF", sport="football")["id"]
+        == "football/us-nfhs"
+    )
+
+
+# --- Round 26 7/7: the Canadian ruleset documents --------------------------
+
+def _ca() -> dict:
+    return ruleset_service.resolve(country="CA", sport="football")
+
+
+def _cjfl() -> dict:
+    return ruleset_service.resolve(
+        country="CA", region="ON", association="CJFL", sport="football"
+    )
+
+
+def test_ca_catalogue_entries_resolve() -> None:
+    assert _ca()["id"] == "football/ca-base"
+    assert _cjfl()["id"] == "football/ca-cjfl-ofc"
+    # generic Canadian, not routed to the Ontario/CJFL document
+    assert ruleset_service.resolve(country="CA", region="BC", sport="football")["id"] == "football/ca-base"
+    # even Ontario without the CJFL association is generic ca-base
+    assert ruleset_service.resolve(country="CA", region="ON", sport="football")["id"] == "football/ca-base"
+
+
+def test_ca_base_carries_the_canadian_shape() -> None:
+    ca = _ca()
+    assert ruleset_service.downs_sequence(ca) == ["1st", "2nd", "3rd"]
+    geo = ruleset_service.field_geometry(ca)
+    assert geo["length_yards"] == 110
+    assert geo["end_zone_depth_yards"] == 20
+    assert ruleset_service.no_fair_catch(ca) is True
+    assert ruleset_service.no_yards_halo(ca) == 5
+    assert ruleset_service.scoring_values(ca)["single"] == 1
+    # No Yards is a Canadian-only Special Teams foul; the rest of the
+    # catalogue is inherited from us-nfhs.
+    pens = ruleset_service.penalty_rules(ca)
+    assert ("Special Teams", "No Yards") in pens
+    assert ("Offensive", "False Start") in pens  # inherited
+    # uncertain values are flagged, not silently shipped as fact
+    assert "try_spot" in ca["_source_notes"]
+    assert "no_yards_halo_yards" in ca["_source_notes"]
+
+
+def test_ca_cjfl_ofc_extends_ca_base() -> None:
+    cjfl = _cjfl()
+    assert "extends" not in cjfl  # fully resolved
+    assert cjfl["jurisdiction"] == {"country": "CA", "region": "ON", "association": "CJFL"}
+    assert cjfl["defaults"]["timezone"] == "America/Toronto"
+    # inherits the Canadian shape from ca-base
+    assert ruleset_service.downs_sequence(cjfl) == ["1st", "2nd", "3rd"]
+    assert ruleset_service.field_geometry(cjfl)["length_yards"] == 110
+    assert ruleset_service.no_fair_catch(cjfl) is True
+
+
+def test_field_goal_play_is_disabled_on_every_shipped_ruleset() -> None:
+    # Engine reality: no field-goal play-type handler exists, so no shipped
+    # ruleset -- US or Canadian -- may enable it. This pins that alignment
+    # so ca-base can't later drift to field_goal_play: true ahead of the
+    # engine.
+    for rid in (
+        "football/us-nfhs",
+        "football/us-ms-mhsaa",
+        "football/ca-base",
+        "football/ca-cjfl-ofc",
+    ):
+        ruleset = ruleset_service.load_ruleset(rid)
+        assert ruleset["field"].get("field_goal_play") is False, rid
+        assert "field_goal" not in ruleset_service.valid_play_types(ruleset), rid
