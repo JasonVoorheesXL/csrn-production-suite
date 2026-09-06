@@ -47,6 +47,39 @@ def test_period_structure_matches_period_service_and_default_state() -> None:
     assert period["quarter_length_seconds"] == app.DEFAULT_STATE["clock_seconds"]
     assert period["count"] == 4
     assert period["quarters"] == ["1", "2", "3", "4", "OT"]  # PeriodService._quarter valid set
+    # Round 26 groundwork: the 4-down cycle is becoming ruleset data. This
+    # value must stay 4 for every US football ruleset -- canonical_state_
+    # service / rules_service / penalty_service all still hardcode ["1st".."4th"]
+    # today and will migrate to read this. 3 is Canadian (ships as ca-base).
+    assert period["downs_per_set"] == 4
+
+
+def test_field_geometry_matches_the_hardcoded_0_to_100_scale() -> None:
+    # Round 26 groundwork: the bare 0-100 field literal and the red-zone 20
+    # are becoming ruleset data. These must reproduce today's geometry exactly
+    # for every US ruleset (canonical_state_service end == 100 / 0 touchdown
+    # + safety detection, field_state red_zone 0 < to_goal <= 20).
+    field = _ms()["field"]
+    assert field["length_yards"] == 100
+    assert field["end_zone_depth_yards"] == 10
+    assert field["red_zone_yards"] == 20
+    assert field["no_fair_catch"] is False   # NFHS keeps the fair catch
+
+
+def test_scoring_values_match_the_current_point_deltas() -> None:
+    # game_operations_service.VALID_SCORE_DELTAS = {-1, 1, 2, 3, 6};
+    # statistics_service infers FG == 3 / XP == 1 / 2PT == 2 / TD == 6 from
+    # the delta. `single` (the rouge) ships in the schema so ca-base can
+    # inherit the shape -- a US game never scores one.
+    scoring = _ms()["scoring"]
+    assert scoring == {
+        "touchdown": 6,
+        "field_goal": 3,
+        "safety": 2,
+        "convert_kick": 1,
+        "convert_major": 2,
+        "single": 1,
+    }
 
 
 def test_classification_and_reserved_ids_match_reconcile_5a_csrn_ids() -> None:

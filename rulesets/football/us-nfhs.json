@@ -9,15 +9,28 @@
   },
   "period": {
     "count": 4,
+    "downs_per_set": 4,
     "quarter_length_seconds": 720,
     "quarters": ["1", "2", "3", "4", "OT"],
     "overtime_format": "nfhs_10yard"
   },
   "field": {
+    "length_yards": 100,
+    "end_zone_depth_yards": 10,
+    "red_zone_yards": 20,
+    "no_fair_catch": false,
     "kickoff_spot": "own_40",
     "free_kick_spot": "own_20",
     "try_spot": "opp_3",
     "touchback_spot": "own_20"
+  },
+  "scoring": {
+    "touchdown": 6,
+    "field_goal": 3,
+    "safety": 2,
+    "convert_kick": 1,
+    "convert_major": 2,
+    "single": 1
   },
   "penalties": {
     "Offensive/False Start": {"yards": 5, "dead_ball": true},
