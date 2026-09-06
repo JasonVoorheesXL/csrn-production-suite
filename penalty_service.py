@@ -186,9 +186,20 @@ class PenaltyService:
             state["down"] = "1st"
             state["distance"] = "10"
         else:
-            if move_sign < 0:
+            # Distance must move based on WHICH SIDE the foul is against, not
+            # on move_sign (which also folds in team_direction -- the side of
+            # the field the offense happens to be driving toward this half).
+            # A foul against the offense always pushes the enforcement spot
+            # away from the line-to-gain (distance increases) regardless of
+            # which physical end zone that is; a foul against the defense
+            # always pushes it toward the line-to-gain (distance decreases).
+            # Keying this off move_sign instead inverted the result for
+            # roughly half of all penalties -- whichever team/half currently
+            # had team_direction=="left" (move_sign flips sign with
+            # direction, but against_offense/against_defense do not).
+            if against_offense:
                 state["distance"] = str(min(99, old_distance + enforced))
-            elif move_sign > 0:
+            elif against_defense:
                 remaining = old_distance - enforced
                 if remaining <= 0:
                     state["down"] = "1st"
