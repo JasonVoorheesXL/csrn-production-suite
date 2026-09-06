@@ -137,6 +137,36 @@ def test_scoring_values_helper_matches_the_current_point_deltas() -> None:
     }
 
 
+def test_service_scoring_caches_match_the_ruleset_point_values() -> None:
+    # Round 26 4/7: canonical_state_service + rules_service resolve TD / safety
+    # point values from the ruleset. For every US ruleset they must equal the
+    # old hardcoded +6 / +2.
+    from canonical_state_service import CanonicalStateFoundation
+    from rules_service import RulesService
+
+    scoring = ruleset_service.scoring_values(_ms())
+    assert scoring["touchdown"] == 6 and scoring["safety"] == 2
+    assert CanonicalStateFoundation._scoring() == scoring
+    assert RulesService._scoring() == scoring
+
+
+def test_single_never_produced_and_field_goal_play_stays_out_for_us_rulesets() -> None:
+    # Round 26 4/7 dormancy proof: no NFHS/MHSAA ruleset enables the
+    # field_goal play type, and RulesService rejects it exactly as before.
+    # (The single/rouge has no ruleset "enable" flag -- it simply never
+    # occurs because nothing emits a SINGLE event in a US game -- but the
+    # schema still carries scoring.single so ca-base can inherit the shape.)
+    from rules_service import RulesService
+
+    assert _ms()["field"]["field_goal_play"] is False
+    assert ruleset_service.valid_play_types(_ms()) == {"run", "pass", "kickoff", "punt"}
+    assert RulesService._valid_play_types() == {"run", "pass", "kickoff", "punt"}
+    assert "field_goal" not in RulesService._valid_play_types()
+    # base NFHS document carries the flag at the same value
+    base = ruleset_service.load_ruleset("football/us-nfhs")
+    assert base["field"]["field_goal_play"] is False
+
+
 def test_classification_and_reserved_ids_match_reconcile_5a_csrn_ids() -> None:
     cls = _ms()["classification"]
     assert cls["classes"] == ["1A", "2A", "3A", "4A", "5A", "6A", "7A"]  # SUPPORTED_CLASSES

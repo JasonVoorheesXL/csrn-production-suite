@@ -38,6 +38,8 @@ class RulesService:
 
     VALID_TEAMS = {"home", "visitor"}
     VALID_DIRECTIONS = {"left", "right"}
+    # Frozen fallback + golden anchor. The live set is _valid_play_types(),
+    # which the ruleset can widen (Canadian "field_goal"); NFHS never does.
     VALID_PLAY_TYPES = {"run", "pass", "kickoff", "punt"}
     SNAPSHOT_FIELDS = (
         "home_score",
@@ -111,6 +113,49 @@ class RulesService:
     @classmethod
     def _field_length(cls) -> int:
         return int(cls._field_geometry().get("length_yards", 100) or 100)
+
+    # Point values + accepted play types, from the same football ruleset.
+    # The literals are the frozen fallback + golden anchor.
+    _SCORING_FALLBACK = {
+        "touchdown": 6,
+        "field_goal": 3,
+        "safety": 2,
+        "convert_kick": 1,
+        "convert_major": 2,
+        "single": 1,
+    }
+    _scoring_cache: dict[str, int] | None = None
+    _valid_play_types_cache: set[str] | None = None
+
+    @classmethod
+    def _scoring(cls) -> dict[str, int]:
+        if cls._scoring_cache is None:
+            try:
+                ruleset = ruleset_service.resolve(
+                    country="US", region="MS", association="MHSAA", sport="football"
+                )
+                cls._scoring_cache = (
+                    ruleset_service.scoring_values(ruleset)
+                    or dict(cls._SCORING_FALLBACK)
+                )
+            except Exception:
+                cls._scoring_cache = dict(cls._SCORING_FALLBACK)
+        return cls._scoring_cache
+
+    @classmethod
+    def _valid_play_types(cls) -> set[str]:
+        if cls._valid_play_types_cache is None:
+            try:
+                ruleset = ruleset_service.resolve(
+                    country="US", region="MS", association="MHSAA", sport="football"
+                )
+                cls._valid_play_types_cache = (
+                    ruleset_service.valid_play_types(ruleset)
+                    or set(cls.VALID_PLAY_TYPES)
+                )
+            except Exception:
+                cls._valid_play_types_cache = set(cls.VALID_PLAY_TYPES)
+        return cls._valid_play_types_cache
 
     @classmethod
     def spot_to_coord(cls, value: Any) -> int:
@@ -295,7 +340,7 @@ class RulesService:
         incoming = dict(payload or {})
         team = str(incoming.get("team", "")).lower()
         kind = str(incoming.get("play_type", "")).lower()
-        if team not in self.VALID_TEAMS or kind not in self.VALID_PLAY_TYPES:
+        if team not in self.VALID_TEAMS or kind not in self._valid_play_types():
             return RulesResult("INVALID_PLAY", {})
 
         lock_started = perf_counter()
@@ -359,6 +404,8 @@ class RulesService:
                 for field in self.SNAPSHOT_FIELDS
             }
             length = self._field_length()
+            td_points = self._scoring().get("touchdown", 6)
+            safety_points = self._scoring().get("safety", 2)
             start = self.spot_to_coord(
                 incoming.get("start_spot") or state.get("ball_spot") or (length // 2)
             )
@@ -613,7 +660,7 @@ class RulesService:
                 )
                 if touchdown:
                     state[f"{receiving}_score"] = (
-                        int(state.get(f"{receiving}_score", 0) or 0) + 6
+                        int(state.get(f"{receiving}_score", 0) or 0) + td_points
                     )
                     CanonicalStateFoundation.enter_pending_try(state, receiving)
                 else:
@@ -681,7 +728,7 @@ class RulesService:
                     state["down"] = "1st"
                     state["distance"] = "10"
                     if turnover_touchdown:
-                        state[f"{turnover_team}_score"] = int(state.get(f"{turnover_team}_score", 0)) + 6
+                        state[f"{turnover_team}_score"] = int(state.get(f"{turnover_team}_score", 0)) + td_points
                         CanonicalStateFoundation.enter_pending_try(state, turnover_team)
                         touchdown = True
                         self._show_player_spotlight(
@@ -722,7 +769,7 @@ class RulesService:
                         )
                     self._stop_clock(state)
                 elif touchdown:
-                    state[f"{team}_score"] = int(state.get(f"{team}_score", 0)) + 6
+                    state[f"{team}_score"] = int(state.get(f"{team}_score", 0)) + td_points
                     CanonicalStateFoundation.enter_pending_try(state, team)
                     self._stop_clock(state)
                     is_pass_reception = kind == "pass" and outcome == "complete"
@@ -749,7 +796,7 @@ class RulesService:
                     )
                 elif safety:
                     other = self.opposite(team)
-                    state[f"{other}_score"] = int(state.get(f"{other}_score", 0)) + 2
+                    state[f"{other}_score"] = int(state.get(f"{other}_score", 0)) + safety_points
                     CanonicalStateFoundation.enter_free_kick(state, team)
                     self._stop_clock(state)
                 else:

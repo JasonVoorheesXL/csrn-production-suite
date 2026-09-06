@@ -123,6 +123,7 @@ class StatisticsService:
             "extra_point_attempts": 0,
             "two_point_conversions": 0,
             "two_point_attempts": 0,
+            "singles": 0,
             "turnovers_gained": 0,
             "interceptions_gained": 0,
             "fumble_recoveries": 0,
@@ -167,6 +168,7 @@ class StatisticsService:
             "extra_point_attempts": 0,
             "two_point_conversions": 0,
             "two_point_attempts": 0,
+            "singles": 0,
             "points": 0,
             "rushing_attempts": 0,
             "rushing_yards": 0,
@@ -286,6 +288,15 @@ class StatisticsService:
                 teams[team]["two_point_attempts"] += 1
                 if conversion_outcome in {"", "good"} and delta == 2:
                     teams[team]["two_point_conversions"] += 1
+            elif code == "SINGLE":
+                # Rouge / single (Canadian). A distinct event code -- never a
+                # PAT: event_service forbids XP/2PT outside pending_try and
+                # forbids SINGLE (a non-try event) during it, so the two can
+                # never collide despite sharing a 1-point delta. Classified
+                # by code here, exactly like FG/XP/2PT; delta is only the
+                # made-scoring check.
+                if delta >= 1:
+                    teams[team]["singles"] += 1
 
             if code == "TURNOVER":
                 key = str(event.get("id") or event.get("play_id") or id(event))
@@ -326,6 +337,9 @@ class StatisticsService:
                     scorer["two_point_attempts"] += 1
                     if delta == 2:
                         scorer["two_point_conversions"] += 1
+                elif code == "SINGLE":
+                    if delta >= 1:
+                        scorer["singles"] += 1
 
             if delta:
                 after = event.get("after") if isinstance(event.get("after"), dict) else {}

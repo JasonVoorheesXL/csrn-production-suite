@@ -289,3 +289,21 @@ def no_fair_catch(ruleset: Mapping[str, Any]) -> bool:
     """True when the ruleset abolishes the fair catch (Canadian football).
     NFHS keeps it, so this is False for every current US ruleset."""
     return bool((ruleset.get("field") or {}).get("no_fair_catch", False))
+
+
+_BASE_PLAY_TYPES: frozenset[str] = frozenset({"run", "pass", "kickoff", "punt"})
+
+
+def valid_play_types(ruleset: Mapping[str, Any]) -> set[str]:
+    """The play types the rules engine accepts for this ruleset.
+
+    Always the four scrimmage/kick types RulesService has always allowed;
+    a ruleset that sets ``field.field_goal_play`` true additionally allows
+    ``"field_goal"`` as a distinct, returnable place-kick (Canadian rules,
+    where a missed field goal is live). NFHS omits the flag, so the set is
+    unchanged for every current US ruleset.
+    """
+    out = set(_BASE_PLAY_TYPES)
+    if bool((ruleset.get("field") or {}).get("field_goal_play", False)):
+        out.add("field_goal")
+    return out

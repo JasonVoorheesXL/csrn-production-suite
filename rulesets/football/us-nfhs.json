@@ -19,6 +19,7 @@
     "end_zone_depth_yards": 10,
     "red_zone_yards": 20,
     "no_fair_catch": false,
+    "field_goal_play": false,
     "kickoff_spot": "own_40",
     "free_kick_spot": "own_20",
     "try_spot": "opp_3",

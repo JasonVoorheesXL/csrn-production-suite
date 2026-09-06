@@ -304,6 +304,34 @@ class CanonicalStateFoundation:
     def _field_length(cls) -> int:
         return int(cls._field_geometry().get("length_yards", 100) or 100)
 
+    # Point values, from the same football ruleset. The literals are the
+    # frozen fallback + golden anchor (NFHS TD 6 / safety 2).
+    _SCORING_FALLBACK = {
+        "touchdown": 6,
+        "field_goal": 3,
+        "safety": 2,
+        "convert_kick": 1,
+        "convert_major": 2,
+        "single": 1,
+    }
+    _scoring_cache: dict[str, int] | None = None
+
+    @classmethod
+    def _scoring(cls) -> dict[str, int]:
+        if cls._scoring_cache is None:
+            resolved = dict(cls._SCORING_FALLBACK)
+            try:
+                import ruleset_service
+
+                ruleset = ruleset_service.resolve(
+                    country="US", region="MS", association="MHSAA", sport="football"
+                )
+                resolved = ruleset_service.scoring_values(ruleset) or resolved
+            except Exception:
+                resolved = dict(cls._SCORING_FALLBACK)
+            cls._scoring_cache = resolved
+        return cls._scoring_cache
+
     @classmethod
     def _team_own_yard_spot(cls, state: Mapping[str, Any], team: str, yard: int) -> str:
         direction = str(state.get(f"{team}_direction", "right" if team == "home" else "left") or "right").lower()
@@ -451,15 +479,17 @@ class CanonicalStateFoundation:
             )
             touchdown = turnover_touchdown
             safety = False
+        td_points = cls._scoring().get("touchdown", 6)
+        safety_points = cls._scoring().get("safety", 2)
         if turnover and touchdown:
-            state[f"{play['turnover_team']}_score"] = int(state.get(f"{play['turnover_team']}_score", 0) or 0) + 6
+            state[f"{play['turnover_team']}_score"] = int(state.get(f"{play['turnover_team']}_score", 0) or 0) + td_points
             cls.enter_pending_try(state, play["turnover_team"])
         elif touchdown:
-            state[f"{team}_score"] = int(state.get(f"{team}_score", 0) or 0) + 6
+            state[f"{team}_score"] = int(state.get(f"{team}_score", 0) or 0) + td_points
             cls.enter_pending_try(state, team)
         elif safety:
             other = cls.opposite(team)
-            state[f"{other}_score"] = int(state.get(f"{other}_score", 0) or 0) + 2
+            state[f"{other}_score"] = int(state.get(f"{other}_score", 0) or 0) + safety_points
             cls.enter_free_kick(state, team)
         elif turnover:
             state["possession"] = str(play.get("turnover_team") or cls.opposite(team))
