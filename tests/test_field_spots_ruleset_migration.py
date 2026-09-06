@@ -9,7 +9,8 @@ from canonical_state_service import CanonicalStateFoundation as C
 
 
 def _reset():
-    C._field_yards_cache = None
+    # Round 26 6/7: caches are now keyed by ruleset id.
+    C._field_yards_cache = {}
 
 
 def _state():
@@ -38,9 +39,9 @@ def test_enter_kickoff_free_kick_try_produce_the_same_ball_spots() -> None:
 def test_falls_back_to_literals_if_the_ruleset_engine_is_unavailable(monkeypatch) -> None:
     _reset()
 
-    def boom(**_kw):
+    def boom(*_a, **_kw):
         raise RuntimeError("no rulesets")
 
-    monkeypatch.setattr(ruleset_service, "resolve", boom)
+    monkeypatch.setattr(ruleset_service, "load_ruleset", boom)
     assert C._field_yards() == {"kickoff": 40, "free_kick": 20, "try": 3}
     _reset()

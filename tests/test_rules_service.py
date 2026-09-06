@@ -684,8 +684,13 @@ def test_fair_catch_signal_is_honoured_under_the_default_nfhs_ruleset() -> None:
 
 def test_no_fair_catch_ruleset_drops_the_fair_catch_signal() -> None:
     # Round 26 5/7: with a no-fair-catch ruleset (Canadian) the same payload
-    # must ignore fair_catch entirely -- the returner runs it.
-    RulesService._no_fair_catch_cache = True
+    # must ignore fair_catch entirely -- the returner runs it. (Round 26 6/7:
+    # the cache is keyed by ruleset id, so seed the active id's entry.)
+    import ruleset_service
+
+    RulesService._no_fair_catch_cache = {
+        ruleset_service.active_ruleset_id(): True
+    }
     try:
         service, _, _, _, _ = build_service()
         result = service.play(
@@ -705,4 +710,4 @@ def test_no_fair_catch_ruleset_drops_the_fair_catch_signal() -> None:
         assert "fair catch" not in play["result"].lower()
         assert "returned by" in play["result"].lower()
     finally:
-        RulesService._no_fair_catch_cache = None
+        RulesService._no_fair_catch_cache = {}

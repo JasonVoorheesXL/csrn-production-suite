@@ -93,22 +93,25 @@ class RulesService:
         "end_zone_depth_yards": 10,
         "red_zone_yards": 20,
     }
-    _field_geometry_cache: dict[str, int] | None = None
+    # Every derived value below is resolved from ruleset_service.active_
+    # ruleset() (the game's jurisdiction, generic US base when absent --
+    # identical engine values to us-ms-mhsaa, so a no-op today) and cached
+    # keyed by the resolved ruleset id. The *_FALLBACK literals are the
+    # frozen anchor used only if the ruleset engine raises.
+    _field_geometry_cache: dict[str, dict[str, int]] = {}
 
     @classmethod
     def _field_geometry(cls) -> dict[str, int]:
-        if cls._field_geometry_cache is None:
+        rid = ruleset_service.active_ruleset_id()
+        if rid not in cls._field_geometry_cache:
             try:
-                ruleset = ruleset_service.resolve(
-                    country="US", region="MS", association="MHSAA", sport="football"
-                )
-                cls._field_geometry_cache = (
-                    ruleset_service.field_geometry(ruleset)
+                cls._field_geometry_cache[rid] = (
+                    ruleset_service.field_geometry(ruleset_service.active_ruleset())
                     or dict(cls._FIELD_GEOMETRY_FALLBACK)
                 )
             except Exception:
-                cls._field_geometry_cache = dict(cls._FIELD_GEOMETRY_FALLBACK)
-        return cls._field_geometry_cache
+                cls._field_geometry_cache[rid] = dict(cls._FIELD_GEOMETRY_FALLBACK)
+        return cls._field_geometry_cache[rid]
 
     @classmethod
     def _field_length(cls) -> int:
@@ -124,51 +127,47 @@ class RulesService:
         "convert_major": 2,
         "single": 1,
     }
-    _scoring_cache: dict[str, int] | None = None
-    _valid_play_types_cache: set[str] | None = None
-    _no_fair_catch_cache: bool | None = None
+    _scoring_cache: dict[str, dict[str, int]] = {}
+    _valid_play_types_cache: dict[str, set[str]] = {}
+    _no_fair_catch_cache: dict[str, bool] = {}
 
     @classmethod
     def _scoring(cls) -> dict[str, int]:
-        if cls._scoring_cache is None:
+        rid = ruleset_service.active_ruleset_id()
+        if rid not in cls._scoring_cache:
             try:
-                ruleset = ruleset_service.resolve(
-                    country="US", region="MS", association="MHSAA", sport="football"
-                )
-                cls._scoring_cache = (
-                    ruleset_service.scoring_values(ruleset)
+                cls._scoring_cache[rid] = (
+                    ruleset_service.scoring_values(ruleset_service.active_ruleset())
                     or dict(cls._SCORING_FALLBACK)
                 )
             except Exception:
-                cls._scoring_cache = dict(cls._SCORING_FALLBACK)
-        return cls._scoring_cache
+                cls._scoring_cache[rid] = dict(cls._SCORING_FALLBACK)
+        return cls._scoring_cache[rid]
 
     @classmethod
     def _valid_play_types(cls) -> set[str]:
-        if cls._valid_play_types_cache is None:
+        rid = ruleset_service.active_ruleset_id()
+        if rid not in cls._valid_play_types_cache:
             try:
-                ruleset = ruleset_service.resolve(
-                    country="US", region="MS", association="MHSAA", sport="football"
-                )
-                cls._valid_play_types_cache = (
-                    ruleset_service.valid_play_types(ruleset)
+                cls._valid_play_types_cache[rid] = (
+                    ruleset_service.valid_play_types(ruleset_service.active_ruleset())
                     or set(cls.VALID_PLAY_TYPES)
                 )
             except Exception:
-                cls._valid_play_types_cache = set(cls.VALID_PLAY_TYPES)
-        return cls._valid_play_types_cache
+                cls._valid_play_types_cache[rid] = set(cls.VALID_PLAY_TYPES)
+        return cls._valid_play_types_cache[rid]
 
     @classmethod
     def _no_fair_catch(cls) -> bool:
-        if cls._no_fair_catch_cache is None:
+        rid = ruleset_service.active_ruleset_id()
+        if rid not in cls._no_fair_catch_cache:
             try:
-                ruleset = ruleset_service.resolve(
-                    country="US", region="MS", association="MHSAA", sport="football"
+                cls._no_fair_catch_cache[rid] = ruleset_service.no_fair_catch(
+                    ruleset_service.active_ruleset()
                 )
-                cls._no_fair_catch_cache = ruleset_service.no_fair_catch(ruleset)
             except Exception:
-                cls._no_fair_catch_cache = False
-        return cls._no_fair_catch_cache
+                cls._no_fair_catch_cache[rid] = False
+        return cls._no_fair_catch_cache[rid]
 
     @classmethod
     def spot_to_coord(cls, value: Any) -> int:
@@ -229,25 +228,23 @@ class RulesService:
     def opposite(team: str) -> str:
         return "visitor" if team == "home" else "home"
 
-    # The down cycle, sourced from the football ruleset (US/MS/MHSAA). The
-    # literal is the frozen fallback + golden anchor; 3 downs is Canadian.
+    # The down cycle -- active ruleset, cached by id (see _field_geometry).
+    # 3 downs is Canadian; every US ruleset resolves ["1st".."4th"].
     _DOWNS_SEQUENCE_FALLBACK = ["1st", "2nd", "3rd", "4th"]
-    _downs_sequence_cache: list[str] | None = None
+    _downs_sequence_cache: dict[str, list[str]] = {}
 
     @classmethod
     def _downs_sequence(cls) -> list[str]:
-        if cls._downs_sequence_cache is None:
+        rid = ruleset_service.active_ruleset_id()
+        if rid not in cls._downs_sequence_cache:
             try:
-                ruleset = ruleset_service.resolve(
-                    country="US", region="MS", association="MHSAA", sport="football"
-                )
-                cls._downs_sequence_cache = (
-                    ruleset_service.downs_sequence(ruleset)
+                cls._downs_sequence_cache[rid] = (
+                    ruleset_service.downs_sequence(ruleset_service.active_ruleset())
                     or list(cls._DOWNS_SEQUENCE_FALLBACK)
                 )
             except Exception:
-                cls._downs_sequence_cache = list(cls._DOWNS_SEQUENCE_FALLBACK)
-        return cls._downs_sequence_cache
+                cls._downs_sequence_cache[rid] = list(cls._DOWNS_SEQUENCE_FALLBACK)
+        return cls._downs_sequence_cache[rid]
 
     @classmethod
     def advance_down(cls, down: Any) -> str:

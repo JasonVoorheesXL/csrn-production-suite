@@ -1346,6 +1346,10 @@ def _five_a_classification_rules() -> tuple[str, list[tuple[str, str]]]:
     try:
         import ruleset_service
 
+        # Intentionally pinned to us-ms-mhsaa, not routed through
+        # ruleset_service.active_ruleset(): this is the Mississippi 5A
+        # school-ID pilot (reserved CSRN IDs, id_format) -- jurisdiction-
+        # specific by nature, not a per-game engine rule.
         cls_rules = ruleset_service.resolve(
             country="US", region="MS", association="MHSAA", sport="football"
         ).get("classification", {})

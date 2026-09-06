@@ -223,21 +223,43 @@ class CanonicalStateFoundation:
         return f"LEFT {value}" if value < mid else f"RIGHT {length - value}"
 
 
-    # Kickoff / free-kick / try spots, sourced once from the football ruleset
-    # (US/MS/MHSAA). The literals are the frozen fallback + golden anchor.
+    # Down cycle / field spots / geometry / point values are all resolved
+    # from the active football ruleset (ruleset_service.active_ruleset), and
+    # every derived value is cached keyed by that ruleset's id -- so a
+    # process that ever serves more than one jurisdiction keeps them
+    # separate. Absent jurisdiction fields on the state, active_ruleset
+    # falls back to the generic US base, whose values equal us-ms-mhsaa, so
+    # this is a no-op for every current broadcast. The *_FALLBACK literals
+    # are the frozen anchor used only if the ruleset engine raises.
     _FIELD_YARDS_FALLBACK = {"kickoff": 40, "free_kick": 20, "try": 3}
-    _field_yards_cache: dict[str, int] | None = None
+    _DOWNS_SEQUENCE_FALLBACK = ["1st", "2nd", "3rd", "4th"]
+    _FIELD_GEOMETRY_FALLBACK = {
+        "length_yards": 100,
+        "end_zone_depth_yards": 10,
+        "red_zone_yards": 20,
+    }
+    _SCORING_FALLBACK = {
+        "touchdown": 6,
+        "field_goal": 3,
+        "safety": 2,
+        "convert_kick": 1,
+        "convert_major": 2,
+        "single": 1,
+    }
+    _field_yards_cache: dict[str, dict[str, int]] = {}
+    _downs_sequence_cache: dict[str, list[str]] = {}
+    _field_geometry_cache: dict[str, dict[str, int]] = {}
+    _scoring_cache: dict[str, dict[str, int]] = {}
 
     @classmethod
-    def _field_yards(cls) -> dict[str, int]:
-        if cls._field_yards_cache is None:
+    def _field_yards(cls, state: Mapping[str, Any] | None = None) -> dict[str, int]:
+        import ruleset_service
+
+        rid = ruleset_service.active_ruleset_id(state)
+        if rid not in cls._field_yards_cache:
             resolved = dict(cls._FIELD_YARDS_FALLBACK)
             try:
-                import ruleset_service
-
-                field = ruleset_service.resolve(
-                    country="US", region="MS", association="MHSAA", sport="football"
-                ).get("field", {})
+                field = ruleset_service.active_ruleset(state).get("field", {})
                 mapping = {
                     "kickoff": field.get("kickoff_spot"),
                     "free_kick": field.get("free_kick_spot"),
@@ -249,88 +271,57 @@ class CanonicalStateFoundation:
                         resolved[key] = yard
             except Exception:
                 resolved = dict(cls._FIELD_YARDS_FALLBACK)
-            cls._field_yards_cache = resolved
-        return cls._field_yards_cache
-
-    # The down cycle, sourced from the same football ruleset. The literal is
-    # the frozen fallback + golden anchor; 3 downs is Canadian (ca-base).
-    _DOWNS_SEQUENCE_FALLBACK = ["1st", "2nd", "3rd", "4th"]
-    _downs_sequence_cache: list[str] | None = None
+            cls._field_yards_cache[rid] = resolved
+        return cls._field_yards_cache[rid]
 
     @classmethod
-    def _downs_sequence(cls) -> list[str]:
-        if cls._downs_sequence_cache is None:
-            resolved = list(cls._DOWNS_SEQUENCE_FALLBACK)
-            try:
-                import ruleset_service
+    def _downs_sequence(cls, state: Mapping[str, Any] | None = None) -> list[str]:
+        import ruleset_service
 
-                ruleset = ruleset_service.resolve(
-                    country="US", region="MS", association="MHSAA", sport="football"
-                )
-                resolved = ruleset_service.downs_sequence(ruleset) or resolved
+        rid = ruleset_service.active_ruleset_id(state)
+        if rid not in cls._downs_sequence_cache:
+            try:
+                resolved = ruleset_service.downs_sequence(
+                    ruleset_service.active_ruleset(state)
+                ) or list(cls._DOWNS_SEQUENCE_FALLBACK)
             except Exception:
                 resolved = list(cls._DOWNS_SEQUENCE_FALLBACK)
-            cls._downs_sequence_cache = resolved
-        return cls._downs_sequence_cache
-
-    # Field geometry, from the same football ruleset. length_yards is the
-    # goal-line-to-goal-line coordinate span (100 for NFHS, 110 Canadian);
-    # red_zone_yards is the "inside the N" threshold. The literals are the
-    # frozen fallback + golden anchor.
-    _FIELD_GEOMETRY_FALLBACK = {
-        "length_yards": 100,
-        "end_zone_depth_yards": 10,
-        "red_zone_yards": 20,
-    }
-    _field_geometry_cache: dict[str, int] | None = None
+            cls._downs_sequence_cache[rid] = resolved
+        return cls._downs_sequence_cache[rid]
 
     @classmethod
-    def _field_geometry(cls) -> dict[str, int]:
-        if cls._field_geometry_cache is None:
-            resolved = dict(cls._FIELD_GEOMETRY_FALLBACK)
-            try:
-                import ruleset_service
+    def _field_geometry(cls, state: Mapping[str, Any] | None = None) -> dict[str, int]:
+        import ruleset_service
 
-                ruleset = ruleset_service.resolve(
-                    country="US", region="MS", association="MHSAA", sport="football"
-                )
-                resolved = ruleset_service.field_geometry(ruleset) or resolved
+        rid = ruleset_service.active_ruleset_id(state)
+        if rid not in cls._field_geometry_cache:
+            try:
+                resolved = ruleset_service.field_geometry(
+                    ruleset_service.active_ruleset(state)
+                ) or dict(cls._FIELD_GEOMETRY_FALLBACK)
             except Exception:
                 resolved = dict(cls._FIELD_GEOMETRY_FALLBACK)
-            cls._field_geometry_cache = resolved
-        return cls._field_geometry_cache
+            cls._field_geometry_cache[rid] = resolved
+        return cls._field_geometry_cache[rid]
 
     @classmethod
-    def _field_length(cls) -> int:
-        return int(cls._field_geometry().get("length_yards", 100) or 100)
-
-    # Point values, from the same football ruleset. The literals are the
-    # frozen fallback + golden anchor (NFHS TD 6 / safety 2).
-    _SCORING_FALLBACK = {
-        "touchdown": 6,
-        "field_goal": 3,
-        "safety": 2,
-        "convert_kick": 1,
-        "convert_major": 2,
-        "single": 1,
-    }
-    _scoring_cache: dict[str, int] | None = None
+    def _field_length(cls, state: Mapping[str, Any] | None = None) -> int:
+        return int(cls._field_geometry(state).get("length_yards", 100) or 100)
 
     @classmethod
-    def _scoring(cls) -> dict[str, int]:
-        if cls._scoring_cache is None:
-            resolved = dict(cls._SCORING_FALLBACK)
+    def _scoring(cls, state: Mapping[str, Any] | None = None) -> dict[str, int]:
+        import ruleset_service
+
+        rid = ruleset_service.active_ruleset_id(state)
+        if rid not in cls._scoring_cache:
             try:
-                import ruleset_service
-
-                ruleset = ruleset_service.resolve(
-                    country="US", region="MS", association="MHSAA", sport="football"
-                )
-                resolved = ruleset_service.scoring_values(ruleset) or resolved
+                resolved = ruleset_service.scoring_values(
+                    ruleset_service.active_ruleset(state)
+                ) or dict(cls._SCORING_FALLBACK)
             except Exception:
                 resolved = dict(cls._SCORING_FALLBACK)
-            cls._scoring_cache = resolved
-        return cls._scoring_cache
+            cls._scoring_cache[rid] = resolved
+        return cls._scoring_cache[rid]
 
     @classmethod
     def _team_own_yard_spot(cls, state: Mapping[str, Any], team: str, yard: int) -> str:
@@ -479,8 +470,8 @@ class CanonicalStateFoundation:
             )
             touchdown = turnover_touchdown
             safety = False
-        td_points = cls._scoring().get("touchdown", 6)
-        safety_points = cls._scoring().get("safety", 2)
+        td_points = cls._scoring(state).get("touchdown", 6)
+        safety_points = cls._scoring(state).get("safety", 2)
         if turnover and touchdown:
             state[f"{play['turnover_team']}_score"] = int(state.get(f"{play['turnover_team']}_score", 0) or 0) + td_points
             cls.enter_pending_try(state, play["turnover_team"])
@@ -503,7 +494,7 @@ class CanonicalStateFoundation:
             else:
                 import ruleset_service
 
-                downs = cls._downs_sequence()
+                downs = cls._downs_sequence(state)
                 state["down"] = ruleset_service.next_down(old_down, downs)
                 state["distance"] = str(max(1, distance - yards))
                 if ruleset_service.is_terminal_down(old_down, downs):

@@ -107,15 +107,20 @@ def clear_cache() -> None:
         _CACHE.clear()
 
 
-def resolve(
+def resolve_id(
     *,
     country: str | None = "US",
     region: str | None = None,
     association: str | None = None,
     sport: str = "football",
-) -> dict[str, Any]:
-    """Map a jurisdiction + sport to a resolved ruleset. Falls back to
-    DEFAULT_RULESET_ID when nothing matches."""
+) -> str:
+    """The ruleset id a jurisdiction + sport maps to (no document load).
+    Falls back to DEFAULT_RULESET_ID when nothing in the catalogue matches.
+
+    Cheap -- a catalogue scan, no deep copy -- so callers that cache derived
+    values keyed by ruleset id can check the key on every call and only
+    load the document when the key is new.
+    """
     country_n = (country or "").strip().upper() or None
     region_n = (region or "").strip().upper() or None
     association_n = (association or "").strip().upper() or None
@@ -130,8 +135,54 @@ def resolve(
             continue
         if a is not None and a != association_n:
             continue
-        return load_ruleset(ruleset_id)
-    return load_ruleset(DEFAULT_RULESET_ID)
+        return ruleset_id
+    return DEFAULT_RULESET_ID
+
+
+def resolve(
+    *,
+    country: str | None = "US",
+    region: str | None = None,
+    association: str | None = None,
+    sport: str = "football",
+) -> dict[str, Any]:
+    """Map a jurisdiction + sport to a resolved ruleset. Falls back to
+    DEFAULT_RULESET_ID when nothing matches."""
+    return load_ruleset(
+        resolve_id(
+            country=country, region=region, association=association, sport=sport
+        )
+    )
+
+
+def active_ruleset(
+    state: Mapping[str, Any] | None = None, *, sport: str = "football"
+) -> dict[str, Any]:
+    """The resolved ruleset for the game described by *state*.
+
+    Jurisdiction is taken from state's ``country`` / ``region`` /
+    ``association`` -- the fields a Canadian broadcast will carry. When they
+    are absent (every current broadcast) this falls back to the generic
+    base, whose down / field / scoring / penalty / period values are
+    identical to us-ms-mhsaa, so routing every engine consumer through here
+    is a no-op today. It is the single place a future sport/jurisdiction
+    picker wires into.
+    """
+    return load_ruleset(active_ruleset_id(state, sport=sport))
+
+
+def active_ruleset_id(
+    state: Mapping[str, Any] | None = None, *, sport: str = "football"
+) -> str:
+    """The ruleset id for *state*'s jurisdiction -- the cheap key a consumer
+    checks before loading the document. See ``active_ruleset``."""
+    s = state if isinstance(state, Mapping) else {}
+    return resolve_id(
+        country=s.get("country") or "US",
+        region=s.get("region") or None,
+        association=s.get("association") or None,
+        sport=sport,
+    )
 
 
 def available_rulesets() -> list[dict[str, str]]:

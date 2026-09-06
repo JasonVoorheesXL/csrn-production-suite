@@ -183,6 +183,65 @@ def test_single_never_produced_and_field_goal_play_stays_out_for_us_rulesets() -
     assert base["field"]["field_goal_play"] is False
 
 
+def test_active_ruleset_is_the_single_resolver_and_caches_by_id() -> None:
+    # Round 26 6/7: every engine consumer resolves through
+    # ruleset_service.active_ruleset(); derived values are cached keyed by
+    # the resolved ruleset id (dicts, not process-wide singletons).
+    from canonical_state_service import CanonicalStateFoundation
+    from penalty_service import PenaltyService
+    from period_service import PeriodService
+    from rules_service import RulesService
+
+    assert ruleset_service.active_ruleset_id() == "football/us-nfhs"
+    assert ruleset_service.active_ruleset_id({}) == "football/us-nfhs"
+    assert (
+        ruleset_service.active_ruleset_id(
+            {"country": "US", "region": "MS", "association": "MHSAA"}
+        )
+        == "football/us-ms-mhsaa"
+    )
+    assert ruleset_service.active_ruleset()["id"] == "football/us-nfhs"
+
+    # Routing every current game through the base is a no-op: us-nfhs and
+    # us-ms-mhsaa carry identical engine values.
+    nfhs = ruleset_service.active_ruleset()
+    mhsaa = ruleset_service.active_ruleset(
+        {"country": "US", "region": "MS", "association": "MHSAA"}
+    )
+    for key in ("period", "field", "scoring", "penalties"):
+        assert nfhs[key] == mhsaa[key]
+
+    # Every service cache is now an id-keyed dict.
+    CanonicalStateFoundation._field_geometry()
+    CanonicalStateFoundation._downs_sequence()
+    CanonicalStateFoundation._scoring()
+    CanonicalStateFoundation._field_yards()
+    PenaltyService._penalty_rules()
+    PenaltyService._downs_sequence()
+    PeriodService._period()
+    RulesService._downs_sequence()
+    RulesService._field_geometry()
+    RulesService._scoring()
+    RulesService._valid_play_types()
+    RulesService._no_fair_catch()
+    for cache in (
+        CanonicalStateFoundation._field_geometry_cache,
+        CanonicalStateFoundation._downs_sequence_cache,
+        CanonicalStateFoundation._scoring_cache,
+        CanonicalStateFoundation._field_yards_cache,
+        PenaltyService._penalty_rules_cache,
+        PenaltyService._downs_sequence_cache,
+        PeriodService._period_cache,
+        RulesService._downs_sequence_cache,
+        RulesService._field_geometry_cache,
+        RulesService._scoring_cache,
+        RulesService._valid_play_types_cache,
+        RulesService._no_fair_catch_cache,
+    ):
+        assert isinstance(cache, dict)
+        assert "football/us-nfhs" in cache
+
+
 def test_classification_and_reserved_ids_match_reconcile_5a_csrn_ids() -> None:
     cls = _ms()["classification"]
     assert cls["classes"] == ["1A", "2A", "3A", "4A", "5A", "6A", "7A"]  # SUPPORTED_CLASSES
