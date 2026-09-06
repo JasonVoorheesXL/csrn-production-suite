@@ -82,6 +82,40 @@ def test_scoring_values_match_the_current_point_deltas() -> None:
     }
 
 
+def test_downs_sequence_helper_reproduces_the_four_down_cycle() -> None:
+    # Round 26: canonical_state_service / rules_service / penalty_service all
+    # hardcode ["1st".."4th"] + a "4th -> 1st" wrap + a "4th is terminal"
+    # check. downs_sequence / next_down / is_terminal_down must reproduce
+    # that exactly for every US ruleset (3 is Canadian, ships as ca-base).
+    seq = ruleset_service.downs_sequence(_ms())
+    assert seq == ["1st", "2nd", "3rd", "4th"]
+    assert ruleset_service.next_down("1st", seq) == "2nd"
+    assert ruleset_service.next_down("3rd", seq) == "4th"
+    assert ruleset_service.next_down("4th", seq) == "1st"
+    assert ruleset_service.is_terminal_down("4th", seq) is True
+    assert ruleset_service.is_terminal_down("3rd", seq) is False
+
+
+def test_field_geometry_helper_matches_the_0_to_100_scale() -> None:
+    assert ruleset_service.field_geometry(_ms()) == {
+        "length_yards": 100,
+        "end_zone_depth_yards": 10,
+        "red_zone_yards": 20,
+    }
+    assert ruleset_service.no_fair_catch(_ms()) is False
+
+
+def test_scoring_values_helper_matches_the_current_point_deltas() -> None:
+    assert ruleset_service.scoring_values(_ms()) == {
+        "touchdown": 6,
+        "field_goal": 3,
+        "safety": 2,
+        "convert_kick": 1,
+        "convert_major": 2,
+        "single": 1,
+    }
+
+
 def test_classification_and_reserved_ids_match_reconcile_5a_csrn_ids() -> None:
     cls = _ms()["classification"]
     assert cls["classes"] == ["1A", "2A", "3A", "4A", "5A", "6A", "7A"]  # SUPPORTED_CLASSES

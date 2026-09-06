@@ -184,3 +184,101 @@ def penalty_rules(ruleset: Mapping[str, Any]) -> dict[tuple[str, str], dict[str,
         if unit and name and isinstance(value, Mapping):
             out[(unit, name)] = dict(value)
     return out
+
+
+# --- down / field / scoring shape (Round 26) ------------------------------
+#
+# canonical_state_service, rules_service and penalty_service each hardcode
+# the same three shapes today: the ["1st".."4th"] down cycle, the bare
+# 0-100 field coordinate scale, and the point value of every scoring play.
+# These helpers read those from the ruleset instead so a 3-down / 110-yard
+# / rouge-scoring document (ca-base) can express Canadian football without
+# any consumer branching on jurisdiction. For every current US ruleset they
+# return exactly the values above -- see tests/test_ruleset_golden.py.
+
+_DOWN_ORDINALS: tuple[str, ...] = ("1st", "2nd", "3rd", "4th", "5th", "6th")
+
+_FIELD_GEOMETRY_DEFAULTS: dict[str, int] = {
+    "length_yards": 100,
+    "end_zone_depth_yards": 10,
+    "red_zone_yards": 20,
+}
+
+_SCORING_DEFAULTS: dict[str, int] = {
+    "touchdown": 6,
+    "field_goal": 3,
+    "safety": 2,
+    "convert_kick": 1,
+    "convert_major": 2,
+    "single": 1,
+}
+
+
+def downs_sequence(ruleset: Mapping[str, Any]) -> list[str]:
+    """Ordered down labels for one series -- ``["1st", "2nd", "3rd", "4th"]``
+    for NFHS, ``["1st", "2nd", "3rd"]`` for Canadian.
+
+    Length is ``period.downs_per_set`` (default 4), clamped to the ordinals
+    this module knows how to name.
+    """
+    raw = ((ruleset.get("period") or {}).get("downs_per_set", 4))
+    try:
+        count = int(raw)
+    except (TypeError, ValueError):
+        count = 4
+    count = max(1, min(count, len(_DOWN_ORDINALS)))
+    return list(_DOWN_ORDINALS[:count])
+
+
+def next_down(down: str, sequence: list[str]) -> str:
+    """The down after *down* within *sequence*, wrapping the last entry back
+    to the first (a fresh series). An unrecognised *down* also resets to the
+    first entry -- matches the ``"4th" -> "1st"`` cycle the consumers use.
+    """
+    if not sequence:
+        return down
+    try:
+        idx = sequence.index(down)
+    except ValueError:
+        return sequence[0]
+    return sequence[(idx + 1) % len(sequence)]
+
+
+def is_terminal_down(down: str, sequence: list[str]) -> bool:
+    """True when *down* is the last of the series -- failing to convert it is
+    a turnover on downs (the consumers' ``if old_down == "4th"`` check)."""
+    return bool(sequence) and down == sequence[-1]
+
+
+def field_geometry(ruleset: Mapping[str, Any]) -> dict[str, int]:
+    """``{length_yards, end_zone_depth_yards, red_zone_yards}`` for the
+    ruleset, each defaulting to today's hardcoded value when absent."""
+    field = ruleset.get("field") or {}
+    out = dict(_FIELD_GEOMETRY_DEFAULTS)
+    for key in out:
+        if key in field:
+            try:
+                out[key] = int(field[key])
+            except (TypeError, ValueError):
+                pass
+    return out
+
+
+def scoring_values(ruleset: Mapping[str, Any]) -> dict[str, int]:
+    """Point value of every scoring play, ruleset values merged over the
+    current NFHS defaults (TD 6 / FG 3 / safety 2 / convert-kick 1 /
+    convert-major 2 / single 1)."""
+    scoring = ruleset.get("scoring") or {}
+    out = dict(_SCORING_DEFAULTS)
+    for key, value in scoring.items():
+        try:
+            out[str(key)] = int(value)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def no_fair_catch(ruleset: Mapping[str, Any]) -> bool:
+    """True when the ruleset abolishes the fair catch (Canadian football).
+    NFHS keeps it, so this is False for every current US ruleset."""
+    return bool((ruleset.get("field") or {}).get("no_fair_catch", False))
