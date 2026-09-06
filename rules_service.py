@@ -83,9 +83,41 @@ class RulesService:
         self._transaction_lock = transaction_lock
         self._now = now
 
-    @staticmethod
-    def spot_to_coord(value: Any) -> int:
-        """Canonical field coordinate: 0=left goal line, 100=right goal line."""
+    # Field geometry, from the football ruleset (US/MS/MHSAA). length_yards
+    # is the goal-line-to-goal-line coordinate span (100 NFHS / 110
+    # Canadian). The literal is the frozen fallback + golden anchor.
+    _FIELD_GEOMETRY_FALLBACK = {
+        "length_yards": 100,
+        "end_zone_depth_yards": 10,
+        "red_zone_yards": 20,
+    }
+    _field_geometry_cache: dict[str, int] | None = None
+
+    @classmethod
+    def _field_geometry(cls) -> dict[str, int]:
+        if cls._field_geometry_cache is None:
+            try:
+                ruleset = ruleset_service.resolve(
+                    country="US", region="MS", association="MHSAA", sport="football"
+                )
+                cls._field_geometry_cache = (
+                    ruleset_service.field_geometry(ruleset)
+                    or dict(cls._FIELD_GEOMETRY_FALLBACK)
+                )
+            except Exception:
+                cls._field_geometry_cache = dict(cls._FIELD_GEOMETRY_FALLBACK)
+        return cls._field_geometry_cache
+
+    @classmethod
+    def _field_length(cls) -> int:
+        return int(cls._field_geometry().get("length_yards", 100) or 100)
+
+    @classmethod
+    def spot_to_coord(cls, value: Any) -> int:
+        """Canonical field coordinate: 0=left goal line, length=right goal
+        line (length is the ruleset field length, 100 NFHS / 110 Canadian)."""
+        length = cls._field_length()
+        mid = length // 2
         text = str(value or "").strip().lower()
         if text in {"left goal", "left_goal", "home goal", "home_goal", "0"}:
             return 0
@@ -94,37 +126,39 @@ class RulesService:
             "right_goal",
             "visitor goal",
             "visitor_goal",
-            "100",
+            str(length),
         }:
-            return 100
-        if text == "50":
-            return 50
-        match = re.match(r"^(left|right|home|visitor)\s*(\d{1,2})$", text)
+            return length
+        if text == str(mid):
+            return mid
+        match = re.match(r"^(left|right|home|visitor)\s*(\d{1,3})$", text)
         if match:
             side = match.group(1)
-            yard = max(0, min(49, int(match.group(2))))
-            return yard if side in {"left", "home"} else 100 - yard
+            yard = max(0, min(mid - 1, int(match.group(2))))
+            return yard if side in {"left", "home"} else length - yard
         try:
-            return max(0, min(100, int(float(text))))
+            return max(0, min(length, int(float(text))))
         except (TypeError, ValueError):
-            return 50
+            return mid
 
-    @staticmethod
-    def coord_to_spot(coord: Any) -> str:
+    @classmethod
+    def coord_to_spot(cls, coord: Any) -> str:
+        length = cls._field_length()
+        mid = length // 2
         try:
-            normalized = max(0, min(100, int(coord)))
+            normalized = max(0, min(length, int(coord)))
         except (TypeError, ValueError):
-            normalized = 50
+            normalized = mid
         if normalized == 0:
             return "LEFT GOAL"
-        if normalized == 100:
+        if normalized == length:
             return "RIGHT GOAL"
-        if normalized == 50:
-            return "50"
+        if normalized == mid:
+            return str(mid)
         return (
             f"LEFT {normalized}"
-            if normalized < 50
-            else f"RIGHT {100 - normalized}"
+            if normalized < mid
+            else f"RIGHT {length - normalized}"
         )
 
     @staticmethod
@@ -324,8 +358,9 @@ class RulesService:
                 field: copy.deepcopy(state.get(field))
                 for field in self.SNAPSHOT_FIELDS
             }
+            length = self._field_length()
             start = self.spot_to_coord(
-                incoming.get("start_spot") or state.get("ball_spot") or 50
+                incoming.get("start_spot") or state.get("ball_spot") or (length // 2)
             )
             end_value = incoming.get("end_spot")
             end = self.spot_to_coord(
@@ -371,16 +406,16 @@ class RulesService:
                 gaining_direction = self.team_direction(state, turnover_team)
                 turnover_return_yards = max(0, (return_end - turnover_spot) * gaining_direction)
                 turnover_touchdown = (
-                    (gaining_direction == 1 and return_end == 100)
+                    (gaining_direction == 1 and return_end == length)
                     or (gaining_direction == -1 and return_end == 0)
                 )
                 yards = 0 if outcome == "interception" else (turnover_spot - start) * direction
                 end = return_end
-            touchdown = (not turnover) and ((direction == 1 and end == 100) or (
+            touchdown = (not turnover) and ((direction == 1 and end == length) or (
                 direction == -1 and end == 0
             ))
             safety = (direction == 1 and end == 0) or (
-                direction == -1 and end == 100
+                direction == -1 and end == length
             )
             first_down = False
             label = kind.title()
@@ -552,7 +587,14 @@ class RulesService:
                     state["possession"] = team
                 if touchback:
                     receiving_direction = self.team_direction(state, receiving)
-                    end = 20 if receiving_direction == 1 else 80
+                    # Touchback to the receiving team's own 20; mirrored to
+                    # (length - 20) when they drive the other way.
+                    touchback_yard = 20
+                    end = (
+                        touchback_yard
+                        if receiving_direction == 1
+                        else length - touchback_yard
+                    )
                 kick_distance = abs(landing - start)
                 return_direction = self.team_direction(state, receiving)
                 return_yards = max(0, (end - landing) * return_direction)
@@ -565,7 +607,7 @@ class RulesService:
                     and not muff_recovered_by_kicking_team
                     and numbers["returner"]
                     and (
-                        (return_direction == 1 and end == 100)
+                        (return_direction == 1 and end == length)
                         or (return_direction == -1 and end == 0)
                     )
                 )

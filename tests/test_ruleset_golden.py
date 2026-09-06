@@ -105,6 +105,27 @@ def test_field_geometry_helper_matches_the_0_to_100_scale() -> None:
     assert ruleset_service.no_fair_catch(_ms()) is False
 
 
+def test_service_field_geometry_caches_reproduce_the_0_to_100_scale() -> None:
+    # Round 26: canonical_state_service + rules_service resolve their field
+    # length / red-zone threshold from the ruleset instead of a bare 100/20
+    # literal. For every US ruleset this must round-trip identically to the
+    # old hardcoded 0-100 coordinate space.
+    from canonical_state_service import CanonicalStateFoundation
+    from rules_service import RulesService
+
+    geo = ruleset_service.field_geometry(_ms())
+    assert geo["length_yards"] == 100
+    assert CanonicalStateFoundation._field_geometry() == geo
+    assert RulesService._field_geometry() == geo
+
+    assert CanonicalStateFoundation._spot_to_coord("RIGHT 30") == 70
+    assert CanonicalStateFoundation._coord_to_spot(100) == "RIGHT GOAL"
+    assert CanonicalStateFoundation._coord_to_spot(50) == "50"
+    assert RulesService.spot_to_coord("right 30") == 70
+    assert RulesService.coord_to_spot(100) == "RIGHT GOAL"
+    assert RulesService.coord_to_spot(50) == "50"
+
+
 def test_scoring_values_helper_matches_the_current_point_deltas() -> None:
     assert ruleset_service.scoring_values(_ms()) == {
         "touchdown": 6,
