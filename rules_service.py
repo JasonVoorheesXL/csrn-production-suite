@@ -452,6 +452,8 @@ class RulesService:
             landing = end
             kick_distance = 0
             return_yards = 0
+            muffed_punt = False
+            muff_recovered_by_kicking_team = False
 
             if kind == "run":
                 kneel = bool(incoming.get("kneel"))
@@ -507,15 +509,39 @@ class RulesService:
                 touchback = bool(incoming.get("touchback"))
                 fair_catch = bool(incoming.get("fair_catch"))
                 blocked = bool(incoming.get("blocked"))
+                # A muffed punt is its own outcome, distinct from a generic
+                # fumble: the returning team bobbles the catch, and if the
+                # KICKING team recovers it, possession never actually
+                # transfers to the receiving team at all -- unlike a normal
+                # punt, whose possession flip a few lines above is
+                # unconditional. Recorded separately (turnover_type
+                # "muff_recovery") so it never reports as a plain fumble
+                # recovery, and so it isn't silently double-counted as a
+                # generic Fumble/Fumble-lost turnover the way it used to be
+                # (that generic pair was computed earlier for every play
+                # kind, punts included, and was never reset for this branch).
+                muffed_punt = bool(incoming.get("muffed_punt"))
+                muff_recovered_by_kicking_team = muffed_punt and bool(
+                    incoming.get("fumble_lost")
+                )
+                turnover = muff_recovered_by_kicking_team
+                turnover_type = "muff_recovery" if muff_recovered_by_kicking_team else ""
+                turnover_team = team if muff_recovered_by_kicking_team else ""
+                if muff_recovered_by_kicking_team:
+                    state["possession"] = team
                 if touchback:
                     receiving_direction = self.team_direction(state, receiving)
                     end = 20 if receiving_direction == 1 else 80
                 kick_distance = abs(landing - start)
                 return_direction = self.team_direction(state, receiving)
                 return_yards = max(0, (end - landing) * return_direction)
+                turnover_spot = end
+                return_end = end
+                turnover_return_yards = 0
                 touchdown = bool(
                     not touchback
                     and not fair_catch
+                    and not muff_recovered_by_kicking_team
                     and numbers["returner"]
                     and (
                         (return_direction == 1 and end == 100)
@@ -537,7 +563,19 @@ class RulesService:
                     f"{label} by #{numbers['kicker'] or '?'} "
                     f"landed at {self.coord_to_spot(landing)}"
                 )
-                if numbers["returner"] and not fair_catch and not touchback:
+                if muffed_punt:
+                    description += ", muffed by the receiving team"
+                    if muff_recovered_by_kicking_team:
+                        description += (
+                            f", recovered by the kicking team at "
+                            f"{self.coord_to_spot(end)}"
+                        )
+                    else:
+                        description += (
+                            f", recovered by the receiving team at "
+                            f"{self.coord_to_spot(end)}"
+                        )
+                elif numbers["returner"] and not fair_catch and not touchback:
                     returner = self._display(
                         numbers["returner"],
                         names["returner"],
@@ -801,8 +839,17 @@ class RulesService:
                     "turnover_spot": self.coord_to_spot(turnover_spot) if turnover else "",
                     "return_end_spot": self.coord_to_spot(return_end) if turnover else "",
                     "return_yards": turnover_return_yards if turnover else (return_yards if kind in {"kickoff", "punt"} else 0),
-                    "turnover_player_number": numbers["returner"] if turnover else "",
-                    "turnover_player_name": names["returner"] if turnover else "",
+                    "turnover_player_number": (
+                        ""
+                        if muff_recovered_by_kicking_team
+                        else numbers["returner"] if turnover else ""
+                    ),
+                    "turnover_player_name": (
+                        ""
+                        if muff_recovered_by_kicking_team
+                        else names["returner"] if turnover else ""
+                    ),
+                    "muffed_punt": muffed_punt,
                     "touchdown": touchdown,
                     "safety": safety,
                     "player_name": (
@@ -865,9 +912,18 @@ class RulesService:
                 "turnover_spot": self.coord_to_spot(turnover_spot) if turnover else "",
                 "return_end_spot": self.coord_to_spot(return_end) if turnover else "",
                 "return_yards": turnover_return_yards if turnover else (return_yards if kind in {"kickoff", "punt"} else 0),
-                "turnover_player_number": numbers["returner"] if turnover else "",
-                "turnover_player_name": names["returner"] if turnover else "",
+                "turnover_player_number": (
+                    ""
+                    if muff_recovered_by_kicking_team
+                    else numbers["returner"] if turnover else ""
+                ),
+                "turnover_player_name": (
+                    ""
+                    if muff_recovered_by_kicking_team
+                    else names["returner"] if turnover else ""
+                ),
                 "safety": safety,
+                "muffed_punt": muffed_punt,
                 "notes": str(incoming.get("notes", "")),
                 "created_by": "statistician",
                 "created_at": created_at,
