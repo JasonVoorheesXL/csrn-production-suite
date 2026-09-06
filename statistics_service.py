@@ -194,6 +194,30 @@ class StatisticsService:
         }
 
     @staticmethod
+    def _recorded_during_special_phase(event: Mapping[str, Any] | None) -> bool:
+        """True when `event`'s own recorded before-state shows a special
+        game phase (pending_try / kickoff / free_kick) already active before
+        this event happened.
+
+        A legitimate new scrimmage snap can never occur in that window --
+        both RulesService.play() and EventService.trigger() refuse to record
+        one while a try/kickoff is pending. An event or its linked play that
+        shows one anyway is bad or legacy data (2026-09 bug: a phantom
+        "touchdown" run recorded immediately after a real touchdown, while
+        the try was still pending, inflated a team's touchdown count by one
+        even though the score was never actually incremented for it -- see
+        CanonicalStateFoundation._apply_scrimmage_play for the root cause).
+        Its scoring/touchdown attribution must not be trusted here, whether
+        or not the underlying play record has since been corrected.
+        """
+        if not isinstance(event, Mapping):
+            return False
+        before = event.get("before")
+        if not isinstance(before, Mapping):
+            return False
+        return bool(str(before.get("special_game_phase", "") or "").strip())
+
+    @staticmethod
     def _player_key(team: str, name: Any, number: Any) -> str:
         return f"{team}|{str(number or '').strip()}|{str(name or '').strip().casefold()}"
 
@@ -240,7 +264,10 @@ class StatisticsService:
             delta = self._safe_int(event.get("score_delta", 0))
             conversion_outcome = str(event.get("conversion_outcome") or automation.get("conversion_outcome") or "").lower()
             kick_outcome = str(event.get("kick_outcome") or automation.get("kick_outcome") or "").lower()
-            touchdown = bool(code == "TD" or (code == "TURNOVER" and automation.get("return_td")) or automation.get("touchdown"))
+            touchdown = bool(
+                (code == "TD" or (code == "TURNOVER" and automation.get("return_td")) or automation.get("touchdown"))
+                and not self._recorded_during_special_phase(event)
+            )
 
             if touchdown:
                 teams[team]["touchdowns"] += 1
@@ -343,6 +370,11 @@ class StatisticsService:
             yards = self._safe_int(play.get("yards", 0))
             linked = event_by_id.get(str(play.get("event_id", "")), {})
             linked_automation = linked.get("automation") if isinstance(linked.get("automation"), dict) else {}
+            # See _recorded_during_special_phase: a play's own "touchdown"
+            # field can be stale/erroneous for a snap that never should have
+            # been recorded in the first place. Every stat-attribution site
+            # below reads this instead of the raw play.get("touchdown").
+            play_touchdown = bool(play.get("touchdown")) and not self._recorded_during_special_phase(linked)
 
             if kind in {"run", "pass"} and offense in teams:
                 teams[offense]["total_plays"] += 1
@@ -357,7 +389,7 @@ class StatisticsService:
                     if ball_carrier is not None:
                         ball_carrier["rushing_attempts"] += 1
                         ball_carrier["rushing_yards"] += yards
-                        if play.get("touchdown"):
+                        if play_touchdown:
                             ball_carrier["rushing_touchdowns"] += 1
                 else:
                     outcome = str(play.get("pass_outcome") or linked_automation.get("pass_outcome") or "complete").lower()
@@ -393,9 +425,9 @@ class StatisticsService:
                         if receiver is not None:
                             receiver["receptions"] += 1
                             receiver["receiving_yards"] += yards
-                            if play.get("touchdown"):
+                            if play_touchdown:
                                 receiver["receiving_touchdowns"] += 1
-                        if play.get("touchdown") and passer is not None:
+                        if play_touchdown and passer is not None:
                             passer["passing_touchdowns"] += 1
                     elif outcome == "interception":
                         teams[offense]["interceptions"] += 1
@@ -413,7 +445,7 @@ class StatisticsService:
                     ball_carrier["fumbles_lost"] += 1
 
                 play_id = str(play.get("play_id", "") or "")
-                if play.get("touchdown") and play_id not in touchdown_play_ids:
+                if play_touchdown and play_id not in touchdown_play_ids:
                     teams[offense]["touchdowns"] += 1
                     td_player = receiver if kind == "pass" else ball_carrier
                     if td_player is not None:
@@ -439,7 +471,7 @@ class StatisticsService:
                     if returner is not None:
                         returner[key] += 1
                         returner[yards_key] += return_yards
-                        if play.get("touchdown"):
+                        if play_touchdown:
                             returner["return_touchdowns"] += 1
                             if str(play.get("play_id", "")) not in touchdown_play_ids:
                                 returner["touchdowns"] += 1

@@ -316,6 +316,31 @@ class CanonicalStateFoundation:
         kind = str(play.get("play_type", "") or "").lower()
         if kind not in {"run", "pass"}:
             return
+        if str(state.get("special_game_phase", "") or ""):
+            # A live run/pass snap can never legitimately occur while a
+            # special phase (pending try / kickoff / free kick) is active --
+            # both RulesService.play() and EventService.trigger() reject a
+            # new scrimmage submission in that window. If a stored play still
+            # shows one anyway (bad legacy data, an offline/imported game, a
+            # bypassed validation path, etc.), the ball is parked dead at a
+            # special-phase spot -- frequently sitting exactly ON a goal line
+            # after a score. Replaying that parked spot as this play's start
+            # coordinate (the normal case, a few lines below) trivially
+            # "crosses" the goal line for any nonzero yardage and manufactures
+            # a phantom touchdown/safety and score bump purely from where the
+            # dead ball happened to be sitting -- not from anything that
+            # actually happened on the field. Treat the play as void for
+            # canonical-state purposes instead: no score, no ball movement, no
+            # down/distance change, and the touchdown/safety flags a client
+            # may have submitted are cleared so downstream stats counting
+            # (StatisticsService trusts play["touchdown"] verbatim) can't
+            # double-count it either. See tests/test_canonical_state_service.py
+            # for the incident this pins (2026-09, Caledonia vs. Amory).
+            play["touchdown"] = False
+            play["safety"] = False
+            play["turnover"] = False
+            play["invalid_during_special_phase"] = True
+            return
         direction = -1 if str(state.get(f"{team}_direction", "right")) == "left" else 1
         start = cls._spot_to_coord(state.get("ball_spot") or play.get("ball_spot") or 50)
         try:

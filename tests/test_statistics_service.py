@@ -1,3 +1,29 @@
+"""Coverage for StatisticsService.report().
+
+Two layers live in this file:
+
+* The broad unit coverage (team/player accumulation, scoring totals,
+  turnover tracking, play-register normalisation, sort order) that has
+  guarded report() since it was written -- the ``base_state`` / ``service``
+  / ``report`` helpers below.
+* A regression suite for the 2026-09 Caledonia vs. Amory incident, in
+  which Caledonia's report showed 5 touchdowns for a 27-7 final where only
+  4 were legitimate. The 5th was a phantom scrimmage play ("Touchdown Run")
+  recorded while the game was still in "pending_try" from a real touchdown
+  the play before -- the ball was parked dead on the goal line, so the
+  client-submitted ``automation.touchdown`` flag (and, before the
+  canonical_state_service.py fix, the derived ``play["touchdown"]`` flag
+  too) both said touchdown even though the score was never actually
+  incremented for it. See tests/test_canonical_state_service.py for the
+  canonical-engine half of this same incident.
+
+report() trusts events/plays as given -- it does not call rebuild() -- so
+the incident tests pin the report-layer defence
+(``_recorded_during_special_phase``) independently: report() must ignore a
+touchdown flag on any event/play whose own recorded ``before`` snapshot
+shows a special phase already active, regardless of whether the canonical
+layer has since been fixed or rebuilt.
+"""
 from __future__ import annotations
 
 from typing import Any
@@ -264,3 +290,139 @@ def test_touchdown_play_without_event_still_counts_team_and_player() -> None:
     assert result["players"][0]["touchdowns"] == 1
 
 
+# --------------------------------------------------------------------------
+# 2026-09 Caledonia vs. Amory phantom-touchdown incident (report-layer half)
+#
+# These use StatisticsService().report() directly rather than the
+# module-level report() helper above -- both idioms are fine, they exercise
+# the same entry point. See the module docstring and
+# tests/test_canonical_state_service.py for the full incident write-up.
+# --------------------------------------------------------------------------
+
+
+def _incident_base_state(**overrides) -> dict:
+    state = {
+        "home_team": "Caledonia",
+        "visitor_team": "Amory",
+        "home_score": 14,
+        "visitor_score": 7,
+        "broadcast_id": "",
+    }
+    state.update(overrides)
+    return state
+
+
+def caledonia_incident_state() -> dict:
+    # Trimmed reconstruction of the real play 49 (legitimate TD) -> 50
+    # (phantom TD, recorded during pending_try) -> 51 (XP) sequence.
+    events = [
+        {
+            "id": "evt-49",
+            "play_id": "play-49",
+            "play_number": 49,
+            "event": "PLAY",
+            "team": "home",
+            "before": {"special_game_phase": ""},
+            "automation": {"touchdown": False, "play_type": "run"},
+        },
+        {
+            "id": "evt-50",
+            "play_id": "play-50",
+            "play_number": 50,
+            "event": "PLAY",
+            "team": "home",
+            # The ball was already parked on the goal line from play 49's
+            # real touchdown -- this is the smoking gun a legitimate new
+            # scrimmage snap could never show.
+            "before": {"special_game_phase": "pending_try"},
+            "automation": {"touchdown": True, "play_type": "run"},
+        },
+        {
+            "id": "evt-51",
+            "play_id": "play-51",
+            "play_number": 51,
+            "event": "XP",
+            "team": "home",
+            "before": {"special_game_phase": "pending_try"},
+            "score_delta": 1,
+            "conversion_outcome": "good",
+            "automation": {},
+        },
+    ]
+    plays = [
+        {
+            "play_id": "play-49",
+            "event_id": "evt-49",
+            "play_type": "run",
+            "yards": 5,
+            "offense": "home",
+            "defense": "visitor",
+            "player_name": "Tyler Long",
+            "player_number": "10",
+            "touchdown": True,
+        },
+        {
+            "play_id": "play-50",
+            "event_id": "evt-50",
+            "play_type": "run",
+            "yards": 12,
+            "offense": "home",
+            "defense": "visitor",
+            "player_name": "Caleb Lang",
+            "player_number": "1",
+            # Even if this stray flag were never cleaned up by a rebuild,
+            # the report layer must not trust it either.
+            "touchdown": True,
+        },
+    ]
+    return _incident_base_state(events=events, plays=plays)
+
+
+def test_report_does_not_count_a_touchdown_recorded_during_a_pending_try() -> None:
+    service = StatisticsService()
+    result = service.report(caledonia_incident_state())
+    home = result.data["statistics"]["teams"]["home"]
+    assert home["touchdowns"] == 1
+
+
+def test_report_does_not_credit_the_phantom_players_touchdown() -> None:
+    service = StatisticsService()
+    result = service.report(caledonia_incident_state())
+    players_by_name = {p["name"]: p for p in result.data["statistics"]["players"]}
+    assert players_by_name["Tyler Long"]["rushing_touchdowns"] == 1
+    assert players_by_name["Tyler Long"]["touchdowns"] == 1
+    assert players_by_name["Caleb Lang"]["rushing_touchdowns"] == 0
+    assert players_by_name["Caleb Lang"]["touchdowns"] == 0
+
+
+def test_report_still_counts_a_legitimate_touchdown_outside_any_special_phase() -> None:
+    # Sanity check: a normal touchdown (no special phase pending beforehand)
+    # must still be counted -- this fix must not suppress real scoring.
+    events = [
+        {
+            "id": "evt-1",
+            "play_id": "play-1",
+            "event": "PLAY",
+            "team": "home",
+            "before": {"special_game_phase": ""},
+            "automation": {"touchdown": True, "play_type": "run"},
+        },
+    ]
+    plays = [
+        {
+            "play_id": "play-1",
+            "event_id": "evt-1",
+            "play_type": "run",
+            "yards": 5,
+            "offense": "home",
+            "defense": "visitor",
+            "player_name": "Tyler Long",
+            "player_number": "10",
+            "touchdown": True,
+        },
+    ]
+    service = StatisticsService()
+    result = service.report(_incident_base_state(events=events, plays=plays))
+    assert result.data["statistics"]["teams"]["home"]["touchdowns"] == 1
+    players_by_name = {p["name"]: p for p in result.data["statistics"]["players"]}
+    assert players_by_name["Tyler Long"]["rushing_touchdowns"] == 1
