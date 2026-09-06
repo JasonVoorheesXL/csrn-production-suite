@@ -230,10 +230,15 @@ def downs_sequence(ruleset: Mapping[str, Any]) -> list[str]:
     return list(_DOWN_ORDINALS[:count])
 
 
-def next_down(down: str, sequence: list[str]) -> str:
-    """The down after *down* within *sequence*, wrapping the last entry back
-    to the first (a fresh series). An unrecognised *down* also resets to the
-    first entry -- matches the ``"4th" -> "1st"`` cycle the consumers use.
+def next_down(down: str, sequence: list[str], *, wrap: bool = True) -> str:
+    """The down after *down* within *sequence*. An unrecognised *down* resets
+    to the first entry.
+
+    ``wrap=True`` (default) sends the last down back to the first -- the
+    ``"4th" -> "1st"`` cycle canonical_state_service uses before it applies
+    turnover-on-downs. ``wrap=False`` keeps the last down where it is -- the
+    clamp rules_service / penalty_service apply so a loss-of-down on the
+    final down never reads as a fresh series.
     """
     if not sequence:
         return down
@@ -241,7 +246,9 @@ def next_down(down: str, sequence: list[str]) -> str:
         idx = sequence.index(down)
     except ValueError:
         return sequence[0]
-    return sequence[(idx + 1) % len(sequence)]
+    if idx + 1 < len(sequence):
+        return sequence[idx + 1]
+    return sequence[0] if wrap else sequence[-1]
 
 
 def is_terminal_down(down: str, sequence: list[str]) -> bool:

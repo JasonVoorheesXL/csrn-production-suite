@@ -8,6 +8,7 @@ from time import perf_counter
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
+import ruleset_service
 from canonical_state_service import CanonicalStateFoundation
 from eligibility_service import EligibilityService
 from runtime_diagnostics_service import get_runtime_diagnostics
@@ -136,13 +137,33 @@ class RulesService:
     def opposite(team: str) -> str:
         return "visitor" if team == "home" else "home"
 
-    @staticmethod
-    def advance_down(down: Any) -> str:
-        order = ["1st", "2nd", "3rd", "4th"]
-        try:
-            return order[min(3, order.index(str(down)) + 1)]
-        except ValueError:
-            return "1st"
+    # The down cycle, sourced from the football ruleset (US/MS/MHSAA). The
+    # literal is the frozen fallback + golden anchor; 3 downs is Canadian.
+    _DOWNS_SEQUENCE_FALLBACK = ["1st", "2nd", "3rd", "4th"]
+    _downs_sequence_cache: list[str] | None = None
+
+    @classmethod
+    def _downs_sequence(cls) -> list[str]:
+        if cls._downs_sequence_cache is None:
+            try:
+                ruleset = ruleset_service.resolve(
+                    country="US", region="MS", association="MHSAA", sport="football"
+                )
+                cls._downs_sequence_cache = (
+                    ruleset_service.downs_sequence(ruleset)
+                    or list(cls._DOWNS_SEQUENCE_FALLBACK)
+                )
+            except Exception:
+                cls._downs_sequence_cache = list(cls._DOWNS_SEQUENCE_FALLBACK)
+        return cls._downs_sequence_cache
+
+    @classmethod
+    def advance_down(cls, down: Any) -> str:
+        # wrap=False keeps the last down where it is (no phantom fresh series
+        # on a failed final down); the caller applies turnover-on-downs.
+        return ruleset_service.next_down(
+            str(down), cls._downs_sequence(), wrap=False
+        )
 
     @staticmethod
     def _bounded_int(
@@ -697,7 +718,9 @@ class RulesService:
                     else:
                         state["down"] = self.advance_down(old_down)
                         state["distance"] = str(max(1, distance - yards))
-                        if old_down == "4th":
+                        if ruleset_service.is_terminal_down(
+                            old_down, self._downs_sequence()
+                        ):
                             state["possession"] = self.opposite(team)
                             state["down"] = "1st"
                             state["distance"] = "10"

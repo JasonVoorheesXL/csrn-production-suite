@@ -245,6 +245,27 @@ class CanonicalStateFoundation:
             cls._field_yards_cache = resolved
         return cls._field_yards_cache
 
+    # The down cycle, sourced from the same football ruleset. The literal is
+    # the frozen fallback + golden anchor; 3 downs is Canadian (ca-base).
+    _DOWNS_SEQUENCE_FALLBACK = ["1st", "2nd", "3rd", "4th"]
+    _downs_sequence_cache: list[str] | None = None
+
+    @classmethod
+    def _downs_sequence(cls) -> list[str]:
+        if cls._downs_sequence_cache is None:
+            resolved = list(cls._DOWNS_SEQUENCE_FALLBACK)
+            try:
+                import ruleset_service
+
+                ruleset = ruleset_service.resolve(
+                    country="US", region="MS", association="MHSAA", sport="football"
+                )
+                resolved = ruleset_service.downs_sequence(ruleset) or resolved
+            except Exception:
+                resolved = list(cls._DOWNS_SEQUENCE_FALLBACK)
+            cls._downs_sequence_cache = resolved
+        return cls._downs_sequence_cache
+
     @classmethod
     def _team_own_yard_spot(cls, state: Mapping[str, Any], team: str, yard: int) -> str:
         direction = str(state.get(f"{team}_direction", "right" if team == "home" else "left") or "right").lower()
@@ -409,10 +430,12 @@ class CanonicalStateFoundation:
                 state["down"] = "1st"
                 state["distance"] = "10"
             else:
-                order = {"1st": "2nd", "2nd": "3rd", "3rd": "4th", "4th": "1st"}
-                state["down"] = order.get(old_down, "1st")
+                import ruleset_service
+
+                downs = cls._downs_sequence()
+                state["down"] = ruleset_service.next_down(old_down, downs)
                 state["distance"] = str(max(1, distance - yards))
-                if old_down == "4th":
+                if ruleset_service.is_terminal_down(old_down, downs):
                     state["possession"] = cls.opposite(team)
                     state["down"] = "1st"
                     state["distance"] = "10"

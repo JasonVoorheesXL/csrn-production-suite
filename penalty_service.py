@@ -79,14 +79,37 @@ class PenaltyService:
         except (TypeError, ValueError):
             return fallback
 
-    @staticmethod
-    def _advance_down(value: Any) -> str:
-        order = ["1st", "2nd", "3rd", "4th"]
-        text = str(value or "1st")
-        try:
-            return order[min(3, order.index(text) + 1)]
-        except ValueError:
-            return "1st"
+    # The down cycle, from the same football ruleset as _penalty_rules. The
+    # literal is the frozen fallback + golden anchor; 3 downs is Canadian.
+    _DOWNS_SEQUENCE_FALLBACK = ["1st", "2nd", "3rd", "4th"]
+    _downs_sequence_cache: list[str] | None = None
+
+    @classmethod
+    def _downs_sequence(cls) -> list[str]:
+        if cls._downs_sequence_cache is None:
+            try:
+                import ruleset_service
+
+                ruleset = ruleset_service.resolve(
+                    country="US", region="MS", association="MHSAA", sport="football"
+                )
+                cls._downs_sequence_cache = (
+                    ruleset_service.downs_sequence(ruleset)
+                    or list(cls._DOWNS_SEQUENCE_FALLBACK)
+                )
+            except Exception:
+                cls._downs_sequence_cache = list(cls._DOWNS_SEQUENCE_FALLBACK)
+        return cls._downs_sequence_cache
+
+    @classmethod
+    def _advance_down(cls, value: Any) -> str:
+        # wrap=False: a loss-of-down penalty on the final down leaves it on
+        # the final down (it never manufactures a fresh series).
+        import ruleset_service
+
+        return ruleset_service.next_down(
+            str(value or "1st"), cls._downs_sequence(), wrap=False
+        )
 
     @classmethod
     def enforce(
