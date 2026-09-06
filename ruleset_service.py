@@ -291,6 +291,20 @@ def no_fair_catch(ruleset: Mapping[str, Any]) -> bool:
     return bool((ruleset.get("field") or {}).get("no_fair_catch", False))
 
 
+def no_yards_halo(ruleset: Mapping[str, Any]) -> int:
+    """The restraining-zone ("no yards") radius, in yards, the kicking team
+    must give a punt returner. 0 means the rule does not apply -- NFHS has
+    no such rule, so this is 0 for every current US ruleset. Canadian
+    rulesets set it (commonly 5 for a bouncing ball); the exact amateur /
+    CJFL value is carried in the ruleset's own _source_notes pending a
+    rulebook check.
+    """
+    try:
+        return max(0, int((ruleset.get("field") or {}).get("no_yards_halo_yards", 0) or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
 _BASE_PLAY_TYPES: frozenset[str] = frozenset({"run", "pass", "kickoff", "punt"})
 
 

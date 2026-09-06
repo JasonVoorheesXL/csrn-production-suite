@@ -126,6 +126,7 @@ class RulesService:
     }
     _scoring_cache: dict[str, int] | None = None
     _valid_play_types_cache: set[str] | None = None
+    _no_fair_catch_cache: bool | None = None
 
     @classmethod
     def _scoring(cls) -> dict[str, int]:
@@ -156,6 +157,18 @@ class RulesService:
             except Exception:
                 cls._valid_play_types_cache = set(cls.VALID_PLAY_TYPES)
         return cls._valid_play_types_cache
+
+    @classmethod
+    def _no_fair_catch(cls) -> bool:
+        if cls._no_fair_catch_cache is None:
+            try:
+                ruleset = ruleset_service.resolve(
+                    country="US", region="MS", association="MHSAA", sport="football"
+                )
+                cls._no_fair_catch_cache = ruleset_service.no_fair_catch(ruleset)
+            except Exception:
+                cls._no_fair_catch_cache = False
+        return cls._no_fair_catch_cache
 
     @classmethod
     def spot_to_coord(cls, value: Any) -> int:
@@ -610,7 +623,9 @@ class RulesService:
                     landing_value if landing_value not in (None, "") else end
                 )
                 touchback = bool(incoming.get("touchback"))
-                fair_catch = bool(incoming.get("fair_catch"))
+                # A ruleset with no fair catch (Canadian) ignores the signal
+                # outright -- the returner must run it or concede a single.
+                fair_catch = bool(incoming.get("fair_catch")) and not self._no_fair_catch()
                 blocked = bool(incoming.get("blocked"))
                 # A muffed punt is its own outcome, distinct from a generic
                 # fumble: the returning team bobbles the catch, and if the

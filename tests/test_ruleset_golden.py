@@ -150,6 +150,22 @@ def test_service_scoring_caches_match_the_ruleset_point_values() -> None:
     assert RulesService._scoring() == scoring
 
 
+def test_fair_catch_kept_and_no_yards_absent_for_us_rulesets() -> None:
+    # Round 26 5/7 dormancy: NFHS keeps the fair catch, has no restraining
+    # zone, and its penalty catalogue has no "No Yards" foul.
+    from rules_service import RulesService
+
+    assert _ms()["field"]["no_fair_catch"] is False
+    assert _ms()["field"]["no_yards_halo_yards"] == 0
+    assert ruleset_service.no_fair_catch(_ms()) is False
+    assert ruleset_service.no_yards_halo(_ms()) == 0
+    assert RulesService._no_fair_catch() is False
+    assert not any(name == "No Yards" for _u, name in ruleset_service.penalty_rules(_ms()))
+    base = ruleset_service.load_ruleset("football/us-nfhs")
+    assert base["field"]["no_fair_catch"] is False
+    assert base["field"]["no_yards_halo_yards"] == 0
+
+
 def test_single_never_produced_and_field_goal_play_stays_out_for_us_rulesets() -> None:
     # Round 26 4/7 dormancy proof: no NFHS/MHSAA ruleset enables the
     # field_goal play type, and RulesService rejects it exactly as before.
