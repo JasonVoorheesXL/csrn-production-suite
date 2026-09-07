@@ -1,12 +1,56 @@
 # Phase C — per-sport dispatch for the production theme runtime
 
-**Plan only. No theme code touched in this pass.** Audit of every shipped
-visual theme for sport-specific visual elements, and a design for a real
-per-sport-family dispatch mechanism to replace today's binary
-`sport !== "football"` gate.
+Audit of every shipped visual theme for sport-specific visual elements,
+and a per-sport-family dispatch mechanism replacing the binary
+`sport !== "football"` gate. **Built on branch
+`phase-c-theme-sport-dispatch-20260907`, off production tip `64ed45a`.**
+Scope: `{basketball, baseball, softball}` (soccer explicitly out).
 
-Read against production tip `64ed45a` (the Round 27 worktree). Where
-Round 26 (`5ba5948`, unmerged) already touched a theme file, it is noted.
+## Build outcome (2026-09-07)
+
+| # | Commit | Effect |
+| --- | --- | --- |
+| 1 | mergeRuntimeState family dispatch | `base.game` built per family; football keys stripped for non-football; ships dark (no non-football canonical state yet). |
+| 2 | applyBoardOverrides dispatch + basketball | football patcher unchanged; basketball fast-path clock/period/shot-clock per theme. |
+| 3 | diamond patcher + label sweep | baseball/softball inning/count/outs/bases per theme; possession indicators gated to football/basketball; Heritage QUARTER/DOWN football-only. |
+| 4 | **commissioned** Collegiate Tech diamond | CSS/SVG diamond field graphic in the `.bl-college-field` idiom, runtime-injected. |
+| 5 | **commissioned** Heritage line-score box | `.hp-current-line` R/H/E + at-bat/pitcher name kept live in the press typeface. |
+| 6 | docs + clash-art assessment | this section + `ADDING_A_SPORT_TO_A_FROZEN_THEME.md`. |
+
+**Every change is in `csrn-production-theme-runtime.js/.css` — neither is
+under a SHA-256 pin. No frozen-renderer fingerprint changed;
+`test_gate12/13/14/78/116/126/138/142` are untouched.** Football live
+rendering is byte-identical (the football branch of every dispatch is the
+prior code verbatim; the non-football branches are unreachable without a
+non-football game engine). Full suite through commit 5: 2560 passed, 2
+failed (the pre-existing `test_state_mirror_throttle` env failures).
+
+Manual verification lab: `static/csrn-phasec-dispatch-lab.html`
+(headless-dumpable) renders real engine boards for baseball/basketball and
+drives the runtime patchers.
+
+### Clash-art finish assessment (a real answer, not "open")
+
+Rendered and inspected the committed per-sport art for each theme:
+
+| Theme | Per-sport clash art | Verdict |
+| --- | --- | --- |
+| Friday Night Stadium | `clash/{basketball,baseball,softball}-athletes-keyed.png` (~0.6-0.9 MB, chroma-keyed for team recolour, football render style) + `{…}-background.png` (~2-2.5 MB) | **Finished / production-ready.** |
+| 8-Bit Gameday | `athletes/{basketball,baseball,softball}-athletes.png` (~0.55-0.8 MB, 16-bit pixel art, keyed jerseys) + `environments/{basketball-gym,baseball-ballpark,softball-park}.png` | **Finished / production-ready.** |
+| Digital Neon (hidden) | `neon-r2/{basketball-r41,baseball-r43,softball-r42}-*` full layered cutout stacks + versioned `*-template-driver-contract.json` | **Finished / production-ready** — matches the football neon layer standard. |
+| Heritage Press | `heritage/press-{,softball-}{pitcher,batter}-1920s.png` — baseball figures fully halftone-textured (~65-69 KB); **softball figures are lighter line-art (~12-14 KB)**, same 1920s engraving pose/idiom, less newsprint texture | **Finished, on-style** — softball pair is flatter than the baseball pair; a texture pass would match them, but it is not a placeholder. |
+| Collegiate Tech / Modern Network | no clash-art layer | N/A |
+
+Bottom line: **nothing here is a first-pass placeholder.** The only art
+note is the Heritage softball figures being lighter than the baseball
+ones.
+
+---
+
+## Original plan (kept for reference)
+
+Read against production tip `64ed45a`. Where Round 26 (`5ba5948`,
+unmerged) already touched a theme file, it is noted.
 
 ---
 
