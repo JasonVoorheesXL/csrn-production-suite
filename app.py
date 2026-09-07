@@ -1630,9 +1630,45 @@ def asset_file_hash(path: Path) -> str:
     return AssetService.file_hash(path)
 
 
+def _install_default_sport_family() -> str:
+    """The sport family a legacy record with no sport is backfilled to --
+    the install's configured / only sport, "football" if unset."""
+    import sport_families
+
+    return (
+        sport_families.base_family(_default_onboarding_sport())
+        or "football"
+    )
+
+
+def _normalize_sponsors(items: list[dict[str, Any]]) -> bool:
+    """Round 27 migration: stamp a `sport` family on legacy sponsor records.
+
+    Only records with NO `sport` key are touched -- those pre-date the
+    field. They are backfilled with the install's default sport so nothing
+    disappears from a sport-scoped view after the upgrade. A record whose
+    `sport` is explicitly "" (written by clean_record) is left alone: ""
+    means "every context". Idempotent.
+
+    Note: on a multi-sport install with untagged legacy sponsors this tags
+    them all with the one default family; the operator re-tags the odd
+    ones. That matches the "default to the install's current/only sport"
+    intent.
+    """
+
+    default_sport = _install_default_sport_family()
+    changed = False
+    for sponsor in items:
+        if isinstance(sponsor, dict) and "sport" not in sponsor:
+            sponsor["sport"] = default_sport
+            changed = True
+    return changed
+
+
 SPONSOR_REPOSITORY = SponsorRepository(
     CORE_PERSISTENCE,
     SPONSORS_FILE,
+    normalizer=_normalize_sponsors,
 )
 
 
