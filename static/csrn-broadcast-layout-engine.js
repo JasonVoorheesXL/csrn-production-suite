@@ -803,6 +803,10 @@
     const lengthYards = Number(field.lengthYards ?? field.length_yards) || 100;
     const ezDepthYards = Number(field.endZoneDepthYards ?? field.end_zone_depth_yards) || 10;
     const ezPct = (ezDepthYards / lengthYards) * 50;
+    // 5-yard-line count / per-yard hashmark count -- every playing-field
+    // marking is spaced from these so they line up (100 -> 20 / 100).
+    const ylCount = Math.max(2, Math.round(lengthYards / 5));
+    const hashCount = Math.max(2, Math.round(lengthYards));
     const yardNumberLabels = lengthYards >= 110
       ? ["10","20","30","40","50","C","50","40","30","20","10"]
       : ["10","20","30","40","50","40","30","20","10"];
@@ -811,7 +815,7 @@
     const possessionLogo = possessionTeam.logo
       ? `<img src="${esc(possessionTeam.logo)}" alt="">`
       : `<span>${esc(collegiateInitials(possessionTeam))}</span>`;
-    return `<section class="bl-college-field" data-module="game.field" data-direction="${esc(direction)}" data-possession="${esc(possession)}" data-has-drive-start="${driveStart !== "-" ? "true" : "false"}" data-has-first-down="${hasFirstDown ? "true" : "false"}" data-field-visible="${visible ? "true" : "false"}" style="--ball-x:${ballPct}%;--drive-x:${drivePct}%;--first-x:${firstPct}%;--csrn-ez:${ezPct}%;--csrn-yardnum-count:${yardNumberLabels.length}">
+    return `<section class="bl-college-field" data-module="game.field" data-direction="${esc(direction)}" data-possession="${esc(possession)}" data-has-drive-start="${driveStart !== "-" ? "true" : "false"}" data-has-first-down="${hasFirstDown ? "true" : "false"}" data-field-visible="${visible ? "true" : "false"}" style="--ball-x:${ballPct}%;--drive-x:${drivePct}%;--first-x:${firstPct}%;--csrn-ez:${ezPct}%;--csrn-yardnum-count:${yardNumberLabels.length};--csrn-yl-count:${ylCount};--csrn-hash-count:${hashCount}">
       <div class="bl-college-field-grid" aria-hidden="true">
         <div class="bl-college-endzone bl-left"><span></span></div>
         <div class="bl-college-endzone bl-right"><span></span></div>

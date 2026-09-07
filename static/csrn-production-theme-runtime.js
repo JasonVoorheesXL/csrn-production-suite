@@ -1153,6 +1153,11 @@ function applyFieldGeometry(root, lengthYards, endZoneDepthYards) {
   const ez = Number(endZoneDepthYards) > 0 ? Number(endZoneDepthYards) : 10;
   root.style.setProperty("--csrn-ez", `${(ez / length) * 50}%`);
   root.style.setProperty("--csrn-yardnum-count", length >= 110 ? "11" : "9");
+  // 5-yard-line count and per-yard hashmark count. Every playing-field
+  // marking (5-yd lines, 10-yd lines, hashmarks, numbers) is spaced from
+  // these so they line up. length 100 -> 20 / 100 (today's values).
+  root.style.setProperty("--csrn-yl-count", String(Math.max(2, Math.round(length / 5))));
+  root.style.setProperty("--csrn-hash-count", String(Math.max(2, Math.round(length))));
 }
 
 function productionFieldDirection(source, fieldSource) {
