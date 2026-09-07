@@ -116,8 +116,9 @@ content in each slot:
   inning marked, batting side indicated) occupying the main width, with
   the **base diamond pinned to the right-hand side** showing runners on.
   The R9 prototype (`ensureCollegiateBaseballBottomBar` /
-  `.bl-college-line-score` + `.bl-college-bar-diamond`) is the visual
-  reference for this slot.
+  `.bl-college-line-score` + `.bl-college-bar-diamond`) fixes the *layout*
+  of this slot only — its finish is deliberately below bar (see "the
+  visual bar" below).
 
 **Implementation.** Route `sport === "baseball" | "softball"` in the frozen
 engine's `collegiate()` dispatcher through the `collegiateFootballScorebug`
@@ -128,6 +129,39 @@ slot swaps its field bg by sport; the control-bank slot renders the line
 score + diamond instead of `collegiateField()`. Reuse `collegiateTeamPanel`
 / `collegiateStage` verbatim; promote the `.bl-college-diamond` SVG (R4)
 into the engine or keep injecting it into the now-present bank.
+
+**"Same class as football" — the visual bar (do NOT stop at "add a
+background image").** T1 is not done until every one of these carries over.
+The R9 prototype is a *layout* reference only; its flat green box and neutral
+table are explicitly below bar.
+
+1. **Field art — atmosphere + texture depth.** The baseball / softball
+   field background gets the same treatment as `.bl-college-field`, not a
+   flat fill: directional lighting / stadium glow, grass-vs-dirt texture
+   and depth (mown outfield, infield dirt, foul lines, warning track), and
+   the mowing-stripe / glow polish already accepted on the R4/R5 diamond
+   widget. It should read as a photographed field under lights, matching
+   `.bl-college-field-grid` and `.bl-college-stage-field`'s footballs.
+2. **Team-colour carry-through (`color-mix()`).** Football tints its end
+   zones, panels and markers with each team's colour
+   (`--visitor-primary` / `--home-primary` via `color-mix(in srgb, … %, …)`).
+   Every baseball surface T1 produces — line-score rows / team cells, the
+   diamond (bases, baseline glow, runner markers), the bottom-bar frame,
+   the scoreboard chips — takes the same per-team tint. **No neutral
+   grey/green boxes** (R9's `.bl-cls-table` and `.bl-college-baseball-bar`
+   are exactly what not to ship).
+3. **Panel treatment — glass-morphism + stadium-photo lockup.** The
+   translucent / frosted-card look on football's VISITOR / HOME snapshot
+   panels (`.bl-college-rail`, `.bl-college-team`) and the stadium-photo VS
+   lockup (`.bl-college-stage` + `.bl-college-stage-field` + `.bl-college-vs`)
+   carry over verbatim. Baseball's "clash" resting state is the same
+   photo-backed VS lockup, and its rails / line score sit in the same
+   frosted cards — **never a plain data table**, even at rest.
+
+Acceptance for T1: put a baseball board and a football board side by side;
+the only differences a viewer should see are the sport-specific content
+(innings vs downs, diamond vs yard line, pitcher/batter vs passer/rusher) —
+lighting, texture, team-colour tint and panel material must read identical.
 
 **Item 3 — "On the Mound" / "At Bat" live rail panels.** Built on the
 existing persistent `.bl-college-rail` + `patchCollegiateRails()` system
