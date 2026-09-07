@@ -39,13 +39,19 @@ def create_security_upgrade_blueprint(
         """Stamp the operator's chosen sport onto the fresh session.
 
         Called only after ``session["authenticated"]`` is set. A missing,
-        unrecognised, or unlicensed sport is silently ignored -- the login
-        screen enforces the choice; a bad value must never block sign-in.
+        unrecognised, coming-soon, or unlicensed sport is silently ignored
+        -- the login screen enforces the choice; a bad value must never
+        block sign-in. ``canadian_football`` is accepted when the football
+        family is licensed (Round 27 invariant 1).
         """
 
-        family = sport_families.normalize_family(data.get("sport", ""))
-        if family and family in dependencies.licensed_sport_families():
-            session["sport_context"] = family
+        resolved = sport_families.normalize_sport(data.get("sport", ""))
+        if not resolved or not sport_families.is_engine_ready(resolved):
+            return
+        if sport_families.context_is_licensed(
+            resolved, dependencies.licensed_sport_families()
+        ):
+            session["sport_context"] = resolved
 
     @routes.get("/api/security-status")
     def security_status():
@@ -60,10 +66,9 @@ def create_security_upgrade_blueprint(
                 "pin_configured": bool(security.get("pin_hash")),
                 "authenticated": dependencies.authenticated(),
                 "locked_seconds": remaining,
-                "licensed_sports": licensed,
-                "all_sports_licensed": licensed
-                == list(sport_families.SPORT_FAMILIES),
-                "sport_context": session.get("sport_context", ""),
+                **sport_families.sport_context_view(
+                    session.get("sport_context", ""), licensed
+                ),
             }
         )
 

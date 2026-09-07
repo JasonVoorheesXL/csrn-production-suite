@@ -59,11 +59,11 @@ def test_session_context_reports_current_context_and_license(client) -> None:
 
     body = test_client.get("/api/session-context").get_json()
 
-    assert body == {
-        "sport_context": "football",
-        "licensed_sports": ["football", "basketball"],
-        "all_sports_licensed": False,
-    }
+    assert body["sport_context"] == "football"
+    assert body["sport_scope"] == "football"
+    assert body["licensed_sports"] == ["football", "basketball"]
+    assert body["all_sports_licensed"] is False
+    assert [o["context"] for o in body["other_sports"]][:1] == ["canadian_football"]
 
 
 def test_sport_context_switch_sets_a_licensed_family(client) -> None:
@@ -73,8 +73,23 @@ def test_sport_context_switch_sets_a_licensed_family(client) -> None:
     body = test_client.post("/api/sport-context", json={"sport": "Basketball"}).get_json()
 
     assert body["sport_context"] == "basketball"
+    assert body["sport_scope"] == "basketball"
     with test_client.session_transaction() as current:
         assert current["sport_context"] == "basketball"
+
+
+def test_canadian_football_context_is_covered_by_the_football_license(client) -> None:
+    # Invariant 1: one football license entry, both football contexts.
+    test_client, licensed = client
+    licensed[0] = ["football"]
+    _authenticate(test_client)
+
+    body = test_client.post("/api/sport-context", json={"sport": "canadian_football"}).get_json()
+
+    assert body["sport_context"] == "canadian_football"
+    assert body["sport_scope"] == "football"       # invariant 2: shared roster/sponsor pool
+    with test_client.session_transaction() as current:
+        assert current["sport_context"] == "canadian_football"
 
 
 def test_sport_context_switch_rejects_unlicensed_family(client) -> None:
@@ -87,6 +102,28 @@ def test_sport_context_switch_rejects_unlicensed_family(client) -> None:
     assert response.get_json()["error"] == "SPORT_NOT_LICENSED"
     with test_client.session_transaction() as current:
         assert "sport_context" not in current
+
+
+def test_sport_context_switch_rejects_coming_soon_sport(client) -> None:
+    test_client, _ = client
+    _authenticate(test_client)
+
+    response = test_client.post("/api/sport-context", json={"sport": "hockey"})
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "SPORT_COMING_SOON"
+    with test_client.session_transaction() as current:
+        assert "sport_context" not in current
+
+
+def test_sport_context_switch_rejects_the_gateway_token(client) -> None:
+    test_client, _ = client
+    _authenticate(test_client)
+
+    response = test_client.post("/api/sport-context", json={"sport": "all_others"})
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "SPORT_NOT_RECOGNIZED"
 
 
 def test_sport_context_switch_rejects_unknown_sport(client) -> None:

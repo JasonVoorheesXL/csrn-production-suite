@@ -38,12 +38,9 @@ def create_access_model_blueprint(
     def session_context():
         licensed = list(dependencies.licensed_sport_families())
         return jsonify(
-            {
-                "sport_context": session.get("sport_context", ""),
-                "licensed_sports": licensed,
-                "all_sports_licensed": licensed
-                == list(sport_families.SPORT_FAMILIES),
-            }
+            sport_families.sport_context_view(
+                session.get("sport_context", ""), licensed
+            )
         )
 
     @routes.post("/api/sport-context")
@@ -53,21 +50,29 @@ def create_access_model_blueprint(
         raw = str(data.get("sport", ""))
         licensed = list(dependencies.licensed_sport_families())
 
+        def _view(context: str):
+            return sport_families.sport_context_view(context, licensed)
+
         if raw.strip() == "":
             session.pop("sport_context", None)
-            return jsonify({"sport_context": "", "licensed_sports": licensed})
+            return jsonify(_view(""))
 
-        family = sport_families.normalize_family(raw)
-        if not family:
+        resolved = sport_families.normalize_sport(raw)
+        if not resolved or resolved == sport_families.GATEWAY:
+            # "all_others" is a gateway, not a context -- pick a real sport.
             return jsonify(
-                {"error": "SPORT_NOT_RECOGNIZED", "licensed_sports": licensed}
+                {"error": "SPORT_NOT_RECOGNIZED", **_view(session.get("sport_context", ""))}
             ), 400
-        if family not in licensed:
+        if not sport_families.is_engine_ready(resolved):
             return jsonify(
-                {"error": "SPORT_NOT_LICENSED", "licensed_sports": licensed}
+                {"error": "SPORT_COMING_SOON", **_view(session.get("sport_context", ""))}
+            ), 400
+        if not sport_families.context_is_licensed(resolved, licensed):
+            return jsonify(
+                {"error": "SPORT_NOT_LICENSED", **_view(session.get("sport_context", ""))}
             ), 403
 
-        session["sport_context"] = family
-        return jsonify({"sport_context": family, "licensed_sports": licensed})
+        session["sport_context"] = resolved
+        return jsonify(_view(resolved))
 
     return routes
