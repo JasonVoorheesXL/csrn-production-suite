@@ -262,6 +262,7 @@ class CanonicalStateFoundation:
             resolved = dict(cls._FIELD_YARDS_FALLBACK)
             try:
                 field = ruleset_service.active_ruleset(state).get("field", {})
+                length_yards = int(field.get("length_yards", 100) or 100)
                 mapping = {
                     "kickoff": field.get("kickoff_spot"),
                     "free_kick": field.get("free_kick_spot"),
@@ -269,7 +270,7 @@ class CanonicalStateFoundation:
                 }
                 for key, spec in mapping.items():
                     if spec:
-                        _side, yard = ruleset_service.field_spot_yardage(spec)
+                        _side, yard = ruleset_service.field_spot_yardage(spec, length_yards)
                         resolved[key] = yard
             except Exception:
                 resolved = dict(cls._FIELD_YARDS_FALLBACK)

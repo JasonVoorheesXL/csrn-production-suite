@@ -335,6 +335,25 @@ def test_ca_cjfl_ofc_extends_ca_base() -> None:
     assert ruleset_service.no_fair_catch(cjfl) is True
 
 
+def test_field_spot_yardage_clamps_to_the_rulesets_own_midfield() -> None:
+    # Round 26 Phase B: field_spot_yardage() turns a ruleset spec ("own_35")
+    # into a yard int for canonical_state_service._field_yards. The clamp is
+    # the field's half-way point, not a hardcoded 50 -- so a Canadian
+    # "own_55" (midfield of a 110-yd field) is not pulled back to 50.
+    assert ruleset_service.field_spot_yardage("own_40") == ("own", 40)          # default length 100
+    assert ruleset_service.field_spot_yardage("own_60") == ("own", 50)          # clamp at 100/2
+    assert ruleset_service.field_spot_yardage("own_55", 110) == ("own", 55)     # 110/2 = 55
+    assert ruleset_service.field_spot_yardage("opp_70", 110) == ("opp", 55)
+    # nothing shipped hits the old clamp -- every ruleset's specs are <= 40
+    for rid in ("football/us-nfhs", "football/us-ms-mhsaa", "football/ca-base", "football/ca-cjfl-ofc"):
+        field = ruleset_service.load_ruleset(rid)["field"]
+        for spec_key in ("kickoff_spot", "free_kick_spot", "try_spot", "touchback_spot"):
+            spec = field.get(spec_key)
+            if spec:
+                _side, yard = ruleset_service.field_spot_yardage(spec, field.get("length_yards", 100))
+                assert yard <= 40, (rid, spec_key, spec, yard)
+
+
 def test_coordinate_space_is_state_aware_for_canadian_field_length() -> None:
     # Round 26 Phase B 4a: the scrimmage coordinate space is 0..length_yards
     # -- 0-100 for NFHS, 0-110 for a Canadian game. Threading state through

@@ -223,17 +223,24 @@ def available_rulesets() -> list[dict[str, Any]]:
 
 # --- helpers for consumers migrating off hardcoded constants ---------------
 
-def field_spot_yardage(spec: str) -> tuple[str, int]:
+def field_spot_yardage(spec: str, length_yards: int = 100) -> tuple[str, int]:
     """A symbolic field spot ("own_40", "opp_3") -> (side, yard).
 
-    side is "own" or "opp"; yard is 0-50. Consumers already have
-    _team_own_yard_spot / _opponent_yard_spot helpers that take a yard int.
+    side is "own" or "opp". yard is clamped to the field's half-way point
+    (50 on a 100-yard field, 55 on a 110-yard Canadian field) -- pass the
+    ruleset's field.length_yards so a Canadian midfield spec ("own_55")
+    isn't silently pulled back to 50. Consumers have _team_own_yard_spot /
+    _opponent_yard_spot helpers that take a yard int.
     """
     side, _, raw = str(spec or "").strip().lower().partition("_")
     if side not in {"own", "opp"}:
         raise ValueError(f"bad field spot spec: {spec!r}")
     try:
-        yard = max(0, min(50, int(raw)))
+        midpoint = max(1, int(length_yards) // 2)
+    except (TypeError, ValueError):
+        midpoint = 50
+    try:
+        yard = max(0, min(midpoint, int(raw)))
     except ValueError as exc:
         raise ValueError(f"bad field spot spec: {spec!r}") from exc
     return side, yard
