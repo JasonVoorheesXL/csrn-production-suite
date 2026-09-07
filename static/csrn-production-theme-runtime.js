@@ -667,25 +667,49 @@ function mergeRuntimeState(base, runtime, captionState = null) {
   base.game.clockVisible = clockVisible;
   base.game.clock_visible = clockVisible;
 
-  const productionDown = productionDownDistance(source);
-  base.game.down = productionDown.down;
-  base.game.distance = productionDown.distance;
-  base.game.toGo = productionDown.distance;
-  base.game.to_go = productionDown.distance;
-  base.game.downDistance = productionDown.combined;
-  base.game.down_distance = productionDown.combined;
+  // Phase C: dispatch the game-state block by sport family. The football
+  // branch is verbatim from before; non-football families get their own
+  // fields and the football-only keys are stripped so no stale down /
+  // field / ball-spot data can leak onto a baseball or basketball board.
+  const sportFamily = productionSportFamily(base.sport);
+  base.game.sportFamily = sportFamily;
+  const FOOTBALL_GAME_KEYS = [
+    "down", "distance", "toGo", "to_go", "downDistance", "down_distance",
+    "field", "ballSpot", "ball_spot", "driveStart", "drive_start",
+    "firstDownSpot", "first_down_spot", "fieldDirection", "field_direction"
+  ];
 
-  base.game.possession = textValue(source.possession, gameSource.possession, base.game.possession).toLowerCase();
-  const field = productionFieldState(source, gameSource, source.canonical_field_state);
-  base.game.field = field;
-  base.game.ballSpot = field.ballSpot;
-  base.game.ball_spot = field.ballSpot;
-  base.game.driveStart = field.driveStart;
-  base.game.drive_start = field.driveStart;
-  base.game.firstDownSpot = field.firstDownSpot;
-  base.game.first_down_spot = field.firstDownSpot;
-  base.game.fieldDirection = field.direction;
-  base.game.field_direction = field.direction;
+  if (sportFamily === "football") {
+    const productionDown = productionDownDistance(source);
+    base.game.down = productionDown.down;
+    base.game.distance = productionDown.distance;
+    base.game.toGo = productionDown.distance;
+    base.game.to_go = productionDown.distance;
+    base.game.downDistance = productionDown.combined;
+    base.game.down_distance = productionDown.combined;
+
+    base.game.possession = textValue(source.possession, gameSource.possession, base.game.possession).toLowerCase();
+    const field = productionFieldState(source, gameSource, source.canonical_field_state);
+    base.game.field = field;
+    base.game.ballSpot = field.ballSpot;
+    base.game.ball_spot = field.ballSpot;
+    base.game.driveStart = field.driveStart;
+    base.game.drive_start = field.driveStart;
+    base.game.firstDownSpot = field.firstDownSpot;
+    base.game.first_down_spot = field.firstDownSpot;
+    base.game.fieldDirection = field.direction;
+    base.game.field_direction = field.direction;
+  } else {
+    FOOTBALL_GAME_KEYS.forEach(key => { delete base.game[key]; });
+    if (sportFamily === "basketball") {
+      base.game.possession = textValue(source.possession, gameSource.possession, base.game.possession).toLowerCase();
+      Object.assign(base.game, productionBasketballState(source, gameSource));
+    } else {
+      // baseball / softball -- no possession concept
+      delete base.game.possession;
+      Object.assign(base.game, productionDiamondState(source, gameSource));
+    }
+  }
 
   base.ticker = {...(base.ticker || {})};
   base.ticker.text = eventPlainText(source) || "CSRN LIVE";
@@ -1074,6 +1098,53 @@ function productionClock(runtime) {
     runtime.clock,
     runtime.game_clock
   ) || "-";
+}
+
+// Phase C: collapse a raw sport value to its family. canadian_football rides
+// the football board/graphics; everything unrecognised falls back to
+// "football" so today's football-only pipeline is byte-identical.
+function productionSportFamily(sport) {
+  const raw = String(sport || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (raw === "canadian_football" || raw === "cfl") return "football";
+  if (raw === "basketball" || raw === "baseball" || raw === "softball") return raw;
+  return "football";
+}
+
+function productionBasketballState(source, gameSource) {
+  const pick = (...k) => textValue(...k.flatMap(name => [source[name], gameSource[name]]));
+  return {
+    shotClock: pick("shot_clock", "shotClock"),
+    homeFouls: pick("home_fouls", "homeFouls"),
+    visitorFouls: pick("visitor_fouls", "visitorFouls"),
+    homeBonus: pick("home_bonus", "homeBonus"),
+    visitorBonus: pick("visitor_bonus", "visitorBonus"),
+    homeTimeouts: pick("home_timeouts", "homeTimeouts"),
+    visitorTimeouts: pick("visitor_timeouts", "visitorTimeouts")
+  };
+}
+
+function productionDiamondState(source, gameSource) {
+  const pick = (...k) => textValue(...k.flatMap(name => [source[name], gameSource[name]]));
+  const rawBases = source.bases ?? gameSource.bases;
+  const bases = Array.isArray(rawBases)
+    ? [Boolean(rawBases[0]), Boolean(rawBases[1]), Boolean(rawBases[2])]
+    : [false, false, false];
+  const half = pick("inning_half", "inningHalf").toUpperCase();
+  return {
+    inning: pick("inning"),
+    inningHalf: half.startsWith("B") ? "BOTTOM" : half.startsWith("T") ? "TOP" : half,
+    balls: pick("balls"),
+    strikes: pick("strikes"),
+    outs: pick("outs"),
+    bases,
+    pitcherName: pick("pitcher_name", "pitcherName"),
+    batterName: pick("batter_name", "batterName"),
+    batterPosition: pick("batter_position", "batterPosition"),
+    homeHits: pick("home_hits", "homeHits"),
+    visitorHits: pick("visitor_hits", "visitorHits"),
+    homeErrors: pick("home_errors", "homeErrors"),
+    visitorErrors: pick("visitor_errors", "visitorErrors")
+  };
 }
 
 function productionFootballPeriod(runtime) {
