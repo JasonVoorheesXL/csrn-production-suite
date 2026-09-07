@@ -41,6 +41,7 @@ class EventService:
         "FG",
         "XP",
         "2PT",
+        "SINGLE",
         "TURNOVER",
         "FIRST_DOWN",
         "PENALTY",
@@ -315,6 +316,8 @@ class EventService:
                 if event_code == "2PT" and conversion_good
                 else 1
                 if event_code == "XP" and conversion_good
+                else 1
+                if event_code == "SINGLE"
                 else 0
             )
             if delta:
@@ -420,6 +423,35 @@ class EventService:
                         state["ball_spot"] = self._coord_to_spot(self._spot_to_coord(incoming.get("kick_result_spot"), state), state)
                     state["clock_running"] = False
                     state["clock_started_at"] = 0
+            elif event_code == "SINGLE":
+                # Rouge / single (Canadian): 1 point to the kicking team
+                # (applied above via `delta`); the team scored upon then
+                # scrimmages from its own restart line -- ruleset
+                # field.single_restart_spot ("own_35" in ca-base, UNVERIFIED,
+                # see that file's _source_notes). Never a try; clears any
+                # special phase and does not enter one.
+                receiving = CanonicalStateFoundation.opposite(team)
+                CanonicalStateFoundation.clear_special_phase(state)
+                state["possession"] = receiving
+                state["down"] = "1st"
+                state["distance"] = "10"
+                restart_yard = 35
+                try:
+                    import ruleset_service
+
+                    ruleset = ruleset_service.active_ruleset(state)
+                    spec = str((ruleset.get("field") or {}).get("single_restart_spot") or "own_35")
+                    _side, restart_yard = ruleset_service.field_spot_yardage(
+                        spec,
+                        int((ruleset.get("field") or {}).get("length_yards", 100) or 100),
+                    )
+                except Exception:
+                    restart_yard = 35
+                state["ball_spot"] = CanonicalStateFoundation._team_own_yard_spot(
+                    state, receiving, restart_yard
+                )
+                state["clock_running"] = False
+                state["clock_started_at"] = 0
 
             penalty_enforcement: Mapping[str, Any] = {}
             if event_code == "PENALTY":
@@ -1341,6 +1373,9 @@ class EventService:
             if kick_outcome == "blocked":
                 return "Field Goal Blocked", base + " blocked"
             return "Field Goal No Good", base + " no good"
+
+        if event_code == "SINGLE":
+            return "Single (Rouge)", f"Single point (rouge) for {team_name}"
 
         conversion_outcome = str(incoming.get("conversion_outcome", "good") or "good").lower()
         if event_code == "2PT":

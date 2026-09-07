@@ -150,6 +150,23 @@ def test_service_scoring_caches_match_the_ruleset_point_values() -> None:
     assert RulesService._scoring() == scoring
 
 
+def test_single_restart_spot_is_absent_for_us_and_flagged_unverified_for_ca() -> None:
+    # Round 26 Phase B 4d: after conceding a single/rouge the team scored
+    # upon restarts from field.single_restart_spot. US rulesets have no
+    # single, so it is null/"".
+    for rid in ("football/us-nfhs", "football/us-ms-mhsaa"):
+        assert ruleset_service.single_restart_spot(ruleset_service.load_ruleset(rid)) == ""
+    ca = ruleset_service.load_ruleset("football/ca-base")
+    assert ruleset_service.single_restart_spot(ca) == "own_35"
+    assert ruleset_service.single_restart_spot(
+        ruleset_service.load_ruleset("football/ca-cjfl-ofc")
+    ) == "own_35"
+    # the value is a best guess -- it must be flagged, not shipped as fact
+    assert "single_restart_spot" in ca["_source_notes"]
+    assert "UNVERIFIED" in ca["_source_notes"]["single_restart_spot"] or \
+        "NOT verified" in ca["_source_notes"]["single_restart_spot"]
+
+
 def test_fair_catch_kept_and_no_yards_absent_for_us_rulesets() -> None:
     # Round 26 5/7 dormancy: NFHS keeps the fair catch, has no restraining
     # zone, and its penalty catalogue has no "No Yards" foul.

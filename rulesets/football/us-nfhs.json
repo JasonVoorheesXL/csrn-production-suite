@@ -24,7 +24,8 @@
     "kickoff_spot": "own_40",
     "free_kick_spot": "own_20",
     "try_spot": "opp_3",
-    "touchback_spot": "own_20"
+    "touchback_spot": "own_20",
+    "single_restart_spot": null
   },
   "scoring": {
     "touchdown": 6,

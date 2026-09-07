@@ -362,6 +362,14 @@ def no_fair_catch(ruleset: Mapping[str, Any]) -> bool:
     return bool((ruleset.get("field") or {}).get("no_fair_catch", False))
 
 
+def single_restart_spot(ruleset: Mapping[str, Any]) -> str:
+    """The spec ("own_35") the team scored upon restarts from after
+    conceding a single / rouge, or "" when the ruleset has no single
+    (NFHS). The value for Canadian amateur play is unverified -- see
+    ca-base.json's _source_notes."""
+    return str((ruleset.get("field") or {}).get("single_restart_spot") or "")
+
+
 def no_yards_halo(ruleset: Mapping[str, Any]) -> int:
     """The restraining-zone ("no yards") radius, in yards, the kicking team
     must give a punt returner. 0 means the rule does not apply -- NFHS has

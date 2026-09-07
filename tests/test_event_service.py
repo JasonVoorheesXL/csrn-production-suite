@@ -179,6 +179,47 @@ def test_trigger_enforces_control_source() -> None:
     assert result.data["authority"] == "statistician"
 
 
+def test_single_rouge_scores_one_and_restarts_the_other_team_canadian() -> None:
+    # Round 26 Phase B 4d: a SINGLE (rouge) on a Canadian broadcast is worth
+    # 1 to the kicking team; the team scored upon then scrimmages from its
+    # own restart line (ca-base single_restart_spot "own_35", UNVERIFIED).
+    state = base_state()
+    state.update({
+        "game_data_authority": "statistician",
+        "country": "CA", "region": "ON", "association": "CJFL",
+        "possession": "home", "special_game_phase": "",
+        "home_direction": "right", "visitor_direction": "left",
+    })
+    service, store, _, _ = build_service(state)
+
+    result = service.trigger({"team": "home", "event": "SINGLE", "source": "statistician"})
+
+    assert result.ok
+    assert store["home_score"] == 1
+    assert store["visitor_score"] == 0
+    assert store["possession"] == "visitor"          # team scored upon takes over
+    assert store["special_game_phase"] == ""         # not a try
+    assert store["down"] == "1st" and store["distance"] == "10"
+    assert store["clock_running"] is False
+    # visitor drives "left" -> its own goal is the RIGHT one -> own 35 = "RIGHT 35"
+    assert store["ball_spot"] == "RIGHT 35"
+    assert store["events"][0]["event"] == "SINGLE"
+    assert store["events"][0]["score_delta"] == 1
+    assert store["events"][0]["label"] == "Single (Rouge)"
+
+
+def test_single_event_is_rejected_during_a_pending_try() -> None:
+    # A rouge can never be scored mid-conversion -- structural exclusivity
+    # with XP/2PT that statistics_service relies on.
+    state = base_state()
+    state["game_data_authority"] = "statistician"
+    CanonicalStateFoundation.enter_pending_try(state, "home")
+    service, store, _, _ = build_service(state)
+    result = service.trigger({"team": "home", "event": "SINGLE", "source": "statistician"})
+    assert result.code == "SPECIAL_PHASE_REQUIRES_TRY"
+    assert store["home_score"] == 0
+
+
 def test_touchdown_scores_and_creates_event_and_play() -> None:
     service, store, calls, _ = build_service()
     result = service.trigger({"team": "home", "event": "TD", "player_id": "P1", "play_type": "rush"})
