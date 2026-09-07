@@ -1,0 +1,122 @@
+from __future__ import annotations
+
+from functools import wraps
+from typing import Any
+
+import pytest
+from flask import Flask, jsonify, session
+
+from routes.access_model_routes import (
+    AccessModelRoutesDependencies,
+    create_access_model_blueprint,
+)
+
+
+def _require_auth(func):
+    @wraps(func)
+    def wrapper(*args: Any, **kwargs: Any):
+        if not session.get("authenticated"):
+            return jsonify({"error": "AUTH_REQUIRED"}), 401
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+@pytest.fixture
+def client():
+    licensed = [["football", "basketball"]]
+
+    app = Flask(__name__)
+    app.config.update(TESTING=True, SECRET_KEY="access-model-test")
+    app.register_blueprint(
+        create_access_model_blueprint(
+            AccessModelRoutesDependencies(
+                require_auth=_require_auth,
+                licensed_sport_families=lambda: list(licensed[0]),
+            )
+        )
+    )
+    with app.test_client() as test_client:
+        yield test_client, licensed
+
+
+def _authenticate(test_client) -> None:
+    with test_client.session_transaction() as current:
+        current["authenticated"] = True
+
+
+def test_session_context_requires_auth(client) -> None:
+    test_client, _ = client
+    assert test_client.get("/api/session-context").status_code == 401
+    assert test_client.post("/api/sport-context", json={"sport": "football"}).status_code == 401
+
+
+def test_session_context_reports_current_context_and_license(client) -> None:
+    test_client, _ = client
+    _authenticate(test_client)
+    with test_client.session_transaction() as current:
+        current["sport_context"] = "football"
+
+    body = test_client.get("/api/session-context").get_json()
+
+    assert body == {
+        "sport_context": "football",
+        "licensed_sports": ["football", "basketball"],
+        "all_sports_licensed": False,
+    }
+
+
+def test_sport_context_switch_sets_a_licensed_family(client) -> None:
+    test_client, _ = client
+    _authenticate(test_client)
+
+    body = test_client.post("/api/sport-context", json={"sport": "Basketball"}).get_json()
+
+    assert body["sport_context"] == "basketball"
+    with test_client.session_transaction() as current:
+        assert current["sport_context"] == "basketball"
+
+
+def test_sport_context_switch_rejects_unlicensed_family(client) -> None:
+    test_client, _ = client
+    _authenticate(test_client)
+
+    response = test_client.post("/api/sport-context", json={"sport": "baseball"})
+
+    assert response.status_code == 403
+    assert response.get_json()["error"] == "SPORT_NOT_LICENSED"
+    with test_client.session_transaction() as current:
+        assert "sport_context" not in current
+
+
+def test_sport_context_switch_rejects_unknown_sport(client) -> None:
+    test_client, _ = client
+    _authenticate(test_client)
+
+    response = test_client.post("/api/sport-context", json={"sport": "curling"})
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "SPORT_NOT_RECOGNIZED"
+
+
+def test_sport_context_empty_string_clears_the_context(client) -> None:
+    test_client, _ = client
+    _authenticate(test_client)
+    test_client.post("/api/sport-context", json={"sport": "football"})
+
+    body = test_client.post("/api/sport-context", json={"sport": ""}).get_json()
+
+    assert body["sport_context"] == ""
+    with test_client.session_transaction() as current:
+        assert "sport_context" not in current
+
+
+def test_sport_context_switch_needs_no_pin(client) -> None:
+    # The whole point: an authenticated operator changes sport without
+    # re-entering the PIN. There is no security service in this blueprint.
+    test_client, _ = client
+    _authenticate(test_client)
+    first = test_client.post("/api/sport-context", json={"sport": "football"}).get_json()
+    second = test_client.post("/api/sport-context", json={"sport": "basketball"}).get_json()
+    assert first["sport_context"] == "football"
+    assert second["sport_context"] == "basketball"

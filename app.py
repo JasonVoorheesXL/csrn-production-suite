@@ -89,6 +89,10 @@ from routes.security_upgrade_routes import (
     SecurityUpgradeRoutesDependencies,
     create_security_upgrade_blueprint,
 )
+from routes.access_model_routes import (
+    AccessModelRoutesDependencies,
+    create_access_model_blueprint,
+)
 from routes.school_routes import (
     SchoolRoutesDependencies,
     create_school_blueprint,
@@ -2764,6 +2768,14 @@ def get_upgrade_service() -> UpgradeService:
     return UPGRADE_SERVICE
 
 
+def licensed_sport_families() -> list[str]:
+    """Canonical sport families this install's license grants (Round 27)."""
+    try:
+        return get_entitlement_service().licensed_sport_families()
+    except Exception:
+        return []
+
+
 SECURITY_UPGRADE_ROUTES_BLUEPRINT = create_security_upgrade_blueprint(
     SecurityUpgradeRoutesDependencies(
         get_security_service=lambda: SECURITY_SERVICE,
@@ -2771,9 +2783,18 @@ SECURITY_UPGRADE_ROUTES_BLUEPRINT = create_security_upgrade_blueprint(
         authenticated=authenticated,
         clock=time.time,
         get_upgrade_service=get_upgrade_service,
+        licensed_sport_families=licensed_sport_families,
     )
 )
 APPLICATION_BLUEPRINTS.append(SECURITY_UPGRADE_ROUTES_BLUEPRINT)
+
+ACCESS_MODEL_ROUTES_BLUEPRINT = create_access_model_blueprint(
+    AccessModelRoutesDependencies(
+        require_auth=require_auth,
+        licensed_sport_families=licensed_sport_families,
+    )
+)
+APPLICATION_BLUEPRINTS.append(ACCESS_MODEL_ROUTES_BLUEPRINT)
 
 
 OBS_ROUTES_BLUEPRINT = create_obs_blueprint(

@@ -46,6 +46,9 @@ EXPECTED_BLUEPRINTS = {
     "roster_routes",
     "school_routes",
     "security_upgrade_routes",
+    # Round 27 access model: GET /api/session-context + POST /api/sport-context
+    # -- the operator's switchable sport context (both @require_auth).
+    "access_model_routes",
     "social_routes",
     "sponsor_routes",
     "support_routes",

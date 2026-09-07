@@ -5,6 +5,12 @@ from typing import Any, Callable, Mapping
 
 from flask import Blueprint, jsonify, request, session
 
+import sport_families
+
+
+def _no_licensed_sports() -> list[str]:
+    return []
+
 
 @dataclass(frozen=True)
 class SecurityUpgradeRoutesDependencies:
@@ -15,6 +21,11 @@ class SecurityUpgradeRoutesDependencies:
     authenticated: Callable[[], bool]
     clock: Callable[[], float]
     get_upgrade_service: Callable[[], Any]
+    # Round 27: canonical sport families this install is licensed for, so the
+    # pre-login screen can grey out unlicensed sport icons and the operator's
+    # chosen sport can be stamped onto the session at login. Defaults to "no
+    # sports" so older call sites / tests that do not wire it keep working.
+    licensed_sport_families: Callable[[], list[str]] = _no_licensed_sports
 
 
 def create_security_upgrade_blueprint(
@@ -24,6 +35,18 @@ def create_security_upgrade_blueprint(
 
     routes = Blueprint("security_upgrade_routes", __name__)
 
+    def _stamp_sport_context(data: Mapping[str, Any]) -> None:
+        """Stamp the operator's chosen sport onto the fresh session.
+
+        Called only after ``session["authenticated"]`` is set. A missing,
+        unrecognised, or unlicensed sport is silently ignored -- the login
+        screen enforces the choice; a bad value must never block sign-in.
+        """
+
+        family = sport_families.normalize_family(data.get("sport", ""))
+        if family and family in dependencies.licensed_sport_families():
+            session["sport_context"] = family
+
     @routes.get("/api/security-status")
     def security_status():
         security = dependencies.load_security()
@@ -31,11 +54,16 @@ def create_security_upgrade_blueprint(
             0,
             int(float(security.get("locked_until", 0)) - dependencies.clock()),
         )
+        licensed = list(dependencies.licensed_sport_families())
         return jsonify(
             {
                 "pin_configured": bool(security.get("pin_hash")),
                 "authenticated": dependencies.authenticated(),
                 "locked_seconds": remaining,
+                "licensed_sports": licensed,
+                "all_sports_licensed": licensed
+                == list(sport_families.SPORT_FAMILIES),
+                "sport_context": session.get("sport_context", ""),
             }
         )
 
@@ -57,6 +85,7 @@ def create_security_upgrade_blueprint(
         session.clear()
         session.permanent = True
         session["authenticated"] = True
+        _stamp_sport_context(data)
         return jsonify({"ok": True})
 
     @routes.post("/api/login")
@@ -69,6 +98,7 @@ def create_security_upgrade_blueprint(
             session.clear()
             session.permanent = True
             session["authenticated"] = True
+            _stamp_sport_context(data)
             return jsonify({"ok": True})
 
         payload = {"error": result.code, **result.data}
