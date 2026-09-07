@@ -426,32 +426,71 @@ rendering untouched, reviewed before the next.
 
 ---
 
-## 11. Open questions for review
+## 11. Open questions — resolved 2026-09-07
 
-1. **Ordering** (§9.3): confirm the build starts post-trunk-merge of
-   R26+R27+Phase C, with P0 as the rebase. Alternative: build against
-   `64ed45a` now and carry the merge pain — not recommended.
-2. **`engine_router.py` vs editing `canonical_state_service`** (§3, §9.2):
-   a new dispatch module keeps the football file untouched and dodges the
-   Round 26 merge. Any objection to the extra indirection?
-3. **`index.html` partial** (§9.2): move the baseball operator panel into
-   `templates/_diamond_controls.html` (one-line `{% include %}`) to shrink
-   the 3-way conflict. OK?
-4. **DH policy scope**: model `dh_rule` in the ruleset from P1, but is the
-   FLEX/DP softball model in scope for this engine or a later round?
-   (Leaning: `standard_dh` + `none` in P1; FLEX later.)
-5. **Earned/unearned runs**: operator-flagged in P1 (no automated ER).
-   Acceptable, or is best-effort auto-ER wanted despite the accuracy risk?
-6. **Base-running**: propose-then-override (§5.3) — confirm that's the
-   right entry ergonomics vs a fuller structured base-by-base entry.
-7. **The §8.1 flagged values**: who confirms the MS/NFHS mercy-rule,
-   courtesy-runner, and tiebreaker specifics against a rulebook, and by
-   when? P6 is blocked on it (P0–P5 ship with documented placeholders).
-8. **Softball as its own `SPORT_FAMILIES` entry** already exists (Round
-   27). Confirm one shared engine keyed by ruleset (§8) rather than a
-   separate `softball_*` service set.
+1. **Ordering** — **Confirmed.** No P0+ work on this branch until Round 26 +
+   Round 27 + Phase C merge to trunk post-Friday; then rebase
+   `baseball-engine-scoping-20260907` onto merged trunk and proceed. Same
+   cross-branch-collision reasoning applied everywhere this arc.
+2. **`engine_router.py` vs editing `canonical_state_service`** —
+   **Confirmed: dispatch module.** Football's files stay untouched; same
+   pattern Phase C used (new dispatch layer, not a rewrite of a contended
+   file).
+3. **`index.html` partial** — accepted as the plan of record (see §9.2);
+   confirm at P5.
+4. **DH / DP-FLEX scope** — **superseded by the approved spec (§12 below):
+   all three baseball DH modes and the full softball DP/FLEX state machine
+   are in scope**, P2.
+5. **Earned/unearned runs** — operator-flagged, no automated ER (matches
+   the spec's "record the ruling, don't officiate" principle).
+6. **Base-running** — propose-then-override retained; the spec's
+   `runnerOutcomes[]` PA-output contract (spec §7.2) is the structured form.
+7. **P6 rulebook values** — **owner: the user**, sourcing NFHS/MHSAA
+   baseball + softball rulebooks directly (the role Jay played for Canadian
+   football). The approved spec (§17) already supplies best-effort MHSAA
+   2026-27 values *with* `authorityRef` citations; P6 stays blocked until
+   the user confirms them against the licensed books, and every unconfirmed
+   value ships with a `_source_notes` entry as before.
+8. **Softball as its own family** — confirmed: one shared *event* engine,
+   **sport-specific lineup/substitution state machines** (spec bottom line,
+   §16), jurisdiction-specific profiles.
+
+---
+
+## 12. Reconciliation with the approved implementation spec (2026-09-07)
+
+`docs/CSRN_NFHS_Baseball_Softball_Rules_Engine_Spec_2026.docx` (v1.0,
+Sept 2026) is now **the governing design reference** for the build. It is
+consistent with this scoping plan's architecture and *extends* it in the
+following places — the build (P0+) follows the spec where the two differ:
+
+| Area | This plan said | Spec adds / changes | Effect on the phased plan |
+| --- | --- | --- | --- |
+| **Authority model** | errors / ER operator-flagged, not inferred | Pervasive principle: **"record reality first, validate second."** Engine auto-determines only deterministic mechanics (count, outs, next slot, base occupancy, score arithmetic, run-rule *threshold met*, lineup-history facts). Everything judgment-based (obstruction, interference, balk/illegal pitch, catch/no-catch, batting-out-of-order penalty, illegal-player enforcement, official termination/forfeit) is **recorded from a human** via a generic `UmpireRulingPayload`. Validator severity is `HARD_ERROR` / `SOFT_WARNING` / `NEEDS_RULING` / `INFO` — never a single "illegal" boolean; it may block only internal impossibilities. | P1 `at_bat_rules_service` gains the `NEEDS_RULING` path + `UmpireRulingPayload` reducer input. New: a `rules_validator` producing severity-tagged messages. |
+| **Event sourcing** | lean on `live_command_service` revision chain + Play Register | Formal **append-only event ledger**; `AuthoritativeState = reduce(snapshot, eventsAfter)`; `EVENT_VOIDED` / `EVENT_CORRECTED` reference the original, never destroy it; snapshots at **start of game, end of every half-inning, immediately before suspension**, plus periodic. `stateHash` for deterministic-replay tests. | P1 builds the reducer + snapshot cadence explicitly; P2 corrections are ledger events, not `live_command_service` undo alone. |
+| **Rules profile** | ruleset JSON + `_source_notes`, `extends` chain | `RulesProfile` object (spec §3): `regulation`, `runRules[]` (array, each with `authorityRef` + `effectiveDate` + `appliesTo:[POSTSEASON]`), `timeLimit`, `tieBreaker`, `suspendedGame`, `lineup{reentry,dh,dpFlex,courtesyRunner}`, `pitching{pitchCount,...}`, `field{doubleFirstBase,...}`, `communications`. **Profile version is persisted on the game at creation** (`effectiveProfileId` + `effectiveProfileVersion`); a later master-profile edit never changes a historical game. | P0 ruleset JSON adopts this shape (still `extends`-chained, still `_source_notes` for unverified values). `game_operations_service` stamps the resolved profile id+version onto canonical state at `new_broadcast`. |
+| **Baseball DH** | `standard_dh` + `none` in P1, "player/DH later" | **All three modes in scope**: `NONE` / `TRADITIONAL_DH` / `PLAYER_DH`; player/DH = one player, **one** re-entry entitlement; locked after lineup acceptance (correction workflow to change). | P2 `lineup_service` (baseball sub-engine). |
+| **Softball DP/FLEX** | "later round" | **In scope**: full transition table (spec §9.3), HARD invariant *DP and FLEX never both on offense*, guided transition **wizard** (no free-form position picker), 9/10 living-lineup count. | P2 `lineup_service` (softball sub-engine — genuinely separate from baseball). |
+| **Courtesy runner** | ruleset flag, temporary role | Same, plus: store **role-at-time snapshot** (PITCHER/CATCHER) on entry, never derive later; do not close the pitcher/catcher lineup appearance; `eligibilitySnapshot`; **version the first-inning/first-batter conditions** (NFHS softball changes this for 2027). | P2. |
+| **Game-ending engine** | walk-off / mercy / extras in `inning_service.transition()` | Add: `timeLimit` policy (expiry ≠ result unless profile defines the follow-on), **suspension/resumption** with an exact restoration snapshot (spec §11.4), `TIEBREAKER_RUNNER_PLACED` as a **first-class event** (not a silent 2B mutation). Evaluation order fixed (spec §11.1). | P1 `inning_service` + a `game_end_evaluator`; P2 suspension snapshot/restore. |
+| **Pitch count** | display-only counters; enforcement "later" | Build the **eligibility engine**: `PitchCountPolicy{restBands, finishBatterException, multipleGameDayAggregation}`, status `ELIGIBLE / WARNING / INELIGIBLE_BY_PROFILE / UNKNOWN_HISTORY`. Still **never auto-forfeits**; `UNKNOWN_HISTORY` beats a false "eligible". Off-platform prior-game history is imported, not assumed. | Promote to **P4** (was "later"): counters + rest-band status + the four-state eligibility flag. Auto-forfeit stays out permanently. |
+| **Batting out of order / appeals** | not covered | `BattingOrderAlert` (detection ≠ enforcement — no auto-out, no cursor advance on detection) + `AppealRuling` (BOO / missed base / left early). | P2. |
+| **2026 rule specifics** | — | `PLAYER_DEFENSIVE_MEETING` vs `CHARGED_CONFERENCE` are distinct events (baseball 2026); softball one-way coach→catcher comms (2026). | P1 event taxonomy; mostly cosmetic/counter state. |
+| **Acceptance tests** | "mirror the football test files" | Spec §19 is a ready **30-scenario matrix** (BB-01…MS-02, SUS-01, BOO-*, RUL-01, COR-01) + §19.1 property tests (deterministic replay by `stateHash`, void-and-replay equivalence, profile-version immutability, no-two-runners-one-base, DP/FLEX offensive exclusivity, suspend/resume equivalence). | Adopt verbatim as the P1–P5 acceptance gate. |
+| **MHSAA 2026-27 values** | flagged, unsourced | Spec §17 supplies them **with citations**: varsity pitch bands 1-25/26-50/51-75/76-105/106-120 → 0/1/2/3/4 days, max 120; MS baseball postseason run-rule 10 after 5 (or 4½ if trailing team completed its turn); MHSAA softball **double first base required 2026-27**, international tiebreaker on, 10-run-after-5 championship rule; JV baseball 1½ hr / 5 innings. **Still pending the user's licensed-book confirmation** (the spec itself carries a "Mississippi profile caution" — store the handbook revision date). | P6 inputs, still `_source_notes`-flagged until confirmed. |
+| **2027 future-proofing** | noted lineup/subs deferrals | Spec §18: double first base, dugout→pitcher/catcher one-way comms, softball courtesy-runner first-batter removal, softball comms expansion — **version, never retrofit** into a 2026 game. | Post-engine; profile-version feature flags. |
+
+**Net scope change:** P4 gains the pitch-count eligibility engine; P2 gains
+softball DP/FLEX, all baseball DH modes, batting-out-of-order/appeals, and
+suspension snapshot/restore. Nothing shrinks. The architecture (§2–§3, the
+`diamond_*` parallel services, `engine_router` dispatch, zero football-file
+edits, zero theme re-pins) is unchanged. The spec's §19 test matrix
+replaces "mirror the football tests" as the P1–P5 gate.
 
 ---
 
 *Scoping only. No engine code, ruleset JSON, or UI written this round.
-Awaiting review before P0.*
+Governing design reference:
+`docs/CSRN_NFHS_Baseball_Softball_Rules_Engine_Spec_2026.docx`. Branch holds
+at scoping until R26 + R27 + Phase C merge to trunk; first build action is
+the P0 rebase.*
