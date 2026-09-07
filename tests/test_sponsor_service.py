@@ -148,6 +148,30 @@ def test_clean_record_strips_transient_fields_and_limits_values() -> None:
     assert "contract_expired" not in record
     assert record["lead_ins"] == ["A", "B"]
     assert len(record["notes"]) == 3000
+    # Round 27: no sport given -> "" (shown in every context).
+    assert record["sport"] == ""
+
+
+def test_clean_record_normalizes_the_sport_family() -> None:
+    service = make_service(MemoryStore())
+    assert service.clean_record({"name": "A", "sport": "Football"})["sport"] == "football"
+    # Canadian football sponsors share the football pool (invariant 2).
+    assert service.clean_record({"name": "B", "sport": "Canadian Football"})["sport"] == "football"
+    assert service.clean_record({"name": "C", "sport": "Basketball"})["sport"] == "basketball"
+    # An unknown token is kept, lower-cased, rather than dropped.
+    assert service.clean_record({"name": "D", "sport": "Kabaddi"})["sport"] == "kabaddi"
+
+
+def test_create_and_update_carry_the_sport_family() -> None:
+    store = MemoryStore()
+    service = make_service(store)
+    created = service.create({"name": "Rink Co", "sport": "canadian_football"})
+    assert created.data["sponsor"]["sport"] == "football"
+    updated = service.update(created.data["sponsor"]["id"], {"category": "Regional"})
+    # Not re-specified on update -> preserved.
+    assert updated.data["sponsor"]["sport"] == "football"
+    moved = service.update(created.data["sponsor"]["id"], {"sport": "basketball"})
+    assert moved.data["sponsor"]["sport"] == "basketball"
 
 
 def test_update_preserves_created_at_and_blocks_duplicate_name() -> None:

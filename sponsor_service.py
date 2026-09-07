@@ -61,6 +61,18 @@ class SponsorService:
                 pass
         return str(record.get("status", "Prospect"))
 
+    @staticmethod
+    def _normalized_sport(raw: Any) -> str:
+        """Collapse a sport value to its family ("Canadian Football" ->
+        "football"); pass through an unknown token lower-cased; "" stays "".
+        """
+        text = str(raw or "").strip()
+        if not text:
+            return ""
+        import sport_families
+
+        return sport_families.base_family(text) or text.casefold()[:40]
+
     def clean_record(
         self,
         data: Sponsor,
@@ -82,6 +94,11 @@ class SponsorService:
             "id": sponsor_id
             or str(source.get("id") or f"sponsor-{now}-{self._token_factory()}"),
             "name": str(source.get("name", "")).strip()[:160],
+            # Round 27: the sport family this sponsor is scoped to. Tagged
+            # like rosters -- "football" covers American and Canadian, the
+            # ruleset is a per-broadcast choice. "" = shown in every sport
+            # context (a single-sport install never sets this).
+            "sport": self._normalized_sport(source.get("sport", "")),
             "category": str(source.get("category", "Local Business"))[:80],
             "status": str(source.get("status", "Prospect"))[:40],
             "contact_name": str(source.get("contact_name", "")).strip()[:160],
