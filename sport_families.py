@@ -57,9 +57,15 @@ OTHER_CONTEXTS: tuple[str, ...] = (
     "swimming",
 )
 
-# Contexts a module actually loads for. Everything else in OTHER_CONTEXTS is
-# inert / "coming soon".
-ENGINE_READY: frozenset[str] = frozenset({*SPORT_FAMILIES, "canadian_football"})
+# Contexts a broadcast engine actually loads for today. Only football (and
+# canadian_football, which rides the same Round 26 module) is built. The
+# other four families are real, licensable SPORT_FAMILIES with a login icon,
+# but selecting one lands nowhere useful yet -- so they get the same
+# "coming soon" gate as the OTHER_CONTEXTS placeholders. A family being
+# licensed is tracked separately (resolve_licensed_families /
+# licensed_sport_families): licensed-but-not-ready and not-licensed are
+# different situations and the UI says so.
+ENGINE_READY: frozenset[str] = frozenset({"football", "canadian_football"})
 
 # Wildcard token a license may carry in its ``sports`` list ("every family").
 ALL: str = "*"
@@ -196,6 +202,34 @@ def other_sport_options(
     ]
 
 
+def family_sport_options(
+    licensed_families: Iterable[str],
+) -> list[dict[str, object]]:
+    """Per-family login-tile metadata.
+
+    * ``licensed`` -- the install paid for this family.
+    * ``engine_ready`` -- a broadcast engine exists for it (football only
+      today).
+    * ``available`` -- both, i.e. the operator can actually select it.
+
+    The two "not available" reasons are distinct on purpose: a licensed
+    family with no engine yet ("coming in a future update") vs an
+    unlicensed one ("get licensed").
+    """
+
+    licensed = set(licensed_families)
+    return [
+        {
+            "family": family,
+            "label": LABELS.get(family, family),
+            "licensed": family in licensed,
+            "engine_ready": family in ENGINE_READY,
+            "available": family in ENGINE_READY and family in licensed,
+        }
+        for family in SPORT_FAMILIES
+    ]
+
+
 def sport_context_view(
     sport_context: object, licensed_families: Iterable[str]
 ) -> Mapping[str, object]:
@@ -211,5 +245,6 @@ def sport_context_view(
         "sport_scope": base_family(resolved) if resolved else "",
         "licensed_sports": licensed,
         "all_sports_licensed": licensed == list(SPORT_FAMILIES),
+        "family_sports": family_sport_options(licensed),
         "other_sports": other_sport_options(licensed),
     }

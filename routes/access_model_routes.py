@@ -58,21 +58,21 @@ def create_access_model_blueprint(
             return jsonify(_view(""))
 
         resolved = sport_families.normalize_sport(raw)
+        current = session.get("sport_context", "")
         if not resolved or resolved == sport_families.GATEWAY:
             # "all_others" is a gateway, not a context -- pick a real sport.
-            return jsonify(
-                {"error": "SPORT_NOT_RECOGNIZED", **_view(session.get("sport_context", ""))}
-            ), 400
-        if not sport_families.is_engine_ready(resolved):
-            return jsonify(
-                {"error": "SPORT_COMING_SOON", **_view(session.get("sport_context", ""))}
-            ), 400
-        if not sport_families.context_is_licensed(resolved, licensed):
-            return jsonify(
-                {"error": "SPORT_NOT_LICENSED", **_view(session.get("sport_context", ""))}
-            ), 403
+            return jsonify({"error": "SPORT_NOT_RECOGNIZED", **_view(current)}), 400
 
-        session["sport_context"] = resolved
-        return jsonify(_view(resolved))
+        if sport_families.is_engine_ready(resolved):
+            if not sport_families.context_is_licensed(resolved, licensed):
+                return jsonify({"error": "SPORT_NOT_LICENSED", **_view(current)}), 403
+            session["sport_context"] = resolved
+            return jsonify(_view(resolved))
+
+        # No broadcast engine for this sport yet. Distinguish "you paid for
+        # it, it just isn't built" from "you don't have it at all".
+        if sport_families.context_is_licensed(resolved, licensed):
+            return jsonify({"error": "SPORT_ENGINE_NOT_READY", **_view(current)}), 400
+        return jsonify({"error": "SPORT_COMING_SOON", **_view(current)}), 400
 
     return routes

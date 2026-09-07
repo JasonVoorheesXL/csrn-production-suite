@@ -64,18 +64,23 @@ def test_session_context_reports_current_context_and_license(client) -> None:
     assert body["licensed_sports"] == ["football", "basketball"]
     assert body["all_sports_licensed"] is False
     assert [o["context"] for o in body["other_sports"]][:1] == ["canadian_football"]
+    fams = {f["family"]: f for f in body["family_sports"]}
+    assert fams["football"]["available"] is True          # licensed + engine
+    assert fams["basketball"]["available"] is False        # licensed, no engine
+    assert fams["basketball"]["licensed"] is True
+    assert fams["baseball"]["licensed"] is False
 
 
-def test_sport_context_switch_sets_a_licensed_family(client) -> None:
+def test_sport_context_switch_sets_a_licensed_engine_ready_family(client) -> None:
     test_client, _ = client
     _authenticate(test_client)
 
-    body = test_client.post("/api/sport-context", json={"sport": "Basketball"}).get_json()
+    body = test_client.post("/api/sport-context", json={"sport": "Football"}).get_json()
 
-    assert body["sport_context"] == "basketball"
-    assert body["sport_scope"] == "basketball"
+    assert body["sport_context"] == "football"
+    assert body["sport_scope"] == "football"
     with test_client.session_transaction() as current:
-        assert current["sport_context"] == "basketball"
+        assert current["sport_context"] == "football"
 
 
 def test_canadian_football_context_is_covered_by_the_football_license(client) -> None:
@@ -92,16 +97,41 @@ def test_canadian_football_context_is_covered_by_the_football_license(client) ->
         assert current["sport_context"] == "canadian_football"
 
 
-def test_sport_context_switch_rejects_unlicensed_family(client) -> None:
-    test_client, _ = client
+def test_sport_context_switch_rejects_an_unlicensed_engine_ready_family(client) -> None:
+    test_client, licensed = client
+    licensed[0] = ["basketball"]  # football not licensed on this install
     _authenticate(test_client)
 
-    response = test_client.post("/api/sport-context", json={"sport": "baseball"})
+    response = test_client.post("/api/sport-context", json={"sport": "football"})
 
     assert response.status_code == 403
     assert response.get_json()["error"] == "SPORT_NOT_LICENSED"
     with test_client.session_transaction() as current:
         assert "sport_context" not in current
+
+
+def test_sport_context_switch_licensed_but_engineless_family_is_not_ready(client) -> None:
+    # basketball IS licensed on this stub install, but there is no engine
+    # for it yet -- a distinct reason from "unlicensed".
+    test_client, _ = client
+    _authenticate(test_client)
+
+    response = test_client.post("/api/sport-context", json={"sport": "basketball"})
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "SPORT_ENGINE_NOT_READY"
+    with test_client.session_transaction() as current:
+        assert "sport_context" not in current
+
+
+def test_sport_context_switch_unlicensed_engineless_family_is_coming_soon(client) -> None:
+    test_client, _ = client
+    _authenticate(test_client)
+
+    response = test_client.post("/api/sport-context", json={"sport": "baseball"})
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "SPORT_COMING_SOON"
 
 
 def test_sport_context_switch_rejects_coming_soon_sport(client) -> None:
@@ -154,6 +184,6 @@ def test_sport_context_switch_needs_no_pin(client) -> None:
     test_client, _ = client
     _authenticate(test_client)
     first = test_client.post("/api/sport-context", json={"sport": "football"}).get_json()
-    second = test_client.post("/api/sport-context", json={"sport": "basketball"}).get_json()
+    second = test_client.post("/api/sport-context", json={"sport": "canadian_football"}).get_json()
     assert first["sport_context"] == "football"
-    assert second["sport_context"] == "basketball"
+    assert second["sport_context"] == "canadian_football"

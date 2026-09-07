@@ -47,12 +47,33 @@ def test_base_family_collapses_canadian_football_onto_football() -> None:
     assert sf.base_family("hockey") == "hockey"
 
 
-def test_engine_ready_covers_families_and_canadian_football_only() -> None:
+def test_engine_ready_is_football_and_canadian_football_only() -> None:
+    # Only football (+ canadian_football, same module) has a broadcast
+    # engine today. The other families are real/licensable but not ready.
     assert sf.is_engine_ready("football") is True
     assert sf.is_engine_ready("canadian_football") is True
-    assert sf.is_engine_ready("basketball") is True
+    assert sf.is_engine_ready("basketball") is False
+    assert sf.is_engine_ready("baseball") is False
+    assert sf.is_engine_ready("softball") is False
+    assert sf.is_engine_ready("soccer") is False
     assert sf.is_engine_ready("hockey") is False
-    assert sf.is_engine_ready("tennis") is False
+
+
+def test_family_sport_options_separates_licensed_not_ready_from_unlicensed() -> None:
+    opts = {o["family"]: o for o in sf.family_sport_options(["football", "basketball"])}
+    # football: licensed + engine -> available
+    assert opts["football"] == {
+        "family": "football", "label": "Football",
+        "licensed": True, "engine_ready": True, "available": True,
+    }
+    # basketball: licensed, but no engine -> NOT available, and the reason is
+    # "engine not ready", not "unlicensed"
+    assert opts["basketball"]["licensed"] is True
+    assert opts["basketball"]["engine_ready"] is False
+    assert opts["basketball"]["available"] is False
+    # baseball: not licensed and no engine
+    assert opts["baseball"]["licensed"] is False
+    assert opts["baseball"]["available"] is False
 
 
 def test_resolve_licensed_families_wildcard_and_intersection() -> None:
@@ -96,6 +117,10 @@ def test_sport_context_view_reports_scope_for_canadian_football() -> None:
     assert view["licensed_sports"] == ["football"]
     assert view["all_sports_licensed"] is False
     assert any(o["context"] == "canadian_football" and o["available"] for o in view["other_sports"])
+    # family_sports is embedded for the login tiles / top-nav switcher.
+    fams = {f["family"]: f for f in view["family_sports"]}
+    assert fams["football"]["available"] is True
+    assert fams["basketball"]["available"] is False
 
 
 def test_sport_context_view_blank_and_gateway_read_as_none() -> None:

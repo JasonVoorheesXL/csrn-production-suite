@@ -10,8 +10,23 @@ sport-scoped rosters / sponsors. Branch
 | Concept | Where | Notes |
 | --- | --- | --- |
 | `SPORT_FAMILIES` | `sport_families.py` | `football, basketball, baseball, softball, soccer` — one login icon each, licensable. |
+| `ENGINE_READY` | `sport_families.py` | `football` + `canadian_football` only. A broadcast engine exists for these; every other family/context is gated "coming soon" regardless of licence. |
 | `GATEWAY` = `"all_others"` | `sport_families.py` | A sixth login tile. **Not a context.** Opens the secondary list. `POST /api/sport-context {sport:"all_others"}` → 400. |
 | `OTHER_CONTEXTS` | `sport_families.py` | Behind the gateway: `canadian_football` (real engine), `hockey, lacrosse, tennis, swimming` (coming soon). |
+
+### Engine-readiness vs licensing are separate axes
+
+`family_sport_options()` reports `licensed` (paid for), `engine_ready`
+(built), and `available` (both). The login tiles, the top-nav switcher and
+`POST /api/sport-context` all treat a **licensed-but-engineless** family
+differently from an **unlicensed** one:
+
+| State | Login tile | Switcher | `POST /api/sport-context` |
+| --- | --- | --- | --- |
+| licensed + engine (football) | selectable, green on pick | enabled | 200 |
+| licensed, no engine (e.g. basketball if paid) | `SOON` badge, "engine ships in a future update" | disabled "(soon)" | `400 SPORT_ENGINE_NOT_READY` |
+| not licensed, no engine | lock badge, "get licensed" | omitted | `400 SPORT_COMING_SOON` |
+| engine-ready, not licensed (football unpaid) | lock badge | omitted | `403 SPORT_NOT_LICENSED` |
 | `sport_context` | Flask session | The value the operator is in: a family, or `canadian_football`, or `""`. Set at login from the sport picked, changeable via the top-nav switcher with **no re-PIN**. |
 | `sport_scope` | derived | `base_family(sport_context)` — the roster/sponsor pool + license key. `canadian_football` → `football`. |
 
@@ -64,6 +79,7 @@ every list route is unfiltered — exactly as before Round 27. Every
 | 9 | `_normalize_sponsors` — backfill legacy sponsors |
 | 10 | `/api/sponsors` scoped by `sport_scope`; sponsor-editor `Sport` field |
 | 11 | This document |
+| 12 | Gate `basketball / baseball / softball / soccer` as coming-soon (no engine yet); licensed-vs-unlicensed messaging split; `SPORT_ENGINE_NOT_READY` |
 
 Full suite through commit 10: **2582 passed, 2 failed**. The 2 failures
 (`tests/test_state_mirror_throttle.py`) require a Google-Drive-backed
@@ -116,13 +132,12 @@ they pre-date Round 27 and are not a regression.
    change it before unlocking. Session `sport_context` is the source of
    truth once logged in.
 
-7. **Licensed non-football families have no runtime yet.** `basketball`,
-   `baseball`, `softball`, `soccer` are selectable/licensable and set a
-   real `sport_context`, but there is no sport-specific rendering for them
-   until Phase C (theme runtime per-sport dispatch). A licensed non-football
-   context today gets the generic app scoped to that family's roster/
-   sponsor pool. Flag if these should be gated like the coming-soon
-   sports until Phase C lands.
+7. ~~Licensed non-football families have no runtime yet.~~ **Resolved
+   (commit 12).** `basketball / baseball / softball / soccer` are gated
+   "coming soon" — not selectable — because there's no engine, with copy
+   that distinguishes licensed-but-not-ready from unlicensed. When an
+   engine ships for one, add it to `ENGINE_READY` in `sport_families.py`
+   and it becomes selectable automatically.
 
 8. **Icon glyphs** (`🏈 🏀 ⚾ 🥎 ⚽ 🏅` and `🍁 🏒 🥍 🎾 🏊`) are
    cosmetic placeholders — swap for real icons from the CSRN icon library
