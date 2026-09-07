@@ -335,6 +335,34 @@ def test_ca_cjfl_ofc_extends_ca_base() -> None:
     assert ruleset_service.no_fair_catch(cjfl) is True
 
 
+def test_available_rulesets_exposes_jurisdiction_for_the_picker() -> None:
+    # Round 26 Phase B 1/5: the broadcast-creation jurisdiction picker
+    # groups on available_rulesets()' country / region / association.
+    rows = {r["id"]: r for r in ruleset_service.available_rulesets()}
+    assert set(rows) == {
+        "football/us-nfhs",
+        "football/us-ms-mhsaa",
+        "football/ca-base",
+        "football/ca-cjfl-ofc",
+    }
+    assert (rows["football/us-nfhs"]["country"], rows["football/us-nfhs"]["region"],
+            rows["football/us-nfhs"]["association"]) == ("US", None, "NFHS")
+    assert (rows["football/us-ms-mhsaa"]["country"], rows["football/us-ms-mhsaa"]["region"],
+            rows["football/us-ms-mhsaa"]["association"]) == ("US", "MS", "MHSAA")
+    assert (rows["football/ca-base"]["country"], rows["football/ca-base"]["region"],
+            rows["football/ca-base"]["association"]) == ("CA", None, None)
+    assert (rows["football/ca-cjfl-ofc"]["country"], rows["football/ca-cjfl-ofc"]["region"],
+            rows["football/ca-cjfl-ofc"]["association"]) == ("CA", "ON", "CJFL")
+    for row in rows.values():
+        assert row["sport"] == "football"
+        # the tuple the picker will store must resolve straight back to this
+        # same ruleset id
+        assert ruleset_service.resolve_id(
+            country=row["country"], region=row["region"],
+            association=row["association"], sport="football",
+        ) == row["id"]
+
+
 def test_field_goal_play_is_disabled_on_every_shipped_ruleset() -> None:
     # Engine reality: no field-goal play-type handler exists, so no shipped
     # ruleset -- US or Canadian -- may enable it. This pins that alignment

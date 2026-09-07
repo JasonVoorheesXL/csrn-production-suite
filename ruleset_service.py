@@ -187,10 +187,17 @@ def active_ruleset_id(
     )
 
 
-def available_rulesets() -> list[dict[str, str]]:
-    """{id, label, sport} for every shipped ruleset document -- for a future
-    location/sport picker. Purely informational this round."""
-    out: list[dict[str, str]] = []
+def available_rulesets() -> list[dict[str, Any]]:
+    """One entry per shipped ruleset document: ``id``, ``label``, ``sport``,
+    and the ``country`` / ``region`` / ``association`` its ``jurisdiction``
+    block declares (``region`` / ``association`` may be ``None``).
+
+    This is what the broadcast-creation jurisdiction picker groups on. The
+    jurisdiction is read from the raw document -- every shipped ruleset
+    (us-nfhs, us-ms-mhsaa, ca-base, ca-cjfl-ofc) declares its own, so no
+    ``extends`` resolution is needed here.
+    """
+    out: list[dict[str, Any]] = []
     root = rulesets_dir()
     if not root.is_dir():
         return out
@@ -200,11 +207,15 @@ def available_rulesets() -> list[dict[str, str]]:
             doc = _read_document(rel)
         except (FileNotFoundError, ValueError):
             continue
+        jur = doc.get("jurisdiction") if isinstance(doc.get("jurisdiction"), Mapping) else {}
         out.append(
             {
                 "id": rel,
                 "label": str(doc.get("label", rel)),
                 "sport": str(doc.get("sport", rel.split("/", 1)[0])),
+                "country": (str(jur.get("country")).strip().upper() if jur.get("country") else None),
+                "region": (str(jur.get("region")).strip().upper() if jur.get("region") else None),
+                "association": (str(jur.get("association")).strip().upper() if jur.get("association") else None),
             }
         )
     return out
