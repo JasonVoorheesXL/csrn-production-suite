@@ -163,6 +163,30 @@ the only differences a viewer should see are the sport-specific content
 (innings vs downs, diamond vs yard line, pitcher/batter vs passer/rusher) —
 lighting, texture, team-colour tint and panel material must read identical.
 
+**Extra-innings line score — open-ended columns (added 2026-09-07).** The
+baseball engine models innings as unbounded (regulation length is a ruleset
+value; extras have no cap). The line-score bar must treat per-inning
+columns as **open-ended data**, not a fixed 1–9 grid:
+
+- Render exactly as many inning columns as innings actually played.
+- Past the regulation baseline (7 or 9, ruleset-driven), **shrink column
+  width gracefully** rather than overflowing the bar.
+- Past a practical limit (≈12–13 columns), **roll the window** to show only
+  the most recent few innings plus the current one — the way broadcasts
+  handle marathon games — with a visual cue that earlier innings are
+  scrolled off.
+- **R / H / E totals are cumulative, not per-inning:** they stay
+  fixed-width, pinned to the right edge, and are **never shrunk, dropped,
+  or rolled out of view**.
+- This is a **theme-runtime rendering rule for every eventual baseball
+  board**, not Collegiate-only — Friday Night Stadium / 8-Bit / Heritage
+  line scores inherit the same open-ended-columns + fixed R/H/E contract
+  when their baseball boards go live.
+
+The R9 prototype's `patchCollegiateLineScore` already sizes columns as
+`max(9, inning)` — it has the open-ended count but **not** the shrink or
+window-roll behaviour; T1 adds both.
+
 **Item 3 — "On the Mound" / "At Bat" live rail panels.** Built on the
 existing persistent `.bl-college-rail` + `patchCollegiateRails()` system
 (250 ms fast path; live team stat grid + 25 s rotating `.bl-player-leader`
