@@ -204,6 +204,12 @@ class BroadcastLifecycleService:
             "broadcast_created": True,
             "broadcast_id": item.get("broadcast_id", ""),
             "sport": sport,
+            # Jurisdiction the rules engine resolves against
+            # (ruleset_service.active_ruleset). Absent on legacy records ->
+            # "" -> the generic ruleset, identical engine behaviour to today.
+            "country": str(item.get("country", "") or "").strip().upper() or "US",
+            "region": str(item.get("region", "") or "").strip().upper(),
+            "association": str(item.get("association", "") or "").strip().upper(),
             "season": item.get("season", ""),
             "week": item.get("week", "1"),
             "classification": item.get("classification", ""),

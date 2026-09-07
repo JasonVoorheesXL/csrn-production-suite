@@ -615,6 +615,12 @@ last_obs_status: dict[str, Any] = {
 DEFAULT_STATE: dict[str, Any] = {
     "broadcast_created": False,
     "sport": "Football",
+    # Jurisdiction the rules engine resolves against
+    # (ruleset_service.active_ruleset). Default "US" / "" / "" -> the
+    # generic NFHS ruleset, i.e. today's behaviour before any picker.
+    "country": "US",
+    "region": "",
+    "association": "",
     "level": "Varsity",
     "division": "Boys",
     # Placeholder identity shown before a broadcast is loaded -- from the
