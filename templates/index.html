@@ -149,6 +149,11 @@
             <option disabled>Softball (future)</option>
           </select>
         </label>
+        <label>Rules / Jurisdiction
+          <select id="rulesetJurisdiction" data-country="US" data-region="MS" data-association="MHSAA" onchange="syncRulesetJurisdictionDataset()">
+            <option value="football/us-ms-mhsaa" data-country="US" data-region="MS" data-association="MHSAA" selected>Mississippi HS Football (MHSAA)</option>
+          </select>
+        </label>
         <label>Season
           <input id="season" type="number" min="2020" max="2100">
         </label>
@@ -1805,6 +1810,7 @@ async function initializeAuthenticatedApp() {
   }
 
   await loadConfig();
+  await loadRulesetOptions();
   await loadBroadcasters();
   await loadCaptionControls();
   await loadGameManager();
@@ -2859,8 +2865,13 @@ async function createBroadcast() {
         }
       }
     }
+    const jurisdictionSelect = document.getElementById('rulesetJurisdiction');
+    const jurisdictionOption = jurisdictionSelect?.selectedOptions?.[0];
     const broadcastPayload = {
     sport: document.getElementById('sport').value,
+      country: (jurisdictionOption?.dataset.country ?? jurisdictionSelect?.dataset.country) || 'US',
+      region: (jurisdictionOption?.dataset.region ?? jurisdictionSelect?.dataset.region) || '',
+      association: (jurisdictionOption?.dataset.association ?? jurisdictionSelect?.dataset.association) || '',
       season: document.getElementById('season').value,
       classification: document.getElementById('classification').value,
       week: document.getElementById('week').value,
@@ -4891,6 +4902,63 @@ function updateOrganizationLogoPreview(){
 }
 document.getElementById('cfgOrgLogo')?.addEventListener('input',updateOrganizationLogoPreview);
 
+// Broadcast-creation Rules / Jurisdiction picker. Options are grouped by
+// country; each carries its ruleset's (country, region, association) tuple
+// in data-* attributes, which createBroadcast()/editGame() read. The tuple
+// is what the backend resolves against (ruleset_service.active_ruleset).
+async function loadRulesetOptions() {
+  const select = document.getElementById('rulesetJurisdiction');
+  if (!select) return;
+  let rows;
+  try {
+    rows = (await api('/api/rulesets'))?.rulesets;
+  } catch (_) {
+    return; // keep the static MHSAA option on failure
+  }
+  if (!Array.isArray(rows) || !rows.length) return;
+  const previous = select.value || 'football/us-ms-mhsaa';
+  const countryLabel = (code) => ({US: 'United States', CA: 'Canada'}[code] || code || 'Other');
+  const groups = new Map();
+  for (const r of rows) {
+    const key = r.country || 'ZZ';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+  const orderedKeys = [...groups.keys()].sort((a, b) => (a === 'US' ? -1 : b === 'US' ? 1 : a.localeCompare(b)));
+  select.innerHTML = orderedKeys.map((key) => {
+    const opts = groups.get(key).map((r) => {
+      const c = r.country || '', reg = r.region || '', assoc = r.association || '';
+      return `<option value="${escapeHtml(r.id)}" data-country="${escapeHtml(c)}" data-region="${escapeHtml(reg)}" data-association="${escapeHtml(assoc)}">${escapeHtml(r.label || r.id)}</option>`;
+    }).join('');
+    return `<optgroup label="${escapeHtml(countryLabel(key))}">${opts}</optgroup>`;
+  }).join('');
+  const restore = [...select.options].some((o) => o.value === previous) ? previous : 'football/us-ms-mhsaa';
+  select.value = [...select.options].some((o) => o.value === restore) ? restore : (select.options[0]?.value || '');
+  syncRulesetJurisdictionDataset();
+}
+
+// Mirror the selected <option>'s jurisdiction tuple onto the <select> itself
+// so callers can read it without walking selectedOptions.
+function syncRulesetJurisdictionDataset() {
+  const select = document.getElementById('rulesetJurisdiction');
+  const opt = select?.selectedOptions?.[0];
+  if (!select || !opt) return;
+  select.dataset.country = opt.dataset.country || '';
+  select.dataset.region = opt.dataset.region || '';
+  select.dataset.association = opt.dataset.association || '';
+}
+
+function selectRulesetJurisdiction(country, region, association) {
+  const select = document.getElementById('rulesetJurisdiction');
+  if (!select) return;
+  const want = (v) => String(v || '').trim().toUpperCase();
+  const [wc, wr, wa] = [want(country) || 'US', want(region), want(association)];
+  const match = [...select.options].find((o) =>
+    want(o.dataset.country) === wc && want(o.dataset.region) === wr && want(o.dataset.association) === wa);
+  if (match) select.value = match.value;
+  syncRulesetJurisdictionDataset();
+}
+
 async function loadConfig() {
   currentConfig = await api('/api/config');
   const c = currentConfig;
@@ -6768,6 +6836,7 @@ function renderGameManager(){
 async function editGame(id){
   const r=gameManagerRecords.find(x=>x.broadcast_id===id); if(!r) return; editingBroadcastId=id; moveSetupPanelToGameManager(); const p=document.getElementById('setupPanel'); p.classList.remove('hidden');
   for(const [k,v] of Object.entries({sport:r.sport||'Football',season:r.season||String(new Date().getFullYear()),classification:r.classification||'5A',week:r.week||'1',level:r.level||'Varsity',division:r.division||'Boys',date:r.date||'',venue:r.venue||'',visualMode:r.visual_mode||'graphic',homeTeam:r.home_team||'',visitorTeam:r.visitor_team||''})){const e=document.getElementById(k);if(e)e.value=v;}
+  selectRulesetJurisdiction(r.country||'US', r.region||'', r.association||'');
   document.getElementById('homeSchoolSelect').value=r.home_school_id||'__manual__'; document.getElementById('visitorSchoolSelect').value=r.visitor_school_id||'__manual__'; const m=(r.scheduled_start||'7:00 PM').match(/(\d+):(\d+)\s*(AM|PM)/i); if(m){startHour.value=String(Number(m[1]));startMinute.value=m[2];startAmPm.value=m[3].toUpperCase();}
   populateBroadcastPlanning(r);
   await loadGamePregameStorylines(id);

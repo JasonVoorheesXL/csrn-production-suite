@@ -401,6 +401,11 @@ class BroadcastService:
         for key in self._EDITABLE_KEYS:
             if key in data:
                 item[key] = copy.deepcopy(data[key])
+        for key in ("country", "region", "association"):
+            if key in data:
+                item[key] = self.jurisdiction_code(data[key]) or (
+                    "US" if key == "country" else ""
+                )
 
         sport = str(item.get("sport", "Football") or "Football")
         item.update(

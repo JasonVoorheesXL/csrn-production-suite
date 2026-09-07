@@ -29,6 +29,15 @@ def create_broadcast_blueprint(
         )
         return jsonify(result.data)
 
+    @routes.get("/api/rulesets")
+    @dependencies.require_auth
+    def list_rulesets():
+        """Shipped rulesets + their jurisdiction, for the broadcast-creation
+        jurisdiction picker to group and select from."""
+        import ruleset_service
+
+        return jsonify({"rulesets": ruleset_service.available_rulesets()})
+
     @routes.get("/api/broadcasts")
     @dependencies.require_auth
     def list_broadcasts():
