@@ -254,3 +254,21 @@ class EntitlementService:
         sports = {str(item).casefold() for item in record.get("sports", [])}
         sport_allowed = not sport or "*" in sports or sport.casefold() in sports
         return str(feature) in features and sport_allowed
+
+    def licensed_sport_families(self) -> list[str]:
+        """Canonical sport families this install is licensed for (Round 27).
+
+        Empty when the install is unlicensed. ``"*"`` in the license's
+        ``sports`` list (the development license, or an all-sports
+        commercial license) expands to every family. This is the read
+        model the login-screen sport picker and the ``/api/sport-context``
+        switch validate against.
+        """
+
+        import sport_families
+
+        status = self.status().data["licensing"]
+        if not status.get("valid"):
+            return []
+        record = status.get("license") or {}
+        return sport_families.resolve_licensed_families(record.get("sports", []))
