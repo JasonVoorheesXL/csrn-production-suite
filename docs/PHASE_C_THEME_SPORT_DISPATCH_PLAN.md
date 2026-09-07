@@ -16,6 +16,30 @@ Scope: `{basketball, baseball, softball}` (soccer explicitly out).
 | 4 | **commissioned** Collegiate Tech diamond | CSS/SVG diamond field graphic in the `.bl-college-field` idiom, runtime-injected. |
 | 5 | **commissioned** Heritage line-score box | `.hp-current-line` R/H/E + at-bat/pitcher name kept live in the press typeface. |
 | 6 | docs + clash-art assessment | this section + `ADDING_A_SPORT_TO_A_FROZEN_THEME.md`. |
+| 7 | video-board contract audit + Collegiate fix | reserved `.bl-college-stage` (`data-module="video.board"` + `[data-video-mode="broadcast"]`) on the Collegiate baseball/softball/basketball boards; FNS/8-Bit/Heritage already compliant for every sport. |
+
+### Video-board contract (Gate 16.7 "central video-board ownership") coverage for the new sport panels
+
+The engines were checked for whether their non-football scorebug emits the
+reserved `data-module="video.board"` region a future feed / OBS composite
+slots into (`nativeVideoBoardHost()` in the runtime resolves it per alias).
+
+| Theme | Non-football video-board region | Verdict |
+| --- | --- | --- |
+| Friday Night Stadium | `scoreboard()` emits `<section class="bl-fns-video-board" data-module="video.board">` inside `.bl-fns-main-display` for **every** sport; per-sport clash is `.bl-fns-clash[data-video-mode="clash"][data-clash-sport]`. | **Already honors — no fix.** |
+| 8-Bit Gameday | Identical shape: `.bl-8bit-video-board[data-module="video.board"]` for every sport; per-sport clash `.bl-8bit-clash[data-video-mode="clash"]`. | **Already honors — no fix.** |
+| Heritage Press | `openingContent()` branches on **mode** (player/highlight/sponsor/broadcast), not sport, so `.hp-opening` + `data-video-mode` sections + `.hp-highlight-window[data-module="video.board"]` render for baseball/basketball too. The commissioned line-score box (`.hp-current-line`) is a stats table, not a video surface — it adds no new video region. | **Already honors — no fix.** |
+| Heritage decolorize | `csrn-production-highlight-video` (+ `csrn-production-heritage-highlight-window`) and the `grayscale/contrast/sepia` filter (Gate 16.9 R2/R6/R7/R8) are applied by `mountCentralBoardMedia()` / the runtime CSS keyed on `alias === "heritage_press"` + mode — **sport-agnostic**. A future baseball highlight video inherits the ink-on-paper treatment automatically. **No frozen-gate change, no re-pin.** | **Already honors — no fix.** |
+| Collegiate Tech | `collegiate()` returns `collegiateFootballScorebug` (with `.bl-college-stage[data-module="video.board"]`) **only for football**; baseball/softball fall to `baseballLineScore`, basketball to a bare `bl-scorebug bl-collegiate` — **no video-board region at all**. `nativeVideoBoardHost(root,"collegiate_traditional",mode)` returned null. | **Gap — fixed in commit 7.** Runtime injects `ensureCollegiateVideoStage()`: a compact full-width `.bl-college-stage.bl-college-stage-reserved` strip carrying `data-module="video.board"` and a direct `[data-video-mode="broadcast"]` host (reusing the engine's own `.bl-college-stage-field` / `.bl-college-video-feed` classes). The contract selector now resolves; a feed replaces the child in place. Full mode-swap (highlight/sponsor/player interstitials) for Collegiate non-football still needs the engine's re-render path and is deferred to the actual video capability — the layout space is reserved now. |
+| Modern Network | Scorebug-only for every sport by accepted design (open question 8). No clash/side-rail exists to reserve. | **N/A by design.** |
+
+Side effect of commit 7: with the reserved strip spanning `grid-column:1 / -1`
+on the Collegiate baseball board, the commissioned diamond (commit 4) now
+flows to a full-width row below it instead of the 310 px state column — a
+proportion change to an unmerged same-round panel, visually an improvement.
+The reserved strip ships **visible** (a hatched "VIDEO" swatch + "RESERVED
+FOR LIVE VIDEO"), matching how Heritage already shows a "LIVE VIDEO OPENING"
+placeholder in the live state; flip it to fully hidden if that reads better.
 
 **Every change is in `csrn-production-theme-runtime.js/.css` — neither is
 under a SHA-256 pin. No frozen-renderer fingerprint changed;

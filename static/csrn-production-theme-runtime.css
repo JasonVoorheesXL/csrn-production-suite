@@ -1731,3 +1731,36 @@ html.csrn-production-theme-player-active #playerGraphic{
 .bl-college-diamond-meta small{font-size:13px;line-height:1;text-transform:uppercase;color:#9fb0c4;font-weight:900;letter-spacing:.08em}
 .bl-college-diamond-meta b{font-size:19px;line-height:1;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
 .bl-college-diamond[data-inning-half="bottom"] .bl-cd-inning{color:#ffd23c}
+
+/* Phase C — reserved central video-board slot for Collegiate Tech
+   baseball / softball / basketball (Gate 16.7 "central video-board
+   ownership"). The frozen engine only builds .bl-college-stage for
+   football; this keeps the contract's layout space reserved on the other
+   sports, injected from csrn-production-theme-runtime.js so the pinned
+   engine files stay byte-stable. It ships as a compact, full-width
+   placeholder strip -- a future feed replaces the [data-video-mode]
+   child in place. */
+.bl-college-stage-reserved{
+  grid-column:1 / -1;
+  display:flex!important;
+  align-items:center;
+  height:84px;
+  margin-top:9px;
+  padding:0 16px;
+}
+.bl-college-stage-reserved > .bl-college-stage-field{
+  background:linear-gradient(180deg,rgba(9,20,32,.55),rgba(0,4,10,.72));
+  opacity:1;filter:none;
+}
+.bl-college-stage-reserved > .bl-college-broadcast{
+  position:relative;z-index:2;display:flex;align-items:center;gap:14px;
+  min-width:0;padding:0;
+}
+.bl-college-stage-reserved .bl-college-video-feed{
+  width:104px;height:58px;flex:0 0 auto;
+}
+.bl-college-stage-reserved .bl-college-broadcast::after{
+  content:"RESERVED FOR LIVE VIDEO";
+  font:900 12px/1.3 Rockwell,Georgia,serif;letter-spacing:.12em;
+  color:#9fd0ff;opacity:.78;white-space:nowrap;
+}

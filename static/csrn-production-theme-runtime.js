@@ -1407,6 +1407,7 @@ function applyBasketballBoardOverrides(root, alias, runtime) {
     root.querySelectorAll('[data-bind="game.clock"]').forEach(node => { node.textContent = clock; });
     if (period) root.querySelectorAll('[data-bind="game.period"]').forEach(node => { node.textContent = period; });
     if (shotClock) root.querySelectorAll('[data-bind="game.shotClock"]').forEach(node => { node.textContent = shotClock; });
+    ensureCollegiateVideoStage(root, runtime);
   }
 }
 
@@ -1485,6 +1486,7 @@ function applyDiamondBoardOverrides(root, alias, runtime) {
     const count = root.querySelector(".bl-baseball-state .bl-count");
     if (count) count.textContent = `B ${balls} · S ${strikes} · O ${outs}`;
     paintBases(root.querySelector(".bl-baseball-state .bl-diamond"));
+    ensureCollegiateVideoStage(root, runtime);
     ensureCollegiateDiamond(root, {half, inning, balls, strikes, outs, bases});
   }
 }
@@ -1568,6 +1570,38 @@ function ensureCollegiateDiamond(root, d) {
   host.querySelector(".bl-cd-runner.first").classList.toggle("on", Boolean(runner[0]));
   host.querySelector(".bl-cd-runner.second").classList.toggle("on", Boolean(runner[1]));
   host.querySelector(".bl-cd-runner.third").classList.toggle("on", Boolean(runner[2]));
+}
+
+// Phase C: reserve the central video-board region on the Collegiate Tech
+// baseball / softball / basketball boards. The SHA-256-pinned
+// csrn-broadcast-layout-engine only emits `.bl-college-stage`
+// (data-module="video.board") for football, so switching the operator to a
+// non-football sport drops the region the Gate 16.7 "central video-board
+// ownership" contract depends on -- nativeVideoBoardHost() looks for
+// `.bl-college-stage` and finds nothing. The runtime injects a
+// contract-shaped host here: `.bl-college-stage` with a direct
+// `[data-video-mode="broadcast"]` child, reusing the engine's own
+// `.bl-college-stage-field` / `.bl-college-video-feed` classes. It ships as
+// a quiet placeholder (same as Heritage's "LIVE VIDEO OPENING" slot) so a
+// future feed drops in with no layout retrofit. FNS / 8-Bit / Heritage
+// already emit their board region for every sport and need nothing here.
+function ensureCollegiateVideoStage(root, runtime) {
+  if (!root) return;
+  const board = root.querySelector(".bl-scorebug.bl-collegiate, .bl-baseball-board.bl-collegiate");
+  if (!board) return;
+  if (board.querySelector(":scope > .bl-college-stage")) return;
+  const stage = document.createElement("section");
+  stage.className = "bl-college-stage bl-college-stage-reserved";
+  stage.setAttribute("data-module", "video.board");
+  stage.setAttribute("data-video-reserved", "1");
+  stage.innerHTML =
+    '<div class="bl-college-stage-field" aria-hidden="true"></div>' +
+    '<div class="bl-college-video-replacement bl-college-broadcast" data-video-mode="broadcast">' +
+      '<div class="bl-college-video-feed">VIDEO</div>' +
+    '</div>';
+  const diamond = board.querySelector(":scope > .bl-college-diamond");
+  if (diamond) board.insertBefore(stage, diamond);
+  else board.appendChild(stage);
 }
 
 function applyFootballBoardOverrides(root, alias, runtime) {

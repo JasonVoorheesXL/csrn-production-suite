@@ -69,5 +69,22 @@ try {
   };
 } catch (e) { results.bitBasketball = "ERR " + e.message; }
 
+try {
+  const col = renderBoard("CSRNBroadcastLayoutEngine", "collegiate_traditional", "baseball",
+    {inning: "3", inningHalf: "TOP", balls: "0", strikes: "0", outs: "0", bases: [false, false, false]});
+  PC.applyDiamondBoardOverrides(col, "collegiate_traditional",
+    {sport: "baseball", inning: "7", inning_half: "BOTTOM", balls: "2", strikes: "2", outs: "2", bases: [true, false, true]});
+  const stage = col.querySelector(".bl-college-stage.bl-college-stage-reserved");
+  results.collegiateVideoBoard = {
+    // engine emits no .bl-college-stage for non-football; the runtime reserves it
+    reservedStagePresent: !!stage,
+    hasVideoBoardModule: !!stage && stage.getAttribute("data-module") === "video.board",
+    hasBroadcastHost: !!(stage && stage.querySelector(':scope > [data-video-mode="broadcast"]')),
+    diamondStillPresent: !!col.querySelector(".bl-college-diamond"),
+    // the reserved stage sits ahead of the injected diamond
+    stageBeforeDiamond: !!stage && !!(stage.compareDocumentPosition(col.querySelector(".bl-college-diamond")) & Node.DOCUMENT_POSITION_FOLLOWING)
+  };
+} catch (e) { results.collegiateVideoBoard = "ERR " + e.message; }
+
 document.getElementById("out").textContent = JSON.stringify(results, null, 1);
 </script></body></html>

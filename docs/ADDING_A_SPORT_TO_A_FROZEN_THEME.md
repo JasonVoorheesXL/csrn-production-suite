@@ -62,6 +62,13 @@ layers, a different container) rather than just patch live values.
       by editing a frozen engine
 - [ ] Possession / down / period labels gated so nothing football-shaped
       leaks (`hasPossession`, `family === "football"`)
+- [ ] Central video-board region present for the sport — the engine emits
+      `data-module="video.board"` + a `[data-video-mode]` host, or the
+      runtime injects one (see `ensureCollegiateVideoStage`) so
+      `nativeVideoBoardHost()` resolves and a future feed has a home
+      (Gate 16.7). Heritage video inherits `csrn-production-highlight-video`
+      for the Gate 16.9 decolorize filter automatically (keyed on
+      alias + mode, not sport).
 - [ ] `static/csrn-phasec-dispatch-lab.html` extended to exercise it
 - [ ] Full suite green; frozen `test_gate*` fingerprints unchanged (or
       re-pinned + `CSRN_PROJECT_BIBLE.md` updated if a frozen file really
