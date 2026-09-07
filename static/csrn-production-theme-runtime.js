@@ -1143,7 +1143,8 @@ function productionDiamondState(source, gameSource) {
     homeHits: pick("home_hits", "homeHits"),
     visitorHits: pick("visitor_hits", "visitorHits"),
     homeErrors: pick("home_errors", "homeErrors"),
-    visitorErrors: pick("visitor_errors", "visitorErrors")
+    visitorErrors: pick("visitor_errors", "visitorErrors"),
+    lineScore: objectValue(source.line_score, source.lineScore, gameSource.line_score, gameSource.lineScore)
   };
 }
 
@@ -1475,6 +1476,7 @@ function applyDiamondBoardOverrides(root, alias, runtime) {
     const outsB = labeledCell(root, "OUTS") && labeledCell(root, "OUTS").querySelector(":scope > b");
     if (outsB) outsB.textContent = outs || "0";
     paintBases(labeledCell(root, "RUNNERS"));
+    patchHeritageBoxscore(root, runtime);
     return;
   }
   if (alias === "collegiate_traditional") {
@@ -1485,6 +1487,37 @@ function applyDiamondBoardOverrides(root, alias, runtime) {
     paintBases(root.querySelector(".bl-baseball-state .bl-diamond"));
     ensureCollegiateDiamond(root, {half, inning, balls, strikes, outs, bases});
   }
+}
+
+// Phase C (commissioned): keep Heritage Press's newspaper line-score box
+// (.hp-current-line, built and styled by the engine) live -- R/H/E totals
+// and the current at-bat / pitcher name -- on the fast path. The
+// per-inning columns are structural and change with the whole board.
+function patchHeritageBoxscore(root, runtime) {
+  const homeScore = Math.max(0, Number(runtime.home_score || 0));
+  const visitorScore = Math.max(0, Number(runtime.visitor_score || 0));
+  const line = root.querySelector('.hp-current-line[data-module="game.lineScore"]');
+  if (line) {
+    const rows = [...line.querySelectorAll(".hp-line-row:not(.head)")];
+    const rhe = (row, runs, hits, errors) => {
+      if (!row) return;
+      const cells = [...row.querySelectorAll(":scope > b")];
+      const last3 = cells.slice(-3);
+      if (last3[0]) last3[0].textContent = String(runs);
+      if (last3[1] && hits != null && hits !== "") last3[1].textContent = String(hits);
+      if (last3[2] && errors != null && errors !== "") last3[2].textContent = String(errors);
+    };
+    rhe(rows[0], homeScore, textValue(runtime.home_hits, runtime.homeHits), textValue(runtime.home_errors, runtime.homeErrors));
+    rhe(rows[1], visitorScore, textValue(runtime.visitor_hits, runtime.visitorHits), textValue(runtime.visitor_errors, runtime.visitorErrors));
+  }
+  const roles = [...root.querySelectorAll(".hp-role-stack .hp-role")];
+  const nameOf = (section) => section && section.querySelector("strong");
+  const batter = roles.find(s => /AT BAT/i.test(s.querySelector("h3")?.textContent || ""));
+  const pitcher = roles.find(s => /(MOUND|CIRCLE)/i.test(s.querySelector("h3")?.textContent || ""));
+  const batterName = textValue(runtime.batter_name, runtime.batterName);
+  const pitcherName = textValue(runtime.pitcher_name, runtime.pitcherName);
+  if (batterName && nameOf(batter)) nameOf(batter).textContent = batterName;
+  if (pitcherName && nameOf(pitcher)) nameOf(pitcher).textContent = pitcherName;
 }
 
 // Phase C (commissioned): a full diamond field-position graphic for the
