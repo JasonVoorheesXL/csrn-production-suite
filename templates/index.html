@@ -100,6 +100,7 @@
         <div class="subhead" id="matchup">Secure Access</div>
         <div class="header-actions">
           <div id="phaseBadge" class="phase-badge phase-pregame hidden">PREGAME</div>
+          <select id="sportSwitcher" class="small-button header-sport-switch hidden" onchange="switchSportContext(this.value)" title="Sport context" aria-label="Sport context"></select>
           <button id="switchConsoleButton" class="small-button hidden" onclick="openConnectionRoleModal()">Switch Console</button>
           <button id="headerLogout" class="small-button header-logout hidden" onclick="logout()">Log Out</button>
         </div>
@@ -1811,6 +1812,7 @@ async function initializeAuthenticatedApp() {
   }
 
   await loadConfig();
+  await loadSessionContext();
   await loadBroadcasters();
   await loadCaptionControls();
   await loadGameManager();
@@ -2788,6 +2790,7 @@ function showSecurityState() {
   document.getElementById('phaseBadge').classList.add('hidden');
   document.getElementById('headerLogout').classList.add('hidden');
   document.getElementById('moduleNav').classList.add('hidden');
+  document.getElementById('sportSwitcher').classList.add('hidden');
   document.getElementById('matchup').textContent = 'Secure Access';
 }
 
@@ -2935,6 +2938,66 @@ function applyLoginSportSelection() {
   });
 }
 
+// ---- Round 27: in-app sport-context switcher (top nav, no re-PIN) ------
+const SPORT_FAMILY_LABEL = {football:'Football', basketball:'Basketball', baseball:'Baseball', softball:'Softball', soccer:'Soccer'};
+let sessionContextData = null;
+let sportContext = '';
+let sportScope = '';
+
+async function loadSessionContext() {
+  try {
+    sessionContextData = await api('/api/session-context');
+  } catch (_) {
+    sessionContextData = {sport_context:'', sport_scope:'', licensed_sports:[], other_sports:[]};
+  }
+  sportContext = sessionContextData.sport_context || '';
+  sportScope = sessionContextData.sport_scope || '';
+  renderSportSwitcher();
+}
+
+function renderSportSwitcher() {
+  const sel = document.getElementById('sportSwitcher');
+  if (!sel) return;
+  sel.classList.toggle('hidden', !authenticated);
+  if (!sessionContextData) return;
+  const d = sessionContextData;
+  let html = '<option value="">All sports</option>';
+  const licensed = d.licensed_sports || [];
+  if (licensed.length) {
+    html += '<optgroup label="Sports">' +
+      licensed.map(s => `<option value="${s}">${SPORT_FAMILY_LABEL[s] || s}</option>`).join('') +
+      '</optgroup>';
+  }
+  const others = (d.other_sports || []).map(o =>
+    `<option value="${o.context}"${o.available ? '' : ' disabled'}>${o.label}${o.available ? '' : ' (soon)'}</option>`
+  ).join('');
+  if (others) html += `<optgroup label="More">${others}</optgroup>`;
+  sel.innerHTML = html;
+  // Set to the stored context; if it isn't an option, fall back to "All sports".
+  sel.value = d.sport_context || '';
+  if (sel.value !== (d.sport_context || '')) sel.value = '';
+}
+
+async function switchSportContext(value) {
+  try {
+    const data = await api('/api/sport-context', {sport: value});
+    sessionContextData = data;
+    sportContext = data.sport_context || '';
+    sportScope = data.sport_scope || '';
+    renderSportSwitcher();
+    // Re-run the current module so its rosters / sponsors re-scope.
+    if (typeof showModule === 'function' && currentModule) showModule(currentModule);
+  } catch (err) {
+    const sel = document.getElementById('sportSwitcher');
+    if (sel) sel.value = sportContext;
+    alert({
+      SPORT_NOT_LICENSED: 'That sport is not part of this CSRN license.',
+      SPORT_COMING_SOON: 'That sport is coming soon.',
+      SPORT_NOT_RECOGNIZED: 'Choose a specific sport.'
+    }[err.message] || 'Could not switch sport context.');
+  }
+}
+
 async function setupPin() {
   const pin = document.getElementById('newPin').value;
   const confirm = document.getElementById('confirmPin').value;
@@ -2979,6 +3042,9 @@ async function logout() {
   authenticated = false;
   appInitialized = false;
   currentState = null;
+  sessionContextData = null;
+  sportContext = '';
+  sportScope = '';
   await checkSecurity();
 }
 
@@ -3871,6 +3937,7 @@ function render() {
   document.getElementById('headerLogout').classList.toggle('hidden', !authenticated);
   const switchConsoleButton=document.getElementById('switchConsoleButton'); if(switchConsoleButton) switchConsoleButton.classList.toggle('hidden', !authenticated);
   document.getElementById('moduleNav').classList.toggle('hidden', !authenticated);
+  renderSportSwitcher();
 
   updateRestoreControls();
 

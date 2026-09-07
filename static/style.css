@@ -108,6 +108,8 @@ button.success { background:var(--ok); }
 button.warning { background:var(--warn); }
 button.danger { background:var(--danger); }
 .small-button { min-height:38px; padding:8px 13px; font-size:14px; }
+.header-sport-switch { min-height:38px; padding:6px 10px; max-width:190px; background:#141821; border:1px solid #3a414c; }
+.header-sport-switch:focus { border-color:var(--accent2); outline:none; }
 .top-row { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px; }
 .wide { width:100%; }
 .score-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
