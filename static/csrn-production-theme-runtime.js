@@ -1357,8 +1357,69 @@ function labeledCell(root, label) {
   }) || null;
 }
 
+// Phase C: dispatch the per-poll live board patch by sport family. The
+// football path is unchanged; basketball patches its running clock/period,
+// and baseball/softball have no sub-second board (their state moves on
+// discrete events, which re-render the whole package).
+function applyBoardOverrides(root, alias, runtime) {
+  if (!root) return;
+  const family = productionSportFamily(runtime && runtime.sport);
+  if (family === "basketball") return applyBasketballBoardOverrides(root, alias, runtime);
+  if (family === "baseball" || family === "softball") return applyDiamondBoardOverrides(root, alias, runtime);
+  return applyFootballBoardOverrides(root, alias, runtime);
+}
+
+function applyBasketballBoardOverrides(root, alias, runtime) {
+  if (!root) return;
+  const clock = productionClock(runtime);
+  const period = textValue(runtime.period, runtime.quarter, "").trim();
+  const shotClock = textValue(runtime.shot_clock, runtime.shotClock, "").trim();
+
+  if (alias === "eight_bit_gameday") {
+    const cell = root.querySelector(".bl-8bit-basketball-control-bank .bl-8bit-clock-led")?.closest("span");
+    if (cell) setLedText(cell, clock, "bl-8bit-clock-led");
+    return;
+  }
+  if (alias === "friday_night_stadium") {
+    const host = root.querySelector(".bl-fns-basketball-clock");
+    if (!host) return;
+    const led = host.querySelector(".csrn-production-led-override") || host.querySelector("svg");
+    const replacement = document.createElement("span");
+    replacement.className = "csrn-production-led-override bl-fns-clock-led";
+    replacement.textContent = clock;
+    replacement.setAttribute("role", "img");
+    replacement.setAttribute("aria-label", clock);
+    if (led) led.replaceWith(replacement);
+    else host.appendChild(replacement);
+    const strong = host.querySelector("strong");
+    if (strong && period) strong.textContent = period;
+    return;
+  }
+  if (alias === "heritage_press") {
+    const clockValue = labeledCell(root, "CLOCK")?.querySelector(":scope > b");
+    if (clockValue) clockValue.textContent = clock;
+    const periodValue = labeledCell(root, "PERIOD")?.querySelector(":scope > b");
+    if (periodValue && period) periodValue.textContent = period;
+    return;
+  }
+  if (alias === "collegiate_traditional") {
+    root.querySelectorAll('[data-bind="game.clock"]').forEach(node => { node.textContent = clock; });
+    if (period) root.querySelectorAll('[data-bind="game.period"]').forEach(node => { node.textContent = period; });
+    if (shotClock) root.querySelectorAll('[data-bind="game.shotClock"]').forEach(node => { node.textContent = shotClock; });
+  }
+}
+
+function applyDiamondBoardOverrides(root, alias, runtime) {
+  // Baseball / softball board state (inning, count, outs, bases, RHE) moves
+  // on discrete events, each of which re-renders the whole package via
+  // renderProductionTheme() with fresh mergeRuntimeState data. There is no
+  // running clock to patch on the sub-second fast path. Fleshed out in
+  // Phase C 3/8.
+  void root; void alias; void runtime;
+}
+
 function applyFootballBoardOverrides(root, alias, runtime) {
-  if (!root || String(runtime.sport || "football").toLowerCase() !== "football") return;
+  if (!root || productionSportFamily(runtime && runtime.sport) !== "football") return;
 
   const period = productionFootballPeriod(runtime);
   const downDistance = productionDownDistance(runtime);
@@ -1586,7 +1647,7 @@ function patchLiveGameState(runtime = lastRuntimeForClockPatch) {
   const root = scoreLayout();
   if (!root) return;
 
-  applyFootballBoardOverrides(root, currentAlias, runtime);
+  applyBoardOverrides(root, currentAlias, runtime);
   patchThemeScoresAndPossession(root, currentAlias, runtime);
   patchCollegiateRails(root, runtime, collegiateStatisticsCache.data);
 }
@@ -2769,7 +2830,7 @@ async function renderSelected() {
     patchCaptionDom(alias, captionState);
     await paintFridayNightLayeredFootballClash(scoreTarget, alias, activeVideoMode, state);
 
-    applyFootballBoardOverrides(scoreTarget, alias, runtime);
+    applyBoardOverrides(scoreTarget, alias, runtime);
     patchCollegiateRails(scoreTarget, runtime, collegiateStatistics);
     repairRenderedPlayerMedia(scoreTarget, state);
     mountCentralBoardMedia(scoreTarget, runtime, activeVideoMode, alias);
