@@ -413,16 +413,20 @@ surprise.
 Each phase = its own commits, full regression suite green, football live
 rendering untouched, reviewed before the next.
 
+Table reconciled with §12 (the approved spec is the authority where they
+differ).
+
 | Phase | Deliverable | Gate |
 | --- | --- | --- |
-| **P0** | Rebase branch onto merged trunk (R26+R27+Phase C). `docs/DIAMOND_OVERLAY_CONTRACT.md`. `rulesets/bat-ball-base.json` + `baseball/us-nfhs.json` + `softball/us-nfhs.json` with `_source_notes` for every flagged value (§8.1). `ruleset_service._CATALOG` rows + golden tests. | Ruleset resolves; `_source_notes` present for all flagged keys; football rulesets byte-identical. |
-| **P1** | `diamond_state_service` (canonical fields + pure mutators) + `at_bat_rules_service` (PA outcomes, operator-override base-running) + `inning_service` (half/inning/regulation/mercy/walk-off/extras). No UI. Unit tests mirror `test_canonical_state_service` / `test_rules_service` / `test_period_service`. | A scripted 9-inning game reaches a correct `final` state + line score purely through service calls. |
-| **P2** | `lineup_service` (order, subs, re-entry, courtesy runner, due-up). `diamond_event_service` (operator boundary + Play Register rows + `edit`/`undo`/`restore` via `live_command_service`). `game_operations_service` baseball extensions. | Undo/redo parity with football; a sub mid-inning keeps the box score correct. |
-| **P3** | `box_score_service` (line score + batting/pitching boxes). Overlay-state serializer emitting the §7 contract (incl. the T1 rail gaps). | `box_score_service.report(state)` matches a hand-scored test game; overlay payload validates against `DIAMOND_OVERLAY_CONTRACT.md`. |
-| **P4** | `routes/diamond_game_routes.py` blueprint (mirror `live_game_routes.py`). `app.py` + `phase5_architecture.py` wiring. `engine_router` dispatch on `state["sport"]`. | Football routes untouched; new routes covered; architecture audit passes. |
-| **P5** | Operator UI: `templates/_diamond_controls.html` partial — PA outcome entry, between-PA events, lineup editor, manual set-value. `sport_families.ENGINE_READY += {"baseball","softball"}`. | End-to-end: operator runs a full game from the UI; all five themes render it live (they already can). |
-| **P6** | `baseball/us-ms-mhsaa.json` + `softball/us-ms-mhsaa.json` (MS mercy numbers, timezone, classification) once the flagged §8.1 values are rulebook-confirmed. Pitch-count **display** counters. | MHSAA values sourced + `_source_notes` updated/cleared. |
-| **Later (not this engine)** | Pitch-by-pitch entry; pitch-count/rest **enforcement**; double-switch batting-slot automation; DH/FLEX edge cases; defensive putout/assist auto-attribution; automated ER determination. | — |
+| **P0** | Rebase branch onto merged trunk (R26+R27+Phase C). `docs/DIAMOND_OVERLAY_CONTRACT.md`. `RulesProfile`-shaped `rulesets/bat-ball-base.json` + `baseball/us-nfhs.json` + `softball/us-nfhs.json` with `_source_notes` for every flagged value (§8.1). `ruleset_service._CATALOG` rows + golden tests. Per-game `effectiveProfileId` + `effectiveProfileVersion` stamped at `new_broadcast`. | Ruleset resolves; `_source_notes` present for all flagged keys; football rulesets byte-identical. |
+| **P1** | `diamond_state_service` (canonical fields + pure mutators + `stateHash`) + append-only event reducer with start-of-game / end-of-half-inning snapshots + `at_bat_rules_service` (PA outcomes, `runnerOutcomes[]`, operator-override base-running, `UmpireRulingPayload` / `NEEDS_RULING` path) + `inning_service` + `game_end_evaluator` (regulation / run-rule / walk-off / time-limit / tiebreaker, `TIEBREAKER_RUNNER_PLACED` as a first-class event) + `rules_validator` (HARD_ERROR / SOFT_WARNING / NEEDS_RULING / INFO). No UI. | A scripted 9-inning game reaches a correct `final` state + line score through service calls; spec §19 `END-*`, `RUL-01` and the §19.1 replay/void invariants pass. |
+| **P2** | `lineup_service` — **baseball sub-engine** (starter-centric re-entry, NONE / TRADITIONAL_DH / PLAYER_DH, `PLAYER_DEFENSIVE_MEETING` vs `CHARGED_CONFERENCE`) and **softball sub-engine** (any-player re-entry, full DP/FLEX transition table + guided wizard, HARD invariant *DP+FLEX never both on offense*); courtesy runners (role-at-time snapshot); batting-out-of-order `BattingOrderAlert` + `AppealRuling` (detection ≠ enforcement); due-up. `diamond_event_service` (operator boundary; `EVENT_VOIDED` / `EVENT_CORRECTED` ledger events). Suspension snapshot / resume (spec §11.4). `game_operations_service` baseball extensions. | Spec §19 `BB-01…BB-06`, `SB-01…SB-06`, `CR-01/02`, `BOO-01/02`, `SUS-01`, `COR-01` pass; undo/redo parity with football. |
+| **P3** | `box_score_service` (line score + batting/pitching boxes from the ledger). Overlay-state serializer emitting the §7 contract (incl. the T1 rail gaps). | `box_score_service.report(state)` matches a hand-scored test game; overlay payload validates against `DIAMOND_OVERLAY_CONTRACT.md`. |
+| **P4** | `routes/diamond_game_routes.py` blueprint (mirror `live_game_routes.py`). `app.py` + `phase5_architecture.py` wiring. `engine_router` dispatch on `state["sport"]`. **Pitch-count eligibility engine** — `PitchCountPolicy` (rest bands, finish-batter exception, same-day aggregation), status `ELIGIBLE / WARNING / INELIGIBLE_BY_PROFILE / UNKNOWN_HISTORY`, off-platform prior history imported not assumed, **never auto-forfeit**. | Football routes untouched; new routes covered; architecture audit passes; spec §19 `MS-01` (rest-band status) passes. |
+| **P5** | Operator UI: `templates/_diamond_controls.html` partial — PA outcome entry, between-PA events, ruling workflow, substitution **wizard** (shows slot / starter-sub / prior exits / special role / pitcher-catcher status; picks substitution vs re-entry vs position-change vs DH/DP-FLEX vs courtesy runner vs correction), lineup editor, manual set-value. `sport_families.ENGINE_READY += {"baseball","softball"}`. | End-to-end: operator runs a full game from the UI; all five themes render it live. |
+| **P5b** | **Self-service `RulesProfile` editor** — see §13. | An operator creates a working profile for a *new* state/league from a form + clones the pre-loaded MHSAA template, with no CSRN-side profile build. |
+| **P6** | `baseball/us-ms-mhsaa.json` + `softball/us-ms-mhsaa.json` shipped as **pre-loaded clonable seed templates** (MS pitch bands, run rule, courtesy runner, softball double-first-base + international tiebreaker; timezone; classification) once the §8.1 / spec §17 values are rulebook-confirmed by the owner. Handbook revision/effective date stored on the profile. | MHSAA values owner-confirmed; `_source_notes` updated/cleared; seed templates load in the P5b editor. |
+| **Later (not this engine)** | Pitch-by-pitch entry; double-switch batting-slot automation; defensive putout/assist auto-attribution; automated earned-run determination; any **auto-forfeit / administrative penalty** inference (permanently out — always human-declared). | — |
 
 ---
 
@@ -486,6 +490,42 @@ suspension snapshot/restore. Nothing shrinks. The architecture (§2–§3, the
 `diamond_*` parallel services, `engine_router` dispatch, zero football-file
 edits, zero theme re-pins) is unchanged. The spec's §19 test matrix
 replaces "mirror the football tests" as the P1–P5 gate.
+
+---
+
+## 13. Self-service rules page (P5b — added 2026-09-07)
+
+**Requirement.** The operator edits **every `RulesProfile` field directly** —
+pitch-count bands, run-rule thresholds, courtesy-runner policy, tiebreaker
+policy, DH modes, regulation length, time limit, suspended-game policy,
+field flags, comms — from a form. A new state or league is supported by an
+operator filling out that form, **not** by CSRN building and verifying a
+profile first. CSRN ships *starting templates*, not a locked list.
+
+**Why it's an add-on, not a schema change.** The approved spec's model is
+already built for this: NFHS baseline → state overlay → competition profile
+→ game override, serializable and versioned (spec §1.1, §3, §3.2). P0
+already lands that schema. P5b is a **UI-exposure + editing workflow** on
+top of it — no new engine or ruleset-model work.
+
+**P5b deliverables:**
+
+| Piece | Detail |
+| --- | --- |
+| Profile CRUD UI | Create / clone / edit / archive a `RulesProfile`. Every field from spec §3 editable, grouped (regulation, run rules, tiebreaker, time limit, suspended-game, lineup, pitching/pitch-count, field, communications). |
+| Overlay layering shown explicitly | The editor shows which layer a value comes from (NFHS baseline / state / competition / this profile) and lets the operator override only at their layer — mirrors the spec's overlay-not-fork model. |
+| Pre-loaded seed templates | The P6 MHSAA baseball + softball profiles ship **as clonable templates**, not the only options. "New profile" always offers *Clone a template* or *Start from NFHS baseline* — nobody starts from a blank form. |
+| `runRules[]` / `restBands[]` array editors | Add / remove / reorder threshold rows; each row carries its own `authorityRef` + `effectiveDate` + `appliesTo` (spec §3.1). |
+| Version pinning preserved | Editing a profile creates a **new version**; games already in progress keep the `effectiveProfileVersion` they were created with (spec §3.2, §11.4, §19.1). The UI must make "this changes future games only" explicit. |
+| Validator feedback inline | Save surfaces `HARD_ERROR` (block) / `SOFT_WARNING` / `INFO` from the same `rules_validator` the live engine uses — e.g. a run-rule with `earliestCompletedInning` past `scheduledInnings`. |
+| `_source_notes` carry-through | A cloned template keeps its `_source_notes`; the operator can clear a note when they've confirmed a value against their own rulebook — same convention as everywhere else this arc. |
+
+**Sequencing.** After P5 (needs the operator-UI framework and the P0
+schema); does **not** block on P6's rulebook confirmation (the seed
+template can ship with its values still `_source_notes`-flagged and the
+operator edits from there). Sized as its own phase because it is a full
+CRUD surface + version-management UX, distinct from P5's live
+game-operation controls.
 
 ---
 
