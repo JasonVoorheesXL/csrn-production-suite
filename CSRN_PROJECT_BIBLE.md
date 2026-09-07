@@ -2335,10 +2335,24 @@ the shared engine was extended for the "Collegiate Tech" package series. This
 is an authorized re-pin of the fingerprints to the shipped bytes; no Neon
 renderer behaviour was changed in Round 9. Prior fingerprints:
 `4641A675512EA8C92E1408E421B690F862B49EA509D1009903A5F0B5EFB655EF` /
-`961E39C83C94C1F12194E2D984247E576E96916FB8E5D35BBEC77EFF5B5EA68D`):
+`961E39C83C94C1F12194E2D984247E576E96916FB8E5D35BBEC77EFF5B5EA68D`).
 
-- `static/csrn-broadcast-layout-engine.css`: `822755B7ABBA1F6D7439246904DB3AAEEFDE9649C617461457B73053672A02C9`
-- `static/csrn-broadcast-layout-engine.js`: `CE29D87BCB4DE6F5E21F00B8F61DBA76F18ABB5C340D2D5DF165BF8A6CD3B2A2`
+Re-pinned again 2026-09-06, Round 26 Phase B — the shared engine's
+`collegiate_traditional` field graphic was parameterised for Canadian
+football geometry: `.bl-college-endzone` / yard-number / five-yard-line /
+hashmark rules now read `--csrn-ez` / `--csrn-yardnum-count` custom
+properties, and `collegiateField()` derives the end-zone width and yard
+numbers from the active ruleset's `field.length_yards` /
+`end_zone_depth_yards`. A U.S. field resolves to the historical
+`--csrn-ez:5%` / 9 numbers, so the shipped U.S. look is byte-identical;
+only a Canadian broadcast renders the deeper 110-yd / 20-yd-end-zone
+proportions. No Neon / Friday Night / 8-Bit / Heritage renderer bytes
+were changed. Prior fingerprints:
+`822755B7ABBA1F6D7439246904DB3AAEEFDE9649C617461457B73053672A02C9` /
+`CE29D87BCB4DE6F5E21F00B8F61DBA76F18ABB5C340D2D5DF165BF8A6CD3B2A2`:
+
+- `static/csrn-broadcast-layout-engine.css`: `087BC0B9768A2E4A94D74A44904EF1E153E37D6E5FB7CD42CBD377C53208EB97`
+- `static/csrn-broadcast-layout-engine.js`: `1798F224878CB25CA4D2F304B4F33D8CF4838AC926AC84C67A4006C4D6A46914`
 
 Future Neon changes require an explicit unfreeze decision, a new isolated
 checkpoint, visual comparison against the approved concept, the complete

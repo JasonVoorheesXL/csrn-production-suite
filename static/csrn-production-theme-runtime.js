@@ -1109,9 +1109,14 @@ function productionBallOn(runtime) {
   return numbers?.length ? numbers[numbers.length - 1] : raw.toUpperCase();
 }
 
-function parseFieldSpot(value) {
+// lengthYards is the goal-line-to-goal-line distance of the active ruleset
+// (100 US / 110 Canadian). pct is always 0..100 (% of field width), so the
+// field graphic stays a fixed box; only the yards<->pct conversion scales.
+function parseFieldSpot(value, lengthYards = 100) {
   const raw = textValue(value).trim().toUpperCase();
   if (!raw || raw === "-") return null;
+  const length = Number(lengthYards) > 0 ? Number(lengthYards) : 100;
+  const mid = length / 2;
   const side = raw.includes("RIGHT") ? "right" : raw.includes("LEFT") ? "left" : "";
   if (/GOAL|GL/.test(raw)) {
     if (side === "right") return {raw, side, yard:0, pct:100};
@@ -1119,21 +1124,35 @@ function parseFieldSpot(value) {
   }
   const number = Number(raw.match(/\d+/)?.[0]);
   if (!Number.isFinite(number)) return null;
-  const yard = Math.max(0, Math.min(50, number));
+  const yard = Math.max(0, Math.min(mid, number));
   let pct = 50;
-  if (side === "left") pct = yard;
-  else if (side === "right") pct = 100 - yard;
-  else pct = yard === 50 ? 50 : yard;
+  if (side === "left") pct = (yard / length) * 100;
+  else if (side === "right") pct = 100 - (yard / length) * 100;
+  else pct = yard === mid ? 50 : (yard / length) * 100;
   return {raw, side, yard, pct:Math.max(0, Math.min(100, pct))};
 }
 
-function spotFromPercent(pct) {
+function spotFromPercent(pct, lengthYards = 100) {
   const bounded = Math.max(0, Math.min(100, Number(pct)));
   if (!Number.isFinite(bounded)) return "";
   if (bounded <= 0) return "LEFT GOAL";
   if (bounded >= 100) return "RIGHT GOAL";
-  if (bounded <= 50) return `LEFT ${Math.round(bounded)}`;
-  return `RIGHT ${Math.round(100 - bounded)}`;
+  const length = Number(lengthYards) > 0 ? Number(lengthYards) : 100;
+  if (bounded <= 50) return `LEFT ${Math.round((bounded / 100) * length)}`;
+  return `RIGHT ${Math.round(length - (bounded / 100) * length)}`;
+}
+
+// Sets the field-graphic's geometry CSS vars from the active ruleset. The
+// end-zone-depth ratio is anchored so the historical US look (10-yd end
+// zone on a 100-yd field) is exactly --csrn-ez:5%; a 20-yd Canadian end
+// zone on a 110-yd field scales to ~9.1%. Yard-number count is 9 (US) or
+// 11 (Canadian, which shows the centre "C").
+function applyFieldGeometry(root, lengthYards, endZoneDepthYards) {
+  if (!root || !root.style) return;
+  const length = Number(lengthYards) > 0 ? Number(lengthYards) : 100;
+  const ez = Number(endZoneDepthYards) > 0 ? Number(endZoneDepthYards) : 10;
+  root.style.setProperty("--csrn-ez", `${(ez / length) * 50}%`);
+  root.style.setProperty("--csrn-yardnum-count", length >= 110 ? "11" : "9");
 }
 
 function productionFieldDirection(source, fieldSource) {
@@ -1166,13 +1185,23 @@ function productionFieldState(source, gameSource = {}, canonicalField = {}) {
     gameSource.drive_start,
     gameSource.driveStart
   );
+  // Field geometry from the active ruleset (canonical_state_service.
+  // field_state). Absent (US game / older state) -> 100 / 10, i.e. today.
+  const lengthYards = Number(
+    fieldSource.length_yards ?? fieldSource.lengthYards ?? source.field_length_yards
+  ) || 100;
+  const endZoneDepthYards = Number(
+    fieldSource.end_zone_depth_yards ?? fieldSource.endZoneDepthYards
+  ) || 10;
   const direction = productionFieldDirection(source, fieldSource);
-  const ball = parseFieldSpot(ballRaw);
-  const drive = parseFieldSpot(driveRaw);
+  const ball = parseFieldSpot(ballRaw, lengthYards);
+  const drive = parseFieldSpot(driveRaw, lengthYards);
   const downDistance = productionDownDistance(source);
   const distance = Number(downDistance.distance);
-  const gainPct = ball && Number.isFinite(distance)
-    ? Math.max(0, Math.min(100, ball.pct + (direction === "left" ? -distance : distance)))
+  // distance is a yardage; convert to % of field width before offsetting.
+  const distancePct = Number.isFinite(distance) ? (distance / lengthYards) * 100 : NaN;
+  const gainPct = ball && Number.isFinite(distancePct)
+    ? Math.max(0, Math.min(100, ball.pct + (direction === "left" ? -distancePct : distancePct)))
     : null;
 
   return {
@@ -1180,13 +1209,15 @@ function productionFieldState(source, gameSource = {}, canonicalField = {}) {
     ballPct: ball?.pct ?? 50,
     driveStart: drive?.raw || "",
     driveStartPct: drive?.pct ?? ball?.pct ?? 50,
-    firstDownSpot: gainPct === null ? "" : spotFromPercent(gainPct),
+    firstDownSpot: gainPct === null ? "" : spotFromPercent(gainPct, lengthYards),
     firstDownPct: gainPct ?? ball?.pct ?? 50,
     direction,
     possession: textValue(source.possession, fieldSource.possession, "home").toLowerCase(),
     down: downDistance.down,
     distance: downDistance.distance,
     downDistance: downDistance.combined,
+    lengthYards,
+    endZoneDepthYards,
     visible: source.ball_spot_visible !== false
   };
 }
@@ -1342,6 +1373,7 @@ function applyFootballBoardOverrides(root, alias, runtime) {
       fieldRoot.style.setProperty("--ball-x", `${field.ballPct}%`);
       fieldRoot.style.setProperty("--drive-x", `${field.driveStartPct}%`);
       fieldRoot.style.setProperty("--first-x", `${field.firstDownPct}%`);
+      applyFieldGeometry(fieldRoot, field.lengthYards, field.endZoneDepthYards);
       fieldRoot.dataset.direction = field.direction;
       fieldRoot.dataset.possession = field.possession;
       fieldRoot.dataset.hasDriveStart = field.driveStart ? "true" : "false";

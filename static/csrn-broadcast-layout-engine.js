@@ -798,12 +798,20 @@
     const ballSpotLabel = collegiateFieldSpotLabel(state, ballSpot, possession, direction);
     const firstDownSpotLabel = collegiateFieldSpotLabel(state, firstDownSpot, possession, direction);
     const hasFirstDown = firstDownSpot !== "-";
-    const yardNumbers = ["10","20","30","40","50","40","30","20","10"].map((yard) => `<span>${yard}</span>`).join("");
+    // Field geometry from the active ruleset (100/10 US -> 110/20 Canadian).
+    // ez ratio anchored so a US field is exactly --csrn-ez:5% (unchanged).
+    const lengthYards = Number(field.lengthYards ?? field.length_yards) || 100;
+    const ezDepthYards = Number(field.endZoneDepthYards ?? field.end_zone_depth_yards) || 10;
+    const ezPct = (ezDepthYards / lengthYards) * 50;
+    const yardNumberLabels = lengthYards >= 110
+      ? ["10","20","30","40","50","C","50","40","30","20","10"]
+      : ["10","20","30","40","50","40","30","20","10"];
+    const yardNumbers = yardNumberLabels.map((yard) => `<span>${yard}</span>`).join("");
     const possessionTeam = possession === "visitor" ? state.visitor : state.home;
     const possessionLogo = possessionTeam.logo
       ? `<img src="${esc(possessionTeam.logo)}" alt="">`
       : `<span>${esc(collegiateInitials(possessionTeam))}</span>`;
-    return `<section class="bl-college-field" data-module="game.field" data-direction="${esc(direction)}" data-possession="${esc(possession)}" data-has-drive-start="${driveStart !== "-" ? "true" : "false"}" data-has-first-down="${hasFirstDown ? "true" : "false"}" data-field-visible="${visible ? "true" : "false"}" style="--ball-x:${ballPct}%;--drive-x:${drivePct}%;--first-x:${firstPct}%">
+    return `<section class="bl-college-field" data-module="game.field" data-direction="${esc(direction)}" data-possession="${esc(possession)}" data-has-drive-start="${driveStart !== "-" ? "true" : "false"}" data-has-first-down="${hasFirstDown ? "true" : "false"}" data-field-visible="${visible ? "true" : "false"}" style="--ball-x:${ballPct}%;--drive-x:${drivePct}%;--first-x:${firstPct}%;--csrn-ez:${ezPct}%;--csrn-yardnum-count:${yardNumberLabels.length}">
       <div class="bl-college-field-grid" aria-hidden="true">
         <div class="bl-college-endzone bl-left"><span></span></div>
         <div class="bl-college-endzone bl-right"><span></span></div>

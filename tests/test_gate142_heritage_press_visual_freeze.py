@@ -9,7 +9,11 @@ HERITAGE_OWNED_FROZEN = {
     # re-pinned Round 9 (2026-08-31): test_gate14 was edited only to re-pin the
     # Neon / Friday-Night renderer SHA-256 constants to their shipped bytes
     # (no Heritage assertion changed). See test_gate116 / test_gate126.
-    'tests/test_gate14_heritage_press_engine.py': 'CBAE2FB7B79EDC8BD14125AF7D2727BDCEF26BA98F217E029EDFFFF07D6AD3CA',
+    # re-pinned again Round 26 Phase B (2026-09-06): test_gate14's copy of the
+    # shared csrn-broadcast-layout-engine.css/.js SHA-256 constants was
+    # re-pinned after the collegiate_traditional field graphic gained the
+    # Canadian-geometry CSS custom properties. No Heritage assertion changed.
+    'tests/test_gate14_heritage_press_engine.py': '6F988BCDC7776196B35BA66A585079B1D1E1FC83A5CC14DBC7DD952E4A0184C4',
     'static/heritage/press-batter-1920s.png': 'F2D6174D757D36EDC2075A395FEEFC11ED0E970E12E5B4166EA3EFC3DD787DD6',
     'static/heritage/press-pitcher-1920s.png': 'AF9F23C6F9B15F3B10087B9D2D22C8CA1B26C0E7E29DD8521CA12C4905CAFBAF',
     'static/heritage/press-softball-batter-1920s.png': '0DDC8966DED0DCA3FDE396E2BF00C5BC4A2AFE22029FB1BA42D01C365BA24026',
