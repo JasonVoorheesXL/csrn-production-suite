@@ -5,15 +5,17 @@ import sport_families
 
 def test_families_are_stable_and_football_leads() -> None:
     # The login screen renders icons in this order; football first keeps the
-    # single-sport install's screen visually unchanged.
+    # single-sport install's screen visually unchanged. "all_others" is the
+    # catch-all bucket and sorts last.
     assert sport_families.SPORT_FAMILIES[0] == "football"
+    assert sport_families.SPORT_FAMILIES[-1] == "all_others"
     assert set(sport_families.SPORT_FAMILIES) == {
         "football",
         "basketball",
         "baseball",
         "softball",
-        "volleyball",
         "soccer",
+        "all_others",
     }
 
 
@@ -23,6 +25,11 @@ def test_normalize_family_accepts_names_codes_and_case() -> None:
     assert sport_families.normalize_family("FB") == "football"
     assert sport_families.normalize_family("bsb") == "baseball"
     assert sport_families.normalize_family("sc") == "soccer"
+
+
+def test_normalize_family_resolves_the_all_others_bucket() -> None:
+    for spelling in ("all_others", "All Others", "other", "OTHERS", "all-others"):
+        assert sport_families.normalize_family(spelling) == "all_others"
 
 
 def test_normalize_family_rejects_unknown_and_subvariants() -> None:

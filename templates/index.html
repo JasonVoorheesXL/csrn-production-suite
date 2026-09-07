@@ -120,6 +120,8 @@
       <label>Confirm PIN
         <input id="confirmPin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password">
       </label>
+      <div class="sport-picker" id="setupSportPicker" data-login-sport-picker aria-label="Sport"></div>
+      <div class="auth-subnote" id="setupSportMessage"></div>
       <button class="primary wide" onclick="setupPin()">Save PIN</button>
       <div class="auth-message" id="setupMessage"></div>
     </section>
@@ -133,6 +135,8 @@
       <label>PIN
         <input id="loginPin" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password">
       </label>
+      <div class="sport-picker" id="loginSportPicker" data-login-sport-picker aria-label="Sport"></div>
+      <div class="auth-subnote" id="loginSportMessage"></div>
       <button class="primary wide" onclick="login()">Unlock</button>
       <div class="auth-message" id="loginMessage"></div>
     </section>
@@ -2762,6 +2766,7 @@ async function checkSecurity() {
   document.getElementById('upgradeModule').classList.add('hidden');
   const status = await api('/api/security-status');
   authenticated = status.authenticated;
+  renderLoginSportPickers(status);
   document.getElementById('setupPinPanel').classList.toggle('hidden', status.pin_configured);
   document.getElementById('loginPanel').classList.toggle('hidden', !status.pin_configured || status.authenticated);
   if (status.locked_seconds > 0) {
@@ -2784,13 +2789,99 @@ function showSecurityState() {
   document.getElementById('matchup').textContent = 'Secure Access';
 }
 
+// ---- Round 27: login-screen sport picker -------------------------------
+// Order mirrors sport_families.SPORT_FAMILIES on the server. Icons for
+// every family are always shown; only the install's licensed families are
+// selectable, the rest show a "get licensed" upsell on click.
+const LOGIN_SPORT_META = [
+  ['football',   '🏈', 'Football'],
+  ['basketball', '🏀', 'Basketball'],
+  ['baseball',   '⚾',       'Baseball'],
+  ['softball',   '🥎', 'Softball'],
+  ['soccer',     '⚽',       'Soccer'],
+  ['all_others', '🏅', 'All Others'],
+];
+let loginLicensedSports = [];
+let selectedLoginSport = '';
+let loginSportUserPicked = false;   // true once the operator clicks an icon
+let loginPickerSignature = '';      // rebuild the DOM only when the license set changes
+
+function renderLoginSportPickers(status) {
+  loginLicensedSports = Array.isArray(status.licensed_sports) ? status.licensed_sports.slice() : [];
+
+  // checkSecurity() re-runs on a 15s interval; never clobber a selection the
+  // operator has already made this session -- only auto-preset before that.
+  if (loginSportUserPicked && loginLicensedSports.includes(selectedLoginSport)) {
+    // keep it
+  } else {
+    let preset = String(status.sport_context || '').toLowerCase();
+    if (!preset) {
+      let remembered = '';
+      try { remembered = (localStorage.getItem('csrn_last_sport') || '').toLowerCase(); } catch (_) {}
+      if (remembered && loginLicensedSports.includes(remembered)) preset = remembered;
+      else if (loginLicensedSports.length === 1) preset = loginLicensedSports[0];
+    }
+    selectedLoginSport = loginLicensedSports.includes(preset) ? preset : '';
+  }
+
+  const signature = JSON.stringify(loginLicensedSports);
+  if (signature !== loginPickerSignature) {
+    loginPickerSignature = signature;
+    document.querySelectorAll('[data-login-sport-picker]').forEach(picker => {
+      picker.innerHTML = LOGIN_SPORT_META.map(([family, glyph, label]) => {
+        const licensed = loginLicensedSports.includes(family);
+        return `<button type="button" class="sport-icon" data-sport="${family}"
+          data-licensed="${licensed ? '1' : '0'}" title="${label}${licensed ? '' : ' — not licensed'}"
+          onclick="pickLoginSport('${family}')">
+          <span class="sport-icon-glyph" aria-hidden="true">${glyph}</span>
+          <span class="sport-icon-label">${label}</span>
+          ${licensed ? '' : '<span class="sport-icon-lock" aria-hidden="true">🔒</span>'}
+        </button>`;
+      }).join('');
+    });
+  }
+  applyLoginSportSelection();
+}
+
+function pickLoginSport(family) {
+  if (!loginLicensedSports.includes(family)) {
+    const meta = LOGIN_SPORT_META.find(m => m[0] === family);
+    const name = meta ? meta[2] : family;
+    document.querySelectorAll('#loginSportMessage,#setupSportMessage').forEach(node => {
+      node.textContent = `${name} isn't part of this CSRN license. Contact CSRN to add it.`;
+      node.classList.add('is-upsell');
+    });
+    return;
+  }
+  loginSportUserPicked = true;
+  selectedLoginSport = (selectedLoginSport === family) ? '' : family;
+  document.querySelectorAll('#loginSportMessage,#setupSportMessage').forEach(node => {
+    node.textContent = '';
+    node.classList.remove('is-upsell');
+  });
+  applyLoginSportSelection();
+}
+
+function applyLoginSportSelection() {
+  document.querySelectorAll('[data-login-sport-picker] .sport-icon').forEach(icon => {
+    const family = icon.dataset.sport;
+    const licensed = icon.dataset.licensed === '1';
+    const isSelected = licensed && family === selectedLoginSport;
+    icon.classList.toggle('selected', isSelected);
+    // No dimming until the operator picks one; unlicensed always reads muted.
+    icon.classList.toggle('dimmed', (!!selectedLoginSport && licensed && !isSelected));
+    icon.classList.toggle('unlicensed', !licensed);
+  });
+}
+
 async function setupPin() {
   const pin = document.getElementById('newPin').value;
   const confirm = document.getElementById('confirmPin').value;
   const msg = document.getElementById('setupMessage');
   try {
-    await api('/api/setup-pin', {pin, confirm});
+    await api('/api/setup-pin', {pin, confirm, sport: selectedLoginSport});
     msg.textContent = '';
+    try { if (selectedLoginSport) localStorage.setItem('csrn_last_sport', selectedLoginSport); } catch (_) {}
     authenticated = true;
     await initializeAuthenticatedApp();
   } catch (err) {
@@ -2805,9 +2896,10 @@ async function login() {
   const pin = document.getElementById('loginPin').value;
   const msg = document.getElementById('loginMessage');
   try {
-    await api('/api/login', {pin});
+    await api('/api/login', {pin, sport: selectedLoginSport});
     msg.textContent = '';
     document.getElementById('loginPin').value = '';
+    try { if (selectedLoginSport) localStorage.setItem('csrn_last_sport', selectedLoginSport); } catch (_) {}
     authenticated = true;
     await initializeAuthenticatedApp();
   } catch (err) {

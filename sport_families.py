@@ -15,14 +15,20 @@ from __future__ import annotations
 
 from typing import Iterable
 
-# Display order on the login screen and the top-nav switcher.
+# Display order on the login screen and the top-nav switcher. ``all_others``
+# is a deliberate catch-all bucket: sports CSRN has no dedicated engine /
+# vocabulary for yet (lacrosse, hockey, pickleball, ...). It is a real
+# family for licensing and context-scoping purposes; it is not a specific
+# sport. (American vs Canadian football is NOT handled here -- it stays
+# inside the "football" family, resolved by the Round 26 jurisdiction
+# picker.)
 SPORT_FAMILIES: tuple[str, ...] = (
     "football",
     "basketball",
     "baseball",
     "softball",
-    "volleyball",
     "soccer",
+    "all_others",
 )
 
 # Wildcard token a license may carry in its ``sports`` list to mean
@@ -30,17 +36,22 @@ SPORT_FAMILIES: tuple[str, ...] = (
 ALL = "*"
 
 # Short codes seen elsewhere in the codebase (DragonFly SPORT_CODES,
-# broadcast id prefixes) mapped back onto a canonical family, so a license
-# or a stored record written with a code still resolves.
+# broadcast id prefixes) and a few spellings mapped back onto a canonical
+# family, so a license or a stored record written with a code still
+# resolves.
 _ALIASES: dict[str, str] = {
     "fb": "football",
     "bb": "basketball",
     "ba": "baseball",
     "bsb": "baseball",
     "sb": "softball",
-    "vb": "volleyball",
     "sc": "soccer",
     "soc": "soccer",
+    "other": "all_others",
+    "others": "all_others",
+    "all-others": "all_others",
+    "all others": "all_others",
+    "allothers": "all_others",
 }
 
 
