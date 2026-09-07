@@ -82,7 +82,10 @@ try {
     hasBroadcastHost: !!(stage && stage.querySelector(':scope > [data-video-mode="broadcast"]')),
     diamondStillPresent: !!col.querySelector(".bl-college-diamond"),
     // the reserved stage sits ahead of the injected diamond
-    stageBeforeDiamond: !!stage && !!(stage.compareDocumentPosition(col.querySelector(".bl-college-diamond")) & Node.DOCUMENT_POSITION_FOLLOWING)
+    stageBeforeDiamond: !!stage && !!(stage.compareDocumentPosition(col.querySelector(".bl-college-diamond")) & Node.DOCUMENT_POSITION_FOLLOWING),
+    // item 2: baseball gets the ballpark backdrop, and it is not yet cleared
+    baseballBackdrop: !!stage && stage.classList.contains("bl-college-stage-diamond"),
+    liveFeedCleared: !!stage && stage.classList.contains("bl-college-stage-live-feed")
   };
 } catch (e) { results.collegiateVideoBoard = "ERR " + e.message; }
 

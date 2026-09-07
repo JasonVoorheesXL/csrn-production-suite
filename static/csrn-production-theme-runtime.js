@@ -1585,23 +1585,49 @@ function ensureCollegiateDiamond(root, d) {
 // a quiet placeholder (same as Heritage's "LIVE VIDEO OPENING" slot) so a
 // future feed drops in with no layout retrofit. FNS / 8-Bit / Heritage
 // already emit their board region for every sport and need nothing here.
+//
+// Item 2 (runtime-only, no engine edit): for baseball / softball the
+// resting backdrop of `.bl-college-stage-field` becomes a textured ballpark
+// field (styled in csrn-production-theme-runtime.css), and it clears to
+// transparent the moment a real feed or interstitial mounts into the
+// `[data-video-mode]` host via the nativeVideoBoardHost contract -- so a
+// video feed composites straight into this region with nothing behind it.
 function ensureCollegiateVideoStage(root, runtime) {
   if (!root) return;
   const board = root.querySelector(".bl-scorebug.bl-collegiate, .bl-baseball-board.bl-collegiate");
   if (!board) return;
-  if (board.querySelector(":scope > .bl-college-stage")) return;
-  const stage = document.createElement("section");
-  stage.className = "bl-college-stage bl-college-stage-reserved";
-  stage.setAttribute("data-module", "video.board");
-  stage.setAttribute("data-video-reserved", "1");
-  stage.innerHTML =
-    '<div class="bl-college-stage-field" aria-hidden="true"></div>' +
-    '<div class="bl-college-video-replacement bl-college-broadcast" data-video-mode="broadcast">' +
-      '<div class="bl-college-video-feed">VIDEO</div>' +
-    '</div>';
-  const diamond = board.querySelector(":scope > .bl-college-diamond");
-  if (diamond) board.insertBefore(stage, diamond);
-  else board.appendChild(stage);
+  let stage = board.querySelector(":scope > .bl-college-stage");
+  if (!stage) {
+    stage = document.createElement("section");
+    stage.className = "bl-college-stage bl-college-stage-reserved";
+    stage.setAttribute("data-module", "video.board");
+    stage.setAttribute("data-video-reserved", "1");
+    stage.innerHTML =
+      '<div class="bl-college-stage-field" aria-hidden="true"></div>' +
+      '<div class="bl-college-video-replacement bl-college-broadcast" data-video-mode="broadcast">' +
+        '<div class="bl-college-video-feed">VIDEO</div>' +
+      '</div>';
+    const diamond = board.querySelector(":scope > .bl-college-diamond");
+    if (diamond) board.insertBefore(stage, diamond);
+    else board.appendChild(stage);
+  }
+
+  // Sport-appropriate resting backdrop: baseball / softball get the textured
+  // ballpark field; basketball keeps the plain dark slot from commit 7.
+  const family = productionSportFamily(runtime && runtime.sport);
+  stage.classList.toggle("bl-college-stage-diamond", family === "baseball" || family === "softball");
+
+  // Transparent-for-video: once a feed (or a highlight / sponsor interstitial)
+  // mounts into the [data-video-mode] host, drop the backdrop so the feed
+  // owns the region. mountCentralBoardMedia marks the host with a
+  // csrn-production-*-board class and fills it with <video> / <img>.
+  const host = stage.querySelector(":scope > [data-video-mode]");
+  const liveFeed = Boolean(host && (
+    host.querySelector("video, img") ||
+    host.classList.contains("csrn-production-highlight-board") ||
+    host.classList.contains("csrn-production-sponsor-board")
+  ));
+  stage.classList.toggle("bl-college-stage-live-feed", liveFeed);
 }
 
 function applyFootballBoardOverrides(root, alias, runtime) {

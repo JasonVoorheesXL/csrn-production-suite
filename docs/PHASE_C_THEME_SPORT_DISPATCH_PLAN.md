@@ -69,6 +69,61 @@ Bottom line: **nothing here is a first-pass placeholder.** The only art
 note is the Heritage softball figures being lighter than the baseball
 ones.
 
+### Collegiate Tech baseball layout — R8 (2026-09-07)
+
+| # | Commit | Effect |
+| --- | --- | --- |
+| 8 | Collegiate baseball clash backdrop (item 2) | `ensureCollegiateVideoStage()` now paints `.bl-college-stage-field` as a textured CSS ballpark (mowing fans from the plate, infield dirt, foul lines, tower bloom) for baseball / softball, and clears it to transparent (`.bl-college-stage-live-feed`) the moment a feed or interstitial mounts into the `[data-video-mode]` host — so a real video feed composites straight into that region. Runtime-only; `git diff --stat 64ed45a..HEAD` on all six frozen engine files is empty; no re-pin. Suite 2573 passed / 2 env-failed. |
+
+## Tracked TODO — trunk, post-Friday (do NOT touch a branch for these now)
+
+Discoverable alongside the **jurisdiction-picker CA/US filter** TODO in
+[`docs/ROUND_27_ACCESS_MODEL.md`](ROUND_27_ACCESS_MODEL.md) →
+"Tracked TODO — trunk, post-Friday". All three are single trunk commits to
+be made once Round 26, Round 27 **and** Phase C have merged to one stable
+renderer baseline — deliberately deferred to avoid two branches
+independently re-pinning the same frozen file.
+
+### T1 — Collegiate Tech baseball: structural parity with the football scorebug
+
+**Blocked on:** editing `static/csrn-broadcast-layout-engine.js` (SHA-256
+pinned by `test_gate116`, cross-checked by `test_gate12/13/14/142`), which
+**Round 26 already independently modifies and re-pins** (its Canadian
+110/20 field geometry edits `collegiateField()` + `.bl-college-field-grid`).
+
+**Item 1 — replace the football-field slot.** Route
+`sport === "baseball" | "softball"` in the frozen engine's `collegiate()`
+dispatcher through the `collegiateFootballScorebug` skeleton (or a
+parameterised `collegiateScorebug()`), so baseball renders the full
+`cabinet → live-strip → score/clock row → .bl-college-main-display (rail |
+stage | rail) → .bl-college-control-bank` structure at football's layout
+weight. Fill the control-bank slot with a baseball scoreboard + the
+already-built `.bl-college-diamond` graphic (promote it out of the runtime
+injection into the engine, or keep injecting it into the now-present
+control bank). Reuse `collegiateTeamPanel` / `collegiateStage` verbatim.
+
+**Item 3 — "On the Mound" / "At Bat" live rail panels.** Built on the
+existing persistent `.bl-college-rail` + `patchCollegiateRails()` system
+(250 ms fast path; live team stat grid + 25 s rotating `.bl-player-leader`
+card with headshot + logo fallback; fed by the statistics endpoint). The
+rail only exists inside the football skeleton, so item 3 depends on item 1
+landing first. One side → current pitcher name + live pitching stats; the
+other → current batter name + live batting stats + **On Deck** (next
+batter). Headshots via the same crest-fallback path the leader card
+already uses. Extend `patchCollegiateRails()` with baseball stat keys
+(engine change re-pin already in flight from item 1; the rail *patcher*
+lives in the unpinned runtime).
+
+**Re-pin discipline for the trunk commit:** re-pin
+`test_gate116` + `test_gate12/13/14/142`, update `test_gate162` scope if
+needed, record the new hashes + rationale in `CSRN_PROJECT_BIBLE.md`.
+
+### Explicitly NOT in T1 (future round)
+
+Full starting lineup, batting order, and substitution tracking — needed
+once real baseball games run through the system. Noted here so it is not
+lost; not designed yet.
+
 ---
 
 ## Original plan (kept for reference)
