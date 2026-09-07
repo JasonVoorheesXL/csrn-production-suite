@@ -81,6 +81,22 @@ button, input, select { font:inherit; }
 .sport-icon.dimmed { opacity:.38; }
 .sport-icon.unlicensed { opacity:.5; cursor:help; }
 .sport-icon .sport-icon-lock { position:absolute; top:5px; right:7px; font-size:11px; }
+.sport-icon .sport-icon-caret { position:absolute; bottom:4px; right:8px; font-size:10px; color:var(--muted); }
+.sport-icon.sport-gateway .sport-icon-label { font-size:10px; }
+.sport-others {
+  display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+  margin:2px 0 6px; padding:10px; border:1px solid #333a45; border-radius:10px; background:#10131a;
+}
+.sport-other {
+  display:flex; align-items:center; gap:7px;
+  padding:8px 12px; border:2px solid #3a414c; border-radius:999px;
+  background:#171b23; color:var(--text); font-weight:800; font-size:13px; cursor:pointer;
+}
+.sport-other:hover { border-color:#525b68; }
+.sport-other.selected { border-color:var(--ok); box-shadow:0 0 0 3px rgba(21,115,71,.28); }
+.sport-other.coming-soon { opacity:.5; cursor:help; }
+.sport-other em { font-style:normal; font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.sport-other-empty { color:var(--muted); font-size:13px; }
 .setup-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-bottom:16px; }
 label { display:flex; flex-direction:column; gap:7px; color:var(--muted); font-weight:700; margin-bottom:12px; }
 input, select { width:100%; border:1px solid #444b56; border-radius:9px; background:#111318; color:white; padding:13px; }
