@@ -16,7 +16,9 @@ Scope: `{basketball, baseball, softball}` (soccer explicitly out).
 | 4 | **commissioned** Collegiate Tech diamond | CSS/SVG diamond field graphic in the `.bl-college-field` idiom, runtime-injected. |
 | 5 | **commissioned** Heritage line-score box | `.hp-current-line` R/H/E + at-bat/pitcher name kept live in the press typeface. |
 | 6 | docs + clash-art assessment | this section + `ADDING_A_SPORT_TO_A_FROZEN_THEME.md`. |
-| 7 | video-board contract audit + Collegiate fix | reserved `.bl-college-stage` (`data-module="video.board"` + `[data-video-mode="broadcast"]`) on the Collegiate baseball/softball/basketball boards; FNS/8-Bit/Heritage already compliant for every sport. |
+| 7 | video-board contract audit (+ interim Collegiate `.bl-college-stage` inject) | FNS/8-Bit/Heritage confirmed compliant for every sport; Collegiate gap logged. **Collegiate inject reverted in commit 9.** |
+| 8 | interim Collegiate ballpark backdrop + transparent-for-video | **Reverted in commit 9** — superseded by the refined T1 concept (bottom bar → inning line score + right diamond; clash bg belongs behind the VS in the football skeleton). |
+| 9 | revert 7-8 Collegiate scaffolding + **prototype** the baseball bottom bar | `ensureCollegiateBaseballBottomBar()` (`data-prototype`): the football yard-line strip's slot re-cast as an inning line score with the base diamond pinned right, runtime-injected into the compact board. Proves the T1 visual target; not shippable structure. |
 
 ### Video-board contract (Gate 16.7 "central video-board ownership") coverage for the new sport panels
 
@@ -30,16 +32,8 @@ slots into (`nativeVideoBoardHost()` in the runtime resolves it per alias).
 | 8-Bit Gameday | Identical shape: `.bl-8bit-video-board[data-module="video.board"]` for every sport; per-sport clash `.bl-8bit-clash[data-video-mode="clash"]`. | **Already honors — no fix.** |
 | Heritage Press | `openingContent()` branches on **mode** (player/highlight/sponsor/broadcast), not sport, so `.hp-opening` + `data-video-mode` sections + `.hp-highlight-window[data-module="video.board"]` render for baseball/basketball too. The commissioned line-score box (`.hp-current-line`) is a stats table, not a video surface — it adds no new video region. | **Already honors — no fix.** |
 | Heritage decolorize | `csrn-production-highlight-video` (+ `csrn-production-heritage-highlight-window`) and the `grayscale/contrast/sepia` filter (Gate 16.9 R2/R6/R7/R8) are applied by `mountCentralBoardMedia()` / the runtime CSS keyed on `alias === "heritage_press"` + mode — **sport-agnostic**. A future baseball highlight video inherits the ink-on-paper treatment automatically. **No frozen-gate change, no re-pin.** | **Already honors — no fix.** |
-| Collegiate Tech | `collegiate()` returns `collegiateFootballScorebug` (with `.bl-college-stage[data-module="video.board"]`) **only for football**; baseball/softball fall to `baseballLineScore`, basketball to a bare `bl-scorebug bl-collegiate` — **no video-board region at all**. `nativeVideoBoardHost(root,"collegiate_traditional",mode)` returned null. | **Gap — fixed in commit 7.** Runtime injects `ensureCollegiateVideoStage()`: a compact full-width `.bl-college-stage.bl-college-stage-reserved` strip carrying `data-module="video.board"` and a direct `[data-video-mode="broadcast"]` host (reusing the engine's own `.bl-college-stage-field` / `.bl-college-video-feed` classes). The contract selector now resolves; a feed replaces the child in place. Full mode-swap (highlight/sponsor/player interstitials) for Collegiate non-football still needs the engine's re-render path and is deferred to the actual video capability — the layout space is reserved now. |
+| Collegiate Tech | `collegiate()` returns `collegiateFootballScorebug` (with `.bl-college-stage[data-module="video.board"]`) **only for football**; baseball/softball fall to `baseballLineScore`, basketball to a bare `bl-scorebug bl-collegiate` — **no video-board region at all**. `nativeVideoBoardHost(root,"collegiate_traditional",mode)` returns null. | **Gap — folded into T1.** Commit 7 injected an interim `.bl-college-stage` strip; **reverted in commit 9** once the refined concept landed — the video-board region belongs behind the VS in the football skeleton the baseball board doesn't have yet, so it is built as part of the T1 engine restructure, not bolted onto the compact board. |
 | Modern Network | Scorebug-only for every sport by accepted design (open question 8). No clash/side-rail exists to reserve. | **N/A by design.** |
-
-Side effect of commit 7: with the reserved strip spanning `grid-column:1 / -1`
-on the Collegiate baseball board, the commissioned diamond (commit 4) now
-flows to a full-width row below it instead of the 310 px state column — a
-proportion change to an unmerged same-round panel, visually an improvement.
-The reserved strip ships **visible** (a hatched "VIDEO" swatch + "RESERVED
-FOR LIVE VIDEO"), matching how Heritage already shows a "LIVE VIDEO OPENING"
-placeholder in the live state; flip it to fully hidden if that reads better.
 
 **Every change is in `csrn-production-theme-runtime.js/.css` — neither is
 under a SHA-256 pin. No frozen-renderer fingerprint changed;
@@ -69,11 +63,27 @@ Bottom line: **nothing here is a first-pass placeholder.** The only art
 note is the Heritage softball figures being lighter than the baseball
 ones.
 
-### Collegiate Tech baseball layout — R8 (2026-09-07)
+### Collegiate Tech baseball layout — R7-R9 trail (2026-09-07)
 
-| # | Commit | Effect |
-| --- | --- | --- |
-| 8 | Collegiate baseball clash backdrop (item 2) | `ensureCollegiateVideoStage()` now paints `.bl-college-stage-field` as a textured CSS ballpark (mowing fans from the plate, infield dirt, foul lines, tower bloom) for baseball / softball, and clears it to transparent (`.bl-college-stage-live-feed`) the moment a feed or interstitial mounts into the `[data-video-mode]` host — so a real video feed composites straight into that region. Runtime-only; `git diff --stat 64ed45a..HEAD` on all six frozen engine files is empty; no re-pin. Suite 2573 passed / 2 env-failed. |
+- **R7** reserved a runtime-injected `.bl-college-stage` strip on the
+  Collegiate non-football boards; **R8** gave it a textured CSS ballpark
+  backdrop + a transparent-for-video clear.
+- The operator then refined the concept: Collegiate baseball must **look
+  like football's design** — the centre clash slot shows the VS lockup
+  over a sport-specific field background, and **the bottom yard-line strip
+  becomes an inning-by-inning line score with the base diamond pinned to
+  the right**. That is the full T1 engine restructure, not something to
+  bolt onto the compact board.
+- **R9** therefore reverts the R7/R8 Collegiate scaffolding (the
+  FNS/8-Bit/Heritage audit finding stays) and replaces it with an
+  explicit **throwaway prototype**, `ensureCollegiateBaseballBottomBar()`
+  (`data-prototype="baseball-bottom-bar"`): an inning line score
+  (`.bl-college-line-score` / `.bl-cls-table`, teams × innings + R/H/E,
+  current inning highlighted) beside the existing `.bl-college-diamond`,
+  injected into the compact board. It proves the T1 visual target; it is
+  not a shippable structure. `git diff --stat 64ed45a..HEAD` on all six
+  frozen engine files is empty; no re-pin. Suite 2573 → after R9 revert +
+  prototype, re-run.
 
 ## Tracked TODO — trunk, post-Friday (do NOT touch a branch for these now)
 
@@ -91,16 +101,33 @@ pinned by `test_gate116`, cross-checked by `test_gate12/13/14/142`), which
 **Round 26 already independently modifies and re-pins** (its Canadian
 110/20 field geometry edits `collegiateField()` + `.bl-college-field-grid`).
 
-**Item 1 — replace the football-field slot.** Route
-`sport === "baseball" | "softball"` in the frozen engine's `collegiate()`
-dispatcher through the `collegiateFootballScorebug` skeleton (or a
-parameterised `collegiateScorebug()`), so baseball renders the full
+**Refined concept (operator, 2026-09-07): baseball must look like
+football's design.** Same skeleton, same layout weight, sport-appropriate
+content in each slot:
+
+- **Centre clash slot (`.bl-college-stage`)** — the VS lockup exactly as
+  football, over a **baseball-field background** in `.bl-college-stage-field`
+  instead of the football-field image (each sport gets its own field bg;
+  the R8 CSS ballpark + transparent-for-video clear move here, behind the
+  VS). Other sports follow the same pattern with their own bg.
+- **Bottom bar (`.bl-college-control-bank`, today the yard-line
+  `collegiateField()` strip)** — *this is the biggest change*: it becomes
+  an **inning-by-inning line score** (teams × innings + R/H/E, current
+  inning marked, batting side indicated) occupying the main width, with
+  the **base diamond pinned to the right-hand side** showing runners on.
+  The R9 prototype (`ensureCollegiateBaseballBottomBar` /
+  `.bl-college-line-score` + `.bl-college-bar-diamond`) is the visual
+  reference for this slot.
+
+**Implementation.** Route `sport === "baseball" | "softball"` in the frozen
+engine's `collegiate()` dispatcher through the `collegiateFootballScorebug`
+skeleton (or a parameterised `collegiateScorebug()`), so baseball renders
 `cabinet → live-strip → score/clock row → .bl-college-main-display (rail |
-stage | rail) → .bl-college-control-bank` structure at football's layout
-weight. Fill the control-bank slot with a baseball scoreboard + the
-already-built `.bl-college-diamond` graphic (promote it out of the runtime
-injection into the engine, or keep injecting it into the now-present
-control bank). Reuse `collegiateTeamPanel` / `collegiateStage` verbatim.
+stage | rail) → .bl-college-control-bank` at football's weight. The stage
+slot swaps its field bg by sport; the control-bank slot renders the line
+score + diamond instead of `collegiateField()`. Reuse `collegiateTeamPanel`
+/ `collegiateStage` verbatim; promote the `.bl-college-diamond` SVG (R4)
+into the engine or keep injecting it into the now-present bank.
 
 **Item 3 — "On the Mound" / "At Bat" live rail panels.** Built on the
 existing persistent `.bl-college-rail` + `patchCollegiateRails()` system

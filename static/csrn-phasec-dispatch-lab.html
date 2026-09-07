@@ -70,24 +70,28 @@ try {
 } catch (e) { results.bitBasketball = "ERR " + e.message; }
 
 try {
+  // R9 THROWAWAY PROTOTYPE -- Collegiate baseball bottom bar (inning line
+  // score + right-hand base diamond), runtime-injected, no engine edit.
   const col = renderBoard("CSRNBroadcastLayoutEngine", "collegiate_traditional", "baseball",
     {inning: "3", inningHalf: "TOP", balls: "0", strikes: "0", outs: "0", bases: [false, false, false]});
   PC.applyDiamondBoardOverrides(col, "collegiate_traditional",
-    {sport: "baseball", inning: "7", inning_half: "BOTTOM", balls: "2", strikes: "2", outs: "2", bases: [true, false, true]});
-  const stage = col.querySelector(".bl-college-stage.bl-college-stage-reserved");
-  results.collegiateVideoBoard = {
-    // engine emits no .bl-college-stage for non-football; the runtime reserves it
-    reservedStagePresent: !!stage,
-    hasVideoBoardModule: !!stage && stage.getAttribute("data-module") === "video.board",
-    hasBroadcastHost: !!(stage && stage.querySelector(':scope > [data-video-mode="broadcast"]')),
-    diamondStillPresent: !!col.querySelector(".bl-college-diamond"),
-    // the reserved stage sits ahead of the injected diamond
-    stageBeforeDiamond: !!stage && !!(stage.compareDocumentPosition(col.querySelector(".bl-college-diamond")) & Node.DOCUMENT_POSITION_FOLLOWING),
-    // item 2: baseball gets the ballpark backdrop, and it is not yet cleared
-    baseballBackdrop: !!stage && stage.classList.contains("bl-college-stage-diamond"),
-    liveFeedCleared: !!stage && stage.classList.contains("bl-college-stage-live-feed")
+    {sport: "baseball", inning: "7", inning_half: "BOTTOM", balls: "2", strikes: "2", outs: "2", bases: [true, false, true],
+     home_score: 5, visitor_score: 3, home_hits: 11, visitor_hits: 8, home_errors: 1, visitor_errors: 0,
+     home_abbr: "CAL", visitor_abbr: "AMO",
+     line_score: {visitor: [0,1,0,0,2,0,0], home: [1,0,0,3,0,1]}});
+  const bar = col.querySelector('.bl-college-baseball-bar[data-prototype="baseball-bottom-bar"]');
+  const rows = bar ? [...bar.querySelectorAll("tr[data-row]")].map(r => ({
+    side: r.dataset.row,
+    innings: [...r.querySelectorAll("td[data-inning]")].map(td => td.textContent),
+    rhe: [r.querySelector(".bl-cls-r").textContent, r.querySelector(".bl-cls-h").textContent, r.querySelector(".bl-cls-e").textContent]
+  })) : null;
+  results.collegiateBottomBar = {
+    barPresent: !!bar,
+    diamondInBarSlot: !!bar && !!bar.querySelector(".bl-college-bar-diamond .bl-college-diamond"),
+    currentInningMarked: !!bar && bar.querySelectorAll("td.is-current, th.is-current").length > 0,
+    rows
   };
-} catch (e) { results.collegiateVideoBoard = "ERR " + e.message; }
+} catch (e) { results.collegiateBottomBar = "ERR " + e.stack; }
 
 document.getElementById("out").textContent = JSON.stringify(results, null, 1);
 </script></body></html>

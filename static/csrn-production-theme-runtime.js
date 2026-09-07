@@ -1407,7 +1407,6 @@ function applyBasketballBoardOverrides(root, alias, runtime) {
     root.querySelectorAll('[data-bind="game.clock"]').forEach(node => { node.textContent = clock; });
     if (period) root.querySelectorAll('[data-bind="game.period"]').forEach(node => { node.textContent = period; });
     if (shotClock) root.querySelectorAll('[data-bind="game.shotClock"]').forEach(node => { node.textContent = shotClock; });
-    ensureCollegiateVideoStage(root, runtime);
   }
 }
 
@@ -1486,7 +1485,7 @@ function applyDiamondBoardOverrides(root, alias, runtime) {
     const count = root.querySelector(".bl-baseball-state .bl-count");
     if (count) count.textContent = `B ${balls} · S ${strikes} · O ${outs}`;
     paintBases(root.querySelector(".bl-baseball-state .bl-diamond"));
-    ensureCollegiateVideoStage(root, runtime);
+    ensureCollegiateBaseballBottomBar(root, runtime);
     ensureCollegiateDiamond(root, {half, inning, balls, strikes, outs, bases});
   }
 }
@@ -1528,7 +1527,10 @@ function patchHeritageBoxscore(root, runtime) {
 // the frozen csrn-broadcast-layout-engine files stay byte-stable; styled
 // in csrn-production-theme-runtime.css.
 function ensureCollegiateDiamond(root, d) {
-  const board = root.querySelector(".bl-scorebug.bl-collegiate, .bl-baseball-board.bl-collegiate");
+  // Prefer the R9 prototype bottom bar's right-hand slot; fall back to the
+  // board itself so the graphic still stands alone (and unit tests hold).
+  const board = root.querySelector(".bl-college-baseball-bar .bl-college-bar-diamond")
+    || root.querySelector(".bl-scorebug.bl-collegiate, .bl-baseball-board.bl-collegiate");
   if (!board) return;
   let host = board.querySelector(".bl-college-diamond");
   if (!host) {
@@ -1572,62 +1574,89 @@ function ensureCollegiateDiamond(root, d) {
   host.querySelector(".bl-cd-runner.third").classList.toggle("on", Boolean(runner[2]));
 }
 
-// Phase C: reserve the central video-board region on the Collegiate Tech
-// baseball / softball / basketball boards. The SHA-256-pinned
-// csrn-broadcast-layout-engine only emits `.bl-college-stage`
-// (data-module="video.board") for football, so switching the operator to a
-// non-football sport drops the region the Gate 16.7 "central video-board
-// ownership" contract depends on -- nativeVideoBoardHost() looks for
-// `.bl-college-stage` and finds nothing. The runtime injects a
-// contract-shaped host here: `.bl-college-stage` with a direct
-// `[data-video-mode="broadcast"]` child, reusing the engine's own
-// `.bl-college-stage-field` / `.bl-college-video-feed` classes. It ships as
-// a quiet placeholder (same as Heritage's "LIVE VIDEO OPENING" slot) so a
-// future feed drops in with no layout retrofit. FNS / 8-Bit / Heritage
-// already emit their board region for every sport and need nothing here.
-//
-// Item 2 (runtime-only, no engine edit): for baseball / softball the
-// resting backdrop of `.bl-college-stage-field` becomes a textured ballpark
-// field (styled in csrn-production-theme-runtime.css), and it clears to
-// transparent the moment a real feed or interstitial mounts into the
-// `[data-video-mode]` host via the nativeVideoBoardHost contract -- so a
-// video feed composites straight into this region with nothing behind it.
-function ensureCollegiateVideoStage(root, runtime) {
-  if (!root) return;
+// Phase C R9 -- THROWAWAY PROTOTYPE (data-prototype="baseball-bottom-bar").
+// Proves the T1 target: Collegiate baseball's bottom bar is the football
+// yard-line strip's slot re-cast as an inning-by-inning line score with the
+// base diamond pinned to the right. This runtime injection into the compact
+// baseballLineScore board is scaffolding only -- the real version routes
+// baseball through collegiateFootballScorebug in the SHA-256-pinned engine
+// (see docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md "Tracked TODO -> T1"),
+// which needs a re-pin Round 26 is already holding. Do not build on this.
+function ensureCollegiateBaseballBottomBar(root, runtime) {
+  if (!root) return null;
   const board = root.querySelector(".bl-scorebug.bl-collegiate, .bl-baseball-board.bl-collegiate");
-  if (!board) return;
-  let stage = board.querySelector(":scope > .bl-college-stage");
-  if (!stage) {
-    stage = document.createElement("section");
-    stage.className = "bl-college-stage bl-college-stage-reserved";
-    stage.setAttribute("data-module", "video.board");
-    stage.setAttribute("data-video-reserved", "1");
-    stage.innerHTML =
-      '<div class="bl-college-stage-field" aria-hidden="true"></div>' +
-      '<div class="bl-college-video-replacement bl-college-broadcast" data-video-mode="broadcast">' +
-        '<div class="bl-college-video-feed">VIDEO</div>' +
-      '</div>';
-    const diamond = board.querySelector(":scope > .bl-college-diamond");
-    if (diamond) board.insertBefore(stage, diamond);
-    else board.appendChild(stage);
+  if (!board) return null;
+  let bar = board.querySelector(":scope > .bl-college-baseball-bar");
+  if (!bar) {
+    bar = document.createElement("section");
+    bar.className = "bl-college-control-bank bl-college-baseball-bar";
+    bar.setAttribute("data-module", "game.linescore");
+    bar.setAttribute("data-prototype", "baseball-bottom-bar");
+    bar.innerHTML =
+      '<div class="bl-college-line-score" data-module="game.linescore"></div>' +
+      '<div class="bl-college-bar-diamond"></div>';
+    board.appendChild(bar);
+  }
+  patchCollegiateLineScore(bar, runtime);
+  return bar;
+}
+
+function patchCollegiateLineScore(bar, runtime) {
+  const scored = bar.querySelector(".bl-college-line-score");
+  if (!scored) return;
+  const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+  const inning = Math.max(1, num(runtime.inning) || 1);
+  const cols = Math.max(9, inning);
+  const perInning = (side) => {
+    const raw = objectValue(runtime.line_score)[side] || objectValue(runtime.line_score)[`${side}_innings`];
+    return Array.isArray(raw) ? raw : [];
+  };
+  const abbr = (side) => textValue(
+    objectValue(runtime[`${side}_identity`]).abbreviation,
+    runtime[`${side}_abbr`], runtime[`${side}_short`], side === "home" ? "HOME" : "AWAY"
+  ).toUpperCase().slice(0, 4);
+  const rhe = (side) => [
+    num(runtime[`${side}_score`]) ?? 0,
+    num(textValue(runtime[`${side}_hits`], runtime[`${side}Hits`])),
+    num(textValue(runtime[`${side}_errors`], runtime[`${side}Errors`]))
+  ];
+  const half = textValue(runtime.inning_half, runtime.inningHalf, "TOP").toUpperCase().startsWith("B") ? "home" : "visitor";
+
+  if (scored.dataset.cols !== String(cols)) {
+    const head = ['<th class="bl-cls-team"></th>'];
+    for (let i = 1; i <= cols; i += 1) head.push(`<th data-inning="${i}">${i}</th>`);
+    head.push('<th class="bl-cls-rhe">R</th><th class="bl-cls-rhe">H</th><th class="bl-cls-rhe">E</th>');
+    const bodyRow = (side) => {
+      const cells = [`<th class="bl-cls-team"><span class="bl-cls-abbr" data-row="${side}"></span></th>`];
+      for (let i = 1; i <= cols; i += 1) cells.push(`<td data-inning="${i}"></td>`);
+      cells.push('<td class="bl-cls-rhe bl-cls-r"></td><td class="bl-cls-rhe bl-cls-h"></td><td class="bl-cls-rhe bl-cls-e"></td>');
+      return `<tr data-row="${side}">${cells.join("")}</tr>`;
+    };
+    scored.innerHTML =
+      `<table class="bl-cls-table"><thead><tr>${head.join("")}</tr></thead>` +
+      `<tbody>${bodyRow("visitor")}${bodyRow("home")}</tbody></table>`;
+    scored.dataset.cols = String(cols);
   }
 
-  // Sport-appropriate resting backdrop: baseball / softball get the textured
-  // ballpark field; basketball keeps the plain dark slot from commit 7.
-  const family = productionSportFamily(runtime && runtime.sport);
-  stage.classList.toggle("bl-college-stage-diamond", family === "baseball" || family === "softball");
-
-  // Transparent-for-video: once a feed (or a highlight / sponsor interstitial)
-  // mounts into the [data-video-mode] host, drop the backdrop so the feed
-  // owns the region. mountCentralBoardMedia marks the host with a
-  // csrn-production-*-board class and fills it with <video> / <img>.
-  const host = stage.querySelector(":scope > [data-video-mode]");
-  const liveFeed = Boolean(host && (
-    host.querySelector("video, img") ||
-    host.classList.contains("csrn-production-highlight-board") ||
-    host.classList.contains("csrn-production-sponsor-board")
-  ));
-  stage.classList.toggle("bl-college-stage-live-feed", liveFeed);
+  ["visitor", "home"].forEach((side) => {
+    const row = scored.querySelector(`tr[data-row="${side}"]`);
+    if (!row) return;
+    const abbrNode = row.querySelector(".bl-cls-abbr");
+    if (abbrNode) abbrNode.textContent = abbr(side);
+    const runs = perInning(side);
+    row.querySelectorAll("td[data-inning]").forEach((cell, i) => {
+      const v = runs[i];
+      cell.textContent = (v === 0 || v) ? String(v) : (i + 1 < inning ? "0" : "·");
+    });
+    const [r, h, e] = rhe(side);
+    row.querySelector(".bl-cls-r").textContent = String(r);
+    row.querySelector(".bl-cls-h").textContent = h == null ? "·" : String(h);
+    row.querySelector(".bl-cls-e").textContent = e == null ? "·" : String(e);
+  });
+  scored.querySelectorAll('[data-inning]').forEach((n) => {
+    n.classList.toggle("is-current", Number(n.dataset.inning) === inning);
+  });
+  scored.dataset.battingSide = half;
 }
 
 function applyFootballBoardOverrides(root, alias, runtime) {

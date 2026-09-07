@@ -1732,67 +1732,32 @@ html.csrn-production-theme-player-active #playerGraphic{
 .bl-college-diamond-meta b{font-size:19px;line-height:1;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
 .bl-college-diamond[data-inning-half="bottom"] .bl-cd-inning{color:#ffd23c}
 
-/* Phase C — reserved central video-board slot for Collegiate Tech
-   baseball / softball / basketball (Gate 16.7 "central video-board
-   ownership"). The frozen engine only builds .bl-college-stage for
-   football; this keeps the contract's layout space reserved on the other
-   sports, injected from csrn-production-theme-runtime.js so the pinned
-   engine files stay byte-stable. It ships as a compact, full-width
-   placeholder strip -- a future feed replaces the [data-video-mode]
-   child in place. */
-.bl-college-stage-reserved{
+/* Phase C R9 -- THROWAWAY PROTOTYPE. Collegiate baseball bottom bar: the
+   football yard-line strip's slot re-cast as an inning-by-inning line score
+   with the base diamond pinned right. Runtime-injected into the compact
+   baseballLineScore board; the real version routes baseball through
+   collegiateFootballScorebug in the pinned engine (see T1 in
+   docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md). No engine edit, no re-pin. */
+.bl-college-baseball-bar{
   grid-column:1 / -1;
-  display:flex!important;
-  align-items:center;
-  height:84px;
-  margin-top:9px;
-  padding:0 16px;
+  display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px;
+  align-items:stretch;margin-top:9px;padding:0;border:0;background:none;
 }
-.bl-college-stage-reserved > .bl-college-stage-field{
-  background:linear-gradient(180deg,rgba(9,20,32,.55),rgba(0,4,10,.72));
-  opacity:1;filter:none;
+.bl-college-line-score{
+  display:flex;align-items:center;min-width:0;overflow-x:auto;
+  padding:10px 14px;border:1px solid rgba(255,255,255,.14);border-radius:8px;
+  background:linear-gradient(180deg,rgba(13,54,36,.82),rgba(4,22,18,.88));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 0 30px rgba(0,0,0,.28);
 }
-.bl-college-stage-reserved > .bl-college-broadcast{
-  position:relative;z-index:2;display:flex;align-items:center;gap:14px;
-  min-width:0;padding:0;
-}
-.bl-college-stage-reserved .bl-college-video-feed{
-  width:104px;height:58px;flex:0 0 auto;
-}
-.bl-college-stage-reserved .bl-college-broadcast::after{
-  content:"RESERVED FOR LIVE VIDEO";
-  font:900 12px/1.3 Rockwell,Georgia,serif;letter-spacing:.12em;
-  color:#9fd0ff;opacity:.78;white-space:nowrap;
-}
-
-/* Phase C item 2 — baseball / softball resting backdrop for the reserved
-   stage. Same quality bar as the diamond graphic: mowing fans radiating
-   from the plate, infield dirt at the plate, foul lines, tower-light bloom
-   and a fine turf weave. Pure CSS -- no asset, no engine edit. Overrides
-   the football-field image the frozen engine bakes into
-   .bl-college-stage-field. Basketball keeps the plain dark slot above. */
-.bl-college-stage-diamond > .bl-college-stage-field{
-  opacity:1;
-  filter:saturate(.92) brightness(.8);
-  background:
-    radial-gradient(120% 96% at 50% -12%,rgba(255,255,246,.18),transparent 56%),
-    repeating-linear-gradient(115deg,rgba(255,255,255,.035) 0 2px,transparent 2px 10px),
-    conic-gradient(from 0deg at 50% 100%,
-      transparent 0 44.4deg,rgba(255,255,255,.5) 44.4deg 45.6deg,
-      transparent 45.6deg 314.4deg,rgba(255,255,255,.5) 314.4deg 315.6deg,
-      transparent 315.6deg 360deg),
-    radial-gradient(74% 118% at 50% 100%,#b07b3f 0 29%,rgba(176,123,63,.5) 29% 40%,transparent 41%),
-    repeating-conic-gradient(from 300deg at 50% 100%,#1b6d38 0 7.5deg,#207d41 7.5deg 15deg),
-    linear-gradient(180deg,#0f4a27,#1c6f39 62%,#0b3f20);
-}
-/* Keep the "RESERVED FOR LIVE VIDEO" cluster legible over the ballpark
-   backdrop with a left-anchored scrim that fades into the turf. */
-.bl-college-stage-diamond > .bl-college-broadcast{
-  padding:6px 18px 6px 12px;border-radius:7px;
-  background:linear-gradient(90deg,rgba(4,10,16,.86),rgba(4,10,16,.45) 72%,transparent);
-}
-/* Transparent-for-video: a mounted feed / interstitial owns the region. */
-.bl-college-stage-live-feed > .bl-college-stage-field{
-  opacity:0!important;
-  background:none!important;
-}
+.bl-cls-table{border-collapse:collapse;width:100%;color:#fff;font-family:Rockwell,Georgia,serif;font-variant-numeric:tabular-nums}
+.bl-cls-table th,.bl-cls-table td{padding:6px 9px;text-align:center;font-size:18px;font-weight:900;line-height:1}
+.bl-cls-table thead th{font-size:12px;color:#9fb3ca;letter-spacing:.1em;border-bottom:1px solid rgba(255,255,255,.16)}
+.bl-cls-table .bl-cls-team{text-align:left;min-width:60px;font-size:15px;letter-spacing:.06em;color:#d6e4f6}
+.bl-cls-table .bl-cls-rhe{color:#ffd23c}
+.bl-cls-table thead .bl-cls-rhe{color:#ffe38a}
+.bl-cls-table td.is-current,.bl-cls-table th.is-current{background:rgba(101,183,255,.18);border-radius:4px}
+.bl-college-bar-diamond{display:flex;min-width:0}
+.bl-college-baseball-bar .bl-college-diamond{flex:1;margin:0;grid-template-rows:1fr}
+/* the right cell is just the base picture -- inning/count/outs live in the
+   line score and the top-right state chip, so drop the meta strip here */
+.bl-college-baseball-bar .bl-college-diamond-meta{display:none}
