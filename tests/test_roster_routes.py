@@ -36,8 +36,8 @@ class StubRosterService:
         )
         self.delete_result = RosterResult("OK", {"ok": True})
 
-    def list_rosters(self) -> list[dict[str, Any]]:
-        self.calls.append(("list_rosters", None))
+    def list_rosters(self, sport: str = "") -> list[dict[str, Any]]:
+        self.calls.append(("list_rosters", sport))
         return self.rosters
 
     def create(self, incoming: dict[str, Any]) -> RosterResult:
@@ -82,7 +82,19 @@ def test_list_rosters_route_delegates_to_service(roster_client) -> None:
 
     assert response.status_code == 200
     assert response.get_json() == service.rosters
-    assert service.calls == [("list_rosters", None)]
+    # No sport_context on the session -> unscoped, exactly as before Round 27.
+    assert service.calls == [("list_rosters", "")]
+
+
+def test_list_rosters_route_passes_the_session_sport_scope(roster_client) -> None:
+    client, service = roster_client
+    with client.session_transaction() as active_session:
+        active_session["sport_context"] = "canadian_football"
+
+    client.get("/api/rosters")
+
+    # Invariant 2: a canadian_football context scopes to the football pool.
+    assert service.calls == [("list_rosters", "football")]
 
 
 def test_create_roster_route_preserves_success_contract(roster_client) -> None:

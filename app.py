@@ -2523,6 +2523,17 @@ def pin_is_configured() -> bool:
 def authenticated() -> bool:
     return bool(session.get("authenticated"))
 
+def current_sport_scope() -> str:
+    """The operator's active sport scope for roster / sponsor filtering.
+
+    ``base_family(session["sport_context"])`` -- a canadian_football
+    context resolves to ``"football"`` so it shares the football pool
+    (Round 27 invariant 2). Empty when no context is set, which leaves
+    every management list unfiltered (the single-sport default)."""
+    import sport_families
+
+    return sport_families.base_family(session.get("sport_context", ""))
+
 def require_auth(func: Callable):
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -2652,6 +2663,7 @@ ROSTER_ROUTES_BLUEPRINT = create_roster_blueprint(
     RosterRoutesDependencies(
         require_auth=require_auth,
         get_roster_service=get_roster_service,
+        sport_scope=current_sport_scope,
     )
 )
 APPLICATION_BLUEPRINTS.append(ROSTER_ROUTES_BLUEPRINT)

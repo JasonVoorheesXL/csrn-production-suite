@@ -82,6 +82,39 @@ def test_list_rosters_adds_school_name_and_player_counts() -> None:
     assert rosters[0]["inactive_count"] == 1
 
 
+def _mixed_sport_store() -> MemoryStore:
+    return MemoryStore(
+        schools=[{"id": "caledonia", "broadcast_name": "Caledonia"}],
+        rosters=[
+            roster_record(id="chs-fb", sport="Football"),
+            roster_record(id="chs-bb", sport="Basketball"),
+            roster_record(id="chs-vb", sport="Volleyball"),
+        ],
+    )
+
+
+def test_list_rosters_unscoped_returns_every_sport() -> None:
+    # Round 27: an empty sport is the single-sport install's behaviour --
+    # nothing is filtered.
+    ids = {r["id"] for r in make_service(_mixed_sport_store()).list_rosters()}
+    assert ids == {"chs-fb", "chs-bb", "chs-vb"}
+    assert {r["id"] for r in make_service(_mixed_sport_store()).list_rosters("")} == ids
+
+
+def test_list_rosters_scoped_to_a_family() -> None:
+    service = make_service(_mixed_sport_store())
+    assert [r["id"] for r in service.list_rosters("basketball")] == ["chs-bb"]
+    assert [r["id"] for r in service.list_rosters("Football")] == ["chs-fb"]
+
+
+def test_list_rosters_canadian_football_scope_shows_football_rosters() -> None:
+    # Invariant 2: rosters are tagged "Football" regardless of ruleset, so a
+    # canadian_football context (scope "football") must not come back empty.
+    service = make_service(_mixed_sport_store())
+    assert [r["id"] for r in service.list_rosters("canadian_football")] == ["chs-fb"]
+    assert [r["id"] for r in service.list_rosters("football")] == ["chs-fb"]
+
+
 def test_read_returns_summary_or_not_found() -> None:
     store = MemoryStore(
         rosters=[roster_record()],

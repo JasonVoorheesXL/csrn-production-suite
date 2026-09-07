@@ -27,8 +27,8 @@ class StubRosterService:
         self.import_result = StubResult("OK", {"imported": 2})
         self.calls: list[tuple[str, Any]] = []
 
-    def list_rosters(self) -> list[dict[str, Any]]:
-        self.calls.append(("list", None))
+    def list_rosters(self, sport: str = "") -> list[dict[str, Any]]:
+        self.calls.append(("list", sport))
         return [{"id": "r1"}]
 
     def create(self, payload: dict[str, Any]) -> StubResult:
@@ -115,7 +115,34 @@ def test_list_rosters_delegates(roster_client) -> None:
     response = client.get("/api/rosters", headers=auth_headers())
     assert response.status_code == 200
     assert response.get_json() == [{"id": "r1"}]
-    assert service.calls[-1] == ("list", None)
+    # Default dependency -> no sport scope forwarded.
+    assert service.calls[-1] == ("list", "")
+
+
+def test_list_rosters_forwards_the_sport_scope_dependency() -> None:
+    service = StubRosterService()
+
+    def require_auth(view: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(view)
+        def protected(*args: Any, **kwargs: Any):
+            return view(*args, **kwargs)
+
+        return protected
+
+    app = Flask(__name__)
+    app.config.update(TESTING=True)
+    app.register_blueprint(
+        create_roster_blueprint(
+            RosterRoutesDependencies(
+                require_auth=require_auth,
+                get_roster_service=lambda: service,
+                sport_scope=lambda: "football",
+            )
+        )
+    )
+    with app.test_client() as client:
+        client.get("/api/rosters")
+    assert service.calls[-1] == ("list", "football")
 
 
 def test_create_roster_preserves_success_and_conflict_mappings(roster_client) -> None:
