@@ -134,14 +134,28 @@ class SponsorService:
             and asset.get("asset_type") == "Logo"
         ]
 
-    def list_payload(self) -> dict[str, Any]:
+    def list_payload(self, sport: str = "") -> dict[str, Any]:
+        """Decorated sponsors, optionally scoped to one sport family.
+
+        Round 27: ``sport`` is the operator's active sport scope
+        (``base_family(sport_context)``). A sponsor tagged with a different
+        family is hidden; a sponsor with no / blank ``sport`` (a
+        cross-sport sponsor, and every sponsor on a single-sport install)
+        is always shown. An empty ``sport`` returns every sponsor.
+        """
+
         assets = {
             str(asset.get("id", "")): asset
             for asset in self._load_assets()
         }
+        scope = self._normalized_sport(sport)
         sponsors: list[Sponsor] = []
         for source in self._load_sponsors():
             sponsor = self.decorate(source)
+            if scope:
+                tag = self._normalized_sport(sponsor.get("sport", ""))
+                if tag and tag != scope:
+                    continue
             linked = assets.get(str(sponsor.get("asset_id", "")))
             if linked and linked.get("file_url"):
                 sponsor["logo_url"] = linked.get("file_url", "")

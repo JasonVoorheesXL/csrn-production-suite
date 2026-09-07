@@ -2667,6 +2667,7 @@ SPONSOR_ROUTES_BLUEPRINT = create_sponsor_blueprint(
         get_sponsor_upload_dir=lambda: SPONSOR_UPLOAD_DIR,
         clock=lambda: time.time(),
         token_hex=lambda length: secrets.token_hex(length),
+        sport_scope=current_sport_scope,
     )
 )
 APPLICATION_BLUEPRINTS.append(SPONSOR_ROUTES_BLUEPRINT)

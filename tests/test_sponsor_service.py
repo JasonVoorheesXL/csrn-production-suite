@@ -105,6 +105,43 @@ def test_list_payload_decorates_status_and_resolves_linked_asset() -> None:
     assert [asset["id"] for asset in payload["logo_assets"]] == ["asset-logo"]
 
 
+def _mixed_sport_sponsors() -> MemoryStore:
+    return MemoryStore(
+        sponsors=[
+            sponsor(id="fb", name="Gridiron Co", sport="football"),
+            sponsor(id="bb", name="Court Co", sport="basketball"),
+            sponsor(id="any", name="Statewide Co", sport=""),   # cross-sport
+            sponsor(id="legacy", name="Old Co"),                # no sport key
+        ]
+    )
+
+
+def test_list_payload_unscoped_returns_every_sponsor() -> None:
+    store = _mixed_sport_sponsors()
+    ids = {s["id"] for s in make_service(store).list_payload()["sponsors"]}
+    assert ids == {"fb", "bb", "any", "legacy"}
+    assert {s["id"] for s in make_service(store).list_payload("")["sponsors"]} == ids
+
+
+def test_list_payload_scoped_hides_other_families_but_keeps_untagged() -> None:
+    store = _mixed_sport_sponsors()
+    scoped = {s["id"] for s in make_service(store).list_payload("football")["sponsors"]}
+    # football sponsor + the "" cross-sport one + the untagged legacy one;
+    # the basketball one is hidden.
+    assert scoped == {"fb", "any", "legacy"}
+
+
+def test_list_payload_canadian_football_scope_matches_football_sponsors() -> None:
+    # Invariant 2: a canadian_football context (scope "football") sees the
+    # football sponsor pool, not an empty one.
+    store = _mixed_sport_sponsors()
+    assert {s["id"] for s in make_service(store).list_payload("canadian_football")["sponsors"]} == {
+        "fb",
+        "any",
+        "legacy",
+    }
+
+
 def test_create_validates_name_and_duplicate_confirmation() -> None:
     store = MemoryStore(sponsors=[sponsor()])
     service = make_service(store)
