@@ -64,8 +64,9 @@ class EventService:
         player_display: Callable[[Any], str],
         show_player_graphic: Callable[..., None],
         apply_penalty: Callable[[dict[str, Any], str, str, int, str], Mapping[str, Any]],
-        spot_to_coord: Callable[[Any], int],
+        spot_to_coord: Callable[..., int],
         team_direction: Callable[[dict[str, Any], str], int],
+        coord_to_spot: Callable[..., str] | None = None,
         normalize_state: Callable[[Mapping[str, Any]], Mapping[str, Any]],
         default_player_graphic: Callable[[], Mapping[str, Any]],
         resolve_player: Callable[[dict[str, Any], str, Any], Mapping[str, Any]] | None = None,
@@ -84,6 +85,7 @@ class EventService:
         self._show_player_graphic = show_player_graphic
         self._apply_penalty = apply_penalty
         self._spot_to_coord = spot_to_coord
+        self._coord_to_spot = coord_to_spot or EventService._default_coord_to_spot
         self._team_direction = team_direction
         self._normalize_state = normalize_state
         self._default_player_graphic = default_player_graphic
@@ -105,7 +107,10 @@ class EventService:
         return str(player.get("number", "") or "").strip() == number
 
     @staticmethod
-    def _coord_to_spot(coord: Any) -> str:
+    def _default_coord_to_spot(coord: Any, state: Any | None = None) -> str:
+        # 0-100 fallback used only when no ruleset-aware coord_to_spot is
+        # injected (some unit-test constructions). app.py always injects the
+        # real RulesService.coord_to_spot, which is field-length aware.
         try:
             value = max(0, min(100, int(coord)))
         except (TypeError, ValueError):
@@ -351,7 +356,7 @@ class EventService:
                         20,
                     )
                 elif requested_spot:
-                    result_spot = self._coord_to_spot(self._spot_to_coord(requested_spot))
+                    result_spot = self._coord_to_spot(self._spot_to_coord(requested_spot, state), state)
                 else:
                     return EventResult(
                         "KICKOFF_RESULT_SPOT_REQUIRED",
@@ -388,7 +393,7 @@ class EventService:
                 if return_td:
                     direction = self._team_direction(state, team)
                     final_spot = "RIGHT GOAL" if direction == 1 else "LEFT GOAL"
-                state["ball_spot"] = self._coord_to_spot(self._spot_to_coord(final_spot))
+                state["ball_spot"] = self._coord_to_spot(self._spot_to_coord(final_spot, state), state)
                 state["clock_running"] = False
                 state["clock_started_at"] = 0
             if event_code == "FIRST_DOWN":
@@ -412,7 +417,7 @@ class EventService:
                     if bool(incoming.get("kick_touchback")):
                         state["ball_spot"] = CanonicalStateFoundation._team_own_yard_spot(state, receiving, 20)
                     elif str(incoming.get("kick_result_spot", "") or "").strip():
-                        state["ball_spot"] = self._coord_to_spot(self._spot_to_coord(incoming.get("kick_result_spot")))
+                        state["ball_spot"] = self._coord_to_spot(self._spot_to_coord(incoming.get("kick_result_spot"), state), state)
                     state["clock_running"] = False
                     state["clock_started_at"] = 0
 
@@ -542,9 +547,9 @@ class EventService:
                 and not yards
                 and play_type in {"rush", "reception", "return"}
             ):
-                start_coord = self._spot_to_coord(state.get("ball_spot") or 50)
+                start_coord = self._spot_to_coord(state.get("ball_spot") or 50, state)
                 direction = self._team_direction(state, team)
-                goal_coord = 100 if direction == 1 else 0
+                goal_coord = self._spot_to_coord("RIGHT GOAL", state) if direction == 1 else 0
                 yards = str(abs(goal_coord - start_coord))
             turnover_type = str(incoming.get("turnover_type", "")).lower()
 

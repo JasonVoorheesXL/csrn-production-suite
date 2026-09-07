@@ -101,12 +101,12 @@ class RulesService:
     _field_geometry_cache: dict[str, dict[str, int]] = {}
 
     @classmethod
-    def _field_geometry(cls) -> dict[str, int]:
-        rid = ruleset_service.active_ruleset_id()
+    def _field_geometry(cls, state: Mapping[str, Any] | None = None) -> dict[str, int]:
+        rid = ruleset_service.active_ruleset_id(state)
         if rid not in cls._field_geometry_cache:
             try:
                 cls._field_geometry_cache[rid] = (
-                    ruleset_service.field_geometry(ruleset_service.active_ruleset())
+                    ruleset_service.field_geometry(ruleset_service.active_ruleset(state))
                     or dict(cls._FIELD_GEOMETRY_FALLBACK)
                 )
             except Exception:
@@ -114,8 +114,8 @@ class RulesService:
         return cls._field_geometry_cache[rid]
 
     @classmethod
-    def _field_length(cls) -> int:
-        return int(cls._field_geometry().get("length_yards", 100) or 100)
+    def _field_length(cls, state: Mapping[str, Any] | None = None) -> int:
+        return int(cls._field_geometry(state).get("length_yards", 100) or 100)
 
     # Point values + accepted play types, from the same football ruleset.
     # The literals are the frozen fallback + golden anchor.
@@ -132,12 +132,12 @@ class RulesService:
     _no_fair_catch_cache: dict[str, bool] = {}
 
     @classmethod
-    def _scoring(cls) -> dict[str, int]:
-        rid = ruleset_service.active_ruleset_id()
+    def _scoring(cls, state: Mapping[str, Any] | None = None) -> dict[str, int]:
+        rid = ruleset_service.active_ruleset_id(state)
         if rid not in cls._scoring_cache:
             try:
                 cls._scoring_cache[rid] = (
-                    ruleset_service.scoring_values(ruleset_service.active_ruleset())
+                    ruleset_service.scoring_values(ruleset_service.active_ruleset(state))
                     or dict(cls._SCORING_FALLBACK)
                 )
             except Exception:
@@ -145,12 +145,12 @@ class RulesService:
         return cls._scoring_cache[rid]
 
     @classmethod
-    def _valid_play_types(cls) -> set[str]:
-        rid = ruleset_service.active_ruleset_id()
+    def _valid_play_types(cls, state: Mapping[str, Any] | None = None) -> set[str]:
+        rid = ruleset_service.active_ruleset_id(state)
         if rid not in cls._valid_play_types_cache:
             try:
                 cls._valid_play_types_cache[rid] = (
-                    ruleset_service.valid_play_types(ruleset_service.active_ruleset())
+                    ruleset_service.valid_play_types(ruleset_service.active_ruleset(state))
                     or set(cls.VALID_PLAY_TYPES)
                 )
             except Exception:
@@ -158,22 +158,22 @@ class RulesService:
         return cls._valid_play_types_cache[rid]
 
     @classmethod
-    def _no_fair_catch(cls) -> bool:
-        rid = ruleset_service.active_ruleset_id()
+    def _no_fair_catch(cls, state: Mapping[str, Any] | None = None) -> bool:
+        rid = ruleset_service.active_ruleset_id(state)
         if rid not in cls._no_fair_catch_cache:
             try:
                 cls._no_fair_catch_cache[rid] = ruleset_service.no_fair_catch(
-                    ruleset_service.active_ruleset()
+                    ruleset_service.active_ruleset(state)
                 )
             except Exception:
                 cls._no_fair_catch_cache[rid] = False
         return cls._no_fair_catch_cache[rid]
 
     @classmethod
-    def spot_to_coord(cls, value: Any) -> int:
+    def spot_to_coord(cls, value: Any, state: Mapping[str, Any] | None = None) -> int:
         """Canonical field coordinate: 0=left goal line, length=right goal
         line (length is the ruleset field length, 100 NFHS / 110 Canadian)."""
-        length = cls._field_length()
+        length = cls._field_length(state)
         mid = length // 2
         text = str(value or "").strip().lower()
         if text in {"left goal", "left_goal", "home goal", "home_goal", "0"}:
@@ -199,8 +199,8 @@ class RulesService:
             return mid
 
     @classmethod
-    def coord_to_spot(cls, coord: Any) -> str:
-        length = cls._field_length()
+    def coord_to_spot(cls, coord: Any, state: Mapping[str, Any] | None = None) -> str:
+        length = cls._field_length(state)
         mid = length // 2
         try:
             normalized = max(0, min(length, int(coord)))
@@ -234,12 +234,12 @@ class RulesService:
     _downs_sequence_cache: dict[str, list[str]] = {}
 
     @classmethod
-    def _downs_sequence(cls) -> list[str]:
-        rid = ruleset_service.active_ruleset_id()
+    def _downs_sequence(cls, state: Mapping[str, Any] | None = None) -> list[str]:
+        rid = ruleset_service.active_ruleset_id(state)
         if rid not in cls._downs_sequence_cache:
             try:
                 cls._downs_sequence_cache[rid] = (
-                    ruleset_service.downs_sequence(ruleset_service.active_ruleset())
+                    ruleset_service.downs_sequence(ruleset_service.active_ruleset(state))
                     or list(cls._DOWNS_SEQUENCE_FALLBACK)
                 )
             except Exception:
@@ -247,11 +247,11 @@ class RulesService:
         return cls._downs_sequence_cache[rid]
 
     @classmethod
-    def advance_down(cls, down: Any) -> str:
+    def advance_down(cls, down: Any, state: Mapping[str, Any] | None = None) -> str:
         # wrap=False keeps the last down where it is (no phantom fresh series
         # on a failed final down); the caller applies turnover-on-downs.
         return ruleset_service.next_down(
-            str(down), cls._downs_sequence(), wrap=False
+            str(down), cls._downs_sequence(state), wrap=False
         )
 
     @staticmethod
@@ -413,16 +413,14 @@ class RulesService:
                 field: copy.deepcopy(state.get(field))
                 for field in self.SNAPSHOT_FIELDS
             }
-            length = self._field_length()
-            td_points = self._scoring().get("touchdown", 6)
-            safety_points = self._scoring().get("safety", 2)
+            length = self._field_length(state)
+            td_points = self._scoring(state).get("touchdown", 6)
+            safety_points = self._scoring(state).get("safety", 2)
             start = self.spot_to_coord(
-                incoming.get("start_spot") or state.get("ball_spot") or (length // 2)
-            )
+                incoming.get("start_spot") or state.get("ball_spot") or (length // 2), state)
             end_value = incoming.get("end_spot")
             end = self.spot_to_coord(
-                end_value if end_value not in (None, "") else start
-            )
+                end_value if end_value not in (None, "") else start, state)
             direction = self.team_direction(state, team)
             yards = (end - start) * direction
             old_down = str(state.get("down", "1st"))
@@ -453,13 +451,12 @@ class RulesService:
                     incoming.get("turnover_spot")
                     or incoming.get("interception_spot")
                     or incoming.get("recovery_spot")
-                    or self.coord_to_spot(end)
+                    or self.coord_to_spot(end, state)
                 )
-                turnover_spot = self.spot_to_coord(spot_value)
+                turnover_spot = self.spot_to_coord(spot_value, state)
                 return_value = incoming.get("return_end_spot")
                 return_end = self.spot_to_coord(
-                    return_value if return_value not in (None, "") else self.coord_to_spot(turnover_spot)
-                )
+                    return_value if return_value not in (None, "") else self.coord_to_spot(turnover_spot, state), state)
                 gaining_direction = self.team_direction(state, turnover_team)
                 turnover_return_yards = max(0, (return_end - turnover_spot) * gaining_direction)
                 turnover_touchdown = (
@@ -617,12 +614,11 @@ class RulesService:
                 CanonicalStateFoundation.clear_special_phase(state)
                 landing_value = incoming.get("landing_spot")
                 landing = self.spot_to_coord(
-                    landing_value if landing_value not in (None, "") else end
-                )
+                    landing_value if landing_value not in (None, "") else end, state)
                 touchback = bool(incoming.get("touchback"))
                 # A ruleset with no fair catch (Canadian) ignores the signal
                 # outright -- the returner must run it or concede a single.
-                fair_catch = bool(incoming.get("fair_catch")) and not self._no_fair_catch()
+                fair_catch = bool(incoming.get("fair_catch")) and not self._no_fair_catch(state)
                 blocked = bool(incoming.get("blocked"))
                 # A muffed punt is its own outcome, distinct from a generic
                 # fumble: the returning team bobbles the catch, and if the
@@ -676,26 +672,26 @@ class RulesService:
                     )
                     CanonicalStateFoundation.enter_pending_try(state, receiving)
                 else:
-                    state["ball_spot"] = self.coord_to_spot(end)
+                    state["ball_spot"] = self.coord_to_spot(end, state)
                     state["down"] = "1st"
                     state["distance"] = "10"
                 self._stop_clock(state)
                 label = "Kickoff" if kind == "kickoff" else "Punt"
                 description = (
                     f"{label} by #{numbers['kicker'] or '?'} "
-                    f"landed at {self.coord_to_spot(landing)}"
+                    f"landed at {self.coord_to_spot(landing, state)}"
                 )
                 if muffed_punt:
                     description += ", muffed by the receiving team"
                     if muff_recovered_by_kicking_team:
                         description += (
                             f", recovered by the kicking team at "
-                            f"{self.coord_to_spot(end)}"
+                            f"{self.coord_to_spot(end, state)}"
                         )
                     else:
                         description += (
                             f", recovered by the receiving team at "
-                            f"{self.coord_to_spot(end)}"
+                            f"{self.coord_to_spot(end, state)}"
                         )
                 elif numbers["returner"] and not fair_catch and not touchback:
                     returner = self._display(
@@ -704,10 +700,10 @@ class RulesService:
                     )
                     description += (
                         f", returned by {returner} for {return_yards} yards "
-                        f"to {self.coord_to_spot(end)}"
+                        f"to {self.coord_to_spot(end, state)}"
                     )
                 else:
-                    description += f", ball at {self.coord_to_spot(end)}"
+                    description += f", ball at {self.coord_to_spot(end, state)}"
                 description += (
                     " — touchback"
                     if touchback
@@ -817,10 +813,10 @@ class RulesService:
                         state["down"] = "1st"
                         state["distance"] = "10"
                     else:
-                        state["down"] = self.advance_down(old_down)
+                        state["down"] = self.advance_down(old_down, state)
                         state["distance"] = str(max(1, distance - yards))
                         if ruleset_service.is_terminal_down(
-                            old_down, self._downs_sequence()
+                            old_down, self._downs_sequence(state)
                         ):
                             state["possession"] = self.opposite(team)
                             state["down"] = "1st"
@@ -837,7 +833,7 @@ class RulesService:
                     ):
                         self._stop_clock(state)
                 if not touchdown and not safety:
-                    state["ball_spot"] = self.coord_to_spot(end)
+                    state["ball_spot"] = self.coord_to_spot(end, state)
 
                 if kind == "pass" and outcome == "sack":
                     # A sack recorded through the statistician's play form
@@ -877,18 +873,18 @@ class RulesService:
 
             if turnover_type == "interception":
                 defender = self._display(numbers["returner"], names["returner"]) if numbers["returner"] or names["returner"] else self._team_fallback(state, self.opposite(team))
-                description += f" by {defender} at {self.coord_to_spot(turnover_spot)}"
+                description += f" by {defender} at {self.coord_to_spot(turnover_spot, state)}"
                 if turnover_return_yards:
-                    description += f", returned {turnover_return_yards} yards to {self.coord_to_spot(return_end)}"
+                    description += f", returned {turnover_return_yards} yards to {self.coord_to_spot(return_end, state)}"
             if bool(incoming.get("fumble")):
                 description += ", fumble" + (
                     " lost" if bool(incoming.get("fumble_lost")) else " recovered"
                 )
                 if bool(incoming.get("fumble_lost")):
                     recoverer = self._display(numbers["returner"], names["returner"]) if numbers["returner"] or names["returner"] else self._team_fallback(state, self.opposite(team))
-                    description += f", recovered by {recoverer} at {self.coord_to_spot(turnover_spot)}"
+                    description += f", recovered by {recoverer} at {self.coord_to_spot(turnover_spot, state)}"
                     if turnover_return_yards:
-                        description += f", returned {turnover_return_yards} yards to {self.coord_to_spot(return_end)}"
+                        description += f", returned {turnover_return_yards} yards to {self.coord_to_spot(return_end, state)}"
             if turnover_type == "downs":
                 description += ", turnover on downs"
             if turnover_touchdown:
@@ -960,8 +956,8 @@ class RulesService:
                     "turnover": turnover,
                     "turnover_type": turnover_type,
                     "turnover_team": turnover_team,
-                    "turnover_spot": self.coord_to_spot(turnover_spot) if turnover else "",
-                    "return_end_spot": self.coord_to_spot(return_end) if turnover else "",
+                    "turnover_spot": self.coord_to_spot(turnover_spot, state) if turnover else "",
+                    "return_end_spot": self.coord_to_spot(return_end, state) if turnover else "",
                     "return_yards": turnover_return_yards if turnover else (return_yards if kind in {"kickoff", "punt"} else 0),
                     "turnover_player_number": (
                         ""
@@ -986,7 +982,7 @@ class RulesService:
                     ),
                     "sacker_number": numbers["sacker"],
                     "landing_spot": (
-                        self.coord_to_spot(landing)
+                        self.coord_to_spot(landing, state)
                         if kind in {"kickoff", "punt"}
                         else ""
                     ),
@@ -1023,8 +1019,8 @@ class RulesService:
                 "kicking_team": team if kind in {"kickoff", "punt"} else "",
                 "down": old_down,
                 "distance": old_distance,
-                "ball_spot": self.coord_to_spot(start),
-                "end_spot": self.coord_to_spot(end),
+                "ball_spot": self.coord_to_spot(start, state),
+                "end_spot": self.coord_to_spot(end, state),
                 "play_type": kind,
                 "result": description,
                 "yards": yards,
@@ -1033,8 +1029,8 @@ class RulesService:
                 "turnover": turnover,
                 "turnover_type": turnover_type,
                 "turnover_team": turnover_team,
-                "turnover_spot": self.coord_to_spot(turnover_spot) if turnover else "",
-                "return_end_spot": self.coord_to_spot(return_end) if turnover else "",
+                "turnover_spot": self.coord_to_spot(turnover_spot, state) if turnover else "",
+                "return_end_spot": self.coord_to_spot(return_end, state) if turnover else "",
                 "return_yards": turnover_return_yards if turnover else (return_yards if kind in {"kickoff", "punt"} else 0),
                 "turnover_player_number": (
                     ""
@@ -1084,7 +1080,7 @@ class RulesService:
                     if ref.get("number") and not ref.get("resolved")
                 ],
                 "landing_spot": (
-                    self.coord_to_spot(landing)
+                    self.coord_to_spot(landing, state)
                     if kind in {"kickoff", "punt"}
                     else ""
                 ),

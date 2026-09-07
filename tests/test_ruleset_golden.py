@@ -335,6 +335,43 @@ def test_ca_cjfl_ofc_extends_ca_base() -> None:
     assert ruleset_service.no_fair_catch(cjfl) is True
 
 
+def test_coordinate_space_is_state_aware_for_canadian_field_length() -> None:
+    # Round 26 Phase B 4a: the scrimmage coordinate space is 0..length_yards
+    # -- 0-100 for NFHS, 0-110 for a Canadian game. Threading state through
+    # the coord helpers is what makes a 110-yard drive actually reachable.
+    from canonical_state_service import CanonicalStateFoundation as C
+    from rules_service import RulesService
+
+    us = {}  # no jurisdiction -> generic US base
+    ca = {"country": "CA", "region": "ON", "association": "CJFL"}
+
+    # goal line: 100 vs 110
+    assert C._spot_to_coord("RIGHT GOAL", us) == 100
+    assert C._spot_to_coord("RIGHT GOAL", ca) == 110
+    assert RulesService.spot_to_coord("right goal", us) == 100
+    assert RulesService.spot_to_coord("right goal", ca) == 110
+
+    # "RIGHT 45" = 45 yds from the right goal: coord 55 on a 100 field,
+    # coord 65 on a 110 field
+    assert C._spot_to_coord("RIGHT 45", us) == 55
+    assert C._spot_to_coord("RIGHT 45", ca) == 65
+    assert C._coord_to_spot(65, ca) == "RIGHT 45"
+    # Canadian centre line is the 55
+    assert C._coord_to_spot(55, ca) == "55"
+    assert C._coord_to_spot(55, us) == "RIGHT 45"
+
+    # yards_to_goal / field_state report at the right scale
+    ca_state = dict(ca, ball_spot="LEFT 20", possession="home", home_direction="right")
+    fs = C.field_state(ca_state)
+    assert fs["length_yards"] == 110
+    assert fs["end_zone_depth_yards"] == 20
+    assert fs["yards_to_goal"] == 90  # 110 - 20
+
+    us_state = {"ball_spot": "LEFT 20", "possession": "home", "home_direction": "right"}
+    assert C.field_state(us_state)["yards_to_goal"] == 80
+    assert C.field_state(us_state)["length_yards"] == 100
+
+
 def test_available_rulesets_exposes_jurisdiction_for_the_picker() -> None:
     # Round 26 Phase B 1/5: the broadcast-creation jurisdiction picker
     # groups on available_rulesets()' country / region / association.

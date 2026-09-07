@@ -116,8 +116,8 @@ class CanonicalStateFoundation:
         """
 
         roles = cls.team_roles(state)
-        length = cls._field_length()
-        coord = cls._spot_to_coord(state.get("ball_spot") or (length // 2))
+        length = cls._field_length(state)
+        coord = cls._spot_to_coord(state.get("ball_spot") or (length // 2), state)
         direction = str(
             state.get(f"{roles.possessing_team}_direction", "right") or "right"
         ).strip().lower()
@@ -136,7 +136,9 @@ class CanonicalStateFoundation:
             "down": str(state.get("down", "1st") or "1st"),
             "distance": str(state.get("distance", "10") or "10"),
             "yards_to_goal": to_goal,
-            "red_zone": 0 < to_goal <= cls._field_geometry().get("red_zone_yards", 20),
+            "red_zone": 0 < to_goal <= cls._field_geometry(state).get("red_zone_yards", 20),
+            "length_yards": cls._field_geometry(state).get("length_yards", 100),
+            "end_zone_depth_yards": cls._field_geometry(state).get("end_zone_depth_yards", 10),
             "drive_direction": str(
                 state.get(f"{roles.possessing_team}_direction", "right") or "right"
             ),
@@ -184,8 +186,8 @@ class CanonicalStateFoundation:
         return ""
 
     @classmethod
-    def _spot_to_coord(cls, value: Any) -> int:
-        length = cls._field_length()
+    def _spot_to_coord(cls, value: Any, state: Mapping[str, Any] | None = None) -> int:
+        length = cls._field_length(state)
         mid = length // 2
         text = str(value or "").strip().upper()
         if text in {"LEFT GOAL", "HOME GOAL", "0"}:
@@ -207,8 +209,8 @@ class CanonicalStateFoundation:
             return mid
 
     @classmethod
-    def _coord_to_spot(cls, coord: Any) -> str:
-        length = cls._field_length()
+    def _coord_to_spot(cls, coord: Any, state: Mapping[str, Any] | None = None) -> str:
+        length = cls._field_length(state)
         mid = length // 2
         try:
             value = max(0, min(length, int(round(float(coord)))))
@@ -326,16 +328,16 @@ class CanonicalStateFoundation:
     @classmethod
     def _team_own_yard_spot(cls, state: Mapping[str, Any], team: str, yard: int) -> str:
         direction = str(state.get(f"{team}_direction", "right" if team == "home" else "left") or "right").lower()
-        length = cls._field_length()
+        length = cls._field_length(state)
         coord = yard if direction == "right" else length - yard
-        return cls._coord_to_spot(coord)
+        return cls._coord_to_spot(coord, state)
 
     @classmethod
     def _opponent_yard_spot(cls, state: Mapping[str, Any], team: str, yard: int) -> str:
         direction = str(state.get(f"{team}_direction", "right" if team == "home" else "left") or "right").lower()
-        length = cls._field_length()
+        length = cls._field_length(state)
         coord = length - yard if direction == "right" else yard
-        return cls._coord_to_spot(coord)
+        return cls._coord_to_spot(coord, state)
 
     @classmethod
     def enter_pending_try(cls, state: dict[str, Any], scoring_team: str) -> None:
@@ -422,8 +424,8 @@ class CanonicalStateFoundation:
             play["invalid_during_special_phase"] = True
             return
         direction = -1 if str(state.get(f"{team}_direction", "right")) == "left" else 1
-        length = cls._field_length()
-        start = cls._spot_to_coord(state.get("ball_spot") or play.get("ball_spot") or (length // 2))
+        length = cls._field_length(state)
+        start = cls._spot_to_coord(state.get("ball_spot") or play.get("ball_spot") or (length // 2), state)
         try:
             yards = int(play.get("yards", 0) or 0)
         except (TypeError, ValueError):
@@ -432,8 +434,8 @@ class CanonicalStateFoundation:
         if kind == "pass" and outcome in {"incomplete", "spike"}:
             yards = 0
         end = max(0, min(length, start + (yards * direction)))
-        play["ball_spot"] = cls._coord_to_spot(start)
-        play["end_spot"] = cls._coord_to_spot(end)
+        play["ball_spot"] = cls._coord_to_spot(start, state)
+        play["end_spot"] = cls._coord_to_spot(end, state)
 
         old_down = str(state.get("down", "1st") or "1st")
         old_distance_text = str(state.get("distance", "10") or "10")
@@ -447,14 +449,16 @@ class CanonicalStateFoundation:
         turnover_type = str(play.get("turnover_type", "") or "").lower()
         if turnover:
             turnover_spot = cls._spot_to_coord(
-                play.get("turnover_spot") or play.get("end_spot") or cls._coord_to_spot(end)
+                play.get("turnover_spot") or play.get("end_spot") or cls._coord_to_spot(end, state),
+                state,
             )
             return_end = cls._spot_to_coord(
-                play.get("return_end_spot") or play.get("end_spot") or cls._coord_to_spot(turnover_spot)
+                play.get("return_end_spot") or play.get("end_spot") or cls._coord_to_spot(turnover_spot, state),
+                state,
             )
             end = return_end
-            play["turnover_spot"] = cls._coord_to_spot(turnover_spot)
-            play["return_end_spot"] = cls._coord_to_spot(return_end)
+            play["turnover_spot"] = cls._coord_to_spot(turnover_spot, state)
+            play["return_end_spot"] = cls._coord_to_spot(return_end, state)
             gaining_team = str(play.get("turnover_team", "") or cls.opposite(team)).lower()
             if gaining_team not in cls.VALID_TEAMS:
                 gaining_team = cls.opposite(team)
@@ -504,11 +508,11 @@ class CanonicalStateFoundation:
                     turnover = True
                     play["turnover_type"] = "downs"
                     play["turnover_team"] = cls.opposite(team)
-                    play["turnover_spot"] = cls._coord_to_spot(end)
-                    play["return_end_spot"] = cls._coord_to_spot(end)
+                    play["turnover_spot"] = cls._coord_to_spot(end, state)
+                    play["return_end_spot"] = cls._coord_to_spot(end, state)
                     play["return_yards"] = 0
             play["first_down"] = first_down
-        state["ball_spot"] = cls._coord_to_spot(end)
+        state["ball_spot"] = cls._coord_to_spot(end, state)
         play["touchdown"] = touchdown
         play["safety"] = safety
         play["turnover"] = turnover

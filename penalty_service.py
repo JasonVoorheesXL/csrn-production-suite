@@ -86,6 +86,26 @@ class PenaltyService:
 
     _DOWNS_SEQUENCE_FALLBACK = ["1st", "2nd", "3rd", "4th"]
     _downs_sequence_cache: dict[str, list[str]] = {}
+    _field_length_cache: dict[str, int] = {}
+
+    @classmethod
+    def _field_length(cls, state: Mapping[str, Any] | None = None) -> int:
+        """Goal-line-to-goal-line coordinate span for the active ruleset
+        (100 NFHS / 110 Canadian). Cached by resolved ruleset id."""
+        import ruleset_service
+
+        rid = ruleset_service.active_ruleset_id(state)
+        if rid not in cls._field_length_cache:
+            try:
+                cls._field_length_cache[rid] = int(
+                    ruleset_service.field_geometry(
+                        ruleset_service.active_ruleset(state)
+                    ).get("length_yards", 100)
+                    or 100
+                )
+            except Exception:
+                cls._field_length_cache[rid] = 100
+        return cls._field_length_cache[rid]
 
     @classmethod
     def _downs_sequence(cls, state: Mapping[str, Any] | None = None) -> list[str]:
@@ -177,7 +197,8 @@ class PenaltyService:
         defense = cls.opposite(offense)
         direction = int(team_direction(state, offense))
         base_spot = enforcement_spot if str(enforcement_spot or "").strip() else state.get("ball_spot", "50")
-        start_coord = max(0, min(100, int(spot_to_coord(base_spot))))
+        length = cls._field_length(state)
+        start_coord = max(0, min(length, int(spot_to_coord(base_spot))))
 
         against_offense = unit == "Offensive" or (unit in {"Special Teams", "General"} and selected_team == offense)
         against_defense = unit == "Defensive" or (unit in {"Special Teams", "General"} and selected_team == defense)
@@ -186,7 +207,7 @@ class PenaltyService:
 
         requested_half = bool(half_distance)
         if move_sign:
-            goal_coord = 0 if move_sign < 0 else 100
+            goal_coord = 0 if move_sign < 0 else length
             distance_to_goal = abs(goal_coord - start_coord)
             if requested_half:
                 enforced = max(1, distance_to_goal // 2) if distance_to_goal > 1 and configured_yards else 0
@@ -196,7 +217,7 @@ class PenaltyService:
         else:
             enforced = 0
 
-        target_coord = max(0, min(100, target_coord))
+        target_coord = max(0, min(length, target_coord))
         if move_sign:
             state["ball_spot"] = coord_to_spot(target_coord)
 

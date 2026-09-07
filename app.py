@@ -3890,6 +3890,7 @@ def get_event_service() -> EventService:
             show_player_graphic=show_automation_player_graphic,
             apply_penalty=apply_penalty_enforcement,
             spot_to_coord=spot_to_coord,
+            coord_to_spot=coord_to_spot,
             team_direction=team_direction,
             normalize_state=normalize_state,
             default_player_graphic=lambda: copy.deepcopy(
@@ -3910,12 +3911,12 @@ def authority_rejection(state: dict[str, Any]):
     return jsonify(EventService.locked_payload(state)), 409
 
 
-def spot_to_coord(value: Any) -> int:
-    return RulesService.spot_to_coord(value)
+def spot_to_coord(value: Any, state: dict[str, Any] | None = None) -> int:
+    return RulesService.spot_to_coord(value, state)
 
 
-def coord_to_spot(coord: int) -> str:
-    return RulesService.coord_to_spot(coord)
+def coord_to_spot(coord: int, state: dict[str, Any] | None = None) -> str:
+    return RulesService.coord_to_spot(coord, state)
 
 
 def team_direction(state: dict[str, Any], team: str) -> int:

@@ -22,7 +22,7 @@ def make_service(initial):
         player_display=lambda p:"",
         show_player_graphic=lambda *a,**k:None,
         apply_penalty=lambda state,*a,**k:{"applied":False},
-        spot_to_coord=lambda v:20,
+        spot_to_coord=lambda v, *_a: 20,
         team_direction=lambda state,team:1,
         normalize_state=lambda state:dict(state),
         default_player_graphic=lambda:{},
