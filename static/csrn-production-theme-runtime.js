@@ -1483,7 +1483,58 @@ function applyDiamondBoardOverrides(root, alias, runtime) {
     const count = root.querySelector(".bl-baseball-state .bl-count");
     if (count) count.textContent = `B ${balls} · S ${strikes} · O ${outs}`;
     paintBases(root.querySelector(".bl-baseball-state .bl-diamond"));
+    ensureCollegiateDiamond(root, {half, inning, balls, strikes, outs, bases});
   }
+}
+
+// Phase C (commissioned): a full diamond field-position graphic for the
+// Collegiate Tech baseball / softball board, in the same CSS/SVG idiom as
+// the football field strip (bl-college-field). Injected by the runtime so
+// the frozen csrn-broadcast-layout-engine files stay byte-stable; styled
+// in csrn-production-theme-runtime.css.
+function ensureCollegiateDiamond(root, d) {
+  const board = root.querySelector(".bl-scorebug.bl-collegiate, .bl-baseball-board.bl-collegiate");
+  if (!board) return;
+  let host = board.querySelector(".bl-college-diamond");
+  if (!host) {
+    host = document.createElement("div");
+    host.className = "bl-college-diamond";
+    host.setAttribute("data-module", "game.field");
+    host.innerHTML =
+      '<div class="bl-college-diamond-grid" aria-hidden="true">' +
+        '<svg class="bl-college-diamond-art" viewBox="0 0 320 220" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' +
+          '<path class="bl-cd-grass" d="M160 208 L18 96 A200 200 0 0 1 302 96 Z"/>' +
+          '<path class="bl-cd-dirt" d="M160 200 L70 128 A128 128 0 0 1 250 128 Z"/>' +
+          '<path class="bl-cd-infield" d="M160 176 L112 132 L160 90 L208 132 Z"/>' +
+          '<path class="bl-cd-foul" d="M160 200 L20 92 M160 200 L300 92"/>' +
+          '<circle class="bl-cd-mound" cx="160" cy="140" r="11"/>' +
+          '<rect class="bl-cd-base" x="200" y="126" width="12" height="12" transform="rotate(45 206 132)"/>' +
+          '<rect class="bl-cd-base" x="154" y="82"  width="12" height="12" transform="rotate(45 160 88)"/>' +
+          '<rect class="bl-cd-base" x="108" y="126" width="12" height="12" transform="rotate(45 114 132)"/>' +
+          '<path class="bl-cd-home" d="M154 190 h12 v7 l-6 6 l-6 -6 Z"/>' +
+          '<rect class="bl-cd-runner first"  x="200" y="126" width="12" height="12" transform="rotate(45 206 132)"/>' +
+          '<rect class="bl-cd-runner second" x="154" y="82"  width="12" height="12" transform="rotate(45 160 88)"/>' +
+          '<rect class="bl-cd-runner third"  x="108" y="126" width="12" height="12" transform="rotate(45 114 132)"/>' +
+        '</svg>' +
+      '</div>' +
+      '<div class="bl-college-diamond-meta">' +
+        '<span><small>Inning</small><b class="bl-cd-inning"></b></span>' +
+        '<span><small>Count</small><b class="bl-cd-count"></b></span>' +
+        '<span><small>Outs</small><b class="bl-cd-outs"></b></span>' +
+      '</div>';
+    board.appendChild(host);
+  }
+  host.dataset.inningHalf = (d.half === "BOT" ? "bottom" : "top");
+  const arrow = d.half === "BOT" ? "▼" : "▲";
+  const setText = (sel, text) => { const n = host.querySelector(sel); if (n) n.textContent = text; };
+  setText(".bl-cd-inning", `${arrow} ${d.inning || "-"}`);
+  setText(".bl-cd-count", `${d.balls || "0"}–${d.strikes || "0"}`);
+  const outsN = Math.max(0, Math.min(3, Number(d.outs) || 0));
+  setText(".bl-cd-outs", "● ".repeat(outsN).trim() + " " + "○ ".repeat(3 - outsN).trim());
+  const runner = d.bases || [false, false, false];
+  host.querySelector(".bl-cd-runner.first").classList.toggle("on", Boolean(runner[0]));
+  host.querySelector(".bl-cd-runner.second").classList.toggle("on", Boolean(runner[1]));
+  host.querySelector(".bl-cd-runner.third").classList.toggle("on", Boolean(runner[2]));
 }
 
 function applyFootballBoardOverrides(root, alias, runtime) {
