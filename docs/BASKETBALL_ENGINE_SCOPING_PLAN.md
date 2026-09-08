@@ -320,10 +320,16 @@ re-pins**, same as the baseball round. Unlike hockey, basketball needs
 Build **after** R26 + R27 + Phase C merge to trunk (depends on R26's
 `ruleset_service` shape + `_source_notes`, R27's `sport_families`, and
 Phase C's already-merged basketball display). P0 = rebase onto merged
-trunk. **Basketball, baseball and hockey engines share three touch points
-— `sport_families.ENGINE_READY`, `ruleset_service._CATALOG`, and
-`engine_router.py` — so they should be sequenced (not landed in parallel
-on trunk) or explicitly coordinated at merge.**
+trunk.
+
+**Confirmed cross-engine build sequence (2026-09-07): baseball → basketball
+→ hockey.** Basketball is **second**. Its P0 rebases onto the trunk state
+that already includes the baseball engine and *appends* its rows to
+`ruleset_service._CATALOG`, its case to `engine_router.py`, and its entry
+to `sport_families.ENGINE_READY` rather than creating them. Full rationale
++ the tracker for this sequence live in the baseball scoping plan §9.4
+(`baseball-engine-scoping-20260907`). Scoping stays parallel; only the
+builds sequence.
 
 ---
 
