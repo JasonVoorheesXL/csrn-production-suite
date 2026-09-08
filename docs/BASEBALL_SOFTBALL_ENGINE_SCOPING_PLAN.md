@@ -406,6 +406,30 @@ from forking further; the first build commit rebases onto the merged
 trunk. This is called out here so it is a deliberate decision, not a
 surprise.
 
+### 9.4 Cross-engine build sequence — CONFIRMED 2026-09-07 (this doc is the tracker)
+
+Baseball, basketball and hockey engines all edit the same three shared
+touch points (`sport_families.ENGINE_READY`, `ruleset_service._CATALOG`,
+the new shared `engine_router.py`), so their **P0+ builds cannot land on
+trunk in parallel.** Confirmed order:
+
+1. **Baseball** (this round) — first. Furthest along: spec reconciled
+   (§12), rules-verification checklist already with the owner, self-service
+   rules page already scoped as P5b (§13).
+2. **Basketball** (`basketball-engine-scoping-20260907`) — second. Only
+   three clean MHSAA unknowns to verify (shot clock / bonus rule /
+   timeouts); no structural blockers.
+3. **Hockey** (`hockey-engine-scoping-20260907`) — last. Still has an open
+   governing-body question (which association governs Sault College's
+   hockey) that needs Jay's input before real rule content can be written;
+   building it first would stall on that.
+
+This sequences the **builds** only — all three stay **scoped in parallel**
+(already done). It does not change any scoping. Each later engine's P0
+rebases onto the trunk state that includes the earlier engine(s), and
+*appends* its case to `engine_router.py` / its rows to `_CATALOG` / its
+entry to `ENGINE_READY` rather than creating them.
+
 ---
 
 ## 10. Phased build plan (for the build round — not started)
