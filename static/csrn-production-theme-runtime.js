@@ -669,25 +669,49 @@ function mergeRuntimeState(base, runtime, captionState = null) {
   base.game.clockVisible = clockVisible;
   base.game.clock_visible = clockVisible;
 
-  const productionDown = productionDownDistance(source);
-  base.game.down = productionDown.down;
-  base.game.distance = productionDown.distance;
-  base.game.toGo = productionDown.distance;
-  base.game.to_go = productionDown.distance;
-  base.game.downDistance = productionDown.combined;
-  base.game.down_distance = productionDown.combined;
+  // Phase C: dispatch the game-state block by sport family. The football
+  // branch is verbatim from before; non-football families get their own
+  // fields and the football-only keys are stripped so no stale down /
+  // field / ball-spot data can leak onto a baseball or basketball board.
+  const sportFamily = productionSportFamily(base.sport);
+  base.game.sportFamily = sportFamily;
+  const FOOTBALL_GAME_KEYS = [
+    "down", "distance", "toGo", "to_go", "downDistance", "down_distance",
+    "field", "ballSpot", "ball_spot", "driveStart", "drive_start",
+    "firstDownSpot", "first_down_spot", "fieldDirection", "field_direction"
+  ];
 
-  base.game.possession = textValue(source.possession, gameSource.possession, base.game.possession).toLowerCase();
-  const field = productionFieldState(source, gameSource, source.canonical_field_state);
-  base.game.field = field;
-  base.game.ballSpot = field.ballSpot;
-  base.game.ball_spot = field.ballSpot;
-  base.game.driveStart = field.driveStart;
-  base.game.drive_start = field.driveStart;
-  base.game.firstDownSpot = field.firstDownSpot;
-  base.game.first_down_spot = field.firstDownSpot;
-  base.game.fieldDirection = field.direction;
-  base.game.field_direction = field.direction;
+  if (sportFamily === "football") {
+    const productionDown = productionDownDistance(source);
+    base.game.down = productionDown.down;
+    base.game.distance = productionDown.distance;
+    base.game.toGo = productionDown.distance;
+    base.game.to_go = productionDown.distance;
+    base.game.downDistance = productionDown.combined;
+    base.game.down_distance = productionDown.combined;
+
+    base.game.possession = textValue(source.possession, gameSource.possession, base.game.possession).toLowerCase();
+    const field = productionFieldState(source, gameSource, source.canonical_field_state);
+    base.game.field = field;
+    base.game.ballSpot = field.ballSpot;
+    base.game.ball_spot = field.ballSpot;
+    base.game.driveStart = field.driveStart;
+    base.game.drive_start = field.driveStart;
+    base.game.firstDownSpot = field.firstDownSpot;
+    base.game.first_down_spot = field.firstDownSpot;
+    base.game.fieldDirection = field.direction;
+    base.game.field_direction = field.direction;
+  } else {
+    FOOTBALL_GAME_KEYS.forEach(key => { delete base.game[key]; });
+    if (sportFamily === "basketball") {
+      base.game.possession = textValue(source.possession, gameSource.possession, base.game.possession).toLowerCase();
+      Object.assign(base.game, productionBasketballState(source, gameSource));
+    } else {
+      // baseball / softball -- no possession concept
+      delete base.game.possession;
+      Object.assign(base.game, productionDiamondState(source, gameSource));
+    }
+  }
 
   base.ticker = {...(base.ticker || {})};
   base.ticker.text = eventPlainText(source) || "CSRN LIVE";
@@ -1089,6 +1113,54 @@ function productionClock(runtime) {
   ) || "-";
 }
 
+// Phase C: collapse a raw sport value to its family. canadian_football rides
+// the football board/graphics; everything unrecognised falls back to
+// "football" so today's football-only pipeline is byte-identical.
+function productionSportFamily(sport) {
+  const raw = String(sport || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (raw === "canadian_football" || raw === "cfl") return "football";
+  if (raw === "basketball" || raw === "baseball" || raw === "softball") return raw;
+  return "football";
+}
+
+function productionBasketballState(source, gameSource) {
+  const pick = (...k) => textValue(...k.flatMap(name => [source[name], gameSource[name]]));
+  return {
+    shotClock: pick("shot_clock", "shotClock"),
+    homeFouls: pick("home_fouls", "homeFouls"),
+    visitorFouls: pick("visitor_fouls", "visitorFouls"),
+    homeBonus: pick("home_bonus", "homeBonus"),
+    visitorBonus: pick("visitor_bonus", "visitorBonus"),
+    homeTimeouts: pick("home_timeouts", "homeTimeouts"),
+    visitorTimeouts: pick("visitor_timeouts", "visitorTimeouts")
+  };
+}
+
+function productionDiamondState(source, gameSource) {
+  const pick = (...k) => textValue(...k.flatMap(name => [source[name], gameSource[name]]));
+  const rawBases = source.bases ?? gameSource.bases;
+  const bases = Array.isArray(rawBases)
+    ? [Boolean(rawBases[0]), Boolean(rawBases[1]), Boolean(rawBases[2])]
+    : [false, false, false];
+  const half = pick("inning_half", "inningHalf").toUpperCase();
+  return {
+    inning: pick("inning"),
+    inningHalf: half.startsWith("B") ? "BOTTOM" : half.startsWith("T") ? "TOP" : half,
+    balls: pick("balls"),
+    strikes: pick("strikes"),
+    outs: pick("outs"),
+    bases,
+    pitcherName: pick("pitcher_name", "pitcherName"),
+    batterName: pick("batter_name", "batterName"),
+    batterPosition: pick("batter_position", "batterPosition"),
+    homeHits: pick("home_hits", "homeHits"),
+    visitorHits: pick("visitor_hits", "visitorHits"),
+    homeErrors: pick("home_errors", "homeErrors"),
+    visitorErrors: pick("visitor_errors", "visitorErrors"),
+    lineScore: objectValue(source.line_score, source.lineScore, gameSource.line_score, gameSource.lineScore)
+  };
+}
+
 function productionFootballPeriod(runtime) {
   const raw = textValue(runtime.quarter, runtime.period, "1").trim().toUpperCase();
   if (raw === "OT") return "OT";
@@ -1351,8 +1423,309 @@ function labeledCell(root, label) {
   }) || null;
 }
 
+// Phase C: dispatch the per-poll live board patch by sport family. The
+// football path is unchanged; basketball patches its running clock/period,
+// and baseball/softball have no sub-second board (their state moves on
+// discrete events, which re-render the whole package).
+function applyBoardOverrides(root, alias, runtime) {
+  if (!root) return;
+  const family = productionSportFamily(runtime && runtime.sport);
+  if (family === "basketball") return applyBasketballBoardOverrides(root, alias, runtime);
+  if (family === "baseball" || family === "softball") return applyDiamondBoardOverrides(root, alias, runtime);
+  return applyFootballBoardOverrides(root, alias, runtime);
+}
+
+function applyBasketballBoardOverrides(root, alias, runtime) {
+  if (!root) return;
+  const clock = productionClock(runtime);
+  const period = textValue(runtime.period, runtime.quarter, "").trim();
+  const shotClock = textValue(runtime.shot_clock, runtime.shotClock, "").trim();
+
+  if (alias === "eight_bit_gameday") {
+    const cell = root.querySelector(".bl-8bit-basketball-control-bank .bl-8bit-clock-led")?.closest("span");
+    if (cell) setLedText(cell, clock, "bl-8bit-clock-led");
+    return;
+  }
+  if (alias === "friday_night_stadium") {
+    const host = root.querySelector(".bl-fns-basketball-clock");
+    if (!host) return;
+    const led = host.querySelector(".csrn-production-led-override") || host.querySelector("svg");
+    const replacement = document.createElement("span");
+    replacement.className = "csrn-production-led-override bl-fns-clock-led";
+    replacement.textContent = clock;
+    replacement.setAttribute("role", "img");
+    replacement.setAttribute("aria-label", clock);
+    if (led) led.replaceWith(replacement);
+    else host.appendChild(replacement);
+    const strong = host.querySelector("strong");
+    if (strong && period) strong.textContent = period;
+    return;
+  }
+  if (alias === "heritage_press") {
+    const clockValue = labeledCell(root, "CLOCK")?.querySelector(":scope > b");
+    if (clockValue) clockValue.textContent = clock;
+    const periodValue = labeledCell(root, "PERIOD")?.querySelector(":scope > b");
+    if (periodValue && period) periodValue.textContent = period;
+    return;
+  }
+  if (alias === "collegiate_traditional") {
+    root.querySelectorAll('[data-bind="game.clock"]').forEach(node => { node.textContent = clock; });
+    if (period) root.querySelectorAll('[data-bind="game.period"]').forEach(node => { node.textContent = period; });
+    if (shotClock) root.querySelectorAll('[data-bind="game.shotClock"]').forEach(node => { node.textContent = shotClock; });
+  }
+}
+
+function applyDiamondBoardOverrides(root, alias, runtime) {
+  if (!root) return;
+  // The render signature carries no game-state fields, so the diamond board
+  // is kept live here on the fast path -- same contract as the football
+  // board. All lookups are guarded: a partly-rendered board is left alone.
+  const half = textValue(runtime.inning_half, runtime.inningHalf, "TOP").toUpperCase().startsWith("B") ? "BOT" : "TOP";
+  const inning = textValue(runtime.inning, "").trim();
+  const balls = textValue(runtime.balls, "").trim();
+  const strikes = textValue(runtime.strikes, "").trim();
+  const outs = textValue(runtime.outs, "").trim();
+  const rawBases = runtime.bases;
+  const bases = Array.isArray(rawBases)
+    ? [Boolean(rawBases[0]), Boolean(rawBases[1]), Boolean(rawBases[2])]
+    : null;
+
+  const setLed = (node, value, cls) => {
+    if (!node) return;
+    const span = document.createElement("span");
+    span.className = `csrn-production-led-override ${cls || ""}`.trim();
+    span.textContent = String(value || "-").toUpperCase();
+    span.setAttribute("role", "img");
+    span.setAttribute("aria-label", span.textContent);
+    node.replaceWith(span);
+  };
+  const leds = (scope) => scope ? [...scope.querySelectorAll(".csrn-production-led-override, svg")] : [];
+  // baseDiamond() renders its <i> pips in the visual order [2nd, 3rd, 1st].
+  const paintBases = (host) => {
+    if (!host || !bases) return;
+    const order = [bases[1], bases[2], bases[0]];
+    host.querySelectorAll("i").forEach((pip, i) => pip.classList.toggle("on", Boolean(order[i])));
+  };
+  const inningCellOf = (scope) => [...(scope ? scope.querySelectorAll("span") : [])]
+    .find(s => /INNING$/.test((s.querySelector("small")?.textContent || "").trim().toUpperCase())) || null;
+
+  if (alias === "eight_bit_gameday") {
+    const bank = root.querySelector(".bl-8bit-diamond-control-bank");
+    if (!bank) return;
+    const count = leds(bank.querySelector(".bl-8bit-count-pair"));
+    setLed(count[0], balls, "bl-8bit-small-led");
+    setLed(count[1], strikes, "bl-8bit-small-led");
+    const inningCell = inningCellOf(bank);
+    setLed(leds(inningCell)[0], inning, "bl-8bit-inning-led");
+    const inningSmall = inningCell && inningCell.querySelector("small");
+    if (inningSmall) inningSmall.textContent = `${half} INNING`;
+    setLed(leds(labeledCell(bank, "OUTS"))[0], outs, "bl-8bit-small-led");
+    paintBases(labeledCell(bank, "BASES"));
+    return;
+  }
+  if (alias === "friday_night_stadium") {
+    const center = root.querySelector(".bl-fns-diamond-center");
+    setLed(leds(center && center.querySelector('strong[aria-label="INNING"]'))[0], `${half} ${inning}`.trim(), "bl-fns-inning-led");
+    paintBases(center && center.querySelector(".bl-fns-role-bases"));
+    const bottom = root.querySelector(".bl-fns-diamond-bottom");
+    setLed(leds(labeledCell(bottom, "BALLS"))[0], balls, "bl-fns-small-led");
+    setLed(leds(labeledCell(bottom, "STRIKES"))[0], strikes, "bl-fns-small-led");
+    setLed(leds(labeledCell(bottom, "OUTS"))[0], outs, "bl-fns-small-led");
+    return;
+  }
+  if (alias === "heritage_press") {
+    const inningB = labeledCell(root, "INNING") && labeledCell(root, "INNING").querySelector(":scope > b");
+    if (inningB) inningB.textContent = `${half === "BOT" ? "BOTTOM" : "TOP"} ${inning}`.trim();
+    const countB = labeledCell(root, "COUNT") && labeledCell(root, "COUNT").querySelector(":scope > b");
+    if (countB) countB.textContent = `${balls || "0"}–${strikes || "0"}`;
+    const outsB = labeledCell(root, "OUTS") && labeledCell(root, "OUTS").querySelector(":scope > b");
+    if (outsB) outsB.textContent = outs || "0";
+    paintBases(labeledCell(root, "RUNNERS"));
+    patchHeritageBoxscore(root, runtime);
+    return;
+  }
+  if (alias === "collegiate_traditional") {
+    root.querySelectorAll('[data-bind="game.inning"]').forEach(node => { node.textContent = inning; });
+    root.querySelectorAll('[data-bind="game.inningHalf"]').forEach(node => { node.textContent = half; });
+    const count = root.querySelector(".bl-baseball-state .bl-count");
+    if (count) count.textContent = `B ${balls} · S ${strikes} · O ${outs}`;
+    paintBases(root.querySelector(".bl-baseball-state .bl-diamond"));
+    ensureCollegiateBaseballBottomBar(root, runtime);
+    ensureCollegiateDiamond(root, {half, inning, balls, strikes, outs, bases});
+  }
+}
+
+// Phase C (commissioned): keep Heritage Press's newspaper line-score box
+// (.hp-current-line, built and styled by the engine) live -- R/H/E totals
+// and the current at-bat / pitcher name -- on the fast path. The
+// per-inning columns are structural and change with the whole board.
+function patchHeritageBoxscore(root, runtime) {
+  const homeScore = Math.max(0, Number(runtime.home_score || 0));
+  const visitorScore = Math.max(0, Number(runtime.visitor_score || 0));
+  const line = root.querySelector('.hp-current-line[data-module="game.lineScore"]');
+  if (line) {
+    const rows = [...line.querySelectorAll(".hp-line-row:not(.head)")];
+    const rhe = (row, runs, hits, errors) => {
+      if (!row) return;
+      const cells = [...row.querySelectorAll(":scope > b")];
+      const last3 = cells.slice(-3);
+      if (last3[0]) last3[0].textContent = String(runs);
+      if (last3[1] && hits != null && hits !== "") last3[1].textContent = String(hits);
+      if (last3[2] && errors != null && errors !== "") last3[2].textContent = String(errors);
+    };
+    rhe(rows[0], homeScore, textValue(runtime.home_hits, runtime.homeHits), textValue(runtime.home_errors, runtime.homeErrors));
+    rhe(rows[1], visitorScore, textValue(runtime.visitor_hits, runtime.visitorHits), textValue(runtime.visitor_errors, runtime.visitorErrors));
+  }
+  const roles = [...root.querySelectorAll(".hp-role-stack .hp-role")];
+  const nameOf = (section) => section && section.querySelector("strong");
+  const batter = roles.find(s => /AT BAT/i.test(s.querySelector("h3")?.textContent || ""));
+  const pitcher = roles.find(s => /(MOUND|CIRCLE)/i.test(s.querySelector("h3")?.textContent || ""));
+  const batterName = textValue(runtime.batter_name, runtime.batterName);
+  const pitcherName = textValue(runtime.pitcher_name, runtime.pitcherName);
+  if (batterName && nameOf(batter)) nameOf(batter).textContent = batterName;
+  if (pitcherName && nameOf(pitcher)) nameOf(pitcher).textContent = pitcherName;
+}
+
+// Phase C (commissioned): a full diamond field-position graphic for the
+// Collegiate Tech baseball / softball board, in the same CSS/SVG idiom as
+// the football field strip (bl-college-field). Injected by the runtime so
+// the frozen csrn-broadcast-layout-engine files stay byte-stable; styled
+// in csrn-production-theme-runtime.css.
+function ensureCollegiateDiamond(root, d) {
+  // Prefer the R9 prototype bottom bar's right-hand slot; fall back to the
+  // board itself so the graphic still stands alone (and unit tests hold).
+  const board = root.querySelector(".bl-college-baseball-bar .bl-college-bar-diamond")
+    || root.querySelector(".bl-scorebug.bl-collegiate, .bl-baseball-board.bl-collegiate");
+  if (!board) return;
+  let host = board.querySelector(".bl-college-diamond");
+  if (!host) {
+    host = document.createElement("div");
+    host.className = "bl-college-diamond";
+    host.setAttribute("data-module", "game.field");
+    host.innerHTML =
+      '<div class="bl-college-diamond-grid" aria-hidden="true">' +
+        '<svg class="bl-college-diamond-art" viewBox="0 0 320 220" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' +
+          '<path class="bl-cd-grass" d="M160 208 L18 96 A200 200 0 0 1 302 96 Z"/>' +
+          '<path class="bl-cd-dirt" d="M160 200 L70 128 A128 128 0 0 1 250 128 Z"/>' +
+          '<path class="bl-cd-infield" d="M160 176 L112 132 L160 90 L208 132 Z"/>' +
+          '<path class="bl-cd-foul" d="M160 200 L20 92 M160 200 L300 92"/>' +
+          '<circle class="bl-cd-mound" cx="160" cy="140" r="11"/>' +
+          '<rect class="bl-cd-base" x="200" y="126" width="12" height="12" transform="rotate(45 206 132)"/>' +
+          '<rect class="bl-cd-base" x="154" y="82"  width="12" height="12" transform="rotate(45 160 88)"/>' +
+          '<rect class="bl-cd-base" x="108" y="126" width="12" height="12" transform="rotate(45 114 132)"/>' +
+          '<path class="bl-cd-home" d="M154 190 h12 v7 l-6 6 l-6 -6 Z"/>' +
+          '<rect class="bl-cd-runner first"  x="200" y="126" width="12" height="12" transform="rotate(45 206 132)"/>' +
+          '<rect class="bl-cd-runner second" x="154" y="82"  width="12" height="12" transform="rotate(45 160 88)"/>' +
+          '<rect class="bl-cd-runner third"  x="108" y="126" width="12" height="12" transform="rotate(45 114 132)"/>' +
+        '</svg>' +
+      '</div>' +
+      '<div class="bl-college-diamond-meta">' +
+        '<span><small>Inning</small><b class="bl-cd-inning"></b></span>' +
+        '<span><small>Count</small><b class="bl-cd-count"></b></span>' +
+        '<span><small>Outs</small><b class="bl-cd-outs"></b></span>' +
+      '</div>';
+    board.appendChild(host);
+  }
+  host.dataset.inningHalf = (d.half === "BOT" ? "bottom" : "top");
+  const arrow = d.half === "BOT" ? "▼" : "▲";
+  const setText = (sel, text) => { const n = host.querySelector(sel); if (n) n.textContent = text; };
+  setText(".bl-cd-inning", `${arrow} ${d.inning || "-"}`);
+  setText(".bl-cd-count", `${d.balls || "0"}–${d.strikes || "0"}`);
+  const outsN = Math.max(0, Math.min(3, Number(d.outs) || 0));
+  setText(".bl-cd-outs", "● ".repeat(outsN).trim() + " " + "○ ".repeat(3 - outsN).trim());
+  const runner = d.bases || [false, false, false];
+  host.querySelector(".bl-cd-runner.first").classList.toggle("on", Boolean(runner[0]));
+  host.querySelector(".bl-cd-runner.second").classList.toggle("on", Boolean(runner[1]));
+  host.querySelector(".bl-cd-runner.third").classList.toggle("on", Boolean(runner[2]));
+}
+
+// Phase C R9 -- THROWAWAY PROTOTYPE (data-prototype="baseball-bottom-bar").
+// Proves the T1 target: Collegiate baseball's bottom bar is the football
+// yard-line strip's slot re-cast as an inning-by-inning line score with the
+// base diamond pinned to the right. This runtime injection into the compact
+// baseballLineScore board is scaffolding only -- the real version routes
+// baseball through collegiateFootballScorebug in the SHA-256-pinned engine
+// (see docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md "Tracked TODO -> T1"),
+// which needs a re-pin Round 26 is already holding. Do not build on this.
+function ensureCollegiateBaseballBottomBar(root, runtime) {
+  if (!root) return null;
+  const board = root.querySelector(".bl-scorebug.bl-collegiate, .bl-baseball-board.bl-collegiate");
+  if (!board) return null;
+  let bar = board.querySelector(":scope > .bl-college-baseball-bar");
+  if (!bar) {
+    bar = document.createElement("section");
+    bar.className = "bl-college-control-bank bl-college-baseball-bar";
+    bar.setAttribute("data-module", "game.linescore");
+    bar.setAttribute("data-prototype", "baseball-bottom-bar");
+    bar.innerHTML =
+      '<div class="bl-college-line-score" data-module="game.linescore"></div>' +
+      '<div class="bl-college-bar-diamond"></div>';
+    board.appendChild(bar);
+  }
+  patchCollegiateLineScore(bar, runtime);
+  return bar;
+}
+
+function patchCollegiateLineScore(bar, runtime) {
+  const scored = bar.querySelector(".bl-college-line-score");
+  if (!scored) return;
+  const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+  const inning = Math.max(1, num(runtime.inning) || 1);
+  const cols = Math.max(9, inning);
+  const perInning = (side) => {
+    const raw = objectValue(runtime.line_score)[side] || objectValue(runtime.line_score)[`${side}_innings`];
+    return Array.isArray(raw) ? raw : [];
+  };
+  const abbr = (side) => textValue(
+    objectValue(runtime[`${side}_identity`]).abbreviation,
+    runtime[`${side}_abbr`], runtime[`${side}_short`], side === "home" ? "HOME" : "AWAY"
+  ).toUpperCase().slice(0, 4);
+  const rhe = (side) => [
+    num(runtime[`${side}_score`]) ?? 0,
+    num(textValue(runtime[`${side}_hits`], runtime[`${side}Hits`])),
+    num(textValue(runtime[`${side}_errors`], runtime[`${side}Errors`]))
+  ];
+  const half = textValue(runtime.inning_half, runtime.inningHalf, "TOP").toUpperCase().startsWith("B") ? "home" : "visitor";
+
+  if (scored.dataset.cols !== String(cols)) {
+    const head = ['<th class="bl-cls-team"></th>'];
+    for (let i = 1; i <= cols; i += 1) head.push(`<th data-inning="${i}">${i}</th>`);
+    head.push('<th class="bl-cls-rhe">R</th><th class="bl-cls-rhe">H</th><th class="bl-cls-rhe">E</th>');
+    const bodyRow = (side) => {
+      const cells = [`<th class="bl-cls-team"><span class="bl-cls-abbr" data-row="${side}"></span></th>`];
+      for (let i = 1; i <= cols; i += 1) cells.push(`<td data-inning="${i}"></td>`);
+      cells.push('<td class="bl-cls-rhe bl-cls-r"></td><td class="bl-cls-rhe bl-cls-h"></td><td class="bl-cls-rhe bl-cls-e"></td>');
+      return `<tr data-row="${side}">${cells.join("")}</tr>`;
+    };
+    scored.innerHTML =
+      `<table class="bl-cls-table"><thead><tr>${head.join("")}</tr></thead>` +
+      `<tbody>${bodyRow("visitor")}${bodyRow("home")}</tbody></table>`;
+    scored.dataset.cols = String(cols);
+  }
+
+  ["visitor", "home"].forEach((side) => {
+    const row = scored.querySelector(`tr[data-row="${side}"]`);
+    if (!row) return;
+    const abbrNode = row.querySelector(".bl-cls-abbr");
+    if (abbrNode) abbrNode.textContent = abbr(side);
+    const runs = perInning(side);
+    row.querySelectorAll("td[data-inning]").forEach((cell, i) => {
+      const v = runs[i];
+      cell.textContent = (v === 0 || v) ? String(v) : (i + 1 < inning ? "0" : "·");
+    });
+    const [r, h, e] = rhe(side);
+    row.querySelector(".bl-cls-r").textContent = String(r);
+    row.querySelector(".bl-cls-h").textContent = h == null ? "·" : String(h);
+    row.querySelector(".bl-cls-e").textContent = e == null ? "·" : String(e);
+  });
+  scored.querySelectorAll('[data-inning]').forEach((n) => {
+    n.classList.toggle("is-current", Number(n.dataset.inning) === inning);
+  });
+  scored.dataset.battingSide = half;
+}
+
 function applyFootballBoardOverrides(root, alias, runtime) {
-  if (!root || String(runtime.sport || "football").toLowerCase() !== "football") return;
+  if (!root || productionSportFamily(runtime && runtime.sport) !== "football") return;
 
   const period = productionFootballPeriod(runtime);
   const downDistance = productionDownDistance(runtime);
@@ -1482,6 +1855,11 @@ function patchThemeScoresAndPossession(root, alias, runtime) {
   const homeScore = Math.max(0, Number(runtime.home_score || 0));
   const visitorScore = Math.max(0, Number(runtime.visitor_score || 0));
   const possession = String(runtime.possession || "home").toLowerCase();
+  // Phase C: scores are universal; a possession indicator is football/
+  // basketball only -- baseball/softball have no possession, so never stamp
+  // one onto a diamond board.
+  const family = productionSportFamily(runtime.sport);
+  const hasPossession = family === "football" || family === "basketball";
 
   if (alias === "friday_night_stadium") {
     const home = root.querySelector('[data-module="home.score"]');
@@ -1490,15 +1868,20 @@ function patchThemeScoresAndPossession(root, alias, runtime) {
     setStadiumLedSvg(home, homeScore, "bl-fns-score-led");
     setStadiumLedSvg(visitor, visitorScore, "bl-fns-score-led");
 
-    for (const [node, active] of [
-      [home, possession === "home"],
-      [visitor, possession === "visitor"]
-    ]) {
-      if (!node) continue;
-      const old = node.querySelector(".bl-fns-possession-ball");
-      const next = fnsPossessionNode(active);
-      if (old) old.replaceWith(next);
-      else node.appendChild(next);
+    // The football score marker (fnsPossessionNode) is a football; the
+    // basketball tower carries its own possession cue, and a diamond board
+    // has none. Only decorate the football score.
+    if (family === "football") {
+      for (const [node, active] of [
+        [home, possession === "home"],
+        [visitor, possession === "visitor"]
+      ]) {
+        if (!node) continue;
+        const old = node.querySelector(".bl-fns-possession-ball");
+        const next = fnsPossessionNode(active);
+        if (old) old.replaceWith(next);
+        else node.appendChild(next);
+      }
     }
     return;
   }
@@ -1510,12 +1893,13 @@ function patchThemeScoresAndPossession(root, alias, runtime) {
     setLedText(home, homeScore, "bl-8bit-score-led");
     setLedText(visitor, visitorScore, "bl-8bit-score-led");
 
-    const possessionCell = labeledCell(root, "POSSESSION");
-    setLedText(
-      possessionCell,
-      possession === "visitor" ? "VISITOR" : "HOME",
-      "bl-8bit-possession-led"
-    );
+    if (hasPossession) {
+      setLedText(
+        labeledCell(root, "POSSESSION"),
+        possession === "visitor" ? "VISITOR" : "HOME",
+        "bl-8bit-possession-led"
+      );
+    }
     return;
   }
 
@@ -1539,27 +1923,24 @@ function patchThemeScoresAndPossession(root, alias, runtime) {
 
     const possessionCell = labeledCell(root, "POSSESSION");
     const possessionValue = possessionCell?.querySelector(":scope > b");
-    if (possessionValue) {
+    if (possessionValue && hasPossession) {
       possessionValue.textContent =
         possession === "visitor"
           ? textValue(runtime.visitor_team, "VISITOR")
           : textValue(runtime.home_team, "HOME");
     }
 
-    // Heritage's state grid uses newspaper cells rather than all data-bind fields.
-    const periodCell =
-      labeledCell(root, "QUARTER") ||
-      labeledCell(root, "PERIOD");
-    const clockCell = labeledCell(root, "CLOCK");
-    const downCell = labeledCell(root, "DOWN");
-
-    const periodValue = periodCell?.querySelector(":scope > b");
-    const clockValue = clockCell?.querySelector(":scope > b");
-    const downValue = downCell?.querySelector(":scope > b");
-
-    if (periodValue) periodValue.textContent = productionFootballPeriod(runtime);
-    if (clockValue) clockValue.textContent = productionClock(runtime);
-    if (downValue) downValue.textContent = productionDownDistance(runtime).combined;
+    // Heritage's state grid uses newspaper cells rather than all data-bind
+    // fields. QUARTER / DOWN are football-only; PERIOD / CLOCK for a
+    // non-football board are owned by applyBoardOverrides, so leave them.
+    if (family === "football") {
+      const periodValue = (labeledCell(root, "QUARTER") || labeledCell(root, "PERIOD"))?.querySelector(":scope > b");
+      const clockValue = labeledCell(root, "CLOCK")?.querySelector(":scope > b");
+      const downValue = labeledCell(root, "DOWN")?.querySelector(":scope > b");
+      if (periodValue) periodValue.textContent = productionFootballPeriod(runtime);
+      if (clockValue) clockValue.textContent = productionClock(runtime);
+      if (downValue) downValue.textContent = productionDownDistance(runtime).combined;
+    }
     return;
   }
 
@@ -1571,7 +1952,8 @@ function patchThemeScoresAndPossession(root, alias, runtime) {
       node.textContent = String(visitorScore);
     });
     root.querySelectorAll(".bl-collegiate-tech").forEach(node => {
-      node.dataset.possession = possession;
+      if (hasPossession) node.dataset.possession = possession;
+      else delete node.dataset.possession;
     });
   }
 }
@@ -1581,7 +1963,7 @@ function patchLiveGameState(runtime = lastRuntimeForClockPatch) {
   const root = scoreLayout();
   if (!root) return;
 
-  applyFootballBoardOverrides(root, currentAlias, runtime);
+  applyBoardOverrides(root, currentAlias, runtime);
   patchThemeScoresAndPossession(root, currentAlias, runtime);
   patchCollegiateRails(root, runtime, collegiateStatisticsCache.data);
 }
@@ -2788,7 +3170,7 @@ async function renderSelected() {
     patchCaptionDom(alias, captionState);
     await paintFridayNightLayeredFootballClash(scoreTarget, alias, activeVideoMode, state);
 
-    applyFootballBoardOverrides(scoreTarget, alias, runtime);
+    applyBoardOverrides(scoreTarget, alias, runtime);
     patchCollegiateRails(scoreTarget, runtime, collegiateStatistics);
     repairRenderedPlayerMedia(scoreTarget, state);
     mountCentralBoardMedia(scoreTarget, runtime, activeVideoMode, alias);
@@ -2904,7 +3286,16 @@ window.CSRNProductionThemeRuntime = Object.freeze({
   activeEvents,
   eventPlainText,
   renderSelected,
-  deactivate
+  deactivate,
+  // Phase C: exposed for isolated DOM tests of the per-sport board patch.
+  // Not part of the runtime's operational contract.
+  __phaseC: Object.freeze({
+    productionSportFamily,
+    mergeRuntimeState,
+    applyBoardOverrides,
+    applyBasketballBoardOverrides,
+    applyDiamondBoardOverrides
+  })
 });
 })();
 

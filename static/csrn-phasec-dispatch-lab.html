@@ -1,0 +1,97 @@
+<!doctype html>
+<!-- Phase C manual verification lab. Open in a browser (or dump-dom headless)
+     and read #out. Exercises productionSportFamily / mergeRuntimeState /
+     applyDiamondBoardOverrides / applyBasketballBoardOverrides against real
+     engine-rendered markup, with no non-football canonical state required. -->
+<html><head><meta charset="utf-8">
+<script src="./csrn-broadcast-layout-engine.js"></script>
+<script src="./csrn-friday-night-stadium-engine.js"></script>
+<script src="./csrn-eight-bit-gameday-engine.js"></script>
+<script src="./csrn-heritage-press-engine.js"></script>
+<script src="./csrn-production-theme-runtime.js"></script>
+</head><body><div id="stage"></div><pre id="out">pending</pre>
+<script>
+onerror = (m, s, l, c, e) => { document.getElementById("out").textContent = "ERR " + (e && e.stack || m); return true; };
+const PC = window.CSRNProductionThemeRuntime.__phaseC;
+const results = {};
+
+function renderBoard(globalName, packageId, sport, gameFields) {
+  const stage = document.getElementById("stage");
+  stage.replaceChildren();
+  const el = document.createElement("div");
+  stage.appendChild(el);
+  window[globalName].renderPackage(el, packageId, sport, {
+    sport,
+    home: {name: "CALEDONIA", mascot: "CAVALIERS", record: "5-1", score: "4"},
+    visitor: {name: "AMORY", mascot: "PANTHERS", record: "3-3", score: "2"},
+    game: {...gameFields}, ticker: {text: "PHASE C LAB"},
+    player: {}, highlight: {}, sponsor: {}, captions: {}
+  }, {diagnostics: false, activeComponents: ["scorebug"]});
+  return el;
+}
+
+results.family = {
+  canadian_football: PC.productionSportFamily("canadian_football"),
+  Basketball: PC.productionSportFamily("Basketball"),
+  baseball: PC.productionSportFamily("baseball"),
+  unknown: PC.productionSportFamily("quidditch")
+};
+
+const merged = PC.mergeRuntimeState(
+  {sport: "baseball", home: {}, visitor: {}, game: {down: "3", field: {}, downDistance: "3 & 7"}, ticker: {}},
+  {sport: "baseball", inning: "7", inning_half: "BOTTOM", balls: "2", strikes: "1", outs: "2", bases: [true, false, true], home_score: 4, visitor_score: 2},
+  null
+);
+results.merged = {
+  sportFamily: merged.game.sportFamily,
+  football_keys_stripped: !("down" in merged.game) && !("field" in merged.game) && !("possession" in merged.game),
+  inning: merged.game.inning, inningHalf: merged.game.inningHalf, outs: merged.game.outs, bases: merged.game.bases
+};
+
+try {
+  const fns = renderBoard("CSRNFridayNightStadiumEngine", "friday_night_stadium", "baseball",
+    {inning: "3", inningHalf: "TOP", balls: "0", strikes: "0", outs: "0", bases: [false, false, false]});
+  PC.applyDiamondBoardOverrides(fns, "friday_night_stadium",
+    {sport: "baseball", inning: "8", inning_half: "BOTTOM", balls: "3", strikes: "2", outs: "1", bases: [true, false, true]});
+  results.fnsDiamond = {
+    inningLed: (fns.querySelector('.bl-fns-diamond-center strong[aria-label="INNING"] .csrn-production-led-override') || {}).textContent,
+    pips: [...fns.querySelectorAll(".bl-fns-role-bases i")].map(i => i.classList.contains("on")),
+    bottomLeds: [...fns.querySelectorAll(".bl-fns-diamond-bottom .csrn-production-led-override")].map(n => n.textContent)
+  };
+} catch (e) { results.fnsDiamond = "ERR " + e.message; }
+
+try {
+  const bit = renderBoard("CSRNEightBitGamedayEngine", "pixel_gameday", "basketball",
+    {period: "1ST", clock: "10:00", homeFouls: "0", visitorFouls: "0"});
+  PC.applyBasketballBoardOverrides(bit, "eight_bit_gameday", {sport: "basketball", clock: "02:14", period: "4TH"});
+  results.bitBasketball = {
+    clock: (bit.querySelector(".bl-8bit-basketball-control-bank .csrn-production-led-override.bl-8bit-clock-led") || {}).textContent
+  };
+} catch (e) { results.bitBasketball = "ERR " + e.message; }
+
+try {
+  // R9 THROWAWAY PROTOTYPE -- Collegiate baseball bottom bar (inning line
+  // score + right-hand base diamond), runtime-injected, no engine edit.
+  const col = renderBoard("CSRNBroadcastLayoutEngine", "collegiate_traditional", "baseball",
+    {inning: "3", inningHalf: "TOP", balls: "0", strikes: "0", outs: "0", bases: [false, false, false]});
+  PC.applyDiamondBoardOverrides(col, "collegiate_traditional",
+    {sport: "baseball", inning: "7", inning_half: "BOTTOM", balls: "2", strikes: "2", outs: "2", bases: [true, false, true],
+     home_score: 5, visitor_score: 3, home_hits: 11, visitor_hits: 8, home_errors: 1, visitor_errors: 0,
+     home_abbr: "CAL", visitor_abbr: "AMO",
+     line_score: {visitor: [0,1,0,0,2,0,0], home: [1,0,0,3,0,1]}});
+  const bar = col.querySelector('.bl-college-baseball-bar[data-prototype="baseball-bottom-bar"]');
+  const rows = bar ? [...bar.querySelectorAll("tr[data-row]")].map(r => ({
+    side: r.dataset.row,
+    innings: [...r.querySelectorAll("td[data-inning]")].map(td => td.textContent),
+    rhe: [r.querySelector(".bl-cls-r").textContent, r.querySelector(".bl-cls-h").textContent, r.querySelector(".bl-cls-e").textContent]
+  })) : null;
+  results.collegiateBottomBar = {
+    barPresent: !!bar,
+    diamondInBarSlot: !!bar && !!bar.querySelector(".bl-college-bar-diamond .bl-college-diamond"),
+    currentInningMarked: !!bar && bar.querySelectorAll("td.is-current, th.is-current").length > 0,
+    rows
+  };
+} catch (e) { results.collegiateBottomBar = "ERR " + e.stack; }
+
+document.getElementById("out").textContent = JSON.stringify(results, null, 1);
+</script></body></html>
