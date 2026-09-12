@@ -79,9 +79,11 @@ def broadcast_client():
             BroadcastRoutesDependencies(
                 require_auth=require_auth,
                 get_broadcast_service=lambda: service,
-                # broadcaster-print-sheet.pdf was added after this fixture
-                # was last updated; nothing in this file exercises it.
+                # broadcaster-print-sheet.pdf and the social-media preview
+                # were both added after this fixture was last updated;
+                # nothing in this file exercises either one.
                 get_broadcaster_print_service=lambda: None,
+                get_social_media_preview_service=lambda: None,
             )
         )
     )
