@@ -1854,8 +1854,8 @@ async function initializeAuthenticatedApp() {
   }
 
   await loadConfig();
-  await loadRulesetOptions();
   await loadSessionContext();
+  await loadRulesetOptions();
   await loadBroadcasters();
   await loadCaptionControls();
   await loadGameManager();
@@ -3040,7 +3040,10 @@ async function switchSportContext(value) {
     sportContext = data.sport_context || '';
     sportScope = data.sport_scope || '';
     renderSportSwitcher();
-    // Re-run the current module so its rosters / sponsors re-scope.
+    // Re-scope the jurisdiction/country picker to the new context
+    // (canadian_football -> CA rulesets, football -> US) and re-run the
+    // current module so its rosters / sponsors re-scope too.
+    await loadRulesetOptions();
     if (typeof showModule === 'function' && currentModule) showModule(currentModule);
   } catch (err) {
     const sel = document.getElementById('sportSwitcher');
@@ -5479,6 +5482,15 @@ async function loadRulesetOptions() {
     return; // keep the static MHSAA option on failure
   }
   if (!Array.isArray(rows) || !rows.length) return;
+  // Scope the picker to the active sport context: canadian_football ->
+  // CA-only rulesets, football -> US-only, unset/other -> unfiltered
+  // (today's behaviour). Both American and Canadian football load the
+  // same engine (base_family collapses canadian_football -> football);
+  // the ruleset itself is the only thing that differs, which is exactly
+  // what this picker chooses (docs/ROUND_27_ACCESS_MODEL.md "Tracked TODO").
+  const rulesetCountry = sportContext === 'canadian_football' ? 'CA' : sportContext === 'football' ? 'US' : null;
+  if (rulesetCountry) rows = rows.filter((r) => (r.country || '') === rulesetCountry);
+  if (!rows.length) return;
   const previous = select.value || 'football/us-ms-mhsaa';
   const countryLabel = (code) => ({US: 'United States', CA: 'Canada'}[code] || code || 'Other');
   const groups = new Map();

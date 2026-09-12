@@ -86,13 +86,16 @@ Full suite through commit 10: **2582 passed, 2 failed**. The 2 failures
 checkout path and fail identically in the Round 22 / Round 26 worktree —
 they pre-date Round 27 and are not a regression.
 
-## Tracked TODO — trunk, post-Friday
+## Tracked TODO — trunk, post-Friday — DONE (Post-Friday Merge Weekend, Phase 2 item 1)
 
-**Jurisdiction-picker CA/US filter (deferred follow-up 1).** Once Round 26
-and Round 27 are both merged to production, add a single commit on trunk
-that scopes the Round 26 country/region/association picker
-(`#rulesetJurisdiction` / `loadRulesetOptions()` / `available_rulesets()`)
-by the active `sport_context`:
+**Jurisdiction-picker CA/US filter (deferred follow-up 1).** Landed once
+Round 26, Round 27 and Phase C were all merged to production: scopes the
+Round 26 country/region/association picker (`#rulesetJurisdiction` /
+`loadRulesetOptions()` / `available_rulesets()`) by the active
+`sport_context`, exactly as specified below. See
+`tests/test_jurisdiction_picker_sport_scoped.py`.
+
+Original spec, for the record:
 
 * `sport_context == "canadian_football"` → CA jurisdictions only
   (`country == "CA"`); operator still picks the association
@@ -115,13 +118,12 @@ TODO is only the jurisdiction pre-scoping half.
    and `OTHER_GLYPH` in `index.html` freely — the login list and the
    top-nav switcher are both API-driven from `other_sport_options()`.
 
-2. **`canadian_football` jurisdiction pre-scoping is a deferred trunk
-   TODO** (see "Tracked TODO" above). Round 27 makes `canadian_football` a
-   valid context whose scope is `football` and whose licence is the
-   football entry, and `is_engine_ready` treats it as the football module.
-   It does not yet filter the Round 26 jurisdiction picker to CA — that
-   commit lands on trunk after both rounds merge. Until then, being in
-   `canadian_football` context behaves like `football` apart from the
+2. **`canadian_football` jurisdiction pre-scoping — DONE** (see "Tracked
+   TODO" above). Round 27 makes `canadian_football` a valid context whose
+   scope is `football` and whose licence is the football entry, and
+   `is_engine_ready` treats it as the football module. It now also filters
+   the Round 26 jurisdiction picker to CA-only. Being in `canadian_football`
+   context behaves like `football` apart from the
    label.
 
 3. **Scoping applies to every `/api/rosters` and `/api/sponsors`
