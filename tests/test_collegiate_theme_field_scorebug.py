@@ -66,7 +66,11 @@ def test_collegiate_video_board_supports_player_highlight_and_sponsor_modes():
     assert "collegiate(state, sport, videoMode)" in js
     assert "collegiateFootballScorebug(state, sport, videoMode)" in js
     assert "function collegiateVideoBoardContent(state, mode)" in js
-    assert "function collegiateStage(state, videoMode)" in js
+    # T1 (docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md): collegiateStage() grew
+    # a sport param so the stage-field background can swap per sport
+    # (baseball/softball ballpark photos vs. football's), defaulting to
+    # "football" so every pre-T1 call site is unaffected.
+    assert 'function collegiateStage(state, videoMode, sport = "football")' in js
     assert 'data-video-mode="highlight"' in js
     assert 'data-video-mode="sponsor"' in js
     assert 'data-video-mode="player"' in js

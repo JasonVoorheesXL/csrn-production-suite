@@ -33,7 +33,12 @@ def test_diamond_patcher_covers_the_four_package_themes() -> None:
     assert '.bl-8bit-diamond-control-bank' in body
     assert '.bl-fns-diamond-center' in body and '.bl-fns-diamond-bottom' in body
     assert 'labeledCell(root, "INNING")' in body and 'labeledCell(root, "COUNT")' in body
-    assert '.bl-baseball-state .bl-count' in body
+    # T1 (docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md): Collegiate's baseball
+    # board is no longer the compact .bl-baseball-state board -- it's the
+    # football-weight structure, patched via patchCollegiateBaseballDiamond/
+    # patchCollegiateBaseballLineScore instead.
+    assert 'patchCollegiateBaseballDiamond(root, {half, inning, balls, strikes, outs, bases}, runtime);' in body
+    assert 'patchCollegiateBaseballLineScore(root, runtime);' in body
     assert '[data-bind="game.inning"]' in body
 
 

@@ -625,17 +625,25 @@
     return `<div class="bl-college-clean-logo" data-module="${side}.logo" data-bind="${side}.logo">${logo}</div>`;
   }
 
-  function collegiateTeamPanel(team, side) {
+  // Team Snapshot's stat-grid keys are sport-specific -- football keeps its
+  // original PASS/RUSH/TO triple byte-identical; baseball/softball swap in a
+  // batting-line triple. The Player Leader card stays generic (rotates any
+  // sport's leaders, per patchCollegiateRails() in the unpinned runtime).
+  const COLLEGIATE_RAIL_STATS = Object.freeze({
+    football: Object.freeze([["PASS", "passing_yards"], ["RUSH", "rushing_yards"], ["TO", "turnovers_gained"]]),
+    baseball: Object.freeze([["AVG", "batting_avg"], ["H", "hits"], ["RBI", "rbi"]]),
+    softball: Object.freeze([["AVG", "batting_avg"], ["H", "hits"], ["RBI", "rbi"]])
+  });
+
+  function collegiateTeamPanel(team, side, sport = "football") {
+    const stats = COLLEGIATE_RAIL_STATS[sport] || COLLEGIATE_RAIL_STATS.football;
+    const statCells = stats.map(([label, key]) => `<b><small>${label}</small><strong data-stat="${key}">-</strong></b>`).join("");
     return `<section class="bl-college-team bl-${side}" data-module="${side}.team">
       <div class="bl-college-side-label">${side === "home" ? "HOME" : "VISITOR"}</div>
       <div class="bl-college-rail" data-college-rail="${side}">
         <article class="bl-college-rail-card bl-team-snapshot">
           <span>Team Snapshot</span>
-          <div class="bl-college-stat-grid">
-            <b><small>PASS</small><strong data-stat="passing_yards">-</strong></b>
-            <b><small>RUSH</small><strong data-stat="rushing_yards">-</strong></b>
-            <b><small>TO</small><strong data-stat="turnovers_gained">-</strong></b>
-          </div>
+          <div class="bl-college-stat-grid">${statCells}</div>
         </article>
         <article class="bl-college-rail-card bl-player-leader is-empty">
           <span>Player Leader</span>
@@ -756,9 +764,9 @@
     return collegiateClashStage(state);
   }
 
-  function collegiateStage(state, videoMode) {
+  function collegiateStage(state, videoMode, sport = "football") {
     return `<section class="bl-college-stage" data-module="video.board">
-      <div class="bl-college-stage-field" aria-hidden="true"></div>
+      <div class="bl-college-stage-field" data-sport="${esc(sport)}" aria-hidden="true"></div>
       ${collegiateVideoBoardContent(state, videoMode)}
     </section>`;
   }
@@ -851,10 +859,152 @@
       <div class="bl-college-cabinet" aria-hidden="true"></div>
       <div class="bl-college-live-strip"><b>LIVE</b><span class="bl-college-ticker-copy">${esc(state.ticker.text || "CSRN LIVE")}</span><em>CSRN</em></div>
       ${collegiateScoreClockRow(state)}
-      <main class="bl-college-main-display">${collegiateTeamPanel(state.visitor, "visitor")}${collegiateStage(state, videoMode)}${collegiateTeamPanel(state.home, "home")}</main>
+      <main class="bl-college-main-display">${collegiateTeamPanel(state.visitor, "visitor", "football")}${collegiateStage(state, videoMode, "football")}${collegiateTeamPanel(state.home, "home", "football")}</main>
       <section class="bl-college-control-bank" data-module="game.state">
         ${collegiateField(state)}
       </section>
+    </div>`;
+  }
+
+  // T1 (docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md): Collegiate Tech baseball
+  // at football's structural weight -- same cabinet/live-strip/score-clock-
+  // row/main-display/control-bank skeleton, sport-appropriate content in
+  // each slot. Supersedes the R9 throwaway prototype (ensureCollegiate-
+  // BaseballBottomBar / patchCollegiateLineScore, runtime-only, layout-only)
+  // entirely; this is the real, engine-native structure.
+
+  function baseballInningPlan(state) {
+    // Extra-innings line score is open-ended: render exactly as many columns
+    // as have been played, shrink column width past the regulation baseline
+    // (CSS handles the shrink via --csrn-inning-count), and roll the window
+    // past a practical cap so only the most recent innings stay visible --
+    // R/H/E are separate, fixed-width, and never rolled or dropped. This is
+    // a theme-runtime-wide rendering rule (T1 spec); every other baseball
+    // board inherits the same contract when it ships.
+    const regulation = Math.max(1, Number(state.game.regulationInnings ?? state.game.regulation_innings) || 9);
+    const lineScore = state.game.lineScore || state.game.line_score || {};
+    const homeRuns = Array.isArray(lineScore.home) ? lineScore.home : [];
+    const visitorRuns = Array.isArray(lineScore.visitor) ? lineScore.visitor : [];
+    const current = Math.max(1, Number(state.game.inning) || 1);
+    const played = Math.max(regulation, current, homeRuns.length, visitorRuns.length);
+    const CAP = 12;
+    const WINDOW = 9;
+    const rolled = played > CAP;
+    const start = rolled ? played - WINDOW + 1 : 1;
+    const innings = [];
+    for (let i = start; i <= played; i += 1) innings.push(i);
+    return Object.freeze({innings, rolled, hiddenCount: rolled ? start - 1 : 0, played, current});
+  }
+
+  function collegiateBaseballInningValue(runsArr, plan, inningNumber) {
+    const value = runsArr[inningNumber - 1];
+    if (value === 0 || value) return esc(String(value));
+    return inningNumber < plan.current ? "0" : "–";
+  }
+
+  function collegiateBaseballLineScoreRow(state, side, plan) {
+    const team = side === "home" ? state.home : state.visitor;
+    const lineScore = state.game.lineScore || state.game.line_score || {};
+    const runsArr = Array.isArray(lineScore[side]) ? lineScore[side] : [];
+    const hits = side === "home" ? state.game.homeHits : state.game.visitorHits;
+    const errors = side === "home" ? state.game.homeErrors : state.game.visitorErrors;
+    const cells = plan.innings.map((n) => `<span data-inning="${n}" class="${n === plan.current ? "is-current" : ""}">${collegiateBaseballInningValue(runsArr, plan, n)}</span>`).join("");
+    const color = normalizedTeamColor(team.primary) || (side === "home" ? "#0A2342" : "#064624");
+    return `<div class="bl-cls-row bl-${side}" data-module="${side}.lineScore" style="--team-primary:${color}">
+      <span class="bl-cls-team" data-bind="${side}.shortName">${esc(team.shortName || team.name)}</span>
+      <div class="bl-cls-innings" data-row="${side}" data-inning-count="${plan.innings.length}">
+        ${plan.rolled ? `<span class="bl-cls-rolled" aria-hidden="true" title="${plan.hiddenCount} earlier innings scrolled off">⋯</span>` : ""}
+        ${cells}
+      </div>
+      <div class="bl-cls-rhe">
+        <span data-bind="${side}.score">${esc(team.score)}</span>
+        <span data-bind="${side}.hits">${hits === "" || hits == null ? "–" : esc(hits)}</span>
+        <span data-bind="${side}.errors">${errors === "" || errors == null ? "–" : esc(errors)}</span>
+      </div>
+    </div>`;
+  }
+
+  function collegiateBaseballLineScore(state) {
+    const plan = baseballInningPlan(state);
+    const headCells = plan.innings.map((n) => `<span class="${n === plan.current ? "is-current" : ""}">${n}</span>`).join("");
+    return `<div class="bl-college-line-score" data-module="game.lineScore" data-inning-count="${plan.innings.length}" style="--csrn-inning-count:${plan.innings.length + (plan.rolled ? 1 : 0)}">
+      <div class="bl-cls-head" aria-hidden="true">
+        <span class="bl-cls-team"></span>
+        <div class="bl-cls-innings">
+          ${plan.rolled ? `<span class="bl-cls-rolled"></span>` : ""}
+          ${headCells}
+        </div>
+        <div class="bl-cls-rhe"><span>R</span><span>H</span><span>E</span></div>
+      </div>
+      ${collegiateBaseballLineScoreRow(state, "visitor", plan)}
+      ${collegiateBaseballLineScoreRow(state, "home", plan)}
+    </div>`;
+  }
+
+  // Promoted from the R4/R5/R9 runtime-injected prototype (ensureCollegiate-
+  // Diamond) into the engine proper -- same real CSS/SVG field-position
+  // graphic in the .bl-college-field idiom, now part of the pinned,
+  // structurally-prominent control bank instead of a live DOM injection.
+  function collegiateBaseballDiamond(state) {
+    const half = normalizeInningHalf(state.game.inningHalf);
+    const outs = Math.max(0, Math.min(3, Number(state.game.outs) || 0));
+    const bases = state.game.bases || [false, false, false];
+    const arrow = half === "BOTTOM" ? "▼" : "▲";
+    const battingSide = half === "BOTTOM" ? "home" : "visitor";
+    const battingLabel = collegiateTeamMascot(state, battingSide);
+    return `<div class="bl-college-diamond" data-module="game.field" data-inning-half="${half === "BOTTOM" ? "bottom" : "top"}">
+      <div class="bl-college-diamond-grid" aria-hidden="true">
+        <svg class="bl-college-diamond-art" viewBox="0 0 320 220" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+          <path class="bl-cd-grass" d="M160 208 L18 96 A200 200 0 0 1 302 96 Z"/>
+          <path class="bl-cd-dirt" d="M160 200 L70 128 A128 128 0 0 1 250 128 Z"/>
+          <path class="bl-cd-infield" d="M160 176 L112 132 L160 90 L208 132 Z"/>
+          <path class="bl-cd-foul" d="M160 200 L20 92 M160 200 L300 92"/>
+          <circle class="bl-cd-mound" cx="160" cy="140" r="11"/>
+          <rect class="bl-cd-base" x="200" y="126" width="12" height="12" transform="rotate(45 206 132)"/>
+          <rect class="bl-cd-base" x="154" y="82" width="12" height="12" transform="rotate(45 160 88)"/>
+          <rect class="bl-cd-base" x="108" y="126" width="12" height="12" transform="rotate(45 114 132)"/>
+          <path class="bl-cd-home" d="M154 190 h12 v7 l-6 6 l-6 -6 Z"/>
+          <rect class="bl-cd-runner first ${bases[0] ? "on" : ""}" x="200" y="126" width="12" height="12" transform="rotate(45 206 132)"/>
+          <rect class="bl-cd-runner second ${bases[1] ? "on" : ""}" x="154" y="82" width="12" height="12" transform="rotate(45 160 88)"/>
+          <rect class="bl-cd-runner third ${bases[2] ? "on" : ""}" x="108" y="126" width="12" height="12" transform="rotate(45 114 132)"/>
+        </svg>
+      </div>
+      <div class="bl-college-diamond-meta">
+        <span><small>Batting</small><b class="bl-cd-batting" data-bind="game.battingText">${esc(battingLabel)}</b></span>
+        <span><small>Count</small><b class="bl-cd-count" data-bind="game.count">${esc(state.game.balls || "0")}–${esc(state.game.strikes || "0")}</b></span>
+        <span><small>Outs</small><b class="bl-cd-outs" data-bind="game.outs">${"● ".repeat(outs).trim()}${outs < 3 ? ` ${"○ ".repeat(3 - outs).trim()}` : ""}</b></span>
+      </div>
+      <b class="bl-cd-inning-arrow" aria-hidden="true">${arrow}</b>
+    </div>`;
+  }
+
+  function collegiateBaseballLineScoreBank(state) {
+    return `<section class="bl-college-control-bank bl-college-baseball-bank" data-module="game.state">
+      ${collegiateBaseballLineScore(state)}
+      ${collegiateBaseballDiamond(state)}
+    </section>`;
+  }
+
+  function collegiateBaseballScoreClockRow(state) {
+    const half = normalizeInningHalf(state.game.inningHalf);
+    const arrow = half === "BOTTOM" ? "▼" : "▲";
+    return `<header class="bl-college-score-clock-row">
+      ${collegiateScoreChip(state.visitor, "visitor")}
+      <section class="bl-college-clock-row bl-college-inning-row" data-module="game.state">
+        <span>Inning <b data-bind="game.inningHalf">${esc(arrow)} ${esc(half === "BOTTOM" ? "BOT" : "TOP")}</b></span>
+        <strong data-bind="game.inning">${esc(state.game.inning)}</strong>
+      </section>
+      ${collegiateScoreChip(state.home, "home")}
+    </header>`;
+  }
+
+  function collegiateBaseballScorebug(state, sport, videoMode) {
+    return `<div class="bl-scorebug bl-collegiate bl-collegiate-tech bl-sport-${sport}" data-diamond-half="${normalizeInningHalf(state.game.inningHalf).toLowerCase()}" ${collegiateThemeVars(state)}>
+      <div class="bl-college-cabinet" aria-hidden="true"></div>
+      <div class="bl-college-live-strip"><b>LIVE</b><span class="bl-college-ticker-copy">${esc(state.ticker.text || "CSRN LIVE")}</span><em>CSRN</em></div>
+      ${collegiateBaseballScoreClockRow(state)}
+      <main class="bl-college-main-display">${collegiateTeamPanel(state.visitor, "visitor", sport)}${collegiateStage(state, videoMode, sport)}${collegiateTeamPanel(state.home, "home", sport)}</main>
+      ${collegiateBaseballLineScoreBank(state)}
     </div>`;
   }
 
@@ -1217,7 +1367,7 @@
     },
 
     collegiate(state, sport, videoMode) {
-      if (sport === "baseball" || sport === "softball") return baseballLineScore(state,"collegiate");
+      if (sport === "baseball" || sport === "softball") return collegiateBaseballScorebug(state, sport, videoMode);
       if (sport === "football") return collegiateFootballScorebug(state, sport, videoMode);
       return `<div class="bl-scorebug bl-collegiate bl-sport-${sport}">
         <section class="bl-college-team bl-home">${explicitTeam(state.home,"home",{order:["logo","copy"],record:true})}</section>
@@ -1645,15 +1795,21 @@
           highlightVideo:{zone:"top-right",layer:70},sponsor:{zone:"top-left",layer:60},
           captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120}
         }},
+        // T1 (docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md): baseball/softball
+        // now render at football's structural prominence (same skeleton,
+        // same weight), not the old compact top-left board -- so they claim
+        // the same full-safe canvas zone as football, not a corner.
         baseball:{components:{
-          scorebug:{zone:"top-left",layer:100},ticker:{zone:"bottom-center",layer:110},
-          playerCard:{zone:"bottom-left",layer:80},highlightVideo:{zone:"right-center",layer:70},
-          sponsor:{zone:"top-right",layer:60},captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120}
+          scorebug:{zone:"full-safe",width:1840,height:1000,layer:100},ticker:{zone:"top-center",height:58,layer:110,allowOverlapWith:["scorebug"]},
+          playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80,allowOverlapWith:["scorebug"]},
+          highlightVideo:{zone:"top-right",layer:70,allowOverlapWith:["scorebug"]},sponsor:{zone:"top-left",layer:60,allowOverlapWith:["scorebug"]},
+          captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120,allowOverlapWith:["scorebug"]}
         }},
         softball:{components:{
-          scorebug:{zone:"top-left",layer:100},ticker:{zone:"bottom-center",layer:110},
-          playerCard:{zone:"bottom-left",layer:80},highlightVideo:{zone:"right-center",layer:70},
-          sponsor:{zone:"top-right",layer:60},captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120}
+          scorebug:{zone:"full-safe",width:1840,height:1000,layer:100},ticker:{zone:"top-center",height:58,layer:110,allowOverlapWith:["scorebug"]},
+          playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80,allowOverlapWith:["scorebug"]},
+          highlightVideo:{zone:"top-right",layer:70,allowOverlapWith:["scorebug"]},sponsor:{zone:"top-left",layer:60,allowOverlapWith:["scorebug"]},
+          captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120,allowOverlapWith:["scorebug"]}
         }}
       }
     },

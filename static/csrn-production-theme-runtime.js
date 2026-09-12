@@ -1546,12 +1546,11 @@ function applyDiamondBoardOverrides(root, alias, runtime) {
   }
   if (alias === "collegiate_traditional") {
     root.querySelectorAll('[data-bind="game.inning"]').forEach(node => { node.textContent = inning; });
-    root.querySelectorAll('[data-bind="game.inningHalf"]').forEach(node => { node.textContent = half; });
-    const count = root.querySelector(".bl-baseball-state .bl-count");
-    if (count) count.textContent = `B ${balls} · S ${strikes} · O ${outs}`;
-    paintBases(root.querySelector(".bl-baseball-state .bl-diamond"));
-    ensureCollegiateBaseballBottomBar(root, runtime);
-    ensureCollegiateDiamond(root, {half, inning, balls, strikes, outs, bases});
+    root.querySelectorAll('[data-bind="game.inningHalf"]').forEach(node => {
+      node.textContent = `${half === "BOT" ? "▼" : "▲"} ${half === "BOT" ? "BOT" : "TOP"}`;
+    });
+    patchCollegiateBaseballDiamond(root, {half, inning, balls, strikes, outs, bases}, runtime);
+    patchCollegiateBaseballLineScore(root, runtime);
   }
 }
 
@@ -1586,142 +1585,103 @@ function patchHeritageBoxscore(root, runtime) {
   if (pitcherName && nameOf(pitcher)) nameOf(pitcher).textContent = pitcherName;
 }
 
-// Phase C (commissioned): a full diamond field-position graphic for the
-// Collegiate Tech baseball / softball board, in the same CSS/SVG idiom as
-// the football field strip (bl-college-field). Injected by the runtime so
-// the frozen csrn-broadcast-layout-engine files stay byte-stable; styled
-// in csrn-production-theme-runtime.css.
-function ensureCollegiateDiamond(root, d) {
-  // Prefer the R9 prototype bottom bar's right-hand slot; fall back to the
-  // board itself so the graphic still stands alone (and unit tests hold).
-  const board = root.querySelector(".bl-college-baseball-bar .bl-college-bar-diamond")
-    || root.querySelector(".bl-scorebug.bl-collegiate, .bl-baseball-board.bl-collegiate");
-  if (!board) return;
-  let host = board.querySelector(".bl-college-diamond");
-  if (!host) {
-    host = document.createElement("div");
-    host.className = "bl-college-diamond";
-    host.setAttribute("data-module", "game.field");
-    host.innerHTML =
-      '<div class="bl-college-diamond-grid" aria-hidden="true">' +
-        '<svg class="bl-college-diamond-art" viewBox="0 0 320 220" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' +
-          '<path class="bl-cd-grass" d="M160 208 L18 96 A200 200 0 0 1 302 96 Z"/>' +
-          '<path class="bl-cd-dirt" d="M160 200 L70 128 A128 128 0 0 1 250 128 Z"/>' +
-          '<path class="bl-cd-infield" d="M160 176 L112 132 L160 90 L208 132 Z"/>' +
-          '<path class="bl-cd-foul" d="M160 200 L20 92 M160 200 L300 92"/>' +
-          '<circle class="bl-cd-mound" cx="160" cy="140" r="11"/>' +
-          '<rect class="bl-cd-base" x="200" y="126" width="12" height="12" transform="rotate(45 206 132)"/>' +
-          '<rect class="bl-cd-base" x="154" y="82"  width="12" height="12" transform="rotate(45 160 88)"/>' +
-          '<rect class="bl-cd-base" x="108" y="126" width="12" height="12" transform="rotate(45 114 132)"/>' +
-          '<path class="bl-cd-home" d="M154 190 h12 v7 l-6 6 l-6 -6 Z"/>' +
-          '<rect class="bl-cd-runner first"  x="200" y="126" width="12" height="12" transform="rotate(45 206 132)"/>' +
-          '<rect class="bl-cd-runner second" x="154" y="82"  width="12" height="12" transform="rotate(45 160 88)"/>' +
-          '<rect class="bl-cd-runner third"  x="108" y="126" width="12" height="12" transform="rotate(45 114 132)"/>' +
-        '</svg>' +
-      '</div>' +
-      '<div class="bl-college-diamond-meta">' +
-        '<span><small>Inning</small><b class="bl-cd-inning"></b></span>' +
-        '<span><small>Count</small><b class="bl-cd-count"></b></span>' +
-        '<span><small>Outs</small><b class="bl-cd-outs"></b></span>' +
-      '</div>';
-    board.appendChild(host);
-  }
-  host.dataset.inningHalf = (d.half === "BOT" ? "bottom" : "top");
-  const arrow = d.half === "BOT" ? "▼" : "▲";
+// T1 (docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md): the diamond field-position
+// graphic and the inning line score are now rendered natively by the frozen
+// engine (collegiateBaseballDiamond / collegiateBaseballLineScore) as part
+// of the structurally-prominent control bank, so these are find-and-patch
+// fast paths -- no DOM injection -- mirroring the football board's own
+// live-patch contract (applyFootballBoardOverrides). Supersedes the R4/R5/
+// R9 runtime-injected prototype (ensureCollegiateDiamond /
+// ensureCollegiateBaseballBottomBar / patchCollegiateLineScore) entirely.
+function patchCollegiateBaseballDiamond(root, d, runtime) {
+  const host = root.querySelector(".bl-college-diamond");
+  if (!host) return;
+  const half = d.half === "BOT" ? "bottom" : "top";
+  host.dataset.inningHalf = half;
+  const battingSide = half === "bottom" ? "home" : "visitor";
   const setText = (sel, text) => { const n = host.querySelector(sel); if (n) n.textContent = text; };
-  setText(".bl-cd-inning", `${arrow} ${d.inning || "-"}`);
+  setText(".bl-cd-batting", collegiateMascotForSide(runtime, battingSide));
   setText(".bl-cd-count", `${d.balls || "0"}–${d.strikes || "0"}`);
   const outsN = Math.max(0, Math.min(3, Number(d.outs) || 0));
-  setText(".bl-cd-outs", "● ".repeat(outsN).trim() + " " + "○ ".repeat(3 - outsN).trim());
+  setText(".bl-cd-outs", `${"● ".repeat(outsN).trim()}${outsN < 3 ? ` ${"○ ".repeat(3 - outsN).trim()}` : ""}`);
+  const arrowNode = host.querySelector(".bl-cd-inning-arrow");
+  if (arrowNode) arrowNode.textContent = d.half === "BOT" ? "▼" : "▲";
   const runner = d.bases || [false, false, false];
-  host.querySelector(".bl-cd-runner.first").classList.toggle("on", Boolean(runner[0]));
-  host.querySelector(".bl-cd-runner.second").classList.toggle("on", Boolean(runner[1]));
-  host.querySelector(".bl-cd-runner.third").classList.toggle("on", Boolean(runner[2]));
+  ["first", "second", "third"].forEach((base, i) => {
+    const node = host.querySelector(`.bl-cd-runner.${base}`);
+    if (node) node.classList.toggle("on", Boolean(runner[i]));
+  });
 }
 
-// Phase C R9 -- THROWAWAY PROTOTYPE (data-prototype="baseball-bottom-bar").
-// Proves the T1 target: Collegiate baseball's bottom bar is the football
-// yard-line strip's slot re-cast as an inning-by-inning line score with the
-// base diamond pinned to the right. This runtime injection into the compact
-// baseballLineScore board is scaffolding only -- the real version routes
-// baseball through collegiateFootballScorebug in the SHA-256-pinned engine
-// (see docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md "Tracked TODO -> T1"),
-// which needs a re-pin Round 26 is already holding. Do not build on this.
-function ensureCollegiateBaseballBottomBar(root, runtime) {
-  if (!root) return null;
-  const board = root.querySelector(".bl-scorebug.bl-collegiate, .bl-baseball-board.bl-collegiate");
-  if (!board) return null;
-  let bar = board.querySelector(":scope > .bl-college-baseball-bar");
-  if (!bar) {
-    bar = document.createElement("section");
-    bar.className = "bl-college-control-bank bl-college-baseball-bar";
-    bar.setAttribute("data-module", "game.linescore");
-    bar.setAttribute("data-prototype", "baseball-bottom-bar");
-    bar.innerHTML =
-      '<div class="bl-college-line-score" data-module="game.linescore"></div>' +
-      '<div class="bl-college-bar-diamond"></div>';
-    board.appendChild(bar);
-  }
-  patchCollegiateLineScore(bar, runtime);
-  return bar;
-}
-
-function patchCollegiateLineScore(bar, runtime) {
-  const scored = bar.querySelector(".bl-college-line-score");
-  if (!scored) return;
+// Same open-ended-columns / shrink / roll-window contract as the full render
+// (baseballInningPlan in the frozen engine), computed here in parallel for
+// the live fast path -- the two files can't share code (separate script
+// tags), so this mirrors the field-geometry helpers' existing duplication
+// pattern (applyFieldGeometry/spotFromPercent vs. collegiateField's own
+// independent math). Keep both in sync if the column-planning rule changes.
+function baseballLineScorePlan(runtime) {
   const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
-  const inning = Math.max(1, num(runtime.inning) || 1);
-  const cols = Math.max(9, inning);
-  const perInning = (side) => {
-    const raw = objectValue(runtime.line_score)[side] || objectValue(runtime.line_score)[`${side}_innings`];
-    return Array.isArray(raw) ? raw : [];
-  };
-  const abbr = (side) => textValue(
-    objectValue(runtime[`${side}_identity`]).abbreviation,
-    runtime[`${side}_abbr`], runtime[`${side}_short`], side === "home" ? "HOME" : "AWAY"
-  ).toUpperCase().slice(0, 4);
-  const rhe = (side) => [
-    num(runtime[`${side}_score`]) ?? 0,
-    num(textValue(runtime[`${side}_hits`], runtime[`${side}Hits`])),
-    num(textValue(runtime[`${side}_errors`], runtime[`${side}Errors`]))
-  ];
-  const half = textValue(runtime.inning_half, runtime.inningHalf, "TOP").toUpperCase().startsWith("B") ? "home" : "visitor";
+  const current = Math.max(1, num(runtime.inning) || 1);
+  const lineScore = objectValue(runtime.line_score);
+  const homeRuns = Array.isArray(lineScore.home) ? lineScore.home : [];
+  const visitorRuns = Array.isArray(lineScore.visitor) ? lineScore.visitor : [];
+  const regulation = Math.max(1, num(runtime.regulation_innings) || 9);
+  const played = Math.max(regulation, current, homeRuns.length, visitorRuns.length);
+  const CAP = 12;
+  const WINDOW = 9;
+  const rolled = played > CAP;
+  const start = rolled ? played - WINDOW + 1 : 1;
+  const innings = [];
+  for (let i = start; i <= played; i += 1) innings.push(i);
+  return {innings, rolled, hiddenCount: rolled ? start - 1 : 0, played, current};
+}
 
-  if (scored.dataset.cols !== String(cols)) {
-    const head = ['<th class="bl-cls-team"></th>'];
-    for (let i = 1; i <= cols; i += 1) head.push(`<th data-inning="${i}">${i}</th>`);
-    head.push('<th class="bl-cls-rhe">R</th><th class="bl-cls-rhe">H</th><th class="bl-cls-rhe">E</th>');
-    const bodyRow = (side) => {
-      const cells = [`<th class="bl-cls-team"><span class="bl-cls-abbr" data-row="${side}"></span></th>`];
-      for (let i = 1; i <= cols; i += 1) cells.push(`<td data-inning="${i}"></td>`);
-      cells.push('<td class="bl-cls-rhe bl-cls-r"></td><td class="bl-cls-rhe bl-cls-h"></td><td class="bl-cls-rhe bl-cls-e"></td>');
-      return `<tr data-row="${side}">${cells.join("")}</tr>`;
-    };
-    scored.innerHTML =
-      `<table class="bl-cls-table"><thead><tr>${head.join("")}</tr></thead>` +
-      `<tbody>${bodyRow("visitor")}${bodyRow("home")}</tbody></table>`;
-    scored.dataset.cols = String(cols);
+function patchCollegiateBaseballLineScoreRow(root, side, plan, runtime) {
+  const row = root.querySelector(`.bl-cls-row.bl-${side}`);
+  if (!row) return;
+  const innings = row.querySelector(".bl-cls-innings");
+  if (innings && Number(innings.dataset.inningCount) !== plan.innings.length) {
+    const cells = plan.innings.map((n) => `<span data-inning="${n}"></span>`).join("");
+    innings.innerHTML = (plan.rolled ? '<span class="bl-cls-rolled" aria-hidden="true"></span>' : "") + cells;
+    innings.dataset.inningCount = String(plan.innings.length);
   }
-
-  ["visitor", "home"].forEach((side) => {
-    const row = scored.querySelector(`tr[data-row="${side}"]`);
-    if (!row) return;
-    const abbrNode = row.querySelector(".bl-cls-abbr");
-    if (abbrNode) abbrNode.textContent = abbr(side);
-    const runs = perInning(side);
-    row.querySelectorAll("td[data-inning]").forEach((cell, i) => {
-      const v = runs[i];
-      cell.textContent = (v === 0 || v) ? String(v) : (i + 1 < inning ? "0" : "·");
+  if (innings) {
+    const rolledNode = innings.querySelector(".bl-cls-rolled");
+    if (rolledNode) rolledNode.title = `${plan.hiddenCount} earlier innings scrolled off`;
+    const lineScore = objectValue(runtime.line_score);
+    const runsArr = Array.isArray(lineScore[side]) ? lineScore[side] : [];
+    innings.querySelectorAll("[data-inning]").forEach((cell) => {
+      const n = Number(cell.dataset.inning);
+      const value = runsArr[n - 1];
+      cell.textContent = (value === 0 || value) ? String(value) : (n < plan.current ? "0" : "–");
+      cell.classList.toggle("is-current", n === plan.current);
     });
-    const [r, h, e] = rhe(side);
-    row.querySelector(".bl-cls-r").textContent = String(r);
-    row.querySelector(".bl-cls-h").textContent = h == null ? "·" : String(h);
-    row.querySelector(".bl-cls-e").textContent = e == null ? "·" : String(e);
-  });
-  scored.querySelectorAll('[data-inning]').forEach((n) => {
-    n.classList.toggle("is-current", Number(n.dataset.inning) === inning);
-  });
-  scored.dataset.battingSide = half;
+  }
+  const hits = textValue(runtime[`${side}_hits`], runtime[`${side}Hits`]);
+  const errors = textValue(runtime[`${side}_errors`], runtime[`${side}Errors`]);
+  const hitsNode = row.querySelector(`[data-bind="${side}.hits"]`);
+  const errorsNode = row.querySelector(`[data-bind="${side}.errors"]`);
+  if (hitsNode) hitsNode.textContent = hits === "" ? "–" : hits;
+  if (errorsNode) errorsNode.textContent = errors === "" ? "–" : errors;
+}
+
+function patchCollegiateBaseballLineScore(root, runtime) {
+  const container = root.querySelector(".bl-college-line-score");
+  if (!container) return;
+  const plan = baseballLineScorePlan(runtime);
+  if (Number(container.dataset.inningCount) !== plan.innings.length) {
+    const head = container.querySelector(".bl-cls-head .bl-cls-innings");
+    if (head) {
+      const headCells = plan.innings.map((n) => `<span>${n}</span>`).join("");
+      head.innerHTML = (plan.rolled ? '<span class="bl-cls-rolled"></span>' : "") + headCells;
+    }
+    container.style.setProperty("--csrn-inning-count", String(plan.innings.length + (plan.rolled ? 1 : 0)));
+    container.dataset.inningCount = String(plan.innings.length);
+  }
+  const headCells = container.querySelectorAll(".bl-cls-head .bl-cls-innings > span:not(.bl-cls-rolled)");
+  headCells.forEach((node, i) => { node.classList.toggle("is-current", plan.innings[i] === plan.current); });
+  patchCollegiateBaseballLineScoreRow(root, "visitor", plan, runtime);
+  patchCollegiateBaseballLineScoreRow(root, "home", plan, runtime);
 }
 
 function applyFootballBoardOverrides(root, alias, runtime) {
