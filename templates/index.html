@@ -2986,6 +2986,7 @@ async function submitPenalty(){
     await GameStateManager.mutate('/api/event-trigger',payload,'POST',r=>r.state);
     if(msg)msg.textContent='PENALTY RECORDED';
     closePenalty();
+    await refreshPlayRegister('penalty-commit',true);
   }catch(e){
     if(e?.commitStatus==='UNKNOWN_COMMIT'){
       if(msg)msg.textContent='Connection delayed — penalty status is uncertain. Do not enter the next play yet.';
@@ -3410,7 +3411,7 @@ async function confirmAutomationEvent(){
   else if(['FG','XP'].includes(event)){payload.player_id=automationResolved.kicker?.id||'';payload.manual_player=automationManualPayload('kicker');payload.play_type='kick';if(event==='FG'){payload.kick_outcome=document.getElementById('automationKickOutcome').value;payload.kick_result_spot=document.getElementById('automationKickResultSpot').value.trim();payload.kick_touchback=document.getElementById('automationKickTouchback').checked}else{payload.conversion_outcome=document.getElementById('automationKickOutcome').value;}}
   else{payload.turnover_type=document.getElementById('automationTurnoverType').value;payload.player_id=automationResolved.turnover?.id||'';payload.manual_player=automationManualPayload('turnover');payload.return_td=document.getElementById('automationTurnoverTd').checked;payload.turnover_spot=document.getElementById('automationTurnoverSpot').value.trim();payload.return_end_spot=document.getElementById('automationReturnEndSpot').value.trim();}
   const msg=document.getElementById('automationEventMessage');msg.textContent='Recording event…';
-  try{const result=await GameStateManager.mutate('/api/event-trigger',payload,'POST',r=>r.state);closeAutomationEvent();const confirmation=document.getElementById('eventConfirmation');confirmation.textContent=result.message||result.trigger?.description||'Event recorded.';confirmation.className='status success'}catch(e){const friendly=operatorErrorMessage(e,'Unable to record event.');msg.textContent=friendly;msg.className='status error';showOperatorNotice(friendly,'error',7000)}
+  try{const result=await GameStateManager.mutate('/api/event-trigger',payload,'POST',r=>r.state);closeAutomationEvent();await refreshPlayRegister('automation-event-commit',true);const confirmation=document.getElementById('eventConfirmation');confirmation.textContent=result.message||result.trigger?.description||'Event recorded.';confirmation.className='status success'}catch(e){const friendly=operatorErrorMessage(e,'Unable to record event.');msg.textContent=friendly;msg.className='status error';showOperatorNotice(friendly,'error',7000)}
 }
 
 async function triggerEvent(team,event){
