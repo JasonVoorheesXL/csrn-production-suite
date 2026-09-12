@@ -61,6 +61,18 @@ class SponsorService:
                 pass
         return str(record.get("status", "Prospect"))
 
+    @staticmethod
+    def _normalized_sport(raw: Any) -> str:
+        """Collapse a sport value to its family ("Canadian Football" ->
+        "football"); pass through an unknown token lower-cased; "" stays "".
+        """
+        text = str(raw or "").strip()
+        if not text:
+            return ""
+        import sport_families
+
+        return sport_families.base_family(text) or text.casefold()[:40]
+
     def clean_record(
         self,
         data: Sponsor,
@@ -82,6 +94,11 @@ class SponsorService:
             "id": sponsor_id
             or str(source.get("id") or f"sponsor-{now}-{self._token_factory()}"),
             "name": str(source.get("name", "")).strip()[:160],
+            # Round 27: the sport family this sponsor is scoped to. Tagged
+            # like rosters -- "football" covers American and Canadian, the
+            # ruleset is a per-broadcast choice. "" = shown in every sport
+            # context (a single-sport install never sets this).
+            "sport": self._normalized_sport(source.get("sport", "")),
             "category": str(source.get("category", "Local Business"))[:80],
             "status": str(source.get("status", "Prospect"))[:40],
             "contact_name": str(source.get("contact_name", "")).strip()[:160],
@@ -117,14 +134,28 @@ class SponsorService:
             and asset.get("asset_type") == "Logo"
         ]
 
-    def list_payload(self) -> dict[str, Any]:
+    def list_payload(self, sport: str = "") -> dict[str, Any]:
+        """Decorated sponsors, optionally scoped to one sport family.
+
+        Round 27: ``sport`` is the operator's active sport scope
+        (``base_family(sport_context)``). A sponsor tagged with a different
+        family is hidden; a sponsor with no / blank ``sport`` (a
+        cross-sport sponsor, and every sponsor on a single-sport install)
+        is always shown. An empty ``sport`` returns every sponsor.
+        """
+
         assets = {
             str(asset.get("id", "")): asset
             for asset in self._load_assets()
         }
+        scope = self._normalized_sport(sport)
         sponsors: list[Sponsor] = []
         for source in self._load_sponsors():
             sponsor = self.decorate(source)
+            if scope:
+                tag = self._normalized_sport(sponsor.get("sport", ""))
+                if tag and tag != scope:
+                    continue
             linked = assets.get(str(sponsor.get("asset_id", "")))
             if linked and linked.get("file_url"):
                 sponsor["logo_url"] = linked.get("file_url", "")

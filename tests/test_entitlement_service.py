@@ -105,6 +105,30 @@ def test_allows_checks_feature_and_sport(tmp_path: Path) -> None:
     assert current.allows("captions", sport="Baseball") is False
 
 
+def test_licensed_sport_families_reflects_the_license(tmp_path: Path) -> None:
+    current = service(tmp_path, verifier=lambda _: (True, "ok"))
+    assert current.install_license(payload(sports=["Football"])).ok
+    assert current.licensed_sport_families() == ["football"]
+
+
+def test_licensed_sport_families_expands_wildcard_and_orders(tmp_path: Path) -> None:
+    current = service(tmp_path, verifier=lambda _: (True, "ok"))
+    assert current.install_license(payload(sports=["basketball", "football"])).ok
+    assert current.licensed_sport_families() == ["football", "basketball"]
+
+
+def test_licensed_sport_families_is_empty_when_unlicensed(tmp_path: Path) -> None:
+    assert service(tmp_path).licensed_sport_families() == []
+
+
+def test_development_checkout_is_licensed_for_every_family(tmp_path: Path) -> None:
+    # Source checkout -> development license carries sports ["*"].
+    import sport_families
+
+    current = service(tmp_path, installed=False)
+    assert current.licensed_sport_families() == list(sport_families.SPORT_FAMILIES)
+
+
 def test_license_removal_requires_exact_confirmation(tmp_path: Path) -> None:
     current = service(tmp_path, verifier=lambda _: (True, "ok"))
     current.install_license(payload())

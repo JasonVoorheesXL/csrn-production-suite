@@ -30,8 +30,8 @@ class StubSponsorService:
         self.link_result = StubResult("OK", {"sponsor": self.sponsor})
         self.calls: list[tuple[str, Any]] = []
 
-    def list_payload(self) -> dict[str, Any]:
-        self.calls.append(("list", None))
+    def list_payload(self, sport: str = "") -> dict[str, Any]:
+        self.calls.append(("list", sport))
         return {"sponsors": [self.sponsor]}
 
     def create(self, payload: dict[str, Any]) -> StubResult:
@@ -120,6 +120,41 @@ def test_sponsor_routes_require_authentication(sponsor_client) -> None:
     response = client.get("/api/sponsors")
     assert response.status_code == 401
     assert service.calls == []
+
+
+def test_list_sponsors_forwards_the_sport_scope_dependency() -> None:
+    service = StubSponsorService()
+
+    def require_auth(view: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(view)
+        def protected(*args: Any, **kwargs: Any):
+            return view(*args, **kwargs)
+
+        return protected
+
+    app = Flask(__name__)
+    app.config.update(TESTING=True)
+    app.register_blueprint(
+        create_sponsor_blueprint(
+            SponsorRoutesDependencies(
+                require_auth=require_auth,
+                get_sponsor_service=lambda: service,
+                load_sponsors=lambda: [],
+                load_assets=lambda: [],
+                save_assets=lambda items: None,
+                clean_asset_record=lambda payload, asset_id: payload,
+                asset_file_hash=lambda path: "",
+                get_asset_upload_dir=lambda: Path("."),
+                get_sponsor_upload_dir=lambda: Path("."),
+                clock=lambda: 0.0,
+                token_hex=lambda _: "x",
+                sport_scope=lambda: "football",
+            )
+        )
+    )
+    with app.test_client() as client:
+        client.get("/api/sponsors")
+    assert service.calls[-1] == ("list", "football")
 
 
 def test_sponsor_crud_preserves_payloads_and_statuses(sponsor_client) -> None:

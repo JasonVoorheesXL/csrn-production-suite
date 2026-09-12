@@ -91,6 +91,10 @@ from routes.security_upgrade_routes import (
     SecurityUpgradeRoutesDependencies,
     create_security_upgrade_blueprint,
 )
+from routes.access_model_routes import (
+    AccessModelRoutesDependencies,
+    create_access_model_blueprint,
+)
 from routes.school_routes import (
     SchoolRoutesDependencies,
     create_school_blueprint,
@@ -1638,9 +1642,45 @@ def asset_file_hash(path: Path) -> str:
     return AssetService.file_hash(path)
 
 
+def _install_default_sport_family() -> str:
+    """The sport family a legacy record with no sport is backfilled to --
+    the install's configured / only sport, "football" if unset."""
+    import sport_families
+
+    return (
+        sport_families.base_family(_default_onboarding_sport())
+        or "football"
+    )
+
+
+def _normalize_sponsors(items: list[dict[str, Any]]) -> bool:
+    """Round 27 migration: stamp a `sport` family on legacy sponsor records.
+
+    Only records with NO `sport` key are touched -- those pre-date the
+    field. They are backfilled with the install's default sport so nothing
+    disappears from a sport-scoped view after the upgrade. A record whose
+    `sport` is explicitly "" (written by clean_record) is left alone: ""
+    means "every context". Idempotent.
+
+    Note: on a multi-sport install with untagged legacy sponsors this tags
+    them all with the one default family; the operator re-tags the odd
+    ones. That matches the "default to the install's current/only sport"
+    intent.
+    """
+
+    default_sport = _install_default_sport_family()
+    changed = False
+    for sponsor in items:
+        if isinstance(sponsor, dict) and "sport" not in sponsor:
+            sponsor["sport"] = default_sport
+            changed = True
+    return changed
+
+
 SPONSOR_REPOSITORY = SponsorRepository(
     CORE_PERSISTENCE,
     SPONSORS_FILE,
+    normalizer=_normalize_sponsors,
 )
 
 
@@ -2557,6 +2597,17 @@ def pin_is_configured() -> bool:
 def authenticated() -> bool:
     return bool(session.get("authenticated"))
 
+def current_sport_scope() -> str:
+    """The operator's active sport scope for roster / sponsor filtering.
+
+    ``base_family(session["sport_context"])`` -- a canadian_football
+    context resolves to ``"football"`` so it shares the football pool
+    (Round 27 invariant 2). Empty when no context is set, which leaves
+    every management list unfiltered (the single-sport default)."""
+    import sport_families
+
+    return sport_families.base_family(session.get("sport_context", ""))
+
 def require_auth(func: Callable):
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -2654,6 +2705,7 @@ SPONSOR_ROUTES_BLUEPRINT = create_sponsor_blueprint(
         get_sponsor_upload_dir=lambda: SPONSOR_UPLOAD_DIR,
         clock=lambda: time.time(),
         token_hex=lambda length: secrets.token_hex(length),
+        sport_scope=current_sport_scope,
     )
 )
 APPLICATION_BLUEPRINTS.append(SPONSOR_ROUTES_BLUEPRINT)
@@ -2686,6 +2738,7 @@ ROSTER_ROUTES_BLUEPRINT = create_roster_blueprint(
     RosterRoutesDependencies(
         require_auth=require_auth,
         get_roster_service=get_roster_service,
+        sport_scope=current_sport_scope,
     )
 )
 APPLICATION_BLUEPRINTS.append(ROSTER_ROUTES_BLUEPRINT)
@@ -2802,6 +2855,14 @@ def get_upgrade_service() -> UpgradeService:
     return UPGRADE_SERVICE
 
 
+def licensed_sport_families() -> list[str]:
+    """Canonical sport families this install's license grants (Round 27)."""
+    try:
+        return get_entitlement_service().licensed_sport_families()
+    except Exception:
+        return []
+
+
 SECURITY_UPGRADE_ROUTES_BLUEPRINT = create_security_upgrade_blueprint(
     SecurityUpgradeRoutesDependencies(
         get_security_service=lambda: SECURITY_SERVICE,
@@ -2809,9 +2870,18 @@ SECURITY_UPGRADE_ROUTES_BLUEPRINT = create_security_upgrade_blueprint(
         authenticated=authenticated,
         clock=time.time,
         get_upgrade_service=get_upgrade_service,
+        licensed_sport_families=licensed_sport_families,
     )
 )
 APPLICATION_BLUEPRINTS.append(SECURITY_UPGRADE_ROUTES_BLUEPRINT)
+
+ACCESS_MODEL_ROUTES_BLUEPRINT = create_access_model_blueprint(
+    AccessModelRoutesDependencies(
+        require_auth=require_auth,
+        licensed_sport_families=licensed_sport_families,
+    )
+)
+APPLICATION_BLUEPRINTS.append(ACCESS_MODEL_ROUTES_BLUEPRINT)
 
 
 OBS_ROUTES_BLUEPRINT = create_obs_blueprint(

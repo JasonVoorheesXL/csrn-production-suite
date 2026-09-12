@@ -592,12 +592,32 @@ class RosterService:
         )
         return payload
 
-    def list_rosters(self) -> list[Roster]:
+    def list_rosters(self, sport: str = "") -> list[Roster]:
+        """All roster summaries, optionally scoped to one sport family.
+
+        Round 27: ``sport`` is the operator's active sport *scope*
+        (``base_family(sport_context)``), so a ``canadian_football`` and a
+        ``football`` context both pass ``"football"`` here and see the same
+        football rosters. An empty ``sport`` returns every roster -- the
+        single-sport install's behaviour is unchanged.
+        """
+
         schools = self._load_schools()
-        return [
-            self.summary(roster, schools)
-            for roster in self._load_rosters()
-        ]
+        rosters = self._load_rosters()
+        scope = str(sport or "").strip().casefold()
+        if scope:
+            import sport_families
+
+            target = sport_families.base_family(scope) or scope
+
+            def _roster_family(roster: Roster) -> str:
+                raw = str(roster.get("sport", "")).strip()
+                return sport_families.base_family(raw) or raw.casefold()
+
+            rosters = [
+                roster for roster in rosters if _roster_family(roster) == target
+            ]
+        return [self.summary(roster, schools) for roster in rosters]
 
     def read(self, roster_id: str) -> RosterResult:
         roster = self._find(self._load_rosters(), roster_id)

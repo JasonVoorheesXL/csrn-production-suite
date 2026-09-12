@@ -9,10 +9,17 @@ from flask import Blueprint, jsonify, request
 RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
 
 
+def _no_sport_scope() -> str:
+    return ""
+
+
 @dataclass(frozen=True)
 class RosterRoutesDependencies:
     require_auth: RouteDecorator
     get_roster_service: Callable[[], Any]
+    # Round 27: the operator's active sport scope (base_family of the
+    # session sport_context). "" -> no scoping, list every roster.
+    sport_scope: Callable[[], str] = _no_sport_scope
 
 
 def create_roster_blueprint(
@@ -23,7 +30,9 @@ def create_roster_blueprint(
     @routes.get("/api/rosters")
     @dependencies.require_auth
     def list_rosters():
-        return jsonify(dependencies.get_roster_service().list_rosters())
+        return jsonify(
+            dependencies.get_roster_service().list_rosters(dependencies.sport_scope())
+        )
 
     @routes.post("/api/rosters")
     @dependencies.require_auth

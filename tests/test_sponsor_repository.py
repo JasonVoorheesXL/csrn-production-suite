@@ -65,6 +65,27 @@ def test_save_removes_runtime_contract_fields(tmp_path: Path) -> None:
     assert "contract_expired" not in payload[0]
 
 
+def test_normalizer_runs_on_load_and_its_changes_are_persisted(tmp_path: Path) -> None:
+    # Round 27: the SponsorRepository normalizer slot is how the sport-family
+    # backfill reaches existing databases.
+    path = tmp_path / "sponsors.json"
+    path.write_text(json.dumps([{"id": "s1", "name": "Legacy"}]), encoding="utf-8")
+
+    def stamp_sport(items: list[dict]) -> bool:
+        changed = False
+        for item in items:
+            if "sport" not in item:
+                item["sport"] = "football"
+                changed = True
+        return changed
+
+    repository = SponsorRepository(engine(tmp_path), path, normalizer=stamp_sport)
+
+    assert repository.load()[0]["sport"] == "football"
+    # Persisted, so a plain re-read / the next process sees it too.
+    assert json.loads(path.read_text(encoding="utf-8"))[0]["sport"] == "football"
+
+
 def test_save_rejects_duplicate_sponsor_ids(tmp_path: Path) -> None:
     repository = SponsorRepository(
         engine(tmp_path),

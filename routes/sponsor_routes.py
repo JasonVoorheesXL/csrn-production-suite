@@ -10,6 +10,10 @@ from flask import Blueprint, jsonify, request, send_from_directory
 RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
 
 
+def _no_sport_scope() -> str:
+    return ""
+
+
 @dataclass(frozen=True)
 class SponsorRoutesDependencies:
     require_auth: RouteDecorator
@@ -23,6 +27,8 @@ class SponsorRoutesDependencies:
     get_sponsor_upload_dir: Callable[[], Path]
     clock: Callable[[], float]
     token_hex: Callable[[int], str]
+    # Round 27: the operator's active sport scope. "" -> list every sponsor.
+    sport_scope: Callable[[], str] = _no_sport_scope
 
 
 def create_sponsor_blueprint(
@@ -33,7 +39,9 @@ def create_sponsor_blueprint(
     @routes.get("/api/sponsors")
     @dependencies.require_auth
     def list_sponsors():
-        return jsonify(dependencies.get_sponsor_service().list_payload())
+        return jsonify(
+            dependencies.get_sponsor_service().list_payload(dependencies.sport_scope())
+        )
 
     @routes.post("/api/sponsors")
     @dependencies.require_auth

@@ -49,8 +49,8 @@ class StubSponsorService:
             {"sponsor": self.sponsor, "asset": self.asset},
         )
 
-    def list_payload(self) -> dict[str, Any]:
-        self.calls.append(("list_payload", None))
+    def list_payload(self, sport: str = "") -> dict[str, Any]:
+        self.calls.append(("list_payload", sport))
         return self.list_result
 
     def create(self, incoming: dict[str, Any]) -> SponsorResult:
@@ -99,7 +99,19 @@ def test_list_sponsors_route_delegates_to_service(sponsor_client) -> None:
 
     assert response.status_code == 200
     assert response.get_json() == service.list_result
-    assert service.calls == [("list_payload", None)]
+    # No sport_context on the session -> unscoped, exactly as before Round 27.
+    assert service.calls == [("list_payload", "")]
+
+
+def test_list_sponsors_route_passes_the_session_sport_scope(sponsor_client) -> None:
+    client, service = sponsor_client
+    with client.session_transaction() as active_session:
+        active_session["sport_context"] = "canadian_football"
+
+    client.get("/api/sponsors")
+
+    # Invariant 2: a canadian_football context scopes to the football pool.
+    assert service.calls == [("list_payload", "football")]
 
 
 def test_create_sponsor_route_preserves_success_and_validation_contracts(

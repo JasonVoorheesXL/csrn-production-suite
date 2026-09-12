@@ -105,6 +105,43 @@ def test_list_payload_decorates_status_and_resolves_linked_asset() -> None:
     assert [asset["id"] for asset in payload["logo_assets"]] == ["asset-logo"]
 
 
+def _mixed_sport_sponsors() -> MemoryStore:
+    return MemoryStore(
+        sponsors=[
+            sponsor(id="fb", name="Gridiron Co", sport="football"),
+            sponsor(id="bb", name="Court Co", sport="basketball"),
+            sponsor(id="any", name="Statewide Co", sport=""),   # cross-sport
+            sponsor(id="legacy", name="Old Co"),                # no sport key
+        ]
+    )
+
+
+def test_list_payload_unscoped_returns_every_sponsor() -> None:
+    store = _mixed_sport_sponsors()
+    ids = {s["id"] for s in make_service(store).list_payload()["sponsors"]}
+    assert ids == {"fb", "bb", "any", "legacy"}
+    assert {s["id"] for s in make_service(store).list_payload("")["sponsors"]} == ids
+
+
+def test_list_payload_scoped_hides_other_families_but_keeps_untagged() -> None:
+    store = _mixed_sport_sponsors()
+    scoped = {s["id"] for s in make_service(store).list_payload("football")["sponsors"]}
+    # football sponsor + the "" cross-sport one + the untagged legacy one;
+    # the basketball one is hidden.
+    assert scoped == {"fb", "any", "legacy"}
+
+
+def test_list_payload_canadian_football_scope_matches_football_sponsors() -> None:
+    # Invariant 2: a canadian_football context (scope "football") sees the
+    # football sponsor pool, not an empty one.
+    store = _mixed_sport_sponsors()
+    assert {s["id"] for s in make_service(store).list_payload("canadian_football")["sponsors"]} == {
+        "fb",
+        "any",
+        "legacy",
+    }
+
+
 def test_create_validates_name_and_duplicate_confirmation() -> None:
     store = MemoryStore(sponsors=[sponsor()])
     service = make_service(store)
@@ -148,6 +185,30 @@ def test_clean_record_strips_transient_fields_and_limits_values() -> None:
     assert "contract_expired" not in record
     assert record["lead_ins"] == ["A", "B"]
     assert len(record["notes"]) == 3000
+    # Round 27: no sport given -> "" (shown in every context).
+    assert record["sport"] == ""
+
+
+def test_clean_record_normalizes_the_sport_family() -> None:
+    service = make_service(MemoryStore())
+    assert service.clean_record({"name": "A", "sport": "Football"})["sport"] == "football"
+    # Canadian football sponsors share the football pool (invariant 2).
+    assert service.clean_record({"name": "B", "sport": "Canadian Football"})["sport"] == "football"
+    assert service.clean_record({"name": "C", "sport": "Basketball"})["sport"] == "basketball"
+    # An unknown token is kept, lower-cased, rather than dropped.
+    assert service.clean_record({"name": "D", "sport": "Kabaddi"})["sport"] == "kabaddi"
+
+
+def test_create_and_update_carry_the_sport_family() -> None:
+    store = MemoryStore()
+    service = make_service(store)
+    created = service.create({"name": "Rink Co", "sport": "canadian_football"})
+    assert created.data["sponsor"]["sport"] == "football"
+    updated = service.update(created.data["sponsor"]["id"], {"category": "Regional"})
+    # Not re-specified on update -> preserved.
+    assert updated.data["sponsor"]["sport"] == "football"
+    moved = service.update(created.data["sponsor"]["id"], {"sport": "basketball"})
+    assert moved.data["sponsor"]["sport"] == "basketball"
 
 
 def test_update_preserves_created_at_and_blocks_duplicate_name() -> None:

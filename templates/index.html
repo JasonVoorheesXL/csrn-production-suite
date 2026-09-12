@@ -100,6 +100,7 @@
         <div class="subhead" id="matchup">Secure Access</div>
         <div class="header-actions">
           <div id="phaseBadge" class="phase-badge phase-pregame hidden">PREGAME</div>
+          <select id="sportSwitcher" class="small-button header-sport-switch hidden" onchange="switchSportContext(this.value)" title="Sport context" aria-label="Sport context"></select>
           <button id="switchConsoleButton" class="small-button hidden" onclick="openConnectionRoleModal()">Switch Console</button>
           <button id="headerLogout" class="small-button header-logout hidden" onclick="logout()">Log Out</button>
         </div>
@@ -120,6 +121,9 @@
       <label>Confirm PIN
         <input id="confirmPin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password">
       </label>
+      <div class="sport-picker" id="setupSportPicker" data-login-sport-picker aria-label="Sport"></div>
+      <div class="sport-others hidden" id="setupOtherSports" data-login-other-list></div>
+      <div class="auth-subnote" id="setupSportMessage"></div>
       <button class="primary wide" onclick="setupPin()">Save PIN</button>
       <div class="auth-message" id="setupMessage"></div>
     </section>
@@ -133,6 +137,9 @@
       <label>PIN
         <input id="loginPin" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password">
       </label>
+      <div class="sport-picker" id="loginSportPicker" data-login-sport-picker aria-label="Sport"></div>
+      <div class="sport-others hidden" id="loginOtherSports" data-login-other-list></div>
+      <div class="auth-subnote" id="loginSportMessage"></div>
       <button class="primary wide" onclick="login()">Unlock</button>
       <div class="auth-message" id="loginMessage"></div>
     </section>
@@ -1220,7 +1227,7 @@
       <div class="asset-workspace"><div><div id="sponsorList" class="asset-list"></div><div id="sponsorEmpty" class="empty-state hidden">No sponsors match this view.</div></div>
       <div id="sponsorEditor" class="asset-editor hidden"><h2 id="sponsorEditorTitle">Sponsor Profile</h2><input id="sponsorId" type="hidden"><div class="setup-grid">
         <label>Sponsor Name<input id="sponsorName"></label><label>Category<select id="sponsorCategory"><option>Local Business</option><option>Corporate</option><option>Nonprofit</option><option>Media Partner</option><option>Community Partner</option><option>Other</option></select></label>
-        <label>Status<select id="sponsorStatus"><option>Prospect</option><option>Active</option><option>Expired</option><option>Inactive</option></select></label><label>Package<select id="sponsorPackage"><option>General Sponsor</option><option>Presenting Sponsor</option><option>Pregame Sponsor</option><option>Halftime Sponsor</option><option>Player of the Game</option><option>Coach Interview</option><option>Scorebug Sponsor</option><option>Drive Summary</option><option>Custom</option></select></label>
+        <label>Status<select id="sponsorStatus"><option>Prospect</option><option>Active</option><option>Expired</option><option>Inactive</option></select></label><label>Package<select id="sponsorPackage"><option>General Sponsor</option><option>Presenting Sponsor</option><option>Pregame Sponsor</option><option>Halftime Sponsor</option><option>Player of the Game</option><option>Coach Interview</option><option>Scorebug Sponsor</option><option>Drive Summary</option><option>Custom</option></select></label><label>Sport<select id="sponsorSport"><option value="">All sports</option></select></label>
         <label>Contact Name<input id="sponsorContact"></label><label>Email<input id="sponsorEmail" type="email"></label><label>Phone<input id="sponsorPhone"></label><label>Website<input id="sponsorWebsite"></label>
         <label>Contract Start<input id="sponsorStart" type="date"></label><label>Contract End<input id="sponsorEnd" type="date"></label>
         <label class="span-2">Approved Lead-ins<input id="sponsorLeadIns" placeholder="Presented by:, Sponsored by:, Brought to you by:"></label>
@@ -1848,6 +1855,7 @@ async function initializeAuthenticatedApp() {
 
   await loadConfig();
   await loadRulesetOptions();
+  await loadSessionContext();
   await loadBroadcasters();
   await loadCaptionControls();
   await loadGameManager();
@@ -2805,6 +2813,7 @@ async function checkSecurity() {
   document.getElementById('upgradeModule').classList.add('hidden');
   const status = await api('/api/security-status');
   authenticated = status.authenticated;
+  renderLoginSportPickers(status);
   document.getElementById('setupPinPanel').classList.toggle('hidden', status.pin_configured);
   document.getElementById('loginPanel').classList.toggle('hidden', !status.pin_configured || status.authenticated);
   if (status.locked_seconds > 0) {
@@ -2824,7 +2833,225 @@ function showSecurityState() {
   document.getElementById('phaseBadge').classList.add('hidden');
   document.getElementById('headerLogout').classList.add('hidden');
   document.getElementById('moduleNav').classList.add('hidden');
+  document.getElementById('sportSwitcher').classList.add('hidden');
   document.getElementById('matchup').textContent = 'Secure Access';
+}
+
+// ---- Round 27: login-screen sport picker -------------------------------
+// Five family tiles (order mirrors sport_families.SPORT_FAMILIES) plus an
+// "All Others" GATEWAY tile that opens a secondary list. Only a family /
+// other-sport with a real broadcast engine AND a licence is selectable.
+// The rest show a note on click, with different copy for
+// licensed-but-not-ready ("engine ships in a future update") vs
+// not-licensed ("get licensed"). Labels + availability come from
+// /api/security-status (family_sports / other_sports); glyphs are local.
+const LOGIN_TILE_GLYPH = {
+  football: '🏈', basketball: '🏀', baseball: '⚾', softball: '🥎',
+  soccer: '⚽', all_others: '🏅',
+};
+const OTHER_GLYPH = {canadian_football: '🍁', hockey: '🏒', lacrosse: '🥍', tennis: '🎾', swimming: '🏊'};
+let loginFamilySports = [];         // [{family,label,licensed,engine_ready,available}]
+let loginOtherSports = [];          // [{context,label,available}]
+let selectedLoginSport = '';        // a family, or an other-context like 'canadian_football'
+let loginSportUserPicked = false;   // true once the operator clicks a tile
+let loginPickerSignature = '';      // rebuild the DOM only when the offering changes
+
+function loginSportOption(sport) {
+  return loginFamilySports.find(f => f.family === sport)
+    || loginOtherSports.find(o => o.context === sport)
+    || null;
+}
+function loginSportSelectable(sport) {
+  const opt = sport ? loginSportOption(sport) : null;
+  return !!(opt && opt.available);
+}
+function loginSportLabel(sport) {
+  const opt = loginSportOption(sport);
+  return opt ? opt.label : sport;
+}
+function selectedIsOtherSport() {
+  return !!selectedLoginSport && !loginFamilySports.some(f => f.family === selectedLoginSport);
+}
+
+function renderLoginSportPickers(status) {
+  loginFamilySports = Array.isArray(status.family_sports) ? status.family_sports.slice() : [];
+  loginOtherSports = Array.isArray(status.other_sports) ? status.other_sports.slice() : [];
+
+  // checkSecurity() re-runs every 15s; never clobber a selection the operator
+  // has already made this session -- only auto-preset before that.
+  if (!(loginSportUserPicked && loginSportSelectable(selectedLoginSport))) {
+    let preset = String(status.sport_context || '').toLowerCase();
+    if (!preset) {
+      let remembered = '';
+      try { remembered = (localStorage.getItem('csrn_last_sport') || '').toLowerCase(); } catch (_) {}
+      if (remembered && loginSportSelectable(remembered)) preset = remembered;
+      else {
+        const avail = [...loginFamilySports, ...loginOtherSports].filter(o => o.available);
+        if (avail.length === 1) preset = avail[0].family || avail[0].context;
+      }
+    }
+    selectedLoginSport = loginSportSelectable(preset) ? preset : '';
+  }
+
+  const signature = JSON.stringify([loginFamilySports, loginOtherSports]);
+  if (signature !== loginPickerSignature) {
+    loginPickerSignature = signature;
+    document.querySelectorAll('[data-login-sport-picker]').forEach(picker => {
+      const familyTiles = loginFamilySports.map(f => {
+        const pending = f.licensed && !f.engine_ready;
+        const badge = f.licensed
+          ? (f.engine_ready ? '' : '<span class="sport-icon-soon" aria-hidden="true">SOON</span>')
+          : '<span class="sport-icon-lock" aria-hidden="true">🔒</span>';
+        const hint = f.available ? '' : (pending ? ' — engine coming soon' : ' — not licensed');
+        return `<button type="button" class="sport-icon" data-sport="${f.family}"
+          data-licensed="${f.licensed ? '1' : '0'}" data-engine="${f.engine_ready ? '1' : '0'}"
+          data-available="${f.available ? '1' : '0'}" title="${f.label}${hint}"
+          onclick="pickLoginSport('${f.family}')">
+          <span class="sport-icon-glyph" aria-hidden="true">${LOGIN_TILE_GLYPH[f.family] || '•'}</span>
+          <span class="sport-icon-label">${f.label}</span>
+          ${badge}
+        </button>`;
+      }).join('');
+      const gateway = `<button type="button" class="sport-icon sport-gateway" data-sport="all_others"
+        title="More sports" onclick="toggleLoginOtherSports()">
+        <span class="sport-icon-glyph" aria-hidden="true">${LOGIN_TILE_GLYPH.all_others}</span>
+        <span class="sport-icon-label">All Others</span>
+        <span class="sport-icon-caret" aria-hidden="true">▾</span>
+      </button>`;
+      picker.innerHTML = familyTiles + gateway;
+    });
+    document.querySelectorAll('[data-login-other-list]').forEach(list => {
+      list.innerHTML = loginOtherSports.map(o => `
+        <button type="button" class="sport-other" data-sport="${o.context}"
+          data-available="${o.available ? '1' : '0'}"
+          onclick="pickLoginSport('${o.context}')">
+          <span aria-hidden="true">${OTHER_GLYPH[o.context] || '•'}</span>
+          <span>${o.label}</span>
+          ${o.available ? '' : '<em>coming soon</em>'}
+        </button>`).join('') || '<div class="sport-other-empty">No additional sports available.</div>';
+    });
+  }
+  applyLoginSportSelection();
+}
+
+function toggleLoginOtherSports() {
+  document.querySelectorAll('[data-login-other-list]').forEach(list => list.classList.toggle('hidden'));
+}
+
+function pickLoginSport(sport) {
+  const setMsg = text => document.querySelectorAll('#loginSportMessage,#setupSportMessage').forEach(n => {
+    n.textContent = text || ''; n.classList.toggle('is-upsell', !!text);
+  });
+  if (!loginSportSelectable(sport)) {
+    const opt = loginSportOption(sport);
+    const name = loginSportLabel(sport);
+    let text;
+    if (opt && 'family' in opt) {
+      // A real family: licensed-but-no-engine vs not-licensed are different.
+      text = opt.licensed
+        ? `${name} is licensed — the broadcast engine ships in a future CSRN update.`
+        : `${name} isn't part of this CSRN license. Contact CSRN to add it.`;
+    } else {
+      text = `${name} isn't available yet. Contact CSRN.`;
+    }
+    setMsg(text);
+    return;
+  }
+  loginSportUserPicked = true;
+  selectedLoginSport = (selectedLoginSport === sport) ? '' : sport;
+  setMsg('');
+  // Collapse the secondary list once a specific other-sport is chosen.
+  if (selectedIsOtherSport()) {
+    document.querySelectorAll('[data-login-other-list]').forEach(list => list.classList.add('hidden'));
+  }
+  applyLoginSportSelection();
+}
+
+function applyLoginSportSelection() {
+  const somethingPicked = !!selectedLoginSport;
+  const otherPicked = selectedIsOtherSport();
+  document.querySelectorAll('[data-login-sport-picker] .sport-icon').forEach(icon => {
+    const sport = icon.dataset.sport;
+    if (sport === 'all_others') {
+      icon.classList.toggle('selected', otherPicked);
+      icon.classList.toggle('dimmed', somethingPicked && !otherPicked);
+      const label = icon.querySelector('.sport-icon-label');
+      if (label) label.textContent = otherPicked ? loginSportLabel(selectedLoginSport) : 'All Others';
+      return;
+    }
+    const available = icon.dataset.available === '1';
+    const licensed = icon.dataset.licensed === '1';
+    const isSelected = available && sport === selectedLoginSport;
+    icon.classList.toggle('selected', isSelected);
+    icon.classList.toggle('dimmed', somethingPicked && available && !isSelected);
+    icon.classList.toggle('unlicensed', !licensed);
+    icon.classList.toggle('pending', licensed && icon.dataset.engine !== '1');
+  });
+  document.querySelectorAll('[data-login-other-list] .sport-other').forEach(item => {
+    item.classList.toggle('selected', item.dataset.sport === selectedLoginSport);
+    item.classList.toggle('coming-soon', item.dataset.available !== '1');
+  });
+}
+
+// ---- Round 27: in-app sport-context switcher (top nav, no re-PIN) ------
+const SPORT_FAMILY_LABEL = {football:'Football', basketball:'Basketball', baseball:'Baseball', softball:'Softball', soccer:'Soccer'};
+let sessionContextData = null;
+let sportContext = '';
+let sportScope = '';
+
+async function loadSessionContext() {
+  try {
+    sessionContextData = await api('/api/session-context');
+  } catch (_) {
+    sessionContextData = {sport_context:'', sport_scope:'', licensed_sports:[], other_sports:[]};
+  }
+  sportContext = sessionContextData.sport_context || '';
+  sportScope = sessionContextData.sport_scope || '';
+  renderSportSwitcher();
+}
+
+function renderSportSwitcher() {
+  const sel = document.getElementById('sportSwitcher');
+  if (!sel) return;
+  sel.classList.toggle('hidden', !authenticated);
+  if (!sessionContextData) return;
+  const d = sessionContextData;
+  let html = '<option value="">All sports</option>';
+  // Only licensed families appear in the in-app switcher; a licensed family
+  // with no engine yet is shown disabled with "(soon)".
+  const fams = (d.family_sports || []).filter(f => f.licensed).map(f =>
+    `<option value="${f.family}"${f.available ? '' : ' disabled'}>${f.label}${f.available ? '' : ' (soon)'}</option>`
+  ).join('');
+  if (fams) html += `<optgroup label="Sports">${fams}</optgroup>`;
+  const others = (d.other_sports || []).map(o =>
+    `<option value="${o.context}"${o.available ? '' : ' disabled'}>${o.label}${o.available ? '' : ' (soon)'}</option>`
+  ).join('');
+  if (others) html += `<optgroup label="More">${others}</optgroup>`;
+  sel.innerHTML = html;
+  // Set to the stored context; if it isn't an option, fall back to "All sports".
+  sel.value = d.sport_context || '';
+  if (sel.value !== (d.sport_context || '')) sel.value = '';
+}
+
+async function switchSportContext(value) {
+  try {
+    const data = await api('/api/sport-context', {sport: value});
+    sessionContextData = data;
+    sportContext = data.sport_context || '';
+    sportScope = data.sport_scope || '';
+    renderSportSwitcher();
+    // Re-run the current module so its rosters / sponsors re-scope.
+    if (typeof showModule === 'function' && currentModule) showModule(currentModule);
+  } catch (err) {
+    const sel = document.getElementById('sportSwitcher');
+    if (sel) sel.value = sportContext;
+    alert({
+      SPORT_NOT_LICENSED: 'That sport is not part of this CSRN license.',
+      SPORT_ENGINE_NOT_READY: 'That sport is licensed — its broadcast engine ships in a future CSRN update.',
+      SPORT_COMING_SOON: 'That sport is coming soon.',
+      SPORT_NOT_RECOGNIZED: 'Choose a specific sport.'
+    }[err.message] || 'Could not switch sport context.');
+  }
 }
 
 async function setupPin() {
@@ -2832,8 +3059,9 @@ async function setupPin() {
   const confirm = document.getElementById('confirmPin').value;
   const msg = document.getElementById('setupMessage');
   try {
-    await api('/api/setup-pin', {pin, confirm});
+    await api('/api/setup-pin', {pin, confirm, sport: selectedLoginSport});
     msg.textContent = '';
+    try { if (selectedLoginSport) localStorage.setItem('csrn_last_sport', selectedLoginSport); } catch (_) {}
     authenticated = true;
     await initializeAuthenticatedApp();
   } catch (err) {
@@ -2848,9 +3076,10 @@ async function login() {
   const pin = document.getElementById('loginPin').value;
   const msg = document.getElementById('loginMessage');
   try {
-    await api('/api/login', {pin});
+    await api('/api/login', {pin, sport: selectedLoginSport});
     msg.textContent = '';
     document.getElementById('loginPin').value = '';
+    try { if (selectedLoginSport) localStorage.setItem('csrn_last_sport', selectedLoginSport); } catch (_) {}
     authenticated = true;
     await initializeAuthenticatedApp();
   } catch (err) {
@@ -2869,6 +3098,9 @@ async function logout() {
   authenticated = false;
   appInitialized = false;
   currentState = null;
+  sessionContextData = null;
+  sportContext = '';
+  sportScope = '';
   await checkSecurity();
 }
 
@@ -3796,6 +4028,7 @@ function render() {
   document.getElementById('headerLogout').classList.toggle('hidden', !authenticated);
   const switchConsoleButton=document.getElementById('switchConsoleButton'); if(switchConsoleButton) switchConsoleButton.classList.toggle('hidden', !authenticated);
   document.getElementById('moduleNav').classList.toggle('hidden', !authenticated);
+  renderSportSwitcher();
 
   updateRestoreControls();
 
@@ -5073,9 +5306,10 @@ function closeAssetEditor(){document.getElementById('assetEditor').classList.add
 let sponsorRecords=[];let sponsorLogoAssets=[];let selectedSponsor=null;
 async function loadSponsors(){const data=await api('/api/sponsors');sponsorRecords=data.sponsors||[];sponsorLogoAssets=data.logo_assets||[];renderSponsors();populateSponsorGraphicSelectors();populateSponsorAssetSelector()}
 function renderSponsors(){const q=(document.getElementById('sponsorSearch')?.value||'').toLowerCase(),status=document.getElementById('sponsorStatusFilter')?.value||'';const rows=sponsorRecords.filter(s=>(!status||(s.effective_status||s.status)===status)&&(!q||[s.name,s.category,s.package,s.contact_name].join(' ').toLowerCase().includes(q))).sort((a,b)=>a.name.localeCompare(b.name));document.getElementById('sponsorTotal').textContent=sponsorRecords.length;document.getElementById('sponsorActive').textContent=sponsorRecords.filter(s=>(s.effective_status||s.status)==='Active'&&s.active!==false).length;const now=Date.now(),soon=now+45*86400000;document.getElementById('sponsorExpiring').textContent=sponsorRecords.filter(s=>s.contract_end&&new Date(s.contract_end).getTime()>=now&&new Date(s.contract_end).getTime()<=soon).length;document.getElementById('sponsorEmpty').classList.toggle('hidden',rows.length>0);document.getElementById('sponsorList').innerHTML=rows.map(s=>`<button class="asset-card" onclick="editSponsor('${escapeHtml(s.id)}')"><span class="asset-thumb">${s.logo_url?`<img src="${escapeHtml(s.logo_url)}" onerror="this.style.display='none'">`:'SP'}</span><span><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.package)} · ${escapeHtml(s.effective_status||s.status)}</small></span><span class="asset-rights ${(s.effective_status||s.status)==='Active'?'verified':'review'}">${escapeHtml(s.effective_status||s.status)}</span></button>`).join('')}
-function newSponsor(){selectedSponsor=null;const editor=document.getElementById('sponsorEditor');editor.classList.remove('hidden');document.getElementById('sponsorEditorTitle').textContent='New Sponsor';['sponsorId','sponsorName','sponsorContact','sponsorEmail','sponsorPhone','sponsorWebsite','sponsorStart','sponsorEnd','sponsorLeadIns','sponsorLogoUrl','sponsorNotes'].forEach(id=>document.getElementById(id).value='');document.getElementById('sponsorAssetId').value='';document.getElementById('sponsorCategory').value='Local Business';document.getElementById('sponsorStatus').value='Prospect';document.getElementById('sponsorPackage').value='General Sponsor';document.getElementById('sponsorRecordActive').checked=true;document.getElementById('deleteSponsorButton').classList.add('hidden');renderSponsorPreview();editor.classList.add('editor-attention');editor.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>{document.getElementById('sponsorName').focus();editor.classList.remove('editor-attention')},450)}
-function editSponsor(id){selectedSponsor=sponsorRecords.find(s=>s.id===id);if(!selectedSponsor)return;document.getElementById('sponsorEditor').classList.remove('hidden');document.getElementById('sponsorEditorTitle').textContent='Edit Sponsor';const map={sponsorId:'id',sponsorName:'name',sponsorContact:'contact_name',sponsorEmail:'email',sponsorPhone:'phone',sponsorWebsite:'website',sponsorStart:'contract_start',sponsorEnd:'contract_end',sponsorLogoUrl:'logo_url',sponsorNotes:'notes'};Object.entries(map).forEach(([id,key])=>document.getElementById(id).value=selectedSponsor[key]||'');document.getElementById('sponsorCategory').value=selectedSponsor.category||'Local Business';document.getElementById('sponsorStatus').value=selectedSponsor.status||'Prospect';document.getElementById('sponsorPackage').value=selectedSponsor.package||'General Sponsor';document.getElementById('sponsorLeadIns').value=(selectedSponsor.lead_ins||[]).join(', ');document.getElementById('sponsorRecordActive').checked=selectedSponsor.active!==false;populateSponsorAssetSelector();document.getElementById('sponsorAssetId').value=selectedSponsor.asset_id||'';document.getElementById('deleteSponsorButton').classList.remove('hidden');renderSponsorPreview()}
-function sponsorPayload(){return{name:document.getElementById('sponsorName').value.trim(),category:document.getElementById('sponsorCategory').value,status:document.getElementById('sponsorStatus').value,package:document.getElementById('sponsorPackage').value,contact_name:document.getElementById('sponsorContact').value.trim(),email:document.getElementById('sponsorEmail').value.trim(),phone:document.getElementById('sponsorPhone').value.trim(),website:document.getElementById('sponsorWebsite').value.trim(),contract_start:document.getElementById('sponsorStart').value,contract_end:document.getElementById('sponsorEnd').value,lead_ins:document.getElementById('sponsorLeadIns').value.split(',').map(x=>x.trim()).filter(Boolean),asset_id:document.getElementById('sponsorAssetId').value,logo_url:document.getElementById('sponsorLogoUrl').value.trim(),notes:document.getElementById('sponsorNotes').value.trim(),active:document.getElementById('sponsorRecordActive').checked}}
+function newSponsor(){selectedSponsor=null;const editor=document.getElementById('sponsorEditor');editor.classList.remove('hidden');document.getElementById('sponsorEditorTitle').textContent='New Sponsor';['sponsorId','sponsorName','sponsorContact','sponsorEmail','sponsorPhone','sponsorWebsite','sponsorStart','sponsorEnd','sponsorLeadIns','sponsorLogoUrl','sponsorNotes'].forEach(id=>document.getElementById(id).value='');document.getElementById('sponsorAssetId').value='';document.getElementById('sponsorCategory').value='Local Business';document.getElementById('sponsorStatus').value='Prospect';document.getElementById('sponsorPackage').value='General Sponsor';document.getElementById('sponsorRecordActive').checked=true;populateSponsorSportOptions(sportScope||'');document.getElementById('deleteSponsorButton').classList.add('hidden');renderSponsorPreview();editor.classList.add('editor-attention');editor.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>{document.getElementById('sponsorName').focus();editor.classList.remove('editor-attention')},450)}
+function editSponsor(id){selectedSponsor=sponsorRecords.find(s=>s.id===id);if(!selectedSponsor)return;document.getElementById('sponsorEditor').classList.remove('hidden');document.getElementById('sponsorEditorTitle').textContent='Edit Sponsor';const map={sponsorId:'id',sponsorName:'name',sponsorContact:'contact_name',sponsorEmail:'email',sponsorPhone:'phone',sponsorWebsite:'website',sponsorStart:'contract_start',sponsorEnd:'contract_end',sponsorLogoUrl:'logo_url',sponsorNotes:'notes'};Object.entries(map).forEach(([id,key])=>document.getElementById(id).value=selectedSponsor[key]||'');document.getElementById('sponsorCategory').value=selectedSponsor.category||'Local Business';document.getElementById('sponsorStatus').value=selectedSponsor.status||'Prospect';document.getElementById('sponsorPackage').value=selectedSponsor.package||'General Sponsor';populateSponsorSportOptions(selectedSponsor.sport||'');document.getElementById('sponsorLeadIns').value=(selectedSponsor.lead_ins||[]).join(', ');document.getElementById('sponsorRecordActive').checked=selectedSponsor.active!==false;populateSponsorAssetSelector();document.getElementById('sponsorAssetId').value=selectedSponsor.asset_id||'';document.getElementById('deleteSponsorButton').classList.remove('hidden');renderSponsorPreview()}
+function populateSponsorSportOptions(current){const sel=document.getElementById('sponsorSport');if(!sel)return;const fams=(sessionContextData&&Array.isArray(sessionContextData.licensed_sports)&&sessionContextData.licensed_sports.length)?sessionContextData.licensed_sports:['football','basketball','baseball','softball','soccer'];const cur=String(current||'').toLowerCase();const seen=new Set();const opts=['<option value="">All sports</option>'];fams.forEach(f=>{seen.add(f);opts.push(`<option value="${f}">${SPORT_FAMILY_LABEL[f]||f}</option>`)});if(cur&&!seen.has(cur))opts.push(`<option value="${cur}">${SPORT_FAMILY_LABEL[cur]||cur}</option>`);sel.innerHTML=opts.join('');sel.value=cur}
+function sponsorPayload(){return{name:document.getElementById('sponsorName').value.trim(),category:document.getElementById('sponsorCategory').value,status:document.getElementById('sponsorStatus').value,package:document.getElementById('sponsorPackage').value,sport:document.getElementById('sponsorSport').value,contact_name:document.getElementById('sponsorContact').value.trim(),email:document.getElementById('sponsorEmail').value.trim(),phone:document.getElementById('sponsorPhone').value.trim(),website:document.getElementById('sponsorWebsite').value.trim(),contract_start:document.getElementById('sponsorStart').value,contract_end:document.getElementById('sponsorEnd').value,lead_ins:document.getElementById('sponsorLeadIns').value.split(',').map(x=>x.trim()).filter(Boolean),asset_id:document.getElementById('sponsorAssetId').value,logo_url:document.getElementById('sponsorLogoUrl').value.trim(),notes:document.getElementById('sponsorNotes').value.trim(),active:document.getElementById('sponsorRecordActive').checked}}
 async function saveSponsor(confirmDuplicate=false){const p=sponsorPayload();if(!p.name){document.getElementById('sponsorMessage').textContent='Sponsor name is required.';return null}if(confirmDuplicate)p.confirm_duplicate=true;const id=document.getElementById('sponsorId').value;try{const data=await api(id?`/api/sponsors/${encodeURIComponent(id)}`:'/api/sponsors',p,id?'PUT':'POST');selectedSponsor=data.sponsor;document.getElementById('sponsorId').value=selectedSponsor.id;document.getElementById('sponsorMessage').textContent='Sponsor saved.';await loadSponsors();editSponsor(selectedSponsor.id);return selectedSponsor}catch(error){if(error.data?.error==='DUPLICATE_SPONSOR'){const existing=error.data.duplicate_sponsor;const action=await duplicateSponsorChoice(existing);if(action==='open'){await loadSponsors();editSponsor(existing.id);document.getElementById('sponsorMessage').textContent='Opened the existing sponsor record.';return existing}if(action==='create')return saveSponsor(true);document.getElementById('sponsorMessage').textContent='Sponsor creation cancelled.';return null}throw error}}
 async function deleteSponsor(){const id=document.getElementById('sponsorId').value;if(!id||!confirm('Delete this sponsor?'))return;await api(`/api/sponsors/${encodeURIComponent(id)}`,null,'DELETE');closeSponsorEditor();await loadSponsors()}
 async function uploadSponsorLogo(file){if(!file)return;let id=document.getElementById('sponsorId').value;if(!id){const saved=await saveSponsor();id=saved?.id;if(!id)return}async function send(action='prompt'){const fd=new FormData();fd.append('logo',file);fd.append('duplicate_action',action);return fetch(`/api/sponsors/${encodeURIComponent(id)}/logo`,{method:'POST',body:fd})}let r=await send(),d=await r.json();if(r.status===409&&d.error==='DUPLICATE_ASSET'){const action=await duplicateAssetChoice(d.duplicate_asset);if(action==='cancel'){document.getElementById('sponsorMessage').textContent='Upload cancelled.';return}r=await send(action);d=await r.json()}if(!r.ok)throw new Error(d.error||'Upload failed');document.getElementById('sponsorLogoUrl').value=d.logo_url;document.getElementById('sponsorMessage').textContent=d.duplicate_reused?'Existing matching asset reused and linked.':'Logo uploaded, registered in Asset Manager, and linked.';await loadAssets();await loadSponsors();document.getElementById('sponsorAssetId').value=d.asset?.id||'';renderSponsorPreview()}

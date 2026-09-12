@@ -85,6 +85,9 @@ def route_client():
                 authenticated=lambda: bool(session.get("authenticated")),
                 clock=lambda: now[0],
                 get_upgrade_service=lambda: upgrade_service,
+                # Round 27: this install is licensed for football only, so
+                # unlicensed sport choices at login must be ignored.
+                licensed_sport_families=lambda: ["football"],
             )
         )
     )
@@ -130,6 +133,24 @@ def test_security_status_is_public_and_reports_lock_time(route_client) -> None:
         "pin_configured": True,
         "authenticated": False,
         "locked_seconds": 44,
+        "licensed_sports": ["football"],
+        "all_sports_licensed": False,
+        "sport_context": "",
+        "sport_scope": "",
+        "family_sports": [
+            {"family": "football", "label": "Football", "licensed": True, "engine_ready": True, "available": True},
+            {"family": "basketball", "label": "Basketball", "licensed": False, "engine_ready": False, "available": False},
+            {"family": "baseball", "label": "Baseball", "licensed": False, "engine_ready": False, "available": False},
+            {"family": "softball", "label": "Softball", "licensed": False, "engine_ready": False, "available": False},
+            {"family": "soccer", "label": "Soccer", "licensed": False, "engine_ready": False, "available": False},
+        ],
+        "other_sports": [
+            {"context": "canadian_football", "label": "Canadian Football", "available": True},
+            {"context": "hockey", "label": "Hockey", "available": False},
+            {"context": "lacrosse", "label": "Lacrosse", "available": False},
+            {"context": "tennis", "label": "Tennis", "available": False},
+            {"context": "swimming", "label": "Swimming", "available": False},
+        ],
     }
 
 
@@ -242,6 +263,79 @@ def test_logout_clears_session(route_client) -> None:
     assert response.get_json() == {"ok": True}
     with client.session_transaction() as current:
         assert dict(current) == {}
+
+
+def test_login_stamps_a_licensed_sport_context(route_client) -> None:
+    client, _, _, _, _, _ = route_client
+
+    response = client.post("/api/login", json={"pin": "123456", "sport": "Football"})
+
+    assert response.status_code == 200
+    assert response.get_json() == {"ok": True}
+    with client.session_transaction() as current:
+        assert current["sport_context"] == "football"
+
+
+def test_login_accepts_canadian_football_under_the_football_license(route_client) -> None:
+    # The stub install licenses "football" only; canadian_football rides it.
+    client, _, _, _, _, _ = route_client
+
+    response = client.post(
+        "/api/login", json={"pin": "123456", "sport": "canadian-football"}
+    )
+
+    assert response.status_code == 200
+    with client.session_transaction() as current:
+        assert current["sport_context"] == "canadian_football"
+
+
+def test_login_ignores_a_coming_soon_sport(route_client) -> None:
+    client, _, _, _, _, _ = route_client
+
+    response = client.post("/api/login", json={"pin": "123456", "sport": "hockey"})
+
+    assert response.status_code == 200
+    with client.session_transaction() as current:
+        assert current["authenticated"] is True
+        assert "sport_context" not in current
+
+
+def test_login_ignores_an_unlicensed_or_unknown_sport(route_client) -> None:
+    client, _, _, _, _, _ = route_client
+
+    # baseball is not licensed on this stub install; curling is not a family.
+    for bad in ("baseball", "curling", ""):
+        response = client.post("/api/login", json={"pin": "123456", "sport": bad})
+        assert response.status_code == 200
+        with client.session_transaction() as current:
+            assert current["authenticated"] is True
+            assert "sport_context" not in current
+
+
+def test_setup_pin_stamps_a_licensed_sport_context(route_client) -> None:
+    client, _, _, _, _, _ = route_client
+
+    response = client.post(
+        "/api/setup-pin",
+        json={"pin": "123456", "confirm": "123456", "sport": "football"},
+    )
+
+    assert response.status_code == 200
+    with client.session_transaction() as current:
+        assert current["sport_context"] == "football"
+
+
+def test_security_status_carries_licensed_sports_and_current_context(route_client) -> None:
+    client, _, _, _, _, _ = route_client
+    with client.session_transaction() as current:
+        current["authenticated"] = True
+        current["sport_context"] = "football"
+
+    body = client.get("/api/security-status").get_json()
+
+    assert body["licensed_sports"] == ["football"]
+    assert body["all_sports_licensed"] is False
+    assert body["sport_context"] == "football"
 
 
 def test_upgrade_candidate_returns_candidate(route_client) -> None:
