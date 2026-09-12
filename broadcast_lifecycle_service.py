@@ -4,6 +4,8 @@ import copy
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
+import ruleset_service
+
 
 @dataclass(frozen=True)
 class BroadcastLifecycleResult:
@@ -194,12 +196,46 @@ class BroadcastLifecycleService:
             return "live"
         return "pregame"
 
+    def _effective_profile_fields(
+        self, sport: str, country: str, region: str, association: str
+    ) -> dict[str, Any]:
+        # RulesProfile versioning (CSRN_NFHS_Baseball_Softball_Rules_Engine_
+        # Spec_2026 §3.2): "A game stores effectiveProfileId and
+        # effectiveProfileVersion at creation. Changing a master profile
+        # affects only future games unless an explicit migration is
+        # performed." This is that stamp -- computed once, here, at the
+        # moment a planned broadcast record becomes live state, not
+        # re-resolved from country/region/association on every read the way
+        # ruleset_service.active_ruleset() already does for in-game rules
+        # lookups. A resumed live-state snapshot (the other branch of
+        # load()) already carries whatever was stamped here previously and
+        # is never re-stamped.
+        profile_id = ruleset_service.resolve_id(
+            country=country, region=region or None, association=association or None,
+            sport=sport,
+        )
+        try:
+            document = ruleset_service.load_ruleset(profile_id)
+        except (FileNotFoundError, ValueError):
+            document = {}
+        # Existing football rulesets predate this field and carry none;
+        # treat an undeclared version as 1 rather than requiring every
+        # shipped document to be edited.
+        version = document.get("version", 1)
+        return {
+            "effective_profile_id": profile_id,
+            "effective_profile_version": version,
+        }
+
     def _state_from_record(self, item: Mapping[str, Any]) -> dict[str, Any]:
         status = str(item.get("status", "planned"))
         sport = str(item.get("sport", "Football"))
         home_school_id = str(item.get("home_school_id", ""))
         visitor_school_id = str(item.get("visitor_school_id", ""))
         completed = status == "completed"
+        country = str(item.get("country", "") or "").strip().upper() or "US"
+        region = str(item.get("region", "") or "").strip().upper()
+        association = str(item.get("association", "") or "").strip().upper()
         return {
             "broadcast_created": True,
             "broadcast_id": item.get("broadcast_id", ""),
@@ -207,9 +243,10 @@ class BroadcastLifecycleService:
             # Jurisdiction the rules engine resolves against
             # (ruleset_service.active_ruleset). Absent on legacy records ->
             # "" -> the generic ruleset, identical engine behaviour to today.
-            "country": str(item.get("country", "") or "").strip().upper() or "US",
-            "region": str(item.get("region", "") or "").strip().upper(),
-            "association": str(item.get("association", "") or "").strip().upper(),
+            "country": country,
+            "region": region,
+            "association": association,
+            **self._effective_profile_fields(sport, country, region, association),
             "season": item.get("season", ""),
             "week": item.get("week", "1"),
             "classification": item.get("classification", ""),

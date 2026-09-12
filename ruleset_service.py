@@ -6,15 +6,21 @@ classification scheme, reserved school IDs, timezone / association
 defaults) was a hardcoded NFHS-football-with-Mississippi-identifiers
 constant. This module replaces that with plain-JSON ruleset documents.
 
-A ruleset lives in ``rulesets/<sport>/<id>.json`` and may name a parent via
-``"extends": "<sport>/<parent-id>"``. ``load_ruleset`` walks that chain and
-deep-merges parent-then-child: child dicts merge recursively, child
-scalars / lists / explicit null replace the parent value.
+A ruleset lives in ``rulesets/<sport>/<id>.json`` (or, for a document meant
+only as a shared extends-parent across sports, ``rulesets/<id>.json`` --
+see ``bat-ball-base``) and may name a parent via ``"extends": "<id>"``.
+``load_ruleset`` walks that chain and deep-merges parent-then-child: child
+dicts merge recursively, child scalars / lists / explicit null replace the
+parent value.
 
-This round ships exactly two documents -- ``football/us-nfhs`` (base) and
-``football/us-ms-mhsaa`` (extends it, adds MS classification + timezone /
-association) -- which together reproduce every currently-hardcoded value.
-No other sports or jurisdictions.
+Shipped documents: ``football/us-nfhs`` (base) and ``football/us-ms-mhsaa``
+(Round 6/Round 26/Round 27, US); ``football/ca-base`` and
+``football/ca-cjfl-ofc`` (Round 26, Canadian); ``bat-ball-base`` (baseball
+engine P0, the mechanics shared by both bat-and-ball sports -- never
+resolved directly, only extended), ``baseball/us-nfhs`` and
+``softball/us-nfhs`` (baseball engine P0, US NFHS-generic). State-specific
+baseball/softball overlays (the ``us-ms-mhsaa`` equivalent) are a later
+phase, gated on the owner's own MHSAA handbook confirmation.
 """
 
 from __future__ import annotations
@@ -38,6 +44,12 @@ _CATALOG: tuple[tuple[tuple[str | None, str | None, str | None, str], str], ...]
     (("US", None, None, "football"), "football/us-nfhs"),
     (("CA", "ON", "CJFL", "football"), "football/ca-cjfl-ofc"),
     (("CA", None, None, "football"), "football/ca-base"),
+    # Baseball engine P0 -- NFHS-generic only. MHSAA state overlays land
+    # once the owner confirms the 2026-27 handbook values (a later phase).
+    (("US", None, "NFHS", "baseball"), "baseball/us-nfhs"),
+    (("US", None, None, "baseball"), "baseball/us-nfhs"),
+    (("US", None, "NFHS", "softball"), "softball/us-nfhs"),
+    (("US", None, None, "softball"), "softball/us-nfhs"),
 )
 
 # What resolve() falls back to when nothing in the catalogue matches. Keep

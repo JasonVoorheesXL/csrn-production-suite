@@ -213,6 +213,51 @@ def test_load_carries_jurisdiction_onto_state_for_the_rules_engine() -> None:
     assert ruleset_service.active_ruleset_id(ca_state) == "football/ca-cjfl-ofc"
 
 
+def test_load_stamps_effective_profile_id_and_version_at_creation() -> None:
+    # Baseball engine P0 (CSRN_NFHS_Baseball_Softball_Rules_Engine_Spec_2026
+    # Sec.3.2): "A game stores effectiveProfileId and effectiveProfileVersion
+    # at creation." Football's own rulesets predate the "version" field, so
+    # an absent one defaults to 1 rather than requiring every shipped
+    # document to be edited (see test_ruleset_golden.py -- football stays
+    # byte-identical).
+    state = build_service()["service"].load("FB-2026-01").data["state"]
+    assert state["effective_profile_id"] == "football/us-nfhs"
+    assert state["effective_profile_version"] == 1
+
+    bb_row = record()
+    bb_row.update({"sport": "Baseball", "country": "US", "association": "NFHS"})
+    bb_state = build_service(records=[bb_row])["service"].load("FB-2026-01").data["state"]
+    assert bb_state["effective_profile_id"] == "baseball/us-nfhs"
+    assert bb_state["effective_profile_version"] == 1
+
+    sb_row = record()
+    sb_row.update({"sport": "Softball", "country": "US"})
+    sb_state = build_service(records=[sb_row])["service"].load("FB-2026-01").data["state"]
+    assert sb_state["effective_profile_id"] == "softball/us-nfhs"
+
+
+def test_load_never_restamps_a_resumed_live_snapshot() -> None:
+    # Sec.3.2 continued: "Changing a master profile affects only future
+    # games unless an explicit migration is performed." A resumed snapshot
+    # already carries whatever was stamped when the game was first loaded;
+    # this must survive unchanged even if the underlying ruleset catalog
+    # later changes, since load() only computes the stamp on the "build a
+    # fresh state from the record" branch, never on the snapshot-resume one.
+    row = record("live")
+    row.update({"sport": "Baseball", "country": "US", "association": "NFHS"})
+    row["live_state"] = {
+        "broadcast_created": True,
+        "broadcast_id": "FB-2026-01",
+        "effective_profile_id": "baseball/us-nfhs",
+        "effective_profile_version": 7,  # a hypothetical later profile edit
+    }
+    built = build_service(records=[row])
+    result = built["service"].load("FB-2026-01")
+    state = result.data["state"]
+    assert state["effective_profile_id"] == "baseball/us-nfhs"
+    assert state["effective_profile_version"] == 7
+
+
 def test_load_completed_record_restores_final_score_and_review_mode() -> None:
     built = build_service(records=[record("completed")])
     result = built["service"].load("FB-2026-01")

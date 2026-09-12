@@ -5499,12 +5499,19 @@ async function loadRulesetOptions() {
     return; // keep the static MHSAA option on failure
   }
   if (!Array.isArray(rows) || !rows.length) return;
-  // Scope the picker to the active sport context: canadian_football ->
-  // CA-only rulesets, football -> US-only, unset/other -> unfiltered
+  // Scope the picker to the active sport context. Sport first: baseball/
+  // softball ruleset documents share country="US" with football's, so
+  // without this a football broadcast's picker would show baseball's
+  // rulesets too (and vice versa) the moment those documents exist --
+  // caught while adding them in the baseball engine's P0 (docs/
+  // BASEBALL_SOFTBALL_ENGINE_SCOPING_PLAN.md). Country second: canadian_
+  // football -> CA-only, football -> US-only, unset/other -> unfiltered
   // (today's behaviour). Both American and Canadian football load the
   // same engine (base_family collapses canadian_football -> football);
   // the ruleset itself is the only thing that differs, which is exactly
   // what this picker chooses (docs/ROUND_27_ACCESS_MODEL.md "Tracked TODO").
+  const rulesetSport = sportContext === 'canadian_football' ? 'football' : (sportContext === 'football' || sportContext === 'baseball' || sportContext === 'softball') ? sportContext : null;
+  if (rulesetSport) rows = rows.filter((r) => (r.sport || '') === rulesetSport);
   const rulesetCountry = sportContext === 'canadian_football' ? 'CA' : sportContext === 'football' ? 'US' : null;
   if (rulesetCountry) rows = rows.filter((r) => (r.country || '') === rulesetCountry);
   if (!rows.length) return;

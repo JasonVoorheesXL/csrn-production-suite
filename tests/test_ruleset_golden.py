@@ -411,13 +411,19 @@ def test_coordinate_space_is_state_aware_for_canadian_field_length() -> None:
 def test_available_rulesets_exposes_jurisdiction_for_the_picker() -> None:
     # Round 26 Phase B 1/5: the broadcast-creation jurisdiction picker
     # groups on available_rulesets()' country / region / association.
+    # Baseball engine P0 adds bat-ball-base (never itself resolved -- an
+    # extends-parent only) plus baseball/us-nfhs and softball/us-nfhs.
     rows = {r["id"]: r for r in ruleset_service.available_rulesets()}
     assert set(rows) == {
         "football/us-nfhs",
         "football/us-ms-mhsaa",
         "football/ca-base",
         "football/ca-cjfl-ofc",
+        "bat-ball-base",
+        "baseball/us-nfhs",
+        "softball/us-nfhs",
     }
+    football_rows = {k: v for k, v in rows.items() if k.startswith("football/")}
     assert (rows["football/us-nfhs"]["country"], rows["football/us-nfhs"]["region"],
             rows["football/us-nfhs"]["association"]) == ("US", None, "NFHS")
     assert (rows["football/us-ms-mhsaa"]["country"], rows["football/us-ms-mhsaa"]["region"],
@@ -426,7 +432,7 @@ def test_available_rulesets_exposes_jurisdiction_for_the_picker() -> None:
             rows["football/ca-base"]["association"]) == ("CA", None, None)
     assert (rows["football/ca-cjfl-ofc"]["country"], rows["football/ca-cjfl-ofc"]["region"],
             rows["football/ca-cjfl-ofc"]["association"]) == ("CA", "ON", "CJFL")
-    for row in rows.values():
+    for row in football_rows.values():
         assert row["sport"] == "football"
         # the tuple the picker will store must resolve straight back to this
         # same ruleset id
@@ -434,6 +440,18 @@ def test_available_rulesets_exposes_jurisdiction_for_the_picker() -> None:
             country=row["country"], region=row["region"],
             association=row["association"], sport="football",
         ) == row["id"]
+
+    assert (rows["baseball/us-nfhs"]["country"], rows["baseball/us-nfhs"]["region"],
+            rows["baseball/us-nfhs"]["association"]) == ("US", None, "NFHS")
+    assert rows["baseball/us-nfhs"]["sport"] == "baseball"
+    assert (rows["softball/us-nfhs"]["country"], rows["softball/us-nfhs"]["region"],
+            rows["softball/us-nfhs"]["association"]) == ("US", None, "NFHS")
+    assert rows["softball/us-nfhs"]["sport"] == "softball"
+    # never itself a catalog target -- no (country, region, association,
+    # sport) tuple resolves to it
+    assert rows["bat-ball-base"]["country"] is None
+    assert ruleset_service.resolve_id(sport="baseball") != "bat-ball-base"
+    assert ruleset_service.resolve_id(sport="softball") != "bat-ball-base"
 
 
 def test_field_goal_play_is_disabled_on_every_shipped_ruleset() -> None:

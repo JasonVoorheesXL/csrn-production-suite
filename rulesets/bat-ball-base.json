@@ -1,0 +1,59 @@
+{
+  "id": "bat-ball-base",
+  "version": 1,
+  "label": "Bat-and-ball engine baseline (shared baseball/softball mechanics)",
+  "rulesAuthority": "NFHS",
+  "nfhsSeasonYear": 2026,
+  "jurisdiction": {
+    "country": null,
+    "region": null,
+    "association": null
+  },
+  "regulation": {
+    "scheduledInnings": 7,
+    "minimumRegulationInnings": 7,
+    "homeLeadHalfInningRule": true
+  },
+  "runRules": [],
+  "timeLimit": null,
+  "tieBreaker": {
+    "mode": "NONE",
+    "startsAtInning": null,
+    "seededRunnerSelection": null,
+    "substituteAllowed": null
+  },
+  "suspendedGame": {
+    "resumeFromExactState": true
+  },
+  "lineup": {
+    "reentryPolicy": null,
+    "dhPolicy": null,
+    "dpFlexPolicy": null,
+    "courtesyRunnerPolicy": {
+      "enabled": false,
+      "roles": []
+    }
+  },
+  "pitching": {
+    "pitchCountPolicy": null,
+    "pitcherReturnPolicy": null,
+    "conferencePolicy": null
+  },
+  "field": {
+    "doubleFirstBaseRequired": false,
+    "firstBaseType": "single"
+  },
+  "communications": {
+    "defensiveOneWayRecipients": []
+  },
+  "defaults": {
+    "timezone": null,
+    "association": null
+  },
+  "_source_notes": {
+    "role_in_the_extends_chain": "This document is never itself resolved by ruleset_service._CATALOG -- it exists only as the extends-parent both baseball/us-nfhs and softball/us-nfhs share, so the mechanics common to both sports (7-inning regulation, the walk-off/run-rule/suspension MECHANISM shape, no default courtesy-runner/pitch-count/tiebreaker policy) are defined once. Per CSRN_NFHS_Baseball_Softball_Rules_Engine_Spec_2026 Sec.11: 'Do not create a universal NFHS mercy rule -- the NFHS baseline should provide the mechanism; the active state/tournament profile supplies the thresholds.' runRules/timeLimit/pitchCountPolicy/courtesyRunnerPolicy are therefore intentionally empty/disabled here -- MHSAA's actual numbers land in the baseball/us-ms-mhsaa and softball/us-ms-mhsaa overlays (P6), not here.",
+    "minimumRegulationInnings": "Spec Sec.11.1 requires 'the trailing team has completed its required turn at bat' before regulation completes when tied, which needs a minimum-innings concept distinct from scheduledInnings for a rain-shortened or run-rule-ended game. Set equal to scheduledInnings (7) as the NFHS default; state/tournament overlays may lower it for a specific shortened-game procedure.",
+    "tieBreaker.mode": "NONE at the shared baseline: NFHS baseball/softball both continue extra innings normally absent a state-adopted tiebreaker (spec Sec.17.1: 'Continue when tied unless event-specific procedure applies'). The RUNNER_ON_SECOND mode used by MHSAA fast-pitch softball (spec Sec.17.2/17.3) is set on softball's own state overlay (P6), not here, since it is not a baseball rule.",
+    "field.doubleFirstBaseRequired": "false at NFHS baseline: the double-first-base square is a 2027 baseball rules-book change (spec Sec.18) and, for softball, a state-specific EARLY adoption (MHSAA requires it starting 2026-27 per spec Sec.17.2) rather than an NFHS-wide 2026 requirement. True only on the softball state overlay once MHSAA's value is confirmed (P6)."
+  }
+}

@@ -36,6 +36,12 @@ def _fn(name: str) -> str:
 
 def test_load_ruleset_options_filters_by_the_active_sport_context() -> None:
     body = _fn("async function loadRulesetOptions() {")
+    # Sport scoping (added alongside the baseball engine's P0 ruleset docs --
+    # baseball/softball share country="US" with football, so the country
+    # filter alone would leak baseball rulesets into a football picker and
+    # vice versa without this).
+    assert "sportContext === 'canadian_football' ? 'football' : (sportContext === 'football' || sportContext === 'baseball' || sportContext === 'softball') ? sportContext : null" in body
+    assert "if (rulesetSport) rows = rows.filter((r) => (r.sport || '') === rulesetSport);" in body
     assert "sportContext === 'canadian_football' ? 'CA' : sportContext === 'football' ? 'US' : null" in body
     assert "if (rulesetCountry) rows = rows.filter((r) => (r.country || '') === rulesetCountry);" in body
     # bails gracefully rather than showing an empty/broken picker
