@@ -10,8 +10,13 @@ Covers: (1) the football-weight skeleton for baseball/softball, (2) the
 "same class as football" visual-parity bar (field art, color-mix team
 tinting, glass-morphism, never a plain table), (3) the open-ended-columns /
 shrink / roll-window extra-innings rule, and (4) the sport-aware rail stat
-grid. Item 3's "On the Mound"/"At Bat" live rail *content* is a follow-up
-commit on top of this one (depends on this landing first, per the T1 spec).
+grid plus the "On the Mound"/"At Bat" rail content -- names only (pitcher_
+name/batter_name, already plumbed by productionDiamondState), swapping by
+which side is currently batting. Live pitching/batting stats and "On Deck"
+are deliberately left as placeholders: statistics_service.py has no
+baseball stat fields, and On Deck needs a batting order, which the T1 spec
+itself defers to a future round ("Explicitly NOT in T1"). Confirmed with
+the owner rather than assumed -- see the "Rail content scope" check-in.
 """
 
 from __future__ import annotations
@@ -189,3 +194,41 @@ def test_line_score_column_plan_is_duplicated_in_the_runtime_fast_path():
     body = _fn(RUNTIME_JS, "function baseballLineScorePlan(runtime) {")
     assert "const CAP = 12;" in body
     assert "const WINDOW = 9;" in body
+
+
+def test_rail_swaps_pitcher_and_batter_by_batting_side():
+    assert "function baseballBattingSide(runtime) {" in RUNTIME_JS
+    assert "function patchCollegiateBaseballRails(root, runtime, statistics) {" in RUNTIME_JS
+    body = _fn(RUNTIME_JS, "function patchCollegiateBaseballRails(root, runtime, statistics) {")
+    assert "const isBatting = side === battingSide;" in body
+    assert 'textValue(runtime.batter_name, runtime.batterName)' in body
+    assert 'textValue(runtime.pitcher_name, runtime.pitcherName)' in body
+    assert 'titleNode.textContent = isBatting ? "AT BAT" : "ON THE MOUND";' in body
+    # same crest-fallback path the football leader card uses (team logo)
+    assert 'objectValue(runtime?.[`${side}_identity`]);' in body
+    # sport-aware team stat grid keys, matching COLLEGIATE_RAIL_STATS' baseball entry
+    assert 'data-stat="batting_avg"' in body
+    assert 'data-stat="hits"' in body
+    assert 'data-stat="rbi"' in body
+
+
+def test_rail_stats_and_on_deck_are_placeholders_not_fabricated_data():
+    # No baseball fields exist in statistics_service.py yet, and On Deck
+    # needs a batting order the T1 spec defers -- confirmed with the owner
+    # rather than inventing backend data to fill the card.
+    body = _fn(RUNTIME_JS, "function patchCollegiateBaseballRails(root, runtime, statistics) {")
+    assert "AVG – · H – · RBI –" in body
+    assert "IP – · ER – · K –" in body
+    assert "On Deck" not in body
+    assert "on_deck" not in body and "onDeck" not in body
+
+
+def test_football_rail_path_is_unchanged():
+    assert 'function patchCollegiateRails(root, runtime, statistics) {' in RUNTIME_JS
+    body = _fn(RUNTIME_JS, 'function patchCollegiateRails(root, runtime, statistics) {')
+    assert 'if (currentAlias !== "collegiate_traditional" || !root) return;' in body
+    assert 'if (sport === "baseball" || sport === "softball") {' in body
+    assert 'if (!statistics) return;' in body
+    # the original football per-side loop is untouched
+    assert 'data-stat="passing_yards"' in body
+    assert 'collegiatePlayerLeaders(statistics, side)' in body

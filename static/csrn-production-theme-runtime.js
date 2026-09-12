@@ -2958,8 +2958,76 @@ function fitPlayerLeaderName(node) {
   }
 }
 
+// T1 item 3 (docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md): which side is
+// batting flips every half-inning -- TOP bats visitor, BOTTOM bats home.
+function baseballBattingSide(runtime) {
+  return textValue(runtime.inning_half, runtime.inningHalf, "TOP").toUpperCase().startsWith("B") ? "home" : "visitor";
+}
+
+// T1 item 3: "On the Mound" / "At Bat" live rail content, built on the same
+// persistent .bl-college-rail system football's leaders use. Names come
+// from the fields productionDiamondState already plumbs (pitcher_name /
+// batter_name / batter_position); live pitching/batting stats and "On Deck"
+// are left as placeholders -- statistics_service.py has no baseball stat
+// fields yet, and On Deck needs a batting order, which the T1 spec itself
+// defers ("Explicitly NOT in T1 (future round)"). Names now, not fake data.
+function patchCollegiateBaseballRails(root, runtime, statistics) {
+  const battingSide = baseballBattingSide(runtime);
+  ["visitor", "home"].forEach((side) => {
+    const rail = root.querySelector(`[data-college-rail="${side}"]`);
+    if (!rail) return;
+    const team = objectValue(statistics?.teams?.[side]);
+    const avgNode = rail.querySelector('[data-stat="batting_avg"]');
+    const hitsNode = rail.querySelector('[data-stat="hits"]');
+    const rbiNode = rail.querySelector('[data-stat="rbi"]');
+    if (avgNode) avgNode.textContent = statDisplay(team.batting_avg);
+    if (hitsNode) hitsNode.textContent = statDisplay(team.hits);
+    if (rbiNode) rbiNode.textContent = statDisplay(team.rbi);
+
+    const leaderNode = rail.querySelector(".bl-player-leader");
+    if (!leaderNode) return;
+    const isBatting = side === battingSide;
+    const rawName = isBatting
+      ? textValue(runtime.batter_name, runtime.batterName)
+      : textValue(runtime.pitcher_name, runtime.pitcherName);
+    const position = isBatting ? textValue(runtime.batter_position, runtime.batterPosition) : "";
+    const displayName = [position, rawName].filter(Boolean).join(" ").trim();
+
+    // Same crest-fallback path the football leader card uses -- there is no
+    // per-player headshot source for baseball yet, so this always falls
+    // back to the team logo.
+    const identity = objectValue(runtime?.[`${side}_identity`]);
+    const teamLogo = textValue(identity.logo, runtime?.[`${side}_logo`]);
+    if (leaderNode.dataset.renderedImage !== teamLogo) {
+      leaderNode.querySelectorAll("img").forEach(node => node.remove());
+      if (teamLogo) {
+        const image = document.createElement("img");
+        image.src = teamLogo;
+        image.alt = "";
+        leaderNode.prepend(image);
+      }
+      leaderNode.dataset.renderedImage = teamLogo;
+    }
+    leaderNode.classList.toggle("is-empty", !rawName);
+    leaderNode.classList.toggle("has-photo", Boolean(teamLogo));
+    const titleNode = leaderNode.querySelector("span");
+    const nameNode = leaderNode.querySelector('[data-player="name"]');
+    const lineNode = leaderNode.querySelector('[data-player="line"]');
+    if (titleNode) titleNode.textContent = isBatting ? "AT BAT" : "ON THE MOUND";
+    if (nameNode) nameNode.textContent = displayName || "Awaiting Lineup";
+    if (lineNode) lineNode.textContent = isBatting ? "AVG – · H – · RBI –" : "IP – · ER – · K –";
+    if (nameNode) fitPlayerLeaderName(nameNode);
+  });
+}
+
 function patchCollegiateRails(root, runtime, statistics) {
-  if (currentAlias !== "collegiate_traditional" || !root || !statistics) return;
+  if (currentAlias !== "collegiate_traditional" || !root) return;
+  const sport = productionSportFamily(runtime && runtime.sport);
+  if (sport === "baseball" || sport === "softball") {
+    patchCollegiateBaseballRails(root, runtime, statistics);
+    return;
+  }
+  if (!statistics) return;
   ["visitor", "home"].forEach((side, sideIndex) => {
     const rail = root.querySelector(`[data-college-rail="${side}"]`);
     if (!rail) return;
