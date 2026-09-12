@@ -2360,8 +2360,31 @@ and (Phase B first pass)
 `087BC0B9768A2E4A94D74A44904EF1E153E37D6E5FB7CD42CBD377C53208EB97` /
 `1798F224878CB25CA4D2F304B4F33D8CF4838AC926AC84C67A4006C4D6A46914`:
 
+Re-pinned again 2026-09-12, T1 (Collegiate Tech baseball/softball
+structural parity) -- the shared engine picked up three independent,
+non-conflicting edits since the Round 26 Phase B pin above, merged
+cleanly to one baseline before this re-pin: Round 26's Canadian field
+geometry (already covered above), the owner's own Player Spotlight
+redesign (`.bl-college-player`, unrelated to this gate), and T1's own
+work -- the `collegiate()` dispatcher now routes baseball/softball
+through a new `collegiateBaseballScorebug()` at football's structural
+weight (same cabinet/live-strip/score-clock-row/main-display/control-
+bank skeleton), replacing the old compact board and the R9 throwaway
+prototype: a photographed-ballpark stage background per sport, an
+open-ended-column inning line score with color-mix() team tinting and
+glass-morphism panels (`.bl-cls-*`), the base diamond graphic promoted
+from a runtime injection into the engine (`.bl-college-diamond`), and a
+sport-aware Team Snapshot rail stat grid. Football's own rendering is
+unchanged (verified byte-identical by test). Prior fingerprint (Round 26
+Phase B, still the value shipped through Round 27 and Phase C's merge):
+
 - `static/csrn-broadcast-layout-engine.css`: `C170F0B6039C75A10FE6DB0EA847990064608D4A591F8021B4A61ED0A74F734A`
 - `static/csrn-broadcast-layout-engine.js`: `81D127814510042D4360BC30189D8F0D8A513D699287AA5F93490326EE6FEEF5`
+
+Current fingerprint:
+
+- `static/csrn-broadcast-layout-engine.css`: `794331F3AB2B3E55960CBC679A7D255543880F06777EDCDD32B1C196805F2171`
+- `static/csrn-broadcast-layout-engine.js`: `CC276B125466B3B4DD6C71CE6BD291DAE2698C9501D99994F22CD0DF793B0868`
 
 Future Neon changes require an explicit unfreeze decision, a new isolated
 checkpoint, visual comparison against the approved concept, the complete

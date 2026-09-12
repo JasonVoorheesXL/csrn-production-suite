@@ -13,7 +13,12 @@ HERITAGE_OWNED_FROZEN = {
     # shared csrn-broadcast-layout-engine.css/.js SHA-256 constants was
     # re-pinned after the collegiate_traditional field graphic gained the
     # Canadian-geometry CSS custom properties. No Heritage assertion changed.
-    'tests/test_gate14_heritage_press_engine.py': 'E36C823C4A3F7DFE27CAC81116E9C1DE6850089201AE720CC7F9B977EACD78A5',
+    # re-pinned again T1 (2026-09-12): test_gate14's copy of the shared
+    # csrn-broadcast-layout-engine.css/.js SHA-256 constants was re-pinned
+    # again for T1's Collegiate baseball/softball structural-parity work
+    # (see test_gate116 / CSRN_PROJECT_BIBLE.md's Gate 11.6 entry for the
+    # full rationale). No Heritage assertion changed.
+    'tests/test_gate14_heritage_press_engine.py': 'E8EA49E08298D489FE05BB4D18A79DD3DA3E291F3043C2BA5D32443F348F4758',
     'static/heritage/press-batter-1920s.png': 'F2D6174D757D36EDC2075A395FEEFC11ED0E970E12E5B4166EA3EFC3DD787DD6',
     'static/heritage/press-pitcher-1920s.png': 'AF9F23C6F9B15F3B10087B9D2D22C8CA1B26C0E7E29DD8521CA12C4905CAFBAF',
     'static/heritage/press-softball-batter-1920s.png': '0DDC8966DED0DCA3FDE396E2BF00C5BC4A2AFE22029FB1BA42D01C365BA24026',
