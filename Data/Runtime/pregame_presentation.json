@@ -19,11 +19,16 @@
       "mode": "auto",
       "transition_mode": "manual",
       "rotation_seconds": 10,
-      "storylines": [],
+      "storylines": [
+        "Coach Campbell was Itawamba's offensive coordinator from 2020 through 2024, this is his first game back as an opponent",
+        "The first time these two teams met was October 12, 2001 with Itawamba winning that game 41-0",
+        "Caledonia and Itawamba were in the same region before Caledonia advanced to 5A",
+        "Itawamba leads the series 10-1 with Caledonia's only win coming in a 23 to 21 point contest in 2023"
+      ],
       "delay_type": "weather",
       "delay_note": "",
       "estimated_start": "",
-      "updated_at": 1787167069
+      "updated_at": 1787943549
     },
     "FB-2026-4A-W00-002": {
       "mode": "auto",
@@ -34,6 +39,57 @@
       "delay_note": "",
       "estimated_start": "",
       "updated_at": 1787313829
+    },
+    "FB-2026-TEST-W00-001": {
+      "mode": "auto",
+      "transition_mode": "manual",
+      "rotation_seconds": 10,
+      "storylines": [],
+      "delay_type": "weather",
+      "delay_note": "",
+      "estimated_start": "",
+      "updated_at": 1787500608
+    },
+    "FB-2026-OPEN-W00-001": {
+      "mode": "auto",
+      "transition_mode": "manual",
+      "rotation_seconds": 10,
+      "storylines": [
+        "Both teams enter the game after suffering a week 1 loss.  Caledonia to Itawamba and Amory to Pontotoc",
+        "The first time these teams played eachother was September 27th, 1991 and they have played 23 times since.",
+        "Amory has won 20 of the matchups and the teams have played each season since 2017."
+      ],
+      "delay_type": "weather",
+      "delay_note": "",
+      "estimated_start": "",
+      "updated_at": 1788393382
+    },
+    "FB-2026-OPEN-W00-002": {
+      "mode": "auto",
+      "transition_mode": "manual",
+      "rotation_seconds": 10,
+      "storylines": [],
+      "delay_type": "weather",
+      "delay_note": "",
+      "estimated_start": "",
+      "updated_at": 1787942463
+    },
+    "FB-2026-5A-W00-001": {
+      "mode": "auto",
+      "transition_mode": "manual",
+      "rotation_seconds": 10,
+      "storylines": [
+        "This is the second time these teams have played eachother - last year Lamar won 55 to 15",
+        "Coach Campbell picked up his first win last week as the Cavaliers beat Amory 27-7",
+        "Last week, Caledonia's Tyler Long scored 2 rushing touchdowns to go with 148 yards on 22 carriers",
+        "Lamar's Stacy Luker enters his first season as the Raiders' head coach after Jacob Land left for Madison Ridgeland Academy.",
+        "Coach Luker is a 7 time state champion coach coming over from Alabama.  He has accumulated 260 wins in his career.",
+        "Lamar is the reigning MAIS 4A State Champions"
+      ],
+      "delay_type": "weather",
+      "delay_note": "",
+      "estimated_start": "",
+      "updated_at": 1789169421
     }
   }
 }

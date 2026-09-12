@@ -479,6 +479,7 @@ class VenueWeatherService:
         periods = payload.get("properties", {}).get("periods", [])
         period = periods[0] if isinstance(periods, list) and periods else {}
         probability = period.get("probabilityOfPrecipitation", {})
+        humidity = period.get("relativeHumidity", {})
         return {
             "start_time": str(period.get("startTime", "")),
             "temperature": period.get("temperature"),
@@ -486,6 +487,7 @@ class VenueWeatherService:
             "wind_speed": str(period.get("windSpeed", "")),
             "wind_direction": str(period.get("windDirection", "")),
             "precipitation_probability": probability.get("value") if isinstance(probability, dict) else None,
+            "humidity": humidity.get("value") if isinstance(humidity, dict) else None,
             "short_forecast": str(period.get("shortForecast", "")),
             "detailed_forecast": str(period.get("detailedForecast", "")),
             "source": "National Weather Service",

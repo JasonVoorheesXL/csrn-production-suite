@@ -272,6 +272,7 @@
             <button class="warning" onclick="openPregamePresentationControl()">Delay / Presentation</button>
             <button onclick="window.open('/pregame-overlay','_blank')">Open Pregame Overlay</button>
             <button onclick="window.open('/overlay','_blank')">Open Game Overlay</button>
+            <button id="commandStartBroadcastButton" class="success" onclick="startBroadcast()">Start Broadcast (Go Live)</button>
           </div>
         </div>
       </section>
@@ -279,11 +280,11 @@
         <style id="csrn-quick-launch-r23">.command-quick-launch .quick-launch-buttons{flex-wrap:wrap}.command-quick-launch a.button.disabled,.command-quick-launch button:disabled{opacity:.45;pointer-events:none}</style>
         <div class="section-heading compact"><div><h3>Quick Launch</h3><p class="section-note">Open your streaming software and the platform dashboards. Set these in Settings → Quick Launch; an unset button is disabled.</p></div></div>
         <div class="button-row quick-launch-buttons">
-          <button id="qlBroadcastBtn" type="button" onclick="launchBroadcastSoftware()">Open Broadcast Software</button>
-          <a id="qlYoutubeLink" class="button" target="_blank" rel="noopener">Open YouTube</a>
-          <a id="qlFacebookLink" class="button" target="_blank" rel="noopener">Open Facebook</a>
+          <button id="qlBroadcastBtn" class="ql-broadcast-btn" type="button" onclick="launchBroadcastSoftware()">Open Broadcast Software</button>
+          <a id="qlYoutubeLink" class="button ql-youtube-link" target="_blank" rel="noopener">Open YouTube</a>
+          <a id="qlFacebookLink" class="button ql-facebook-link" target="_blank" rel="noopener">Open Facebook</a>
         </div>
-        <div id="qlStatus" class="status"></div>
+        <div id="qlStatus" class="status ql-status"></div>
       </section>
       <section class="panel compact live-operator-controls command-caption-panel">
         <div class="section-heading compact"><div><h3>Live Captions</h3><p class="section-note">Start or stop the active caption feed during the broadcast.</p></div><span id="commandCaptionStateBadge" class="phase-badge">OFF</span></div>
@@ -399,7 +400,7 @@
               <label>Roster<select id="pvhRoster" onchange="loadProgramHighlightPlayers()"></select></label>
               <label>Player<select id="pvhPlayer" onchange="renderProgramHighlightPreview()"></select></label>
               <label class="span-2">Information to Highlight<input id="pvhDetail" maxlength="120" placeholder="Example: 8 tackles · 2 sacks · forced fumble" oninput="renderProgramHighlightPreview()"></label>
-              <label>Display Duration<select id="pvhDuration"><option value="5">5 seconds</option><option value="8" selected>8 seconds</option><option value="12">12 seconds</option><option value="15">15 seconds</option><option value="30">30 seconds</option></select></label>
+              <label>Display Duration<select id="pvhDuration"><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option><option value="15">15 seconds</option><option value="30">30 seconds</option><option value="45" selected>45 seconds</option></select></label>
             </div>
             <div id="pvhPreview" class="program-visual-preview"><strong>PLAYER SPOTLIGHT</strong><span>Select a player and enter the information to feature.</span></div>
             <div class="button-row graphics-actions"><button class="success" onclick="showProgramPlayerHighlight()">Show / Update</button><button onclick="hideProgramPlayerHighlight()">Hide</button><button class="danger" onclick="clearProgramPlayerHighlight()">Clear</button></div>
@@ -487,6 +488,16 @@
     <section id="pregameModule" class="hidden">
       <section class="panel pregame-setup-header">
         <div class="section-heading"><div><h1>Pre-Game Setup</h1><p class="section-note">Load the broadcast, verify OBS, connect devices, assign caption inputs, and choose the program visual before kickoff.</p></div><button class="primary" onclick="showModule('command')">Open Command Center</button></div>
+      </section>
+
+      <section class="panel compact live-operator-controls command-quick-launch">
+        <div class="section-heading compact"><div><h3>Quick Launch</h3><p class="section-note">Open your streaming software and the platform dashboards before kickoff. Set these in Settings → Quick Launch; an unset button is disabled.</p></div></div>
+        <div class="button-row quick-launch-buttons">
+          <button id="qlBroadcastBtnPregame" class="ql-broadcast-btn" type="button" onclick="launchBroadcastSoftware()">Open Broadcast Software</button>
+          <a id="qlYoutubeLinkPregame" class="button ql-youtube-link" target="_blank" rel="noopener">Open YouTube</a>
+          <a id="qlFacebookLinkPregame" class="button ql-facebook-link" target="_blank" rel="noopener">Open Facebook</a>
+        </div>
+        <div id="qlStatusPregame" class="status ql-status"></div>
       </section>
 
       <section class="panel compact pregame-checklist-panel">
@@ -900,7 +911,7 @@
               <input id="rosterId" type="hidden">
               <h2>Roster Setup</h2>
               <div class="setup-grid">
-                <label>School<select id="rosterSchool"></select></label>
+                <label>School<select id="rosterSchool" onchange="renderRosterStaffList()"></select></label>
                 <label>Sport<select id="rosterSport"><option>Football</option><option>Basketball</option><option>Baseball</option><option>Softball</option><option>Soccer</option><option>Volleyball</option><option>Other</option></select></label>
                 <label>Season<input id="rosterSeason" inputmode="numeric"></label>
                 <label>Level<select id="rosterLevel"><option selected>Varsity</option><option>JV</option><option>Middle School</option><option>JUCO</option><option>College</option><option>Other</option></select></label>
@@ -923,6 +934,29 @@
                 </div>
                 <div id="dragonflyRosterStatus" class="status">Ready.</div>
                 <div id="dragonflyRosterResults" class="auto-enrichment-results"></div>
+              </section>
+              <section id="rosterStaffPanel" class="auto-enrichment-card">
+                <div class="module-heading-row">
+                  <div>
+                    <strong>Coaching &amp; Admin Staff</strong>
+                    <p class="section-note">Tied to this roster's school. Managed here instead of the Personnel page, which now focuses on broadcast crew.</p>
+                  </div>
+                  <div class="editor-actions">
+                    <button type="button" class="primary" onclick="newRosterStaffMember()">Add Staff Member</button>
+                  </div>
+                </div>
+                <div id="rosterStaffList" class="roster-player-list"></div>
+                <div id="rosterStaffEditor" class="player-editor hidden">
+                  <input id="rosterStaffId" type="hidden">
+                  <h3>Staff Record</h3>
+                  <label>Full Name<input id="rosterStaffName" oninput="suggestRosterStaffPronunciation()"></label>
+                  <label>Category<select id="rosterStaffCategory" onchange="populateRosterStaffRoleOptions()"><option value="Coach">Coach</option><option value="Administrator">Administrator</option></select></label>
+                  <label>Title / Role<select id="rosterStaffPrimaryRole"></select></label>
+                  <label>Pronunciation<input id="rosterStaffPronunciation"></label>
+                  <label>Status<select id="rosterStaffStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
+                  <div class="editor-actions"><button class="primary" onclick="saveRosterStaffMember()">Save</button><button class="danger" onclick="deleteRosterStaffMember()">Delete</button><button onclick="closeRosterStaffEditor()">Cancel</button></div>
+                  <div id="rosterStaffMessage" class="status"></div>
+                </div>
               </section>
               <div id="rosterMessage" class="status"></div>
               <div class="roster-player-header"><div><h2>Players</h2><p id="rosterCounts" class="section-note"></p></div><div class="editor-actions"><button type="button" onclick="generateMissingRosterPronunciations()">Generate Missing Pronunciations</button><button class="primary" onclick="newRosterPlayer()">Add Player</button></div></div>
@@ -1412,9 +1446,11 @@
             <div class="button-row">
               <input id="cfgBroadcastSoftware" placeholder="C:\Program Files\obs-studio\bin\64bit\obs64.exe">
               <input id="cfgBroadcastSoftwareFile" type="file" class="hidden" onchange="pickBroadcastSoftware(this)">
-              <button type="button" onclick="document.getElementById('cfgBroadcastSoftwareFile').click()">Choose…</button>
+              <button type="button" onclick="chooseBroadcastSoftware()">Choose…</button>
+              <button type="button" class="small-button" onclick="detectBroadcastSoftware()">Detect Installed</button>
             </div>
-            <small class="section-note">Pick your streaming software's program file (OBS, vMix, Streamlabs, …). If only the filename appears, paste the full path.</small>
+            <div id="cfgBroadcastSoftwareDetected" class="section-note hidden"></div>
+            <small class="section-note">Pick your streaming software's program file (OBS, vMix, Streamlabs Desktop, XSplit, …), or click Detect Installed to scan common install locations on this computer.</small>
           </label>
           <label>YouTube URL<input id="cfgYoutubeUrl" placeholder="https://studio.youtube.com/…"></label>
           <label>Facebook URL<input id="cfgFacebookUrl" placeholder="https://www.facebook.com/…"></label>
@@ -1504,7 +1540,8 @@
           <article class="team-card" data-team="home"><h2 id="statHomeHeader">HOME</h2><div class="team-role-indicator"></div><div class="button-row event-buttons possession-aware-actions"><button class="success" data-role="offense" onclick="openPlayEntry('home','run')">Run</button><button class="success" data-role="offense" onclick="openPlayEntry('home','pass')">Pass</button><button data-role="offense" onclick="openPlayEntry('home','punt')">Punt</button><button data-role="offense" onclick="openAutomationEventFromStatistician('home','TD')">TD</button><button data-role="offense" onclick="openAutomationEventFromStatistician('home','FG')">FG</button><button data-role="defense" onclick="openAutomationEventFromStatistician('home','TURNOVER')">Turnover</button><button data-role="offense" onclick="recordFirstDown('home','statistician')">1st Down</button><button data-role="both" onclick="openPenalty('home','statistician')">Penalty</button></div></article>
           <article class="team-card" data-team="visitor"><h2 id="statVisitorHeader">VISITOR</h2><div class="team-role-indicator"></div><div class="button-row event-buttons possession-aware-actions"><button class="success" data-role="offense" onclick="openPlayEntry('visitor','run')">Run</button><button class="success" data-role="offense" onclick="openPlayEntry('visitor','pass')">Pass</button><button data-role="offense" onclick="openPlayEntry('visitor','punt')">Punt</button><button data-role="offense" onclick="openAutomationEventFromStatistician('visitor','TD')">TD</button><button data-role="offense" onclick="openAutomationEventFromStatistician('visitor','FG')">FG</button><button data-role="defense" onclick="openAutomationEventFromStatistician('visitor','TURNOVER')">Turnover</button><button data-role="offense" onclick="recordFirstDown('visitor','statistician')">1st Down</button><button data-role="both" onclick="openPenalty('visitor','statistician')">Penalty</button></div></article>
         </div>
-        <div class="statistician-action-bar"><button class="warning" onclick="undo()">Undo Last Event</button><button class="restore-undone-btn" onclick="restoreLastUndone()" disabled>Restore Last Undone</button><button onclick="openQuickCorrection()">Quick Correct Game State</button><button onclick="openEjection()">Record Ejection</button></div>
+        <article class="rules-card statistician-clock-pinned"><div class="clock-head"><span class="clock-label">Game Clock</span><div id="gameClockReadout" class="game-clock-readout">12:00</div><div id="gameClockStatus" class="clock-status">STOPPED</div></div><div class="button-row"><button class="success" onclick="clockAction('start')">Start</button><button class="danger" onclick="clockAction('stop')">Stop</button><button onclick="adjustClock(-10)">−10</button><button onclick="adjustClock(-1)">−1</button><button onclick="adjustClock(1)">+1</button><button onclick="adjustClock(10)">+10</button><button onclick="setClockDialog()">Set</button><button onclick="clockAction('reset',{seconds:720})">Reset 12:00</button><button onclick="toggleClockVisibility()">Show / Hide</button></div></article>
+        <div class="statistician-action-bar"><button class="warning" onclick="undo()">Undo Last Event</button><button class="restore-undone-btn" onclick="restoreLastUndone()" disabled>Restore Last Undone</button><button class="primary" onclick="quickEditLastPlay()">Quick Edit Last Play</button><button onclick="openEjection()">Record Ejection</button><button id="statPlayCommercialButton" class="success" onclick="playNextCommercial()" title="Plays the next sponsor advertisement in rotation">Play Commercial</button></div><div id="statCommercialStatus" class="status"></div>
         <h2>Possession</h2><div id="statPossessionButtons" class="button-row statistician-state-buttons"><button data-value="home" onclick="setStateFrom('possession','home','statistician')">Home</button><button data-value="visitor" onclick="setStateFrom('possession','visitor','statistician')">Visitor</button></div>
         <h2>Quarter</h2><div id="statQuarterButtons" class="button-row statistician-state-buttons"><button data-value="1" onclick="setStateFrom('quarter','1','statistician')">1</button><button data-value="2" onclick="setStateFrom('quarter','2','statistician')">2</button><button data-value="3" onclick="setStateFrom('quarter','3','statistician')">3</button><button data-value="4" onclick="setStateFrom('quarter','4','statistician')">4</button><button data-value="OT" onclick="setStateFrom('quarter','OT','statistician')">OT</button></div>
         <h2>Down & Distance</h2><div id="statDownButtons" class="button-row statistician-state-buttons"><button data-value="1st" onclick="setStateFrom('down','1st','statistician')">1st</button><button data-value="2nd" onclick="setStateFrom('down','2nd','statistician')">2nd</button><button data-value="3rd" onclick="setStateFrom('down','3rd','statistician')">3rd</button><button data-value="4th" onclick="setStateFrom('down','4th','statistician')">4th</button><select id="statDistance" onchange="setStateFrom('distance',this.value,'statistician')"></select></div>
@@ -1516,7 +1553,6 @@
         </div>
         <section class="rules-control-grid">
           <article class="rules-card"><h2>Drive Direction</h2><p class="section-note">Select the direction the team with possession is driving.</p><div class="button-row drive-direction-buttons"><button id="driveDirLeft" onclick="setDriveDirection('left')">←</button><button id="driveDirRight" onclick="setDriveDirection('right')">→</button></div></article>
-          <article class="rules-card"><h2>Game Clock</h2><div id="gameClockReadout" class="game-clock-readout">12:00</div><div id="gameClockStatus" class="clock-status">STOPPED</div><div class="button-row"><button class="success" onclick="clockAction('start')">Start</button><button class="danger" onclick="clockAction('stop')">Stop</button><button onclick="adjustClock(-10)">−10</button><button onclick="adjustClock(-1)">−1</button><button onclick="adjustClock(1)">+1</button><button onclick="adjustClock(10)">+10</button><button onclick="setClockDialog()">Set</button><button onclick="clockAction('reset',{seconds:720})">Reset 12:00</button><button onclick="toggleClockVisibility()">Show / Hide</button></div></article>
           <article class="rules-card"><h2>Game Context</h2><div id="rulesContext" class="rules-context">Set possession, down, distance and ball spot.</div></article>
           <article class="rules-card" id="periodAdministrationCard"><h2>Period Administration</h2><div class="button-row"><button id="statHalftimeToggle" class="warning" onclick="toggleHalftime()">Start Halftime</button></div><div id="periodStatus" class="rules-context">Quarter lifecycle ready.</div><div class="setup-grid"><label>Second-half receiving team<select id="secondHalfReceiver"><option value="">Auto / Select</option><option value="home">Home</option><option value="visitor">Visitor</option></select></label><label>Overtime possession<select id="overtimePossession"><option value="">Select</option><option value="home">Home</option><option value="visitor">Visitor</option></select></label><label class="span-2">Overtime starting spot<input id="overtimeSpot" placeholder="Association-approved spot, e.g. Visitor 10"></label></div><h3>Correct Quarter</h3><div id="periodQuarterButtons" class="button-row statistician-state-buttons"><button data-value="1" onclick="setStateFrom('quarter','1','statistician')">1</button><button data-value="2" onclick="setStateFrom('quarter','2','statistician')">2</button><button data-value="3" onclick="setStateFrom('quarter','3','statistician')">3</button><button data-value="4" onclick="setStateFrom('quarter','4','statistician')">4</button><button data-value="OT" onclick="setStateFrom('quarter','OT','statistician')">OT</button></div><div class="button-row"><button class="warning" onclick="periodAction('end_quarter')">End Quarter</button><button onclick="periodAction('start_second_half')">Start Second Half</button><button onclick="periodAction('clear_untimed_down')">Untimed Down Complete</button><button onclick="periodAction('start_overtime')">Start Overtime</button><button class="danger" onclick="periodAction('final_game')">Confirm Final</button></div></article>
         </section>
@@ -1591,8 +1627,9 @@
         </div>
         <div class="play-option-grid">
           <label id="playKneelWrap"><input id="playKneel" type="checkbox"> Kneel</label>
-          <label><input id="playFumble" type="checkbox" onchange="turnoverEntryChanged()"> Fumble</label>
-          <label><input id="playFumbleLost" type="checkbox" onchange="turnoverEntryChanged()"> Fumble lost</label>
+          <label id="playFumbleWrap"><input id="playFumble" type="checkbox" onchange="turnoverEntryChanged()"> Fumble</label>
+          <label id="playFumbleLostWrap"><input id="playFumbleLost" type="checkbox" onchange="turnoverEntryChanged()"> Fumble lost</label>
+          <label id="playMuffedPuntWrap" class="hidden"><input id="playMuffedPunt" type="checkbox" onchange="updatePlayPreview()"> Muffed punt — kicking team recovered</label>
           <label><input id="playOutOfBounds" type="checkbox"> Out of bounds</label>
           <label id="playTouchbackWrap"><input id="playTouchback" type="checkbox"> Touchback</label>
           <label id="playFairCatchWrap"><input id="playFairCatch" type="checkbox"> Fair catch</label>
@@ -1995,7 +2032,7 @@ class LiveCommandClient{
     this.lastLatencyMs=0;
     this.rejectedPolls=0;
     this.health='HEALTHY';
-    this.timeoutMs=12000;
+    this.timeoutMs=45000;
     this.storageKey='csrn.pendingCommands.v1';
     this.clearStoredPending();
   }
@@ -3080,9 +3117,14 @@ async function openPlayEntry(team,kind){
   const dir=currentState[team+'_direction']==='left'?'←':'→';const abbr=(team==='home'?currentState.home_abbreviation:currentState.visitor_abbreviation)||teamName.split(/\s+/).map(x=>x[0]).join('').slice(0,4).toUpperCase();document.getElementById('playDriveIndicator').textContent=dir==='←'?`${dir} ${abbr}`:`${abbr} ${dir}`;document.getElementById('playEntryContext').textContent=`${currentState.down||'1st'} & ${currentState.distance||'10'} · ${spotFromCoord(coordFromSpot(currentState.ball_spot||'50'))} · Drive ${dir}`;
   const inherited=coordFromSpot(currentState.ball_spot||'50');const teamDirection=currentState[team+'_direction']==='left'?-1:1;const startCoord=kind==='kickoff'?(teamDirection===1?40:60):inherited;setSpotControl('start',startCoord);setSpotControl('landing',startCoord);setSpotControl('turnover',startCoord);setSpotControl('end',startCoord);document.getElementById('playStartCoord').disabled=true;document.getElementById('unlockStartSpot').textContent='Correct Start Spot';
   ['playBallCarrier','playPasser','playReceiver','playSacker','playKicker','playReturner','playNotes'].forEach(id=>document.getElementById(id).value='');['playBallCarrierResolved','playPasserResolved','playReceiverResolved','playSackerResolved','playKickerResolved','playReturnerResolved'].forEach(id=>{const el=document.getElementById(id);if(el){el.textContent='';el.className='jersey-resolution'}});
-  ['playKneel','playFumble','playFumbleLost','playOutOfBounds','playTouchback','playFairCatch','playBlocked'].forEach(id=>document.getElementById(id).checked=false);
+  ['playKneel','playFumble','playFumbleLost','playMuffedPunt','playOutOfBounds','playTouchback','playFairCatch','playBlocked'].forEach(id=>document.getElementById(id).checked=false);
   const show=(id,on)=>document.getElementById(id).classList.toggle('hidden',!on);
   show('playBallCarrierWrap',kind==='run');show('playKneelWrap',kind==='run');show('playPasserWrap',kind==='pass');show('playReceiverWrap',kind==='pass');show('playSackerWrap',false);show('playPassOutcomeWrap',kind==='pass');show('playKickerWrap',['kickoff','punt'].includes(kind));show('playReturnerWrap',['kickoff','punt'].includes(kind));show('playLandingSpotWrap',['kickoff','punt'].includes(kind));show('playTouchbackWrap',['kickoff','punt'].includes(kind));show('playFairCatchWrap',kind==='punt');show('playBlockedWrap',kind==='punt');
+  // A muffed punt is its own distinct outcome (statistics_service already
+  // supports turnover_type "muff_recovery") -- keep it separate from the
+  // generic Fumble/Fumble lost checkboxes so a muffed punt never gets
+  // reported as a plain fumble recovery.
+  show('playMuffedPuntWrap',kind==='punt');show('playFumbleWrap',kind!=='punt');show('playFumbleLostWrap',kind!=='punt');
   document.getElementById('playPassOutcome').value='complete';playOutcomeChanged();document.getElementById('playEntryModal').classList.remove('hidden');['playStartCoord','playLandingCoord','playTurnoverCoord','playEndCoord'].forEach(id=>document.getElementById(id).oninput=()=>{setSpotControl(id.includes('Start')?'start':id.includes('Landing')?'landing':id.includes('Turnover')?'turnover':'end',document.getElementById(id).value);updatePlayPreview()});updatePlayPreview();
 }
 function closePlayEntry(){document.getElementById('playEntryModal').classList.add('hidden')}
@@ -3091,7 +3133,7 @@ function playOutcomeChanged(){const kind=document.getElementById('playEntryType'
 function updatePlayPreview(){const kind=document.getElementById('playEntryType').value,team=document.getElementById('playEntryTeam').value;const dir=currentState?.[team+'_direction']==='left'?-1:1;const s=Number(document.getElementById('playStartCoord').value),e=Number(document.getElementById('playEndCoord').value),l=Number(document.getElementById('playLandingCoord').value);let text=`Calculated result: ${(e-s)*dir} yards.`;if(['kickoff','punt'].includes(kind))text=`Kick distance: ${Math.abs(l-s)} yards · Return: ${Math.max(0,(e-l)*(-dir))} yards.`;const o=document.getElementById('playPassOutcome').value,turnover=(kind==='pass'&&o==='interception')||document.getElementById('playFumbleLost').checked;if(turnover){const t=Number(document.getElementById('playTurnoverCoord').value),defDir=-dir;text=`Turnover at ${spotFromCoord(t)} · Return: ${Math.max(0,(e-t)*defDir)} yards · New possession.`;}document.getElementById('playEntryPreview').textContent=text+' Down, distance, first down and scoring will be derived automatically.'}
 function rulesPlayStateExtractor(r){return {...currentState,...(r.state||{}),plays:Array.isArray(currentState?.plays)?currentState.plays:[],events:Array.isArray(currentState?.events)?currentState.events:[]}}
 async function finishCommittedPlayEntry(reason='rules-play-commit'){const msg=document.getElementById('playEntryMessage');if(msg)msg.textContent='Play recorded.';showOperatorNotice('Play recorded.','success',2500);closePlayEntry();const register=await refreshPlayRegister(reason,true);if(!register)showOperatorNotice('Play recorded. Updating play register...','warning',5000);return register}
-async function submitPlayEntry(){if(blockForPriorUnresolvedCommand('rules-play'))return;const kind=document.getElementById('playEntryType').value;const entryTeam=document.getElementById('playEntryTeam').value;const roles=currentState?.team_roles||{};if(['run','pass'].includes(kind)&&roles.offense&&entryTeam!==roles.offense){document.getElementById('playEntryMessage').textContent='Offensive play blocked: selected team does not have possession.';return}const defenseTeam=entryTeam==='home'?'visitor':'home';const named=(team,id)=>{const p=resolveRosterPlayer(team,document.getElementById(id).value);return p?playerDisplayName(p):''};const payload={team:entryTeam,play_type:kind,player_name:named(entryTeam,'playBallCarrier'),passer_name:named(entryTeam,'playPasser'),receiver_name:named(entryTeam,'playReceiver'),sacker_name:named(defenseTeam,'playSacker'),kicker_name:named(entryTeam,'playKicker'),returner_name:named(defenseTeam,'playReturner'),start_spot:spotFromCoord(document.getElementById('playStartCoord').value),landing_spot:spotFromCoord(document.getElementById('playLandingCoord').value),end_spot:spotFromCoord(document.getElementById('playEndCoord').value),turnover_spot:spotFromCoord(document.getElementById('playTurnoverCoord').value),return_end_spot:spotFromCoord(document.getElementById('playEndCoord').value),player_number:document.getElementById('playBallCarrier').value,passer_number:document.getElementById('playPasser').value,receiver_number:kind==='pass'?document.getElementById('playReceiver').value:'',sacker_number:document.getElementById('playSacker').value,kicker_number:document.getElementById('playKicker').value,returner_number:document.getElementById('playReturner').value,pass_outcome:document.getElementById('playPassOutcome').value,kneel:document.getElementById('playKneel').checked,fumble:document.getElementById('playFumble').checked,fumble_lost:document.getElementById('playFumbleLost').checked,out_of_bounds:document.getElementById('playOutOfBounds').checked,touchback:document.getElementById('playTouchback').checked,fair_catch:document.getElementById('playFairCatch').checked,blocked:document.getElementById('playBlocked').checked,notes:document.getElementById('playNotes').value};const msg=document.getElementById('playEntryMessage');if(msg)msg.textContent='RECORDING...';try{await GameStateManager.mutate('/api/rules-play',payload,'POST',rulesPlayStateExtractor)}catch(e){if(e?.commitStatus==='UNKNOWN_COMMIT'){if(msg)msg.textContent='Connection delayed — checking play...';showOperatorNotice('Connection delayed — checking play...','warning',0);try{await window.CommandClient.retryUnknown('rules-play',rulesPlayStateExtractor)}catch(retryError){if(retryError?.commitStatus==='UNKNOWN_COMMIT'){if(msg)msg.textContent='Connection delayed — checking play...';showOperatorNotice('Connection delayed — checking play...','warning',0);return}const retryFriendly=operatorErrorMessage(retryError,'Play was not recorded.');if(msg)msg.textContent=retryFriendly;showOperatorNotice(retryFriendly,'error',7000);return}}else{const friendly=operatorErrorMessage(e,'Play was not recorded.');if(msg)msg.textContent=friendly;showOperatorNotice(friendly,'error',7000);return}}await finishCommittedPlayEntry('rules-play-commit')}
+async function submitPlayEntry(){if(blockForPriorUnresolvedCommand('rules-play'))return;const kind=document.getElementById('playEntryType').value;const entryTeam=document.getElementById('playEntryTeam').value;const roles=currentState?.team_roles||{};if(['run','pass'].includes(kind)&&roles.offense&&entryTeam!==roles.offense){document.getElementById('playEntryMessage').textContent='Offensive play blocked: selected team does not have possession.';return}const defenseTeam=entryTeam==='home'?'visitor':'home';const named=(team,id)=>{const p=resolveRosterPlayer(team,document.getElementById(id).value);return p?playerDisplayName(p):''};const payload={team:entryTeam,play_type:kind,player_name:named(entryTeam,'playBallCarrier'),passer_name:named(entryTeam,'playPasser'),receiver_name:named(entryTeam,'playReceiver'),sacker_name:named(defenseTeam,'playSacker'),kicker_name:named(entryTeam,'playKicker'),returner_name:named(defenseTeam,'playReturner'),start_spot:spotFromCoord(document.getElementById('playStartCoord').value),landing_spot:spotFromCoord(document.getElementById('playLandingCoord').value),end_spot:spotFromCoord(document.getElementById('playEndCoord').value),turnover_spot:spotFromCoord(document.getElementById('playTurnoverCoord').value),return_end_spot:spotFromCoord(document.getElementById('playEndCoord').value),player_number:document.getElementById('playBallCarrier').value,passer_number:document.getElementById('playPasser').value,receiver_number:kind==='pass'?document.getElementById('playReceiver').value:'',sacker_number:document.getElementById('playSacker').value,kicker_number:document.getElementById('playKicker').value,returner_number:document.getElementById('playReturner').value,pass_outcome:document.getElementById('playPassOutcome').value,kneel:document.getElementById('playKneel').checked,fumble:document.getElementById('playFumble').checked,fumble_lost:document.getElementById('playFumbleLost').checked,muffed_punt:document.getElementById('playMuffedPunt').checked,out_of_bounds:document.getElementById('playOutOfBounds').checked,touchback:document.getElementById('playTouchback').checked,fair_catch:document.getElementById('playFairCatch').checked,blocked:document.getElementById('playBlocked').checked,notes:document.getElementById('playNotes').value};const msg=document.getElementById('playEntryMessage');if(msg)msg.textContent='RECORDING...';try{await GameStateManager.mutate('/api/rules-play',payload,'POST',rulesPlayStateExtractor)}catch(e){if(e?.commitStatus==='UNKNOWN_COMMIT'){if(msg)msg.textContent='Connection delayed — checking play...';showOperatorNotice('Connection delayed — checking play...','warning',0);try{await window.CommandClient.retryUnknown('rules-play',rulesPlayStateExtractor)}catch(retryError){if(retryError?.commitStatus==='UNKNOWN_COMMIT'){if(msg)msg.textContent='Connection delayed — checking play...';showOperatorNotice('Connection delayed — checking play...','warning',0);return}const retryFriendly=operatorErrorMessage(retryError,'Play was not recorded.');if(msg)msg.textContent=retryFriendly;showOperatorNotice(retryFriendly,'error',7000);return}}else{const friendly=operatorErrorMessage(e,'Play was not recorded.');if(msg)msg.textContent=friendly;showOperatorNotice(friendly,'error',7000);return}}await finishCommittedPlayEntry('rules-play-commit')}
 async function setDriveDirection(direction){const team=currentState.possession==='visitor'?'visitor':'home';try{await GameStateManager.mutate('/api/field-direction',{team,direction})}catch(e){alert(e.data?.message||e.message)}}
 async function setFieldDirection(home_direction){return setDriveDirection(home_direction)}
 async function clockAction(action,extra={}){try{await GameStateManager.mutate('/api/clock-control',{action,...extra})}catch(e){alert(e.data?.message||e.message)}}
@@ -3505,6 +3547,7 @@ async function submitQuickCorrection(){try{await GameStateManager.mutate('/api/g
 function setEditSpot(which,coord){const id=which==='start'?'editStartCoord':'editEndCoord';const label=which==='start'?'editStartSpotLabel':'editEndSpotLabel';const el=document.getElementById(id);el.value=Math.max(0,Math.min(100,Math.round(Number(coord)||0)));document.getElementById(label).textContent=spotFromCoord(el.value);updateEditCalculation()}
 function nudgeEditSpot(which,delta){const el=document.getElementById(which==='start'?'editStartCoord':'editEndCoord');setEditSpot(which,Number(el.value)+delta)}
 function updateEditCalculation(){const ev=(currentState.events||[]).find(e=>e.id===document.getElementById('editEventId').value);if(!ev)return;const team=ev.team||currentState.possession||'home';const dir=currentState?.[team+'_direction']==='left'?-1:1;const yards=(Number(document.getElementById('editEndCoord').value)-Number(document.getElementById('editStartCoord').value))*dir;document.getElementById('editEventYards').value=yards;document.getElementById('editCalculatedSummary').textContent=`Calculated result: ${yards} yards · Ball at ${spotFromCoord(document.getElementById('editEndCoord').value)}`}
+function quickEditLastPlay(){const plays=Array.isArray(currentState?.plays)?currentState.plays:[];const last=plays.slice().reverse().find(p=>!p.undone);if(!last){alert('No plays recorded yet.');return}const ev=(currentState.events||[]).find(e=>e.id===last.event_id);if(!ev){alert('Could not find the event for the last play.');return}openEditEvent(ev.id)}
 function openEditEvent(id){const ev=(currentState.events||[]).find(e=>e.id===id);if(!ev)return;const play=(currentState.plays||[]).find(p=>p.event_id===id||p.play_id===ev.play_id)||{};document.getElementById('editEventId').value=id;document.getElementById('editEventDescription').value=ev.description||'';document.getElementById('editEventQuarter').value=ev.quarter||'';document.getElementById('editEventDown').value=ev.after?.down||'';document.getElementById('editEventDistance').value=ev.after?.distance||'';document.getElementById('editEventPossession').value=ev.after?.possession||'';document.getElementById('editEventNote').value='';const team=ev.team||play.offense||'home';const teamName=team==='home'?currentState.home_team:currentState.visitor_team;const abbr=(team==='home'?currentState.home_abbreviation:currentState.visitor_abbreviation)||teamName.split(/\s+/).map(x=>x[0]).join('').slice(0,4).toUpperCase();const arrow=currentState?.[team+'_direction']==='left'?'←':'→';document.getElementById('editDriveIndicator').textContent=arrow==='←'?`${arrow} ${abbr}`:`${abbr} ${arrow}`;setEditSpot('start',coordFromSpot(play.ball_spot||ev.before?.ball_spot||currentState.ball_spot||'50'));setEditSpot('end',coordFromSpot(play.end_spot||ev.after?.ball_spot||currentState.ball_spot||'50'));document.getElementById('editStartCoord').oninput=()=>setEditSpot('start',document.getElementById('editStartCoord').value);document.getElementById('editEndCoord').oninput=()=>setEditSpot('end',document.getElementById('editEndCoord').value);document.getElementById('editEventModal').classList.remove('hidden');updateEditCalculation()}
 function closeEditEvent(){document.getElementById('editEventModal').classList.add('hidden')}
 async function submitEventEdit(){const eventId=document.getElementById('editEventId').value;const payload={source:'statistician',description:document.getElementById('editEventDescription').value,yards:document.getElementById('editEventYards').value,start_spot:spotFromCoord(document.getElementById('editStartCoord').value),end_spot:spotFromCoord(document.getElementById('editEndCoord').value),ball_spot:spotFromCoord(document.getElementById('editEndCoord').value),quarter:document.getElementById('editEventQuarter').value,note:document.getElementById('editEventNote').value};for(const [key,id] of [['down','editEventDown'],['distance','editEventDistance'],['possession','editEventPossession']]){const v=document.getElementById(id).value;if(v!=='')payload[key]=v}try{await GameStateManager.mutate(`/api/events/${encodeURIComponent(eventId)}/edit`,payload,'POST',r=>r.state);closeEditEvent();loadCorrections()}catch(e){document.getElementById('editEventMessage').textContent=e.data?.message||e.message}}
@@ -3902,6 +3945,7 @@ function render() {
 
   const rs=document.getElementById('readinessSummary'); if(rs) rs.dataset.broadcastStatus=currentState.status||'planned';
   const startButton=document.getElementById('startBroadcastButton'); if(startButton){startButton.disabled=currentState.status==='completed'; startButton.title=currentState.status==='completed'?'Completed broadcasts open in review mode.':'';}
+  const cmdStartButton=document.getElementById('commandStartBroadcastButton'); if(cmdStartButton){cmdStartButton.disabled=currentState.status==='completed'; cmdStartButton.title=currentState.status==='completed'?'Completed broadcasts open in review mode.':'';}
 }
 
 
@@ -4169,9 +4213,11 @@ function newRoster(){
   if(dfApply) dfApply.disabled=true;
 
   closePlayerEditor();
+  closeRosterStaffEditor();
+  renderRosterStaffList();
   renderRosterList();
 }
-function openRoster(id){currentRoster=rosters.find(r=>r.id===id);if(!currentRoster)return;dragonflyRosterSchoolCode='';document.getElementById('rosterEmpty').classList.add('hidden');document.getElementById('rosterWorkspace').classList.remove('hidden');document.getElementById('rosterId').value=currentRoster.id;document.getElementById('rosterSchool').value=currentRoster.school_id;document.getElementById('rosterSport').value=currentRoster.sport;document.getElementById('rosterSeason').value=currentRoster.season;document.getElementById('rosterLevel').value=currentRoster.level;document.getElementById('rosterDivision').value=currentRoster.division;document.getElementById('rosterCounts').textContent=`${currentRoster.active_count} active · ${currentRoster.inactive_count} inactive · ${currentRoster.player_count} total`;populatePositionOptions();renderRosterPlayers();renderRosterList();closePlayerEditor()}
+function openRoster(id){currentRoster=rosters.find(r=>r.id===id);if(!currentRoster)return;dragonflyRosterSchoolCode='';document.getElementById('rosterEmpty').classList.add('hidden');document.getElementById('rosterWorkspace').classList.remove('hidden');document.getElementById('rosterId').value=currentRoster.id;document.getElementById('rosterSchool').value=currentRoster.school_id;document.getElementById('rosterSport').value=currentRoster.sport;document.getElementById('rosterSeason').value=currentRoster.season;document.getElementById('rosterLevel').value=currentRoster.level;document.getElementById('rosterDivision').value=currentRoster.division;document.getElementById('rosterCounts').textContent=`${currentRoster.active_count} active · ${currentRoster.inactive_count} inactive · ${currentRoster.player_count} total`;populatePositionOptions();renderRosterPlayers();renderRosterList();closePlayerEditor();closeRosterStaffEditor();renderRosterStaffList()}
 async function saveRosterSetup(){const payload={school_id:document.getElementById('rosterSchool').value,sport:document.getElementById('rosterSport').value,season:document.getElementById('rosterSeason').value.trim(),level:document.getElementById('rosterLevel').value,division:document.getElementById('rosterDivision').value};try{const id=document.getElementById('rosterId').value;const result=id?await api(`/api/rosters/${encodeURIComponent(id)}`,payload,'PUT'):await api('/api/rosters',payload);document.getElementById('rosterMessage').textContent='Roster saved.';await loadRosters();openRoster(result.id)}catch(e){document.getElementById('rosterMessage').textContent=e.message==='ROSTER_ALREADY_EXISTS'?'That roster already exists.':e.message}}
 async function deleteRoster(){if(!currentRoster||!confirm('Delete this roster and all player records?'))return;await api(`/api/rosters/${encodeURIComponent(currentRoster.id)}`,null,'DELETE');currentRoster=null;document.getElementById('rosterWorkspace').classList.add('hidden');document.getElementById('rosterEmpty').classList.remove('hidden');await loadRosters()}
 function identityMonogramData(name){const initials=String(name||'').trim().split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase().replace(/[^A-Z0-9]/g,'')||'TEAM';return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><rect width="160" height="160" rx="22" fill="#242b35"/><text x="80" y="99" text-anchor="middle" font-family="Arial,sans-serif" font-size="${initials.length>2?48:64}" font-weight="900" fill="#fff">${initials}</text></svg>`)}`}
@@ -4182,6 +4228,96 @@ function rosterHeadshotDisplayUrl(value){
   return `${source}${source.includes('?')?'&':'?'}v=${rosterHeadshotRevision}`;
 }
 function renderRosterPlayers(){const list=document.getElementById('rosterPlayerList');const players=(currentRoster&&currentRoster.players)||[];const school=(schools||[]).find(s=>s.id===currentRoster?.school_id)||{};const teamLogo=school.primary_logo||school.approved_round_logo_path||school.logo_path||school.logo||'';list.innerHTML=players.length?players.slice().sort((a,b)=>(Number(a.number)||999)-(Number(b.number)||999)).map(p=>{const missing=!String(p.headshot||'').trim();const source=p.headshot?rosterHeadshotDisplayUrl(p.headshot):(teamLogo||'/static/player-silhouette.svg');const fallback=teamLogo?'team logo shown':'neutral silhouette shown';return `<button class="roster-player-row ${p.status==='inactive'?'inactive':''}" onclick="editRosterPlayer('${escapeHtml(p.id)}')"><img class="roster-player-thumb" src="${escapeHtml(source)}" alt="${missing?'Player identity fallback':'Player headshot'}" onerror="this.onerror=null;this.src='/static/player-silhouette.svg'"><span class="player-number">${escapeHtml(p.number||'—')}</span><span><strong>${escapeHtml(p.preferred_name||`${p.first_name} ${p.last_name}`.trim())}</strong><small>${escapeHtml(p.position||'Position not set')} · ${escapeHtml(p.grade||'Class not set')}</small>${missing?`<small class="missing-headshot">Headshot missing · ${fallback}</small>`:''}</span><em>${p.status==='inactive'?'Inactive':'Active'}</em></button>`}).join(''):'<div class="muted">No players added.</div>'}
+// Coaching & Admin Staff, tied to this roster's school -- moved here from
+// the main Personnel page (which now stays focused on broadcast crew) so
+// each team's staff lives alongside its roster instead of clogging up the
+// shared personnel list. Reuses the same /api/broadcasters records and
+// endpoints as the Personnel page; renderBroadcasterList() there filters
+// Coach/Administrator out of its own list so they aren't shown twice.
+const ROSTER_STAFF_CATEGORIES=['Coach','Administrator'];
+let rosterStaffPronunciationEdited=false;
+function currentRosterStaffSchoolId(){return document.getElementById('rosterSchool')?.value||''}
+function rosterStaffForSchool(){const schoolId=currentRosterStaffSchoolId();if(!schoolId)return[];return (broadcasters||[]).filter(p=>p.school_id===schoolId&&ROSTER_STAFF_CATEGORIES.includes(p.category||''))}
+function renderRosterStaffList(){
+  const list=document.getElementById('rosterStaffList');if(!list)return;
+  const schoolId=currentRosterStaffSchoolId();
+  const addButton=document.querySelector('#rosterStaffPanel .editor-actions button[onclick="newRosterStaffMember()"]');
+  if(addButton)addButton.disabled=!schoolId;
+  if(!schoolId){list.innerHTML='<div class="muted">Select a school above to manage its coaching and admin staff.</div>';return}
+  const staff=rosterStaffForSchool().slice().sort((a,b)=>(a.full_name||a.name||'').localeCompare(b.full_name||b.name||''));
+  list.innerHTML=staff.length?staff.map(p=>
+    `<button class="roster-player-row ${p.status==='inactive'?'inactive':''}" onclick="editRosterStaffMember('${escapeHtml(p.id)}')"><span><strong>${escapeHtml(p.full_name||p.name||'')}</strong><small>${escapeHtml(p.category||'')} · ${escapeHtml(p.role||p.primary_role||'')}</small></span><em>${p.status==='inactive'?'Inactive':'Active'}</em></button>`
+  ).join(''):'<div class="muted">No coaching or admin staff added for this school yet.</div>';
+}
+function populateRosterStaffRoleOptions(selected){
+  const category=document.getElementById('rosterStaffCategory')?.value||'Coach';
+  const el=document.getElementById('rosterStaffPrimaryRole');if(!el)return;
+  const choices=PERSONNEL_ROLE_OPTIONS[category]||PERSONNEL_ROLE_OPTIONS.Other;
+  const desired=selected||el.value||choices[0];
+  const options=choices.includes(desired)?choices:[...choices,desired];
+  el.innerHTML=options.map(v=>`<option${v===desired?' selected':''}>${escapeHtml(v)}</option>`).join('');
+}
+function suggestRosterStaffPronunciation(){
+  if(rosterStaffPronunciationEdited)return;
+  const name=(document.getElementById('rosterStaffName')?.value||'').trim();
+  if(name)document.getElementById('rosterStaffPronunciation').value=simplePronunciation(name);
+}
+function newRosterStaffMember(){
+  const schoolId=currentRosterStaffSchoolId();
+  if(!schoolId){alert('Select (and save) a school for this roster first.');return}
+  document.getElementById('rosterStaffId').value='';
+  document.getElementById('rosterStaffName').value='';
+  document.getElementById('rosterStaffCategory').value='Coach';
+  populateRosterStaffRoleOptions();
+  document.getElementById('rosterStaffPronunciation').value='';
+  document.getElementById('rosterStaffStatus').value='active';
+  document.getElementById('rosterStaffMessage').textContent='Creating a new staff record.';
+  rosterStaffPronunciationEdited=false;
+  document.getElementById('rosterStaffEditor').classList.remove('hidden');
+  document.getElementById('rosterStaffEditor').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function editRosterStaffMember(id){
+  const person=(broadcasters||[]).find(p=>p.id===id);if(!person)return;
+  document.getElementById('rosterStaffId').value=person.id;
+  document.getElementById('rosterStaffName').value=person.full_name||person.name||'';
+  document.getElementById('rosterStaffCategory').value=ROSTER_STAFF_CATEGORIES.includes(person.category)?person.category:'Coach';
+  populateRosterStaffRoleOptions(person.role||person.primary_role||'');
+  document.getElementById('rosterStaffPronunciation').value=person.pronunciation||'';
+  document.getElementById('rosterStaffStatus').value=person.status||'active';
+  document.getElementById('rosterStaffMessage').textContent='';
+  rosterStaffPronunciationEdited=!!person.pronunciation;
+  document.getElementById('rosterStaffEditor').classList.remove('hidden');
+  document.getElementById('rosterStaffEditor').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function closeRosterStaffEditor(){document.getElementById('rosterStaffEditor').classList.add('hidden')}
+async function saveRosterStaffMember(){
+  const name=document.getElementById('rosterStaffName').value.trim();
+  if(!name){document.getElementById('rosterStaffMessage').textContent='Name is required.';return}
+  const schoolId=currentRosterStaffSchoolId();
+  const role=document.getElementById('rosterStaffPrimaryRole').value;
+  const payload={
+    full_name:name,name,category:document.getElementById('rosterStaffCategory').value,
+    role,primary_role:role,title:role,school_id:schoolId,
+    status:document.getElementById('rosterStaffStatus').value,
+    pronunciation:document.getElementById('rosterStaffPronunciation').value.trim(),
+  };
+  const id=document.getElementById('rosterStaffId').value;
+  try{
+    await (id?api(`/api/broadcasters/${id}`,payload,'PUT'):api('/api/broadcasters',payload));
+  }catch(e){document.getElementById('rosterStaffMessage').textContent=e.data?.message||e.message||'Save failed.';return}
+  document.getElementById('rosterStaffMessage').textContent='Staff record saved.';
+  await loadBroadcasters();
+  renderRosterStaffList();
+  closeRosterStaffEditor();
+}
+async function deleteRosterStaffMember(){
+  const id=document.getElementById('rosterStaffId').value;if(!id)return;
+  if(!confirm('Delete this staff member?'))return;
+  await api(`/api/broadcasters/${id}`,{},'DELETE');
+  await loadBroadcasters();
+  renderRosterStaffList();
+  closeRosterStaffEditor();
+}
 function newRosterPlayer(){if(!currentRoster){alert('Save the roster first.');return}currentPlayer=null;pronunciationEdited=false;document.getElementById('playerEditor').classList.remove('hidden');['playerId','playerNumber','playerFirst','playerLast','playerPreferred','playerWeight','playerHeadshot','playerPronunciation'].forEach(id=>document.getElementById(id).value='');document.getElementById('playerPosition').value='Athlete';document.getElementById('playerSecondaryPosition').value='';document.getElementById('playerGrade').value='';document.getElementById('playerHeightFeet').value='';document.getElementById('playerHeightInches').value='';document.getElementById('playerStatus').value='active';document.getElementById('playerCaptain').checked=false;document.getElementById('playerStarter').checked=false;document.getElementById('playerPronunciationVerified').checked=false;document.getElementById('playerMessage').textContent='';renderRosterPlayerHighlights();document.getElementById('playerEditor').scrollIntoView({behavior:'smooth',block:'nearest'});setTimeout(()=>document.getElementById('playerNumber').focus(),350)}
 function ensureSelectValue(select,value,fallback=""){
   if(!select)return;
@@ -4379,19 +4515,91 @@ async function generateMissingRosterPronunciations(){
     resultMsg.className=failed?'status warning':'status success';
   }
 }
-function printRoster(){if(!currentRoster)return;const players=(currentRoster.players||[]).filter(p=>p.status!=='inactive').slice().sort((a,b)=>(Number(a.number)||999)-(Number(b.number)||999));const school=(schools||[]).find(s=>s.id===currentRoster.school_id);const rows=players.map(p=>{const full=[p.first_name,p.last_name].filter(Boolean).join(' ').trim();return `<tr><td>${escapeHtml(p.number||'')}</td><td>${escapeHtml(full)}</td><td>${escapeHtml(p.preferred_name||'')}</td><td>${escapeHtml([p.position,p.secondary_position].filter(Boolean).join(' / '))}</td><td>${escapeHtml(p.grade||'')}</td><td>${escapeHtml(p.height||'')}</td><td>${escapeHtml(p.weight||'')}</td><td>${escapeHtml(p.pronunciation||'')}</td></tr>`}).join('');const w=window.open('','_blank');w.document.write(`<title>${escapeHtml((school&&school.name)||'Roster')}</title><style>body{font-family:Arial;padding:24px}h1{margin:0}p{margin-top:4px;color:#555}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #999;padding:7px;text-align:left}th{background:#eee}@media print{button{display:none}}.headshot-upload-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}.file-button.compact{margin:0;white-space:nowrap;padding:14px 16px}.file-button.compact input{display:none}@media(max-width:760px){.headshot-upload-row{grid-template-columns:1fr}}
+// --- In-app print / PDF viewing (2026-09-02 fix) --------------------------
+// pywebview on Windows routes window.open(url,'_blank') to the OS default
+// browser, and window.open('','_blank') (no URL) can't be routed at all --
+// Windows shows "Get an app to open this 'about' link" because about:blank
+// isn't a real shell-registered protocol. Both broke every "print" button
+// in this app (roster, statistics) plus the authenticated Broadcaster Print
+// Sheet PDF (it landed in a fresh external browser tab with no session
+// cookie -> AUTH_REQUIRED). Fix: never window.open() for these. Build
+// printable HTML into a hidden same-window iframe and call print() on it
+// (printHtmlInApp), or show a same-origin PDF route in an in-app overlay
+// iframe so it carries the session cookie (openPdfInApp).
+function printHtmlInApp(html){
+  let frame=document.getElementById('csrnPrintFrame');
+  if(!frame){
+    frame=document.createElement('iframe');
+    frame.id='csrnPrintFrame';
+    frame.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    document.body.appendChild(frame);
+  }
+  const doc=frame.contentWindow.document;
+  doc.open();doc.write(html);doc.close();
+  let printed=false;
+  const triggerPrint=()=>{if(printed)return;printed=true;try{frame.contentWindow.focus();frame.contentWindow.print()}catch(e){}};
+  // onload isn't reliable after document.write in WebView2, so this can't
+  // just gate on it -- poll until every image in the printed content (roster
+  // headshots, a team-logo watermark) has settled (loaded, or fallen back to
+  // the silhouette via onerror) or ~1.2s has passed, then print either way.
+  // Text-only callers have no images, so this resolves immediately for them.
+  const deadline=Date.now()+1200;
+  const waitForImages=()=>{
+    const imgs=Array.from(doc.images||[]);
+    if(imgs.every(img=>img.complete)||Date.now()>=deadline){triggerPrint();return}
+    setTimeout(waitForImages,50);
+  };
+  setTimeout(waitForImages,300);
+}
 
+function openPdfInApp(url,label){
+  let overlay=document.getElementById('csrnPdfViewerOverlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='csrnPdfViewerOverlay';
+    overlay.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);display:flex;flex-direction:column;padding:20px';
+    overlay.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><strong id="csrnPdfViewerLabel" style="color:#fff;font-family:Arial,sans-serif"></strong><button id="csrnPdfViewerClose" type="button" style="padding:8px 16px;cursor:pointer">Close</button></div><iframe id="csrnPdfViewerFrame" style="flex:1;border:0;border-radius:6px;background:#fff"></iframe>';
+    document.body.appendChild(overlay);
+    document.getElementById('csrnPdfViewerClose').onclick=()=>{overlay.style.display='none';document.getElementById('csrnPdfViewerFrame').src='about:blank'};
+  }
+  document.getElementById('csrnPdfViewerLabel').textContent=label||'';
+  document.getElementById('csrnPdfViewerFrame').src=url;
+  overlay.style.display='flex';
+}
 
-  /* CSRN_SPECIAL_PHASE_BROADCASTER_WORKFLOW_R1 */
-  .broadcaster-special-phase{border:2px solid #d6a83b;box-shadow:0 0 0 1px rgba(214,168,59,.18) inset}
-  .broadcaster-special-phase .phase-badge{white-space:nowrap}
-  .operator-action-notice{position:sticky;top:8px;z-index:5000;margin:10px 0;padding:12px 14px;font-weight:800;box-shadow:0 4px 18px rgba(0,0,0,.28)}
-  .operator-action-notice.error{border:1px solid #d95b5b}
-  .operator-action-notice.warning{border:1px solid #d6a83b}
-  .statistician-special-phase{margin:12px 0;border:2px solid rgba(214,168,59,.8)}
-  .phase-incompatible{opacity:.42;filter:saturate(.35)}
-  .phase-next-action{outline:3px solid currentColor;outline-offset:2px;font-weight:900}
-</style><h1>${escapeHtml((school&&school.name)||'Team Roster')}</h1><p>${escapeHtml(currentRoster.season)} ${escapeHtml(currentRoster.level)} ${escapeHtml(currentRoster.sport)}</p><button onclick="window.print()">Print</button><table><thead><tr><th>#</th><th>Full Name</th><th>Preferred Name</th><th>Position</th><th>Class</th><th>Height</th><th>Weight</th><th>Pronunciation</th></tr></thead><tbody>${rows}</tbody></table>`);w.document.close()}
+function openImagePreviewInApp(url,label){
+  let overlay=document.getElementById('csrnImageViewerOverlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='csrnImageViewerOverlay';
+    overlay.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.78);display:flex;flex-direction:column;align-items:center;padding:20px';
+    overlay.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;width:100%;max-width:920px"><strong id="csrnImageViewerLabel" style="color:#fff;font-family:Arial,sans-serif"></strong><span><a id="csrnImageViewerDownload" download style="padding:8px 16px;margin-right:8px;background:#fff;border-radius:5px;text-decoration:none;color:#111;font-family:Arial,sans-serif;cursor:pointer">Download</a><button id="csrnImageViewerRegenerate" type="button" style="padding:8px 16px;margin-right:8px;cursor:pointer">Regenerate</button><button id="csrnImageViewerClose" type="button" style="padding:8px 16px;cursor:pointer">Close</button></span></div><div id="csrnImageViewerStatus" style="color:#fff;font-family:Arial,sans-serif;margin-bottom:8px"></div><img id="csrnImageViewerImg" style="max-width:min(920px,92vw);max-height:76vh;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.6);background:#111">';
+    document.body.appendChild(overlay);
+    document.getElementById('csrnImageViewerClose').onclick=()=>{overlay.style.display='none';document.getElementById('csrnImageViewerImg').src=''};
+  }
+  document.getElementById('csrnImageViewerLabel').textContent=label||'';
+  const img=document.getElementById('csrnImageViewerImg');
+  const status=document.getElementById('csrnImageViewerStatus');
+  const download=document.getElementById('csrnImageViewerDownload');
+  const regenerate=document.getElementById('csrnImageViewerRegenerate');
+  const load=()=>{
+    status.textContent='Generating…';
+    const busted=url+(url.includes('?')?'&':'?')+'ts='+Date.now();
+    img.onerror=()=>{status.textContent='Unable to generate the preview image.'};
+    img.onload=()=>{status.textContent=''};
+    img.src=busted;
+    download.href=busted;
+  };
+  regenerate.onclick=load;
+  load();
+  overlay.style.display='flex';
+}
+
+function generateSocialPreview(id){
+  openImagePreviewInApp(`/api/broadcasts/${encodeURIComponent(id)}/social-preview.png`,`Social Media Preview — ${id}`);
+}
+
+function printRoster(){if(!currentRoster)return;const players=(currentRoster.players||[]).filter(p=>p.status!=='inactive').slice().sort((a,b)=>(Number(a.number)||999)-(Number(b.number)||999));const school=(schools||[]).find(s=>s.id===currentRoster.school_id);const teamLogo=(school&&(school.primary_logo||school.approved_round_logo_path||school.logo_path||school.logo))||'';const rows=players.map(p=>{const full=[p.first_name,p.last_name].filter(Boolean).join(' ').trim();const photoSrc=p.headshot?rosterHeadshotDisplayUrl(p.headshot):'/static/player-silhouette.svg';return `<tr><td class="photo"><img class="roster-print-thumb" src="${escapeHtml(photoSrc)}" alt="" onerror="this.onerror=null;this.src='/static/player-silhouette.svg'"></td><td>${escapeHtml(p.number||'')}</td><td>${escapeHtml(full)}</td><td>${escapeHtml(p.preferred_name||'')}</td><td>${escapeHtml([p.position,p.secondary_position].filter(Boolean).join(' / '))}</td><td>${escapeHtml(p.grade||'')}</td><td>${escapeHtml(p.height||'')}</td><td>${escapeHtml(p.weight||'')}</td><td>${escapeHtml(p.pronunciation||'')}</td></tr>`}).join('');const watermark=teamLogo?`<img class="roster-print-watermark" src="${escapeHtml(teamLogo)}" alt="" onerror="this.style.display='none'">`:'';printHtmlInApp(`<!doctype html><title>${escapeHtml((school&&school.name)||'Roster')}</title><style>body{font-family:Arial;margin:0}.roster-print-watermark{position:fixed;left:50%;top:50%;width:4.2in;height:4.2in;transform:translate(-50%,-50%);object-fit:contain;opacity:.07;z-index:0}.roster-print-body{position:relative;z-index:1;padding:24px}h1{margin:0}p{margin-top:4px;color:#555}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #999;padding:6px 7px;text-align:left;vertical-align:middle}th{background:#eee}th.photo,td.photo{width:44px;text-align:center;padding:4px}.roster-print-thumb{width:32px;height:32px;object-fit:cover;border-radius:5px;border:1px solid #999;background:#f2f2f2;display:block;margin:0 auto}</style>${watermark}<div class="roster-print-body"><h1>${escapeHtml((school&&school.name)||'Team Roster')}</h1><p>${escapeHtml(currentRoster.season)} ${escapeHtml(currentRoster.level)} ${escapeHtml(currentRoster.sport)}</p><table><thead><tr><th class="photo"></th><th>#</th><th>Full Name</th><th>Preferred Name</th><th>Position</th><th>Class</th><th>Height</th><th>Weight</th><th>Pronunciation</th></tr></thead><tbody>${rows}</tbody></table></div>`)}
 
 async function saveRosterPlayer(){if(!currentRoster)return;try{const payload=playerPayload();const id=document.getElementById('playerId').value;const result=id?await api(`/api/rosters/${encodeURIComponent(currentRoster.id)}/players/${encodeURIComponent(id)}`,payload,'PUT'):await api(`/api/rosters/${encodeURIComponent(currentRoster.id)}/players`,payload);document.getElementById('playerMessage').textContent=result.warning==='DUPLICATE_JERSEY_NUMBER'?'Saved. Warning: another player uses this jersey number.':'Player saved.';await loadRosters();openRoster(currentRoster.id)}catch(e){document.getElementById('playerMessage').textContent=e.message}}
 async function deleteRosterPlayer(){if(!currentRoster||!currentPlayer||!confirm('Remove this player from the roster?'))return;await api(`/api/rosters/${encodeURIComponent(currentRoster.id)}/players/${encodeURIComponent(currentPlayer.id)}`,null,'DELETE');await loadRosters();openRoster(currentRoster.id)}
@@ -4459,7 +4667,7 @@ function populateProgramVisualControls(){
     loadProgramHighlightPlayers();
     if(isPlayerSpotlightType(currentState?.player_graphic?.graphic_type)){
       document.getElementById('pvhDetail').value=currentState.player_graphic.play_detail||'';
-      document.getElementById('pvhDuration').value=String(currentState.player_graphic.duration||8);
+      document.getElementById('pvhDuration').value=String(currentState.player_graphic.duration||45);
       renderProgramHighlightPreview();
     }
   }
@@ -4522,7 +4730,7 @@ function renderProgramHighlightPreview(){
   const preview=document.getElementById('pvhPreview');if(!preview)return;
   preview.innerHTML=`<strong>PLAYER SPOTLIGHT · ${escapeHtml(player?.number||'—')} ${escapeHtml(full)}</strong><span>${escapeHtml(detail)}</span>`;
 }
-function programHighlightPayload(action){return{action,roster_id:document.getElementById('pvhRoster').value,player_id:document.getElementById('pvhPlayer').value,graphic_type:'player_spotlight',eyebrow:'PLAYER SPOTLIGHT',play_detail:document.getElementById('pvhDetail').value.trim(),duration:Number(document.getElementById('pvhDuration').value||8),visible:action==='show'}}
+function programHighlightPayload(action){return{action,roster_id:document.getElementById('pvhRoster').value,player_id:document.getElementById('pvhPlayer').value,graphic_type:'player_spotlight',eyebrow:'PLAYER SPOTLIGHT',play_detail:document.getElementById('pvhDetail').value.trim(),duration:Number(document.getElementById('pvhDuration').value||45),visible:action==='show'}}
 async function showProgramPlayerHighlight(){const p=programHighlightPayload('show');const status=document.getElementById('pvhStatus');if(!p.player_id){status.textContent='Select a player first.';status.className='status error';return}currentState=await api('/api/graphics/player',{...p,action:'show',visible:true});render()}
 async function hideProgramPlayerHighlight(){currentState=await api('/api/graphics/player',{action:'hide'});render()}
 async function clearProgramPlayerHighlight(){currentState=await api('/api/graphics/player',{action:'clear'});document.getElementById('pvhDetail').value='';renderProgramHighlightPreview();render()}
@@ -4605,10 +4813,48 @@ function sponsorAdvertisementDuration(asset){
 // duration so the block is visible.
 let sponsorTriggerBusy=false;
 function setSponsorTriggerButtons(disabled){
-  for(const id of ['sadRunButton','spsShowButton']){
+  for(const id of ['sadRunButton','spsShowButton','statPlayCommercialButton']){
     const b=document.getElementById(id);
     if(b)b.disabled=disabled;
   }
+}
+// Statistician-page "Play Commercial" -- single button, no sponsor/video
+// picker. Cycles through every approved sponsor advertisement video across
+// all active sponsors, one per click, so the operator (often solo on this
+// page) never has to leave it to run an ad break.
+let statCommercialRotationIndex=0;
+function allSponsorAdvertisementAssets(){
+  const list=[];
+  for(const sponsor of sponsorRecords){
+    if(sponsor.active===false)continue;
+    for(const asset of sponsorAdvertisementAssets(sponsor))list.push({sponsor,asset});
+  }
+  return list;
+}
+async function playNextCommercial(){
+  const status=document.getElementById('statCommercialStatus');
+  const pool=allSponsorAdvertisementAssets();
+  if(!pool.length){if(status){status.textContent='No approved sponsor ad videos available.';status.className='status error'}return}
+  if(sponsorTriggerBusy){if(status){status.textContent='Sponsor trigger already in progress…';status.className='status'}return}
+  if(statCommercialRotationIndex>=pool.length)statCommercialRotationIndex=0;
+  const{sponsor,asset}=pool[statCommercialRotationIndex];
+  statCommercialRotationIndex=(statCommercialRotationIndex+1)%pool.length;
+  sponsorTriggerBusy=true;setSponsorTriggerButtons(true);
+  commandClientStatus('SUBMITTING · sponsor advertisement','warning',0);
+  if(status){status.textContent=`Playing ${sponsor.name} — starting…`;status.className='status'}
+  try{
+    RuntimeDiagnostics.send('COMMERCIAL_START_REQUESTED',{status:'PREPARING',media_asset_id:asset.id});
+    const duration=await sponsorAdvertisementDuration(asset);
+    currentState=await api('/api/graphics/sponsor-spotlight',{action:'show',sponsor_id:sponsor.id,media_asset_id:asset.id,lead_in:'SPONSOR MESSAGE',caption:'',duration,visible:true});
+    RuntimeDiagnostics.send('COMMERCIAL_STARTED',{status:'ON_AIR',media_asset_id:asset.id,duration_ms:duration*1000});
+    commandClientStatus('COMMITTED · sponsor advertisement','success',1800);
+    if(status){status.textContent=`Now playing: ${sponsor.name}`;status.className='status success'}
+    render();
+  }catch(error){
+    RuntimeDiagnostics.send('COMMERCIAL_FAILED',{status:'ERROR',media_asset_id:asset.id});
+    if(status){status.textContent=error.message||'Unable to run sponsor advertisement.';status.className='status error'}
+    commandClientStatus('Sponsor advertisement failed to start.','error',7000);
+  }finally{sponsorTriggerBusy=false;setSponsorTriggerButtons(false)}
 }
 async function runSponsorAdvertisement(){
   const sponsorId=document.getElementById('sadSponsor')?.value||'',mediaAssetId=document.getElementById('sadMedia')?.value||'';
@@ -4725,7 +4971,7 @@ async function poll() {
   ensureObsHealthIndicator();
   statePollInFlight=true;
   const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),6500);
+  const timeout=setTimeout(()=>controller.abort(),20000);
   const started=performance.now();
   try {
     const response=await fetch('/api/state',{credentials:'same-origin',cache:'no-store',signal:controller.signal});
@@ -4893,12 +5139,71 @@ function useBuiltInOrganizationLogo(){
 function pickBroadcastSoftware(input){
   const file=input&&input.files&&input.files[0];
   if(!file)return;
-  // A plain browser only exposes file.name; a desktop webview may also give
-  // a real path. Take whatever is fuller and let the operator finish it.
+  // Fallback path only (see chooseBroadcastSoftware()): a browser file input
+  // never exposes a real filesystem path -- file.path is undefined in every
+  // modern browser and in this app's WebView2-based desktop shell. Take
+  // whatever we can get and let the operator finish/paste the full path.
   const field=document.getElementById('cfgBroadcastSoftware');
   field.value=file.path||field.value||file.name;
   configDirty=true;
   input.value='';
+}
+
+async function chooseBroadcastSoftware(){
+  // Prefer pywebview's native file dialog (window.pywebview.api, exposed by
+  // csrn_desktop.py's DesktopApi) -- it returns a real, full path. The
+  // plain <input type="file"> below only ever gets the bare filename in a
+  // Chromium-based webview, which is what was breaking this button.
+  const api=window.pywebview&&window.pywebview.api;
+  if(api&&typeof api.pick_broadcast_software==='function'){
+    try{
+      const path=await api.pick_broadcast_software();
+      if(path){
+        document.getElementById('cfgBroadcastSoftware').value=path;
+        configDirty=true;
+      }
+      return;
+    }catch(_){
+      // fall through to the file input below
+    }
+  }
+  document.getElementById('cfgBroadcastSoftwareFile').click();
+}
+
+async function detectBroadcastSoftware(){
+  const box=document.getElementById('cfgBroadcastSoftwareDetected');
+  if(!box)return;
+  box.classList.remove('hidden');
+  box.textContent='Scanning this computer…';
+  try{
+    const res=await fetch('/api/launch/broadcast-software/candidates',{headers:{'Accept':'application/json'}});
+    const body=await res.json().catch(()=>({}));
+    const candidates=Array.isArray(body.candidates)?body.candidates:[];
+    if(!candidates.length){
+      box.textContent='No supported broadcast software found in common install locations on this computer. Use Choose… to browse for it.';
+      return;
+    }
+    box.innerHTML='';
+    const label=document.createElement('span');
+    label.textContent='Found: ';
+    box.appendChild(label);
+    candidates.forEach((c,i)=>{
+      const btn=document.createElement('button');
+      btn.type='button';
+      btn.className='small-button';
+      btn.textContent=c.name;
+      btn.title=c.path;
+      btn.onclick=()=>{
+        document.getElementById('cfgBroadcastSoftware').value=c.path;
+        configDirty=true;
+        box.textContent='Using '+c.name+'. Click Save Configuration.';
+      };
+      box.appendChild(btn);
+      if(i<candidates.length-1)box.appendChild(document.createTextNode(' '));
+    });
+  }catch(_){
+    box.textContent='Could not scan this computer for broadcast software.';
+  }
 }
 
 function updateOrganizationLogoPreview(){
@@ -4984,24 +5289,26 @@ function setQuickLaunchLink(el, url, label){
 }
 
 function renderQuickLaunch(){
+  // Quick Launch now shows on both Command Center and Pre-Game Setup
+  // (2026-09-03) -- each copy has its own ids (DOM ids must be unique) but
+  // shares these classes, so update every instance found, not just one.
   const streaming = (currentConfig && currentConfig.streaming) || {};
-  const btn = document.getElementById('qlBroadcastBtn');
-  if(!btn) return;
-  setQuickLaunchLink(document.getElementById('qlYoutubeLink'), streaming.youtube_url, 'YouTube');
-  setQuickLaunchLink(document.getElementById('qlFacebookLink'), streaming.facebook_url, 'Facebook');
+  document.querySelectorAll('.ql-youtube-link').forEach(el=>setQuickLaunchLink(el, streaming.youtube_url, 'YouTube'));
+  document.querySelectorAll('.ql-facebook-link').forEach(el=>setQuickLaunchLink(el, streaming.facebook_url, 'Facebook'));
   const hasSoftware = !!String(streaming.broadcast_software_path || '').trim();
-  btn.disabled = !hasSoftware;
-  btn.title = hasSoftware
-    ? 'Launch your configured streaming software'
-    : 'Broadcast software not configured yet — set it in Settings → Quick Launch';
+  document.querySelectorAll('.ql-broadcast-btn').forEach(btn=>{
+    btn.disabled = !hasSoftware;
+    btn.title = hasSoftware
+      ? 'Launch your configured streaming software'
+      : 'Broadcast software not configured yet — set it in Settings → Quick Launch';
+  });
 }
 
 async function launchBroadcastSoftware(){
-  const status = document.getElementById('qlStatus');
-  const btn = document.getElementById('qlBroadcastBtn');
-  btn.disabled = true;
-  status.textContent = 'Launching…';
-  status.className = 'status';
+  const statusEls = document.querySelectorAll('.ql-status');
+  const btns = document.querySelectorAll('.ql-broadcast-btn');
+  btns.forEach(btn=>{ btn.disabled = true; });
+  statusEls.forEach(status=>{ status.textContent = 'Launching…'; status.className = 'status ql-status'; });
   try {
     const res = await fetch('/api/launch/broadcast-software', {
       method: 'POST',
@@ -5009,15 +5316,13 @@ async function launchBroadcastSoftware(){
     });
     const body = await res.json().catch(() => ({}));
     if(res.ok){
-      status.textContent = 'Broadcast software launched.';
-      status.className = 'status success';
+      statusEls.forEach(status=>{ status.textContent = 'Broadcast software launched.'; status.className = 'status ql-status success'; });
     } else {
-      status.textContent = body.message || 'Could not launch broadcast software.';
-      status.className = 'status error';
+      const message = body.message || 'Could not launch broadcast software.';
+      statusEls.forEach(status=>{ status.textContent = message; status.className = 'status ql-status error'; });
     }
   } catch(_) {
-    status.textContent = 'Could not reach the server.';
-    status.className = 'status error';
+    statusEls.forEach(status=>{ status.textContent = 'Could not reach the server.'; status.className = 'status ql-status error'; });
   } finally {
     renderQuickLaunch();
   }
@@ -6370,7 +6675,14 @@ function displayRole(person) { return `${person.role || person.primary_role || '
 
 function renderBroadcasterList() {
   const term = (document.getElementById('broadcasterSearch').value || '').toLowerCase();
+  // Coach/Administrator staff now live on the Roster page (tied to their
+  // school's roster) instead of here -- keeps this list focused on the
+  // people actually working the broadcast. Existing Coach/Administrator
+  // records still exist underneath (on-air graphics like Coach ID still
+  // pull from the full `broadcasters` array), they're just not browsed
+  // from this list any more.
   const filtered = broadcasters.filter(person =>
+    !ROSTER_STAFF_CATEGORIES.includes(person.category||'') &&
     `${person.full_name||person.name} ${person.preferred_name||''} ${person.role||person.primary_role||''} ${person.category||''}`.toLowerCase().includes(term)
   );
   document.getElementById('broadcasterList').innerHTML = filtered.map(person =>
@@ -6783,7 +7095,7 @@ function renderGameManager(){
   const host=document.getElementById('gameManagerList'); if(!host) return;
   const filter=document.getElementById('gameStatusFilter').value;
   const rows=gameManagerRecords.filter(r=>!r.archived&&(filter==='all'||r.status===filter));
-  host.innerHTML=rows.length?rows.map(r=>`<article class="game-card status-${r.status||'planned'}"><div class="game-card-top"><strong>${r.visitor_team} @ ${r.home_team}</strong><span class="game-status">${prettyStatus(r.status)}</span></div><div class="game-meta"><span>${r.broadcast_id}</span><span>${r.date||'Date TBD'} · ${r.scheduled_start||'Time TBD'}</span><span>${r.venue||'Venue TBD'}</span><span>${String(r.contest_type||'official').replace('_',' ')}${r.region_game?' · Region game':''}${(r.special_designations||[]).length?' · '+r.special_designations.map(x=>x.replaceAll('_',' ')).join(', '):''}</span></div><div class="button-row"><button class="primary" onclick="openGameInCommandCenter('${r.broadcast_id}')">Open in Command Center</button><button onclick="window.open('/api/broadcasts/${encodeURIComponent(r.broadcast_id)}/broadcaster-print-sheet.pdf','_blank')">Broadcaster Print Sheet</button><button onclick="editGame('${r.broadcast_id}')">Edit</button><button onclick="updateGameStatus('${r.broadcast_id}','planned')">Planned</button><button onclick="updateGameStatus('${r.broadcast_id}','live')">Live</button><button onclick="updateGameStatus('${r.broadcast_id}','completed')">Completed</button><button class="danger" onclick="deleteGame('${r.broadcast_id}')">Delete</button></div></article>`).join(''):'<p class="section-note">No broadcasts match this filter.</p>';
+  host.innerHTML=rows.length?rows.map(r=>`<article class="game-card status-${r.status||'planned'}"><div class="game-card-top"><strong>${r.visitor_team} @ ${r.home_team}</strong><span class="game-status">${prettyStatus(r.status)}</span></div><div class="game-meta"><span>${r.broadcast_id}</span><span>${r.date||'Date TBD'} · ${r.scheduled_start||'Time TBD'}</span><span>${r.venue||'Venue TBD'}</span><span>${String(r.contest_type||'official').replace('_',' ')}${r.region_game?' · Region game':''}${(r.special_designations||[]).length?' · '+r.special_designations.map(x=>x.replaceAll('_',' ')).join(', '):''}</span></div><div class="button-row"><button class="primary" onclick="openGameInCommandCenter('${r.broadcast_id}')">Open in Command Center</button><button onclick="openPdfInApp('/api/broadcasts/${encodeURIComponent(r.broadcast_id)}/broadcaster-print-sheet.pdf','Broadcaster Print Sheet — ${escapeHtml(r.broadcast_id)}')">Broadcaster Print Sheet</button><button onclick="generateSocialPreview('${r.broadcast_id}')">Social Media Preview</button><button onclick="editGame('${r.broadcast_id}')">Edit</button><button onclick="updateGameStatus('${r.broadcast_id}','planned')">Planned</button><button onclick="updateGameStatus('${r.broadcast_id}','live')">Live</button><button onclick="updateGameStatus('${r.broadcast_id}','completed')">Completed</button><button class="danger" onclick="deleteGame('${r.broadcast_id}')">Delete</button></div></article>`).join(''):'<p class="section-note">No broadcasts match this filter.</p>';
 }
 async function editGame(id){
   const r=gameManagerRecords.find(x=>x.broadcast_id===id); if(!r) return; editingBroadcastId=id; moveSetupPanelToGameManager(); const p=document.getElementById('setupPanel'); p.classList.remove('hidden');
@@ -6970,11 +7282,7 @@ function printStatisticsReport(){
   const playerRows=(statisticsData.players||[]).map(p=>`<tr><td>${escapeHtml(p.team_name)}</td><td>${escapeHtml(p.number||'')}</td><td>${escapeHtml(p.name)}</td><td>${p.rushing_attempts||0}-${p.rushing_yards||0}</td><td>${p.completions||0}/${p.pass_attempts||0}-${p.passing_yards||0}</td><td>${p.receptions||0}/${p.targets||0}-${p.receiving_yards||0}</td><td>${(p.kickoff_return_yards||0)+(p.punt_return_yards||0)}</td><td>${p.sacks||0}/${p.interceptions||0}/${p.fumble_recoveries||0}</td><td>${p.field_goals||0}/${p.field_goal_attempts||0} FG · ${p.extra_points||0}/${p.extra_point_attempts||0} XP</td><td>${p.points||0}</td></tr>`).join('');
   const playRegister=(statisticsData.play_register||[]).map(p=>`<tr><td>${p.play_number||''}</td><td>Q${escapeHtml(p.quarter||'')}</td><td>${escapeHtml(p.clock||'')}</td><td>${escapeHtml(p.down||'')} & ${escapeHtml(p.distance||'')}</td><td>${escapeHtml(displayTeamName(p.offense_name||p.offense||''))}</td><td>${escapeHtml(p.play_type||'')}</td><td>${escapeHtml(p.result||'')}</td><td>${escapeHtml(String(p.yards??''))}</td></tr>`).join('');
   const plays=(statisticsData.scoring_summary||[]).map(p=>`<tr><td>Q${escapeHtml(p.quarter)}</td><td>${escapeHtml(p.team_name)}</td><td>${escapeHtml(p.description)}</td><td>${p.home_score}–${p.visitor_score}</td></tr>`).join('');
-  const w=window.open('','_blank');if(!w)return;
-  w.document.write(`<!doctype html><html><head><title>CSRN Game Statistics</title><style>body{font-family:Arial,sans-serif;margin:32px;color:#111}h1{margin-bottom:4px}.score{font-size:28px;font-weight:800;margin:18px 0}table{width:100%;border-collapse:collapse;margin:12px 0 28px}th,td{border:1px solid #aaa;padding:7px;text-align:left}th{background:#eee}.note{font-size:12px;color:#555}@media print{button{display:none}}
-.operator-possession-strip{position:sticky;top:8px;z-index:80;display:flex;gap:10px;align-items:center;justify-content:center;padding:9px 12px;margin:8px 0 12px;border:1px solid rgba(255,255,255,.18);border-radius:10px;background:rgba(14,18,24,.96);box-shadow:0 6px 18px rgba(0,0,0,.24);font-size:.95rem}.operator-possession-strip strong{white-space:nowrap}.operator-possession-strip span{font-weight:700}.team-role-indicator{font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.8;margin:-2px 0 8px}.team-card.is-offense{outline:2px solid rgba(78,190,120,.5)}.team-card.is-defense{outline:2px solid rgba(214,168,59,.45)}.possession-aware-actions button.action-hidden{display:none!important}.coin-toss-panel{border:2px solid rgba(214,168,59,.65)}.coin-toss-modal-card{max-width:760px}.coin-toss-modal-card .setup-grid{margin:10px 0}.coin-toss-panel .phase-badge.complete{background:#194f36}.coin-toss-panel .phase-badge.setup{background:#775a18}@media(max-width:720px){.operator-possession-strip{top:4px;justify-content:flex-start;font-size:.9rem}.score-grid,.statistician-controls{grid-template-columns:1fr!important}.team-card{padding:12px}.possession-aware-actions{gap:7px}.possession-aware-actions button{flex:1 1 46%;min-height:44px}.score-buttons button{min-height:42px}.coin-toss-modal-card .setup-grid{grid-template-columns:1fr!important}}
-</style></head><body><h1>CSRN Game Statistics</h1><div>${escapeHtml(statisticsData.date||'')} · ${escapeHtml(statisticsData.venue||'')}</div><div class="score">${escapeHtml(home.name)} ${home.score||0} — ${visitor.score||0} ${escapeHtml(visitor.name)}</div><h2>Team Summary</h2><table><tr><th>Team</th><th>Score</th><th>TD</th><th>FG</th><th>XP</th><th>2PT</th><th>TO Gained</th><th>Rush</th><th>Pass</th><th>Total Yds</th><th>Y/P</th></tr>${teamRows}</table><h2>Individual Production</h2><table><tr><th>Team</th><th>#</th><th>Player</th><th>Rush</th><th>Pass</th><th>Receiving</th><th>Return Yds</th><th>Defense S/INT/FR</th><th>Kicking</th><th>Pts</th></tr>${playerRows||'<tr><td colspan="10">No individual production recorded.</td></tr>'}</table><h2>Scoring Plays</h2><table><tr><th>Quarter</th><th>Team</th><th>Play</th><th>Score</th></tr>${plays||'<tr><td colspan="4">No scoring plays recorded.</td></tr>'}</table><h2>Play Register</h2><table><tr><th>Play</th><th>Quarter</th><th>Clock</th><th>Down & Distance</th><th>Offense</th><th>Type</th><th>Result</th><th>Yards</th></tr>${playRegister||'<tr><td colspan="8">No plays recorded.</td></tr>'}</table><p class="note">${escapeHtml(statisticsData.note||'')}</p><button onclick="window.print()">Print / Save PDF</button>
-</body></html>`);w.document.close();w.focus();
+  printHtmlInApp(`<!doctype html><html><head><title>CSRN Game Statistics</title><style>body{font-family:Arial,sans-serif;margin:32px;color:#111}h1{margin-bottom:4px}.score{font-size:28px;font-weight:800;margin:18px 0}table{width:100%;border-collapse:collapse;margin:12px 0 28px}th,td{border:1px solid #aaa;padding:7px;text-align:left}th{background:#eee}.note{font-size:12px;color:#555}</style></head><body><h1>CSRN Game Statistics</h1><div>${escapeHtml(statisticsData.date||'')} · ${escapeHtml(statisticsData.venue||'')}</div><div class="score">${escapeHtml(home.name)} ${home.score||0} — ${visitor.score||0} ${escapeHtml(visitor.name)}</div><h2>Team Summary</h2><table><tr><th>Team</th><th>Score</th><th>TD</th><th>FG</th><th>XP</th><th>2PT</th><th>TO Gained</th><th>Rush</th><th>Pass</th><th>Total Yds</th><th>Y/P</th></tr>${teamRows}</table><h2>Individual Production</h2><table><tr><th>Team</th><th>#</th><th>Player</th><th>Rush</th><th>Pass</th><th>Receiving</th><th>Return Yds</th><th>Defense S/INT/FR</th><th>Kicking</th><th>Pts</th></tr>${playerRows||'<tr><td colspan="10">No individual production recorded.</td></tr>'}</table><h2>Scoring Plays</h2><table><tr><th>Quarter</th><th>Team</th><th>Play</th><th>Score</th></tr>${plays||'<tr><td colspan="4">No scoring plays recorded.</td></tr>'}</table><h2>Play Register</h2><table><tr><th>Play</th><th>Quarter</th><th>Clock</th><th>Down & Distance</th><th>Offense</th><th>Type</th><th>Result</th><th>Yards</th></tr>${playRegister||'<tr><td colspan="8">No plays recorded.</td></tr>'}</table><p class="note">${escapeHtml(statisticsData.note||'')}</p></body></html>`);
 }
 
 // Keep the operator clock visibly moving between authoritative refreshes.

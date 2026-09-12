@@ -268,3 +268,65 @@ def test_build_journal_route_delegates(system_client) -> None:
     assert calls["journal"] == 1
 
 
+# --------------------------------------------------------------------------
+# Round 24: Settings -> Quick Launch "Detect Installed"
+# --------------------------------------------------------------------------
+
+
+def _system_app_with(**overrides):
+    def require_auth(view: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(view)
+        def protected(*args: Any, **kwargs: Any):
+            if request.headers.get("X-Test-Auth") != "yes":
+                return jsonify({"error": "AUTH_REQUIRED"}), 401
+            return view(*args, **kwargs)
+
+        return protected
+
+    kwargs: dict[str, Any] = dict(
+        require_auth=require_auth,
+        get_configuration_service=lambda: StubConfigurationService(),
+        get_streaming_links=lambda: {},
+        diagnostic_status=lambda: {},
+        load_state=lambda: {"home_score": 0},
+        load_runtime_state=lambda: {"home_score": 0},
+        public_state=lambda state: state,
+        runtime_state=lambda state: state,
+        readiness_payload=lambda: {},
+        load_build_journal=lambda: [],
+    )
+    kwargs.update(overrides)
+    app = Flask(__name__)
+    app.config.update(TESTING=True, SECRET_KEY="route-test")
+    app.register_blueprint(create_system_blueprint(SystemRoutesDependencies(**kwargs)))
+    return app
+
+
+def test_broadcast_software_candidates_route_requires_auth() -> None:
+    app = _system_app_with()
+    with app.test_client() as client:
+        response = client.get("/api/launch/broadcast-software/candidates")
+    assert response.status_code == 401
+
+
+def test_broadcast_software_candidates_route_delegates() -> None:
+    found = [{"name": "OBS Studio", "path": "C:\\obs-studio\\bin\\64bit\\obs64.exe"}]
+    app = _system_app_with(discover_broadcast_software=lambda: found)
+    with app.test_client() as client:
+        response = client.get(
+            "/api/launch/broadcast-software/candidates", headers=auth_headers()
+        )
+    assert response.status_code == 200
+    assert response.get_json() == {"candidates": found}
+
+
+def test_broadcast_software_candidates_route_defaults_to_empty_list() -> None:
+    app = _system_app_with()
+    with app.test_client() as client:
+        response = client.get(
+            "/api/launch/broadcast-software/candidates", headers=auth_headers()
+        )
+    assert response.status_code == 200
+    assert response.get_json() == {"candidates": []}
+
+

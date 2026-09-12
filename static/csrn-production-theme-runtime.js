@@ -533,7 +533,9 @@ function eventPlainText(runtime) {
 }
 
 function tickerSpeed(runtime) {
-  return ({very_slow:24, slow:36, normal:84, fast:189})[runtime.ticker_speed] || 36;
+  // 2026-09: slowed ~10% from {24, 36, 84, 189} per broadcaster feedback
+  // (mirrors templates/overlay.html's legacy ticker so both stay in sync).
+  return ({very_slow:22, slow:32, normal:76, fast:170})[runtime.ticker_speed] || 32;
 }
 
 function tickerPause(runtime) {
@@ -801,10 +803,17 @@ function mountScroller(target, alias, items, runtime, kind) {
 
     requestAnimationFrame(() => {
       const distance = Math.max(1, track.scrollWidth / 2);
-      const moveSeconds = Math.max(18, distance / tickerSpeed(runtime));
+      // Crawl speed must stay constant (== tickerSpeed(runtime)) regardless
+      // of how much ticker content has piled up -- flooring the SCROLL
+      // duration itself (the old `Math.max(18, ...)` here) silently sped the
+      // crawl up as content grew instead of just taking longer per pass.
+      // Keep a minimum on-screen cycle time by extending the pause dwell at
+      // each end instead (mirrors templates/overlay.html's legacy ticker).
+      const moveSeconds = distance / tickerSpeed(runtime);
       const pauseSeconds = tickerPause(runtime);
-      const totalSeconds = moveSeconds + (pauseSeconds * 2);
-      const pauseOffset = totalSeconds ? pauseSeconds / totalSeconds : 0;
+      const minCycleSeconds = 18;
+      const totalSeconds = Math.max(minCycleSeconds, moveSeconds + (pauseSeconds * 2));
+      const pauseOffset = totalSeconds ? ((totalSeconds - moveSeconds) / 2) / totalSeconds : 0;
 
       track.__csrnTickerAnimation = track.animate(
         [
@@ -844,10 +853,14 @@ function mountScroller(target, alias, items, runtime, kind) {
 
     requestAnimationFrame(() => {
       const distance = Math.max(1, track.scrollWidth + viewport.clientWidth);
-      const moveSeconds = Math.max(18, distance / tickerSpeed(runtime));
+      // See the matching comment in animatePersistent(): keep the crawl at
+      // a constant tickerSpeed(runtime) regardless of story length, and
+      // enforce the minimum on-screen cycle via extra pause dwell instead.
+      const moveSeconds = distance / tickerSpeed(runtime);
       const pauseSeconds = tickerPause(runtime);
-      const totalSeconds = moveSeconds + (pauseSeconds * 2);
-      const pauseOffset = totalSeconds ? pauseSeconds / totalSeconds : 0;
+      const minCycleSeconds = 18;
+      const totalSeconds = Math.max(minCycleSeconds, moveSeconds + (pauseSeconds * 2));
+      const pauseOffset = totalSeconds ? ((totalSeconds - moveSeconds) / 2) / totalSeconds : 0;
 
       track.__csrnTickerAnimation = track.animate(
         [
@@ -1136,6 +1149,22 @@ function spotFromPercent(pct) {
   return `RIGHT ${Math.round(100 - bounded)}`;
 }
 
+// The collegiate field graphic only draws the actual playing surface across
+// a 5%-95% window of its container (5% reserved for each end zone graphic --
+// see .bl-college-endzone/.bl-college-yard-numbers/.bl-college-five-yard-lines
+// in csrn-broadcast-layout-engine.css). ballPct/driveStartPct/firstDownPct
+// are computed on a raw 0-100 "goal line to goal line" scale, so applying
+// them directly as a CSS percent placed any spot within ~5 yards of a goal
+// line visually past the true goal line (into the end zone graphic). Rescale
+// only at this final render boundary -- gainPct/parseFieldSpot must stay on
+// the self-consistent raw 0-100 domain internally so the first-down spot
+// label round-trips correctly.
+function renderPctFromRaw(pct) {
+  const bounded = Math.max(0, Math.min(100, Number(pct)));
+  if (!Number.isFinite(bounded)) return 50;
+  return 5 + (bounded / 100) * 90;
+}
+
 function productionFieldDirection(source, fieldSource) {
   const possession = textValue(source.possession, fieldSource.possession, "home").toLowerCase();
   const raw = possession === "visitor"
@@ -1177,11 +1206,11 @@ function productionFieldState(source, gameSource = {}, canonicalField = {}) {
 
   return {
     ballSpot: ball?.raw || "",
-    ballPct: ball?.pct ?? 50,
+    ballPct: renderPctFromRaw(ball?.pct ?? 50),
     driveStart: drive?.raw || "",
-    driveStartPct: drive?.pct ?? ball?.pct ?? 50,
+    driveStartPct: renderPctFromRaw(drive?.pct ?? ball?.pct ?? 50),
     firstDownSpot: gainPct === null ? "" : spotFromPercent(gainPct),
-    firstDownPct: gainPct ?? ball?.pct ?? 50,
+    firstDownPct: renderPctFromRaw(gainPct ?? ball?.pct ?? 50),
     direction,
     possession: textValue(source.possession, fieldSource.possession, "home").toLowerCase(),
     down: downDistance.down,
@@ -2358,6 +2387,30 @@ function normalizePlayerDetailSeparator(root, mode) {
   detail.textContent = detail.textContent.replace(/\s*·\s*$/, "").trim();
 }
 
+// Player Spotlight names are shown large by design (see the "player" branch
+// of collegiateVideoBoardContent) -- long names need to shrink to fit the
+// copy column instead of just truncating with an ellipsis. Runs after every
+// full re-render (a Player Spotlight change always re-renders, per the
+// signature check above), starting from the CSS base size each time so a
+// later shorter name isn't left stuck at a previously-shrunk size.
+function fitCollegiatePlayerSpotlightName(root) {
+  if (!root) return;
+  const el = root.querySelector('.bl-college-player [data-role="spotlight-name"]');
+  const container = el && el.parentElement;
+  if (!el || !container) return;
+  const baseSize = Number(el.dataset.csrnBaseFontPx) || parseFloat(getComputedStyle(el).fontSize) || 64;
+  el.dataset.csrnBaseFontPx = String(baseSize);
+  const minSize = 26;
+  let size = baseSize;
+  el.style.fontSize = `${size}px`;
+  let guard = 0;
+  while (el.scrollWidth > container.clientWidth && size > minSize && guard < 40) {
+    size -= 2;
+    el.style.fontSize = `${size}px`;
+    guard += 1;
+  }
+}
+
 function setPrimaryThemeClasses(mode) {
   document.documentElement.classList.toggle(
     HIGHLIGHT_ACTIVE_CLASS,
@@ -2705,6 +2758,7 @@ async function renderSelected() {
     populateHeritagePlayerHost(scoreTarget, runtime, state, alias, activeVideoMode);
     mountHeritageFootballClash(scoreTarget, runtime, state, activeVideoMode, alias);
     normalizePlayerDetailSeparator(scoreTarget, activeVideoMode);
+    fitCollegiatePlayerSpotlightName(scoreTarget);
     setPrimaryThemeClasses(activeVideoMode);
     enforceLegacyMediaOwnership(activeVideoMode);
 

@@ -734,14 +734,22 @@
     }
     if (mode === "player") {
       const player = state.player || {};
+      // Eyebrow ("event") lives as its own full-width banner across the top
+      // of the box, not tucked above the name -- makes it the first thing
+      // read and lets it run significantly larger without crowding the
+      // player info below. The portrait/copy row below is a plain flex row
+      // (no centering), so the portrait sits left and the copy naturally
+      // fills the rest of the box to the right.
       return `<div class="bl-college-video-replacement bl-college-player" data-video-mode="player">
-        <div class="bl-college-player-portrait">${player.headshot ? `<img src="${esc(player.headshot)}" alt="">` : `<b>#${esc(player.number)}</b>`}</div>
-        <div class="bl-college-video-copy">
-          <small>${esc(player.eyebrow || "PLAYER SPOTLIGHT")}</small>
-          <strong>${esc(player.name)}</strong>
-          <span>${esc(collegiateSpotlightDetail(player))}</span>
-          ${collegiatePasserCredit(player)}
-          ${collegiateSponsorLockup(player)}
+        <div class="bl-college-player-eyebrow">${esc(player.eyebrow || "PLAYER SPOTLIGHT")}</div>
+        <div class="bl-college-player-row">
+          <div class="bl-college-player-portrait">${player.headshot ? `<img src="${esc(player.headshot)}" alt="">` : `<b>#${esc(player.number)}</b>`}</div>
+          <div class="bl-college-video-copy">
+            <strong data-role="spotlight-name">${esc(player.name)}</strong>
+            <span>${esc(collegiateSpotlightDetail(player))}</span>
+            ${collegiatePasserCredit(player)}
+            ${collegiateSponsorLockup(player)}
+          </div>
         </div>
       </div>`;
     }

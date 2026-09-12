@@ -251,3 +251,102 @@ def test_command_center_has_the_quick_launch_toolbar() -> None:
     # disabled + tooltip when unconfigured
     assert "not configured yet" in html
     assert "renderQuickLaunch()" in html
+
+
+# --------------------------------------------------------------------------
+# Round 24 -- "Choose..." saving a bare filename instead of a real path, and
+# "Detect Installed" auto-discovery of supported streaming software.
+# --------------------------------------------------------------------------
+
+
+def test_settings_choose_button_calls_the_native_dialog_helper() -> None:
+    from pathlib import Path
+
+    html = (Path(__file__).resolve().parents[1] / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert 'onclick="chooseBroadcastSoftware()"' in html
+    assert "async function chooseBroadcastSoftware()" in html
+    assert "pywebview" in html and "pick_broadcast_software" in html
+    assert 'onclick="detectBroadcastSoftware()"' in html
+    assert "/api/launch/broadcast-software/candidates" in html
+    assert 'id="cfgBroadcastSoftwareDetected"' in html
+
+
+def test_discover_broadcast_software_finds_a_configured_candidate(monkeypatch, tmp_path) -> None:
+    program_files = tmp_path / "Program Files"
+    obs = program_files / "obs-studio" / "bin" / "64bit" / "obs64.exe"
+    obs.parent.mkdir(parents=True)
+    obs.write_text("stub", encoding="utf-8")
+
+    monkeypatch.setenv("ProgramFiles", str(program_files))
+    monkeypatch.delenv("ProgramW6432", raising=False)
+    monkeypatch.delenv("ProgramFiles(x86)", raising=False)
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+
+    found = app_module._discover_broadcast_software()
+    assert found == [{"name": "OBS Studio", "path": str(obs)}]
+
+
+def test_discover_broadcast_software_finds_multiple_candidates(monkeypatch, tmp_path) -> None:
+    program_files = tmp_path / "Program Files"
+    local_appdata = tmp_path / "AppData" / "Local"
+    obs = program_files / "obs-studio" / "bin" / "64bit" / "obs64.exe"
+    vmix = program_files / "vMix" / "vMix64.exe"
+    obs.parent.mkdir(parents=True)
+    obs.write_text("stub", encoding="utf-8")
+    vmix.parent.mkdir(parents=True)
+    vmix.write_text("stub", encoding="utf-8")
+
+    monkeypatch.setenv("ProgramFiles", str(program_files))
+    monkeypatch.setenv("LOCALAPPDATA", str(local_appdata))
+    monkeypatch.delenv("ProgramW6432", raising=False)
+    monkeypatch.delenv("ProgramFiles(x86)", raising=False)
+
+    found = app_module._discover_broadcast_software()
+    names = {c["name"] for c in found}
+    assert names == {"OBS Studio", "vMix"}
+
+
+def test_discover_broadcast_software_returns_empty_list_when_nothing_found(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setenv("ProgramFiles", str(tmp_path / "empty"))
+    monkeypatch.delenv("ProgramW6432", raising=False)
+    monkeypatch.delenv("ProgramFiles(x86)", raising=False)
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+
+    assert app_module._discover_broadcast_software() == []
+
+
+def test_discover_broadcast_software_never_raises_without_any_env_vars(monkeypatch) -> None:
+    for env_var in ("ProgramFiles", "ProgramW6432", "ProgramFiles(x86)", "LOCALAPPDATA"):
+        monkeypatch.delenv(env_var, raising=False)
+    assert app_module._discover_broadcast_software() == []
+
+
+def test_broadcast_software_candidates_route_requires_auth() -> None:
+    with app_module.app.test_client() as anon:
+        response = anon.get("/api/launch/broadcast-software/candidates")
+    assert response.status_code in (401, 403)
+
+
+def test_broadcast_software_candidates_route_reports_discovered_software(
+    client, monkeypatch, tmp_path
+) -> None:
+    # The route delegates to the same _discover_broadcast_software() bound
+    # at blueprint-construction time, so exercise it through real env vars
+    # (as the request-time function does) rather than monkeypatching the
+    # function reference, which the already-built blueprint would not see.
+    program_files = tmp_path / "Program Files"
+    obs = program_files / "obs-studio" / "bin" / "64bit" / "obs64.exe"
+    obs.parent.mkdir(parents=True)
+    obs.write_text("stub", encoding="utf-8")
+    monkeypatch.setenv("ProgramFiles", str(program_files))
+    monkeypatch.delenv("ProgramW6432", raising=False)
+    monkeypatch.delenv("ProgramFiles(x86)", raising=False)
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+
+    response = client.get("/api/launch/broadcast-software/candidates")
+    assert response.status_code == 200
+    assert response.get_json() == {"candidates": [{"name": "OBS Studio", "path": str(obs)}]}

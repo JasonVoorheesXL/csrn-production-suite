@@ -14,6 +14,7 @@ class BroadcastRoutesDependencies:
     require_auth: RouteDecorator
     get_broadcast_service: Callable[[], Any]
     get_broadcaster_print_service: Callable[[], Any]
+    get_social_media_preview_service: Callable[[], Any]
 
 
 def create_broadcast_blueprint(
@@ -116,6 +117,35 @@ def create_broadcast_blueprint(
         )
         response.headers["Content-Disposition"] = (
             f'attachment; filename="{result.data["filename"]}"'
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @routes.get("/api/broadcasts/<broadcast_id>/social-preview.png")
+    @dependencies.require_auth
+    def social_media_preview(broadcast_id: str):
+        result = dependencies.get_social_media_preview_service().generate(broadcast_id)
+
+        if result.code == "BROADCAST_NOT_FOUND":
+            return jsonify({"error": result.code}), 404
+
+        if result.code == "IMAGE_GENERATION_FAILED":
+            return jsonify(
+                {
+                    "error": result.code,
+                    "message": result.data.get(
+                        "message",
+                        "Unable to generate the social media preview image.",
+                    ),
+                }
+            ), 500
+
+        response = Response(
+            result.data["image"],
+            mimetype="image/png",
+        )
+        response.headers["Content-Disposition"] = (
+            f'inline; filename="{result.data["filename"]}"'
         )
         response.headers["Cache-Control"] = "no-store"
         return response

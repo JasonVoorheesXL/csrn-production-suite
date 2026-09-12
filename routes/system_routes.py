@@ -68,6 +68,10 @@ class SystemRoutesDependencies:
             },
         )
     )
+    # Round 24: "Detect Installed" in Settings -> Quick Launch. Returns a
+    # list of {"name", "path"} dicts for supported streaming software found
+    # at its known default install location on this computer.
+    discover_broadcast_software: Callable[[], list] = lambda: []
 
 
 def create_system_blueprint(
@@ -125,6 +129,16 @@ def create_system_blueprint(
         # this handler never blocks and never crashes on a bad path.
         status, body = dependencies.launch_broadcast_software()
         return jsonify(body), status
+
+    @routes.get("/api/launch/broadcast-software/candidates")
+    @dependencies.require_auth
+    def broadcast_software_candidates():
+        # Round 24: "Detect Installed" -- scans known default install
+        # locations for supported streaming software so an operator doesn't
+        # have to hand-type a path or fight a file picker that can't return
+        # one. Always 200 with a (possibly empty) list; never errors.
+        candidates = dependencies.discover_broadcast_software() or []
+        return jsonify({"candidates": list(candidates)})
 
     @routes.get("/api/health")
     def get_health():

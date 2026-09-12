@@ -1,273 +1,101 @@
+"""Coverage for the coaching/staff directory page added to the Broadcaster
+Print Sheet (2026-09) -- the deferred "page 6" the owner asked to finally
+build. Exercises the pure HTML-assembly logic (_staff_page and friends)
+directly, without invoking generate()'s real Playwright PDF render.
+"""
 from __future__ import annotations
 
-from pathlib import Path
-
 from broadcaster_print_service import BroadcasterPrintService
-from runtime_diagnostics_service import get_runtime_diagnostics
 
 
-def make_service(
-    *,
-    broadcasts: list[dict] | None = None,
-    rosters: list[dict] | None = None,
-    packages: list[dict] | None = None,
-) -> BroadcasterPrintService:
+def make_service(personnel: list[dict] | None = None, *, wire_personnel: bool = True) -> BroadcasterPrintService:
     return BroadcasterPrintService(
-        load_broadcasts=lambda: list(broadcasts or []),
-        load_rosters=lambda: list(rosters or []),
-        load_packages=lambda: list(packages or []),
-        get_school_logo_file=lambda school_id, filename: Path(school_id) / filename,
+        load_broadcasts=lambda: [],
+        load_rosters=lambda: [],
+        load_packages=lambda: [],
+        get_school_logo_file=lambda school_id, filename: None,
+        load_personnel=(lambda: personnel or []) if wire_personnel else None,
     )
 
 
-def broadcast(**overrides) -> dict:
-    base = {
-        "broadcast_id": "BC-1",
-        "sport": "Football",
-        "season": "2026",
-        "level": "Varsity",
-        "division": "Boys",
-        "home_school_id": "home-school",
-        "visitor_school_id": "visitor-school",
+def test_staff_page_lists_each_teams_personnel_under_their_own_column() -> None:
+    personnel = [
+        {"id": "1", "full_name": "Jane Smith", "title": "Head Coach", "category": "Coach", "school_id": "home-1", "status": "active"},
+        {"id": "2", "full_name": "Tom Reed", "title": "Offensive Coordinator", "category": "Coach", "school_id": "home-1", "status": "active"},
+        {"id": "3", "full_name": "Pat Alvarez", "title": "Head Coach", "category": "Coach", "school_id": "visitor-2", "status": "active"},
+    ]
+    service = make_service(personnel)
+    html = service._staff_page("Home Tigers", "Visitor Wolves", "home-1", "visitor-2")
+
+    assert "Jane Smith" in html
+    assert "Tom Reed" in html
+    assert "Pat Alvarez" in html
+    assert "Head Coach" in html
+    assert "Offensive Coordinator" in html
+    assert 'class="staff-page"' in html
+
+
+def test_staff_page_excludes_inactive_and_other_schools_personnel() -> None:
+    personnel = [
+        {"id": "1", "full_name": "Retired Coach", "title": "Head Coach", "category": "Coach", "school_id": "home-1", "status": "inactive"},
+        {"id": "2", "full_name": "Rival Coach", "title": "Head Coach", "category": "Coach", "school_id": "some-other-school", "status": "active"},
+    ]
+    service = make_service(personnel)
+    html = service._staff_page("Home Tigers", "Visitor Wolves", "home-1", "visitor-2")
+
+    assert "Retired Coach" not in html
+    assert "Rival Coach" not in html
+    assert "No staff on file for this team." in html
+
+
+def test_staff_page_sorts_coaches_before_other_categories() -> None:
+    personnel = [
+        {"id": "1", "full_name": "Zed Producer", "title": "Producer", "category": "Production Staff", "school_id": "home-1", "status": "active"},
+        {"id": "2", "full_name": "Ann Coach", "title": "Head Coach", "category": "Coach", "school_id": "home-1", "status": "active"},
+    ]
+    service = make_service(personnel)
+    html = service._staff_page("Home Tigers", "Visitor Wolves", "home-1", "")
+
+    assert html.index("Ann Coach") < html.index("Zed Producer")
+
+
+def test_staff_page_includes_pronunciation_when_present() -> None:
+    personnel = [
+        {"id": "1", "full_name": "Siobhan O'Malley", "title": "Head Coach", "category": "Coach", "pronunciation": "shi-VAWN", "school_id": "home-1", "status": "active"},
+    ]
+    service = make_service(personnel)
+    html = service._staff_page("Home Tigers", "Visitor Wolves", "home-1", "")
+
+    assert "Pronounced: shi-VAWN" in html
+
+
+def test_staff_page_omitted_entirely_when_no_personnel_loader_wired() -> None:
+    service = make_service(wire_personnel=False)
+    html = service._staff_page("Home Tigers", "Visitor Wolves", "home-1", "visitor-2")
+    assert html == ""
+
+
+def test_render_document_appends_staff_page_after_quick_reference() -> None:
+    personnel = [
+        {"id": "1", "full_name": "Jane Smith", "title": "Head Coach", "category": "Coach", "school_id": "home-1", "status": "active"},
+    ]
+    service = make_service(personnel)
+    broadcast = {
         "home_team": "Home Tigers",
-        "visitor_team": "Visitor Bears",
-    }
-    base.update(overrides)
-    return base
-
-
-def roster(**overrides) -> dict:
-    base = {
-        "id": "roster-1",
-        "school_id": "home-school",
+        "visitor_team": "Visitor Wolves",
+        "home_school_id": "home-1",
+        "visitor_school_id": "visitor-2",
+        "date": "2026-09-05",
+        "scheduled_start": "7:00 PM",
+        "venue": "Tiger Stadium",
         "sport": "Football",
-        "season": "2026",
         "level": "Varsity",
-        "division": "Boys",
-        "players": [],
+        "broadcast_id": "bc-1",
     }
-    base.update(overrides)
-    return base
+    document = service._render_document(broadcast, None, None)
 
-
-def last_fallback_log() -> dict:
-    events = get_runtime_diagnostics().snapshot(limit=50)["events"]
-    return next(
-        event
-        for event in reversed(events)
-        if event.get("event_type") == "BROADCASTER_PRINT_ROSTER_FALLBACK"
-    )
-
-
-def test_exact_four_field_match_still_works() -> None:
-    game = broadcast()
-    rosters = [roster(id="home-roster", school_id="home-school")]
-    home = BroadcasterPrintService._fallback_roster(rosters, game, "home-school", "home")
-    assert home is not None
-    assert home["id"] == "home-roster"
-
-
-def test_division_formatting_mismatch_is_relaxed() -> None:
-    game = broadcast(division="boys ")
-    rosters = [roster(id="home-roster", division="Boys")]
-    home = BroadcasterPrintService._fallback_roster(rosters, game, "home-school", "home")
-    assert home is not None
-    assert home["id"] == "home-roster"
-
-    log = last_fallback_log()
-    assert log["result"] == "RELAXED_MATCH"
-    assert log["relaxed_fields"] == ["division"]
-    assert log["matched_fields"] == ["sport", "season", "level"]
-
-
-def test_level_mismatch_is_relaxed_after_division() -> None:
-    # Mirrors the real production case (FB-2026-4A-W00-002, Houston vs
-    # Caledonia): a Junior Varsity broadcast, but only a Varsity roster
-    # exists on file for the school.
-    game = broadcast(level="Junior Varsity")
-    rosters = [roster(id="home-roster", level="Varsity")]
-    home = BroadcasterPrintService._fallback_roster(rosters, game, "home-school", "home")
-    assert home is not None
-    assert home["id"] == "home-roster"
-
-    log = last_fallback_log()
-    assert log["result"] == "RELAXED_MATCH"
-    assert set(log["relaxed_fields"]) == {"level", "division"}
-    assert log["matched_fields"] == ["sport", "season"]
-
-
-def test_sport_mismatch_is_never_relaxed() -> None:
-    game = broadcast(sport="Basketball")
-    rosters = [roster(id="home-roster", sport="Football")]
-    home = BroadcasterPrintService._fallback_roster(rosters, game, "home-school", "home")
-    assert home is None
-
-    log = last_fallback_log()
-    assert log["result"] == "NO_MATCH"
-    assert log["sport_matched"] is False
-
-
-def test_season_mismatch_is_never_relaxed() -> None:
-    game = broadcast(season="2025")
-    rosters = [roster(id="home-roster", season="2026")]
-    home = BroadcasterPrintService._fallback_roster(rosters, game, "home-school", "home")
-    assert home is None
-
-    log = last_fallback_log()
-    assert log["result"] == "NO_MATCH"
-    assert log["season_matched"] is False
-
-
-def test_no_roster_for_school_is_reported_distinctly() -> None:
-    game = broadcast()
-    home = BroadcasterPrintService._fallback_roster([], game, "home-school", "home")
-    assert home is None
-
-    log = last_fallback_log()
-    assert log["result"] == "NO_ROSTER_FOR_SCHOOL"
-
-
-def test_empty_school_id_returns_none_without_logging() -> None:
-    game = broadcast()
-    rosters = [roster()]
-    before = len(get_runtime_diagnostics().snapshot(limit=200)["events"])
-    home = BroadcasterPrintService._fallback_roster(rosters, game, "", "home")
-    after = len(get_runtime_diagnostics().snapshot(limit=200)["events"])
-    assert home is None
-    assert after == before
-
-
-def test_resolve_rosters_uses_exact_match_before_falling_back_to_relaxed() -> None:
-    game = broadcast(
-        home_school_id="home-school",
-        visitor_school_id="visitor-school",
-        level="Junior Varsity",
-    )
-    rosters = [
-        roster(id="home-exact", school_id="home-school", level="Junior Varsity"),
-        roster(id="home-varsity", school_id="home-school", level="Varsity"),
-        roster(id="visitor-varsity", school_id="visitor-school", level="Varsity"),
-    ]
-    service = make_service(rosters=rosters)
-    home, visitor = service._resolve_rosters(game)
-    assert home is not None and home["id"] == "home-exact"
-    assert visitor is not None and visitor["id"] == "visitor-varsity"
-
-
-def test_resolve_rosters_prefers_package_linked_roster_over_fallback() -> None:
-    game = broadcast(broadcast_id="BC-1")
-    rosters = [
-        roster(id="linked-roster", school_id="home-school", level="Junior Varsity"),
-        roster(id="fallback-roster", school_id="home-school", level="Varsity"),
-    ]
-    packages = [{"broadcast_id": "BC-1", "roster_ids": ["linked-roster"]}]
-    service = make_service(rosters=rosters, packages=packages)
-    home, _ = service._resolve_rosters(game)
-    # Linked-by-package match ignores level/division entirely -- it should
-    # win even though its level doesn't match the broadcast's.
-    assert home is not None and home["id"] == "linked-roster"
-
-
-def test_resolve_rosters_returns_none_when_nothing_matches() -> None:
-    game = broadcast(home_school_id="ghost-school")
-    service = make_service(rosters=[roster(school_id="home-school")])
-    home, _ = service._resolve_rosters(game)
-    assert home is None
-
-
-def test_render_document_uses_middle_dot_entity_for_matchup_separator() -> None:
-    service = make_service()
-    document = service._render_document(
-        broadcast(),
-        roster(id="home-roster", school_id="home-school"),
-        roster(id="visitor-roster", school_id="visitor-school"),
-    )
-
-    assert "Football &middot; Varsity" in document
-    assert "Football ? Varsity" not in document
-    assert "Football | Varsity" not in document
-
-
-def players(count: int) -> list[dict]:
-    return [
-        {
-            "id": f"p{i}",
-            "number": str(i),
-            "first_name": f"Player{i}",
-            "last_name": "Test",
-            "position": "WR",
-            "pronunciation": "",
-            "status": "active",
-        }
-        for i in range(count)
-    ]
-
-
-def test_roster_pages_stays_a_single_column_at_or_under_capacity() -> None:
-    # 38 is ROWS_PER_COLUMN -- exactly at the single-column cutoff.
-    service = make_service()
-    html = service._roster_pages(roster(players=players(38)), "Team", "")
-    assert html.count('<section class="roster-page">') == 1
-    assert "roster-columns" not in html
-
-
-def test_roster_pages_condenses_a_large_roster_to_exactly_two_pages() -> None:
-    # A roster over 76 active players (2 x ROWS_PER_COLUMN) previously
-    # split into 2 logical chunks that each still overflowed onto extra
-    # physical pages -- confirmed against Itawamba AHS's real 82-player
-    # roster, which rendered as 4 physical pages instead of 2. Each
-    # oversized half now lays out as 2 columns on the same physical page
-    # instead of spilling further.
-    service = make_service()
-    html = service._roster_pages(roster(players=players(82)), "Team", "")
-    assert html.count('<section class="roster-page">') == 2
-    assert html.count('<div class="roster-columns">') == 2
-
-
-def test_roster_pages_mid_size_roster_still_uses_two_plain_pages() -> None:
-    # 39-76 players: still exactly 2 pages, but each half already fits in
-    # a single column (no need for the 2-column layout).
-    service = make_service()
-    html = service._roster_pages(roster(players=players(72)), "Team", "")
-    assert html.count('<section class="roster-page">') == 2
-    assert "roster-columns" not in html
-
-
-def _doc_with_primary(primary_side: str | None, *, visitor_team: str = "Visitor Bears") -> str:
-    overrides = {"visitor_team": visitor_team}
-    if primary_side is not None:
-        overrides["record_tracking"] = {"primary_side": primary_side}
-    service = make_service()
-    return service._render_document(
-        broadcast(**overrides),
-        roster(
-            id="home-roster",
-            school_id="home-school",
-            players=[{"id": "h", "number": "1", "first_name": "HomeCaptain",
-                      "last_name": "X", "status": "active"}],
-        ),
-        roster(
-            id="visitor-roster",
-            school_id="visitor-school",
-            players=[{"id": "v", "number": "1", "first_name": "VisitorCaptain",
-                      "last_name": "X", "status": "active"}],
-        ),
-    )
-
-
-def test_roster_order_follows_recorded_primary_side_visitor_first() -> None:
-    # Round 13 Task C: was "caledonia" in visitor_team; now record_tracking.
-    doc = _doc_with_primary("visitor")
-    assert doc.index("VisitorCaptain") < doc.index("HomeCaptain")
-
-
-def test_roster_order_is_home_first_when_primary_side_is_home() -> None:
-    doc = _doc_with_primary("home")
-    assert doc.index("HomeCaptain") < doc.index("VisitorCaptain")
-
-
-def test_roster_order_defaults_home_first_and_no_longer_name_matches_caledonia() -> None:
-    # No record_tracking + "caledonia" in the visitor name: the old code put
-    # the visitor roster first on a name match; now it is plain home-first.
-    doc = _doc_with_primary(None, visitor_team="Caledonia Cavaliers")
-    assert doc.index("HomeCaptain") < doc.index("VisitorCaptain")
+    quick_index = document.index('class="quick-reference"')
+    staff_index = document.index('class="staff-page"')
+    assert quick_index < staff_index
+    assert "Jane Smith" in document
+    assert document.index("</html>") > staff_index

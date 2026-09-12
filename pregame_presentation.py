@@ -355,6 +355,12 @@ def _nws_hourly_periods(lat: float | None, lon: float | None) -> list[dict[str, 
                     if isinstance(probability, dict)
                     else probability
                 )
+                humidity = period.get("relativeHumidity", {})
+                humidity_value = (
+                    humidity.get("value")
+                    if isinstance(humidity, dict)
+                    else humidity
+                )
                 periods.append({
                     "start_time": str(period.get("startTime", "")),
                     "end_time": str(period.get("endTime", "")),
@@ -363,6 +369,7 @@ def _nws_hourly_periods(lat: float | None, lon: float | None) -> list[dict[str, 
                     "wind_speed": str(period.get("windSpeed", "")),
                     "wind_direction": str(period.get("windDirection", "")),
                     "precipitation_probability": probability_value,
+                    "humidity": humidity_value,
                     "short_forecast": str(period.get("shortForecast", "")),
                     "detailed_forecast": str(period.get("detailedForecast", "")),
                 })

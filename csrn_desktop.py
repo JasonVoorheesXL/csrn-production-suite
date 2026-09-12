@@ -124,22 +124,124 @@ def wait_until_healthy(
 # --------------------------------------------------------------------------
 
 
-def _create_window(webview):
+def _window_geometry(webview) -> dict[str, int | None]:
+    """Width/height/x/y for ``create_window``, fitted to whatever screen the
+    shell is actually opening on.
+
+    WINDOW_WIDTH/HEIGHT (1600x1000) are sized for the dense control surface,
+    but that's larger than plenty of real screens (a 1366x768 laptop panel,
+    a scaled-down external monitor). pywebview centers by splitting the
+    width/height difference across both edges -- when the window is bigger
+    than the screen that difference is negative, which pushes the title bar
+    (and its close button) above/left of the visible screen. ``webview.screens``
+    can be read before ``create_window``/``start`` are called, so we use the
+    real primary-display size to clamp the window down and center it
+    explicitly, instead of trusting pywebview's own "default: centered"
+    x/y behaviour to save us on an oversized window."""
+    try:
+        screens = webview.screens
+        primary = screens[0] if screens else None
+    except Exception:  # noqa: BLE001 -- never let a screen query block startup
+        primary = None
+
+    if primary is None:
+        return {"width": WINDOW_WIDTH, "height": WINDOW_HEIGHT, "x": None, "y": None}
+
+    screen_width = int(primary.width)
+    screen_height = int(primary.height)
+
+    # Leave headroom for the taskbar / window chrome so the whole window --
+    # title bar and close button included -- lands on screen, not just its
+    # center point.
+    margin = 60
+    width = min(WINDOW_WIDTH, max(screen_width - margin, WINDOW_MIN_WIDTH))
+    height = min(WINDOW_HEIGHT, max(screen_height - margin, WINDOW_MIN_HEIGHT))
+    # Never claim more than the physical screen exists, even on a display
+    # too small to honor the "preferred" minimum.
+    width = min(width, screen_width)
+    height = min(height, screen_height)
+
+    x = max(0, (screen_width - width) // 2)
+    y = max(0, (screen_height - height) // 2)
+    return {"width": width, "height": height, "x": x, "y": y}
+
+
+class DesktopApi:
+    """Exposed to the page as ``window.pywebview.api`` (see ``_create_window``).
+
+    A plain ``<input type="file">`` never exposes a real filesystem path in
+    a Chromium-based webview -- WebView2 deliberately withholds it, the same
+    as every other modern browser, handing the page only the bare filename.
+    That is why the Settings -> Quick Launch "Choose..." picker for the
+    broadcast-software path was saving unusable values like ``obs64.exe``
+    instead of a real path. pywebview's own native file dialog does not have
+    that restriction, so the page calls this method instead when it is
+    running inside this shell.
+    """
+
+    def pick_broadcast_software(self) -> str:
+        try:
+            import webview  # noqa: PLC0415 -- optional GUI dependency, imported late
+
+            window = webview.windows[0] if webview.windows else None
+            if window is None:
+                return ""
+            result = window.create_file_dialog(
+                webview.OPEN_DIALOG,
+                allow_multiple=False,
+                file_types=("Programs (*.exe)", "All files (*.*)"),
+            )
+        except Exception:  # noqa: BLE001 -- a dialog failure must never crash the shell
+            _LOGGER.exception("Broadcast-software file dialog failed.")
+            return ""
+        if not result:
+            return ""  # operator cancelled
+        return str(result[0])
+
+
+def _create_window(webview, api=None):
+    geometry = _window_geometry(webview)
+    min_size = (
+        min(WINDOW_MIN_WIDTH, geometry["width"]),
+        min(WINDOW_MIN_HEIGHT, geometry["height"]),
+    )
     return webview.create_window(
         WINDOW_TITLE,
         WINDOW_URL,
-        width=WINDOW_WIDTH,
-        height=WINDOW_HEIGHT,
-        min_size=(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT),
+        width=geometry["width"],
+        height=geometry["height"],
+        x=geometry["x"],
+        y=geometry["y"],
+        min_size=min_size,
         confirm_close=True,
+        js_api=api,
     )
 
 
 def _window_icon() -> str | None:
-    """The CSRN badge shown on the running window / taskbar entry. Windows
-    otherwise falls back to a generic icon here -- the frozen exe's embedded
-    icon (set in the .spec) only covers the exe, not the pywebview window.
-    Returns None if the asset is missing so the shell never fails to open."""
+    """The CSRN badge for the running window / taskbar entry.
+
+    ``webview.start(icon=...)`` is a GTK/Qt-only feature upstream (see
+    pywebview's own ``examples/icon.py``: "This is supported only on GTK
+    and QT. For other platforms, icon is set during freezing.") -- on
+    Windows this value is accepted but never wired to the native window's
+    HICON. We still pass it (harmless, and it's what other platforms need),
+    but on Windows it does not, and cannot, put the CSRN badge on the
+    window itself.
+
+    On Windows, a window that never sets its own icon falls back to the
+    icon embedded in the *hosting process's exe* for both the title bar and
+    the taskbar button. In dev mode that host is the venv's ``python.exe``,
+    so a generic Python icon is expected there and is not fixable from this
+    module. In the packaged build the host is ``CSRNProductionSuite.exe``,
+    which the .spec embeds ``csrn-logo.ico`` into -- that's what actually
+    puts the CSRN badge on the window, not this function. If the frozen exe
+    still shows a stale icon, suspect Windows' taskbar icon cache
+    (iconcache.db) holding on to an earlier unbadged build rather than the
+    code here.
+
+    Returns None if the asset is missing so the shell never fails to open.
+    """
     return str(WINDOW_ICON) if WINDOW_ICON.is_file() else None
 
 
@@ -190,7 +292,14 @@ def run(*, health_timeout: int = HEALTH_TIMEOUT_SECONDS) -> int:
             server.close()
         return 1
 
-    _create_window(webview)
+    # Off by default upstream. Needed for the in-app Broadcaster Print
+    # Sheet viewer (openPdfInApp() in index.html): without this, the PDF
+    # viewer's own built-in download button silently does nothing -- no
+    # error, no file, on every platform pywebview supports it on. Must be
+    # set before create_window()/start() per pywebview's own docs.
+    webview.settings["ALLOW_DOWNLOADS"] = True
+
+    _create_window(webview, api=DesktopApi())
     webview.start(func=None, gui=None, debug=False, icon=_window_icon())
     # webview.start() blocks until every window is closed.
 
@@ -223,6 +332,21 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=HEALTH_TIMEOUT_SECONDS,
         help="Seconds to wait for /api/health before giving up.",
+    )
+    parser.add_argument(
+        "--installed",
+        action="store_true",
+        help=(
+            "Force installed-mode data paths (the %%LOCALAPPDATA%%/PossumFrog "
+            "runtime root) even when not frozen. The installer's shortcuts "
+            "(csrn-production-suite.iss) always pass this; sys.frozen alone "
+            "already implies it for a packaged .exe, so this flag mainly "
+            "exists so `--installed` never fails argument parsing, and so a "
+            "dev-mode `python.exe csrn_desktop.py --installed` run can be "
+            "used to sanity-check installed-mode paths (e.g. the data "
+            "migration) without a full PyInstaller build. See "
+            "product_paths.resolve_product_paths()."
+        ),
     )
     args = parser.parse_args(argv)
     return run(health_timeout=args.health_timeout)

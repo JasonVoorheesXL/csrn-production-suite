@@ -124,11 +124,18 @@
 .bl-college-player-portrait{flex:0 0 auto;display:grid;place-items:center;width:118px;height:118px;border-radius:50%;border:1px solid rgba(255,255,255,.42);background:rgba(4,12,20,.58);box-shadow:0 0 22px rgba(180,220,255,.22),inset 0 1px 0 rgba(255,255,255,.26);overflow:hidden}
 .bl-college-player-portrait img{width:100%;height:100%;object-fit:cover}
 .bl-college-player-portrait b{font-size:32px;font-weight:950}
-.bl-college-player .bl-college-player-portrait{width:177px;height:177px}
-.bl-college-player .bl-college-player-portrait b{font-size:48px}
-.bl-college-player .bl-college-video-copy small{font-size:24px}
-.bl-college-player .bl-college-video-copy strong{font-size:51px}
-.bl-college-player .bl-college-video-copy span{font-size:27px}
+/* Player Spotlight (mode="player"): the eyebrow/"event" runs as its own
+   full-width banner across the top of the box, the portrait is 2x the
+   base size and sits at the left edge of the row below it, and the copy
+   fills the remaining width to its right. */
+.bl-college-video-replacement.bl-college-player{flex-direction:column;align-items:stretch;justify-content:flex-start;gap:10px;padding:16px 24px}
+.bl-college-player-eyebrow{font-size:32px;font-weight:950;letter-spacing:.14em;text-transform:uppercase;text-align:center;color:#9fd0ff;line-height:1;text-shadow:0 2px 10px rgba(0,0,0,.6)}
+.bl-college-player-row{display:flex;align-items:center;gap:26px;min-width:0}
+.bl-college-player .bl-college-player-portrait{width:354px;height:354px}
+.bl-college-player .bl-college-player-portrait b{font-size:96px}
+.bl-college-player .bl-college-video-copy{flex:1 1 auto;min-width:0;padding-left:6px}
+.bl-college-player .bl-college-video-copy strong{font-size:64px}
+.bl-college-player .bl-college-video-copy span{font-size:32px}
 .bl-college-player .bl-college-video-copy em{font-size:20px}
 .bl-college-sponsor-lockup{display:flex;align-items:center;gap:10px;margin-top:8px;padding-top:8px;border-top:1px solid var(--glass-line)}
 .bl-college-sponsor-lockup img{width:34px;height:34px;object-fit:contain;border-radius:4px;background:rgba(255,255,255,.9)}

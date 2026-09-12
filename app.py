@@ -44,6 +44,8 @@ from sponsor_service import SponsorService
 from venue_service import VenueService
 from broadcast_service import BroadcastService
 from broadcaster_print_service import BroadcasterPrintService
+from social_media_preview_service import SocialMediaPreviewService
+from pregame_presentation import _presentation_settings as _pregame_presentation_settings
 from personnel_service import PersonnelService
 from asset_service import AssetService
 from graphics_service import GraphicsService
@@ -1832,9 +1834,35 @@ def get_broadcaster_print_service() -> BroadcasterPrintService:
             load_rosters=load_rosters,
             load_packages=load_packages,
             get_school_logo_file=lambda school_id, filename: DATA_DIR / "Logos" / normalize_school_id(school_id) / filename,
+            load_personnel=load_broadcasters,
         )
 
     return BROADCASTER_PRINT_SERVICE
+
+
+SOCIAL_MEDIA_PREVIEW_SERVICE: SocialMediaPreviewService | None = None
+
+
+def get_social_media_preview_service() -> SocialMediaPreviewService:
+    global SOCIAL_MEDIA_PREVIEW_SERVICE
+
+    if SOCIAL_MEDIA_PREVIEW_SERVICE is None:
+        SOCIAL_MEDIA_PREVIEW_SERVICE = SocialMediaPreviewService(
+            load_broadcasts=load_broadcasts,
+            load_state=load_state,
+            load_final_state_archive=load_final_state_archive,
+            get_school_logo_file=lambda school_id, filename: DATA_DIR / "Logos" / normalize_school_id(school_id) / filename,
+            get_asset_upload_dir=lambda: ASSET_UPLOAD_DIR,
+            get_sponsor_service=get_sponsor_service,
+            get_theme_service=get_theme_service,
+            build_statistics=build_statistics,
+            load_config=load_config,
+            get_storylines=lambda broadcast_id: _pregame_presentation_settings(broadcast_id).get("storylines", []),
+            get_static_dir=lambda: Path(__file__).resolve().parent / "static",
+            output_dir=SOCIAL_CARDS_DIR,
+        )
+
+    return SOCIAL_MEDIA_PREVIEW_SERVICE
 
 def normalize_roster_id(value: str) -> str:
     return normalize_school_id(value)
@@ -2877,6 +2905,97 @@ def _launch_broadcast_software() -> tuple[int, dict[str, Any]]:
     return 200, {"ok": True, "launched": str(target)}
 
 
+# Round 24: Quick Launch "Detect Installed" -- a plain <input type="file">
+# never exposes a real filesystem path in a Chromium-based webview (WebView2
+# withholds it deliberately, same as every other modern browser; it only
+# ever hands back the bare filename), so operators kept saving an unusable
+# "obs64.exe" instead of a real path. Alongside the native file-dialog fix
+# in csrn_desktop.py, this offers one-click detection for the streaming
+# software CSRN supports out of the box, checked at each program's known
+# default Windows install location.
+#
+# Forward slashes deliberately, not backslashes: pathlib only treats "\" as
+# a separator on Windows, so a raw r"a\b\c.exe" literal silently becomes one
+# bogus filename (containing literal backslashes) instead of nested folders
+# on any non-Windows Path implementation -- e.g. under pytest on Linux/CI.
+# "/" is understood as a separator by both WindowsPath and PosixPath.
+_BROADCAST_SOFTWARE_CANDIDATES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "OBS Studio",
+        (
+            "obs-studio/bin/64bit/obs64.exe",
+            "obs-studio/bin/32bit/obs32.exe",
+        ),
+    ),
+    (
+        "Streamlabs Desktop",
+        (
+            "Streamlabs Desktop/Streamlabs Desktop.exe",
+            "Streamlabs OBS/Streamlabs OBS.exe",
+        ),
+    ),
+    (
+        "vMix",
+        (
+            "vMix/vMix64.exe",
+            "vMix/vMix.exe",
+        ),
+    ),
+    (
+        "XSplit Broadcaster",
+        (
+            "SplitmediaLabs/XSplit/Bin/XSplit.Core.exe",
+            "XSplit/Broadcaster/xsplit.core.exe",
+        ),
+    ),
+)
+
+
+def _broadcast_software_search_roots() -> list[Path]:
+    """Base directories to check each candidate's relative path under.
+    Order matters only for de-duplication; a 64-bit OBS install can appear
+    under ProgramW6432 and ProgramFiles at once on some systems."""
+    roots: list[Path] = []
+    seen: set[str] = set()
+    for env_var in ("ProgramFiles", "ProgramW6432", "ProgramFiles(x86)", "LOCALAPPDATA"):
+        value = os.environ.get(env_var)
+        if not value:
+            continue
+        key = value.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        roots.append(Path(value))
+    return roots
+
+
+def _discover_broadcast_software() -> list[dict[str, str]]:
+    """Streaming software found at its known default install location on
+    this computer. Best-effort and read-only -- an unreadable drive or a
+    missing env var just yields fewer (or zero) candidates, never an error,
+    so Settings can call this unconditionally."""
+    found: list[dict[str, str]] = []
+    seen_paths: set[str] = set()
+    roots = _broadcast_software_search_roots()
+    for name, relative_paths in _BROADCAST_SOFTWARE_CANDIDATES:
+        for relative in relative_paths:
+            for root in roots:
+                candidate = root / relative
+                try:
+                    exists = candidate.is_file()
+                except OSError:
+                    exists = False
+                if not exists:
+                    continue
+                key = str(candidate).lower()
+                if key in seen_paths:
+                    continue
+                seen_paths.add(key)
+                found.append({"name": name, "path": str(candidate)})
+                break  # one confirmed hit per candidate program is enough
+    return found
+
+
 SYSTEM_ROUTES_BLUEPRINT = create_system_blueprint(
     SystemRoutesDependencies(
         require_auth=require_auth,
@@ -2890,6 +3009,7 @@ SYSTEM_ROUTES_BLUEPRINT = create_system_blueprint(
         readiness_payload=readiness_payload,
         load_build_journal=load_build_journal,
         launch_broadcast_software=_launch_broadcast_software,
+        discover_broadcast_software=_discover_broadcast_software,
     )
 )
 APPLICATION_BLUEPRINTS.append(SYSTEM_ROUTES_BLUEPRINT)
@@ -2944,6 +3064,7 @@ BROADCAST_ROUTES_BLUEPRINT = create_broadcast_blueprint(
         require_auth=require_auth,
         get_broadcast_service=get_broadcast_service,
         get_broadcaster_print_service=get_broadcaster_print_service,
+        get_social_media_preview_service=get_social_media_preview_service,
     )
 )
 APPLICATION_BLUEPRINTS.append(BROADCAST_ROUTES_BLUEPRINT)

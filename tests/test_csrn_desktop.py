@@ -140,6 +140,8 @@ def _fake_webview(events: list[str], captured: dict | None = None):
     return types.SimpleNamespace(
         create_window=lambda *a, **k: events.append("window"),
         start=_start,
+        settings={},
+        screens=[],
     )
 
 
@@ -208,6 +210,54 @@ def test_run_unhealthy_server_is_stopped_and_reported(monkeypatch) -> None:
 
     assert csrn_desktop.run(health_timeout=1) == 1
     assert server.closed is True
+
+
+# --------------------------------------------------------------------------
+# CLI parsing -- the installer's shortcuts (csrn-production-suite.iss) and
+# post-install [Run] entry all launch with `--installed`; app.py's
+# resolve_product_paths() reads it straight off sys.argv. main()'s own
+# argparse must accept it too, or a strict parse_args() rejects it as an
+# unrecognized argument and exits before the window (or even the health
+# check) ever runs -- with console=False that's a silent, invisible failure
+# the very first time someone launches from the Desktop/Start Menu shortcut.
+# --------------------------------------------------------------------------
+
+
+def test_main_accepts_the_installed_flag_the_installer_shortcuts_pass(monkeypatch) -> None:
+    captured: dict = {}
+    monkeypatch.setattr(
+        csrn_desktop, "run", lambda **k: captured.update(k) or 0
+    )
+    assert csrn_desktop.main(["--installed"]) == 0
+    assert captured == {"health_timeout": csrn_desktop.HEALTH_TIMEOUT_SECONDS}
+
+
+def test_main_accepts_installed_and_health_timeout_together(monkeypatch) -> None:
+    captured: dict = {}
+    monkeypatch.setattr(
+        csrn_desktop, "run", lambda **k: captured.update(k) or 0
+    )
+    assert csrn_desktop.main(["--installed", "--health-timeout", "5"]) == 0
+    assert captured == {"health_timeout": 5}
+
+
+def test_installer_shortcuts_only_pass_flags_main_understands() -> None:
+    # Guards the other direction: if the .iss ever grows a new
+    # Parameters: value, main()'s argparse must be updated to accept it too.
+    root = Path(csrn_desktop.__file__).resolve().parent
+    iss = (root / "packaging/windows/csrn-production-suite.iss").read_text(encoding="utf-8")
+    known_flags = {"--health-timeout", "--installed", "-h", "--help"}
+    for line in iss.splitlines():
+        if 'Parameters: "' not in line:
+            continue
+        params = line.split('Parameters: "', 1)[1].split('"', 1)[0]
+        for token in params.split():
+            if token.startswith("--") or token.startswith("-"):
+                assert token in known_flags, (
+                    f"{token!r} is passed by the installer but main()'s "
+                    "argparse doesn't accept it -- the installed shortcuts "
+                    "would fail to launch"
+                )
 
 
 def test_shell_has_no_subprocess_signal_or_serve_only_machinery() -> None:
@@ -313,6 +363,105 @@ def test_run_passes_the_window_icon_to_pywebview_start(monkeypatch) -> None:
     assert Path(captured["icon"]).name == "csrn-logo.ico"
 
 
+def test_run_enables_downloads_before_starting_the_window(monkeypatch) -> None:
+    # Regression guard for the 2026-09-03 fix: ALLOW_DOWNLOADS is off by
+    # default upstream, and the in-app Broadcaster Print Sheet PDF viewer
+    # (openPdfInApp() in index.html) relies on its built-in download button
+    # actually working -- without this, that button is a silent no-op.
+    events: list[str] = []
+    server = _FakeServer()
+    fake_webview = _fake_webview(events)
+    monkeypatch.setattr(csrn_desktop, "current_state", lambda: "DOWN")
+    monkeypatch.setattr(csrn_desktop, "wait_until_healthy", lambda *a, **k: True)
+    monkeypatch.setitem(sys.modules, "app", _fake_app(server, events))
+    monkeypatch.setitem(sys.modules, "webview", fake_webview)
+
+    assert csrn_desktop.run(health_timeout=1) == 0
+    assert fake_webview.settings.get("ALLOW_DOWNLOADS") is True
+
+
+# --------------------------------------------------------------------------
+# Window sizing / centering -- must fit whatever screen it opens on
+# --------------------------------------------------------------------------
+
+
+class _FakeScreen:
+    def __init__(self, width: int, height: int) -> None:
+        self.width = width
+        self.height = height
+
+
+def test_window_geometry_shrinks_to_fit_a_smaller_screen() -> None:
+    webview = types.SimpleNamespace(screens=[_FakeScreen(1366, 768)])
+    geometry = csrn_desktop._window_geometry(webview)
+
+    assert geometry["width"] <= 1366
+    assert geometry["height"] <= 768
+    # fully on screen: the window plus its centered offset never exceeds
+    # the physical display in either dimension
+    assert geometry["x"] + geometry["width"] <= 1366
+    assert geometry["y"] + geometry["height"] <= 768
+    assert geometry["x"] >= 0
+    assert geometry["y"] >= 0
+
+
+def test_window_geometry_centers_on_the_primary_screen() -> None:
+    webview = types.SimpleNamespace(screens=[_FakeScreen(1920, 1080)])
+    geometry = csrn_desktop._window_geometry(webview)
+
+    assert geometry["x"] == (1920 - geometry["width"]) // 2
+    assert geometry["y"] == (1080 - geometry["height"]) // 2
+
+
+def test_window_geometry_keeps_preferred_size_on_a_large_screen() -> None:
+    webview = types.SimpleNamespace(screens=[_FakeScreen(2560, 1440)])
+    geometry = csrn_desktop._window_geometry(webview)
+
+    assert geometry["width"] == csrn_desktop.WINDOW_WIDTH
+    assert geometry["height"] == csrn_desktop.WINDOW_HEIGHT
+
+
+def test_window_geometry_falls_back_to_static_size_without_screen_info() -> None:
+    webview = types.SimpleNamespace(screens=[])
+    geometry = csrn_desktop._window_geometry(webview)
+    assert geometry == {
+        "width": csrn_desktop.WINDOW_WIDTH,
+        "height": csrn_desktop.WINDOW_HEIGHT,
+        "x": None,
+        "y": None,
+    }
+
+
+def test_window_geometry_survives_screens_raising(monkeypatch) -> None:
+    class _Boom:
+        @property
+        def screens(self):
+            raise RuntimeError("GUI toolkit not ready")
+
+    geometry = csrn_desktop._window_geometry(_Boom())
+    assert geometry["width"] == csrn_desktop.WINDOW_WIDTH
+    assert geometry["x"] is None
+
+
+def test_create_window_passes_explicit_centered_geometry(monkeypatch) -> None:
+    captured: dict = {}
+
+    def _create_window(*a, **k):
+        captured.update(k)
+
+    webview = types.SimpleNamespace(
+        screens=[_FakeScreen(1366, 768)],
+        create_window=_create_window,
+    )
+    csrn_desktop._create_window(webview)
+
+    assert captured["width"] <= 1366
+    assert captured["height"] <= 768
+    assert captured["x"] is not None and captured["y"] is not None
+    assert captured["min_size"][0] <= captured["width"]
+    assert captured["min_size"][1] <= captured["height"]
+
+
 def test_shipped_csrn_logo_ico_is_transparent_and_multi_resolution() -> None:
     # Regression guard for the 2026-09-02 fix: the .ico must not carry an
     # opaque white box, and must ship the standard icon sizes.
@@ -343,6 +492,107 @@ def test_bundled_runtime_hook_wires_playwright_and_hf_offline() -> None:
     assert "ms-playwright" in hook
     assert "CSRN_WHISPER_MODEL_DIR" in hook
     assert "HF_HUB_OFFLINE" in hook
+
+
+# --------------------------------------------------------------------------
+# DesktopApi -- native file dialog for Settings -> Quick Launch "Choose..."
+# (2026-09-03 fix: a plain <input type="file"> only ever hands the page a
+# bare filename in this WebView2-based shell, never a real path.)
+# --------------------------------------------------------------------------
+
+
+def test_run_wires_the_desktop_api_into_create_window(monkeypatch) -> None:
+    events: list[str] = []
+    captured: dict = {}
+    server = _FakeServer()
+    monkeypatch.setattr(csrn_desktop, "current_state", lambda: "DOWN")
+    monkeypatch.setattr(csrn_desktop, "wait_until_healthy", lambda *a, **k: True)
+    monkeypatch.setitem(sys.modules, "app", _fake_app(server, events))
+
+    def _create_window(*a, js_api=None, **k):
+        captured["js_api"] = js_api
+        events.append("window")
+
+    fake_webview = types.SimpleNamespace(
+        create_window=_create_window,
+        start=lambda **k: events.append("loop"),
+        settings={},
+        screens=[],
+    )
+    monkeypatch.setitem(sys.modules, "webview", fake_webview)
+
+    assert csrn_desktop.run(health_timeout=1) == 0
+    assert isinstance(captured["js_api"], csrn_desktop.DesktopApi)
+
+
+def test_create_window_passes_the_api_through_as_js_api() -> None:
+    captured: dict = {}
+
+    def _create_window(*a, **k):
+        captured.update(k)
+
+    webview = types.SimpleNamespace(
+        screens=[_FakeScreen(1366, 768)],
+        create_window=_create_window,
+    )
+    api = csrn_desktop.DesktopApi()
+    csrn_desktop._create_window(webview, api=api)
+
+    assert captured["js_api"] is api
+
+
+def test_pick_broadcast_software_returns_the_chosen_path(monkeypatch) -> None:
+    fake_window = types.SimpleNamespace(
+        create_file_dialog=lambda *a, **k: ("C:\\obs-studio\\bin\\64bit\\obs64.exe",)
+    )
+    fake_webview = types.SimpleNamespace(
+        windows=[fake_window], OPEN_DIALOG="open"
+    )
+    monkeypatch.setitem(sys.modules, "webview", fake_webview)
+
+    api = csrn_desktop.DesktopApi()
+    assert api.pick_broadcast_software() == "C:\\obs-studio\\bin\\64bit\\obs64.exe"
+
+
+def test_pick_broadcast_software_returns_empty_string_when_cancelled(monkeypatch) -> None:
+    fake_window = types.SimpleNamespace(create_file_dialog=lambda *a, **k: None)
+    fake_webview = types.SimpleNamespace(windows=[fake_window], OPEN_DIALOG="open")
+    monkeypatch.setitem(sys.modules, "webview", fake_webview)
+
+    api = csrn_desktop.DesktopApi()
+    assert api.pick_broadcast_software() == ""
+
+
+def test_pick_broadcast_software_survives_a_dialog_failure(monkeypatch) -> None:
+    def _boom(*a, **k):
+        raise RuntimeError("GUI toolkit not ready")
+
+    fake_window = types.SimpleNamespace(create_file_dialog=_boom)
+    fake_webview = types.SimpleNamespace(windows=[fake_window], OPEN_DIALOG="open")
+    monkeypatch.setitem(sys.modules, "webview", fake_webview)
+
+    api = csrn_desktop.DesktopApi()
+    assert api.pick_broadcast_software() == ""  # never raises into the JS bridge
+
+
+def test_pick_broadcast_software_returns_empty_string_with_no_open_window(monkeypatch) -> None:
+    fake_webview = types.SimpleNamespace(windows=[], OPEN_DIALOG="open")
+    monkeypatch.setitem(sys.modules, "webview", fake_webview)
+
+    api = csrn_desktop.DesktopApi()
+    assert api.pick_broadcast_software() == ""
+
+
+def test_settings_prefers_the_native_dialog_and_falls_back_to_the_file_input() -> None:
+    html = (Path(csrn_desktop.__file__).resolve().parent / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert "async function chooseBroadcastSoftware()" in html
+    assert "window.pywebview&&window.pywebview.api" in html
+    assert "api.pick_broadcast_software()" in html
+    assert 'onclick="chooseBroadcastSoftware()"' in html
+    # the plain file input stays wired as the fallback for a plain browser
+    assert 'onchange="pickBroadcastSoftware(this)"' in html
 
 
 def test_installer_launches_the_shell_exe_and_opens_the_lan_ports() -> None:

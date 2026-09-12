@@ -31,6 +31,7 @@ STAFF_ROLES = (
     "Offensive Coordinator",
     "Defensive Coordinator",
     "Special Teams Coordinator",
+    "Position Coach",
     "Play-by-Play",
     "Color Analyst",
     "Sideline Reporter",
