@@ -1052,14 +1052,16 @@ class EventService:
                 )
                 state["state_revision"] = base_revision
                 if not remaining_events:
+                    # CanonicalStateFoundation.rebuild() (immediately above) already
+                    # seeded every canonical field from this same `baseline` and set
+                    # state["plays"] to the correctly filtered remaining-plays list.
+                    # Re-copying target["before"] onto state and wiping events/plays
+                    # here was redundant with -- and actively undid -- that correct
+                    # rebuild: it snapped the whole game back to its pre-baseline
+                    # state (often pre-game/Q1) and deleted every surviving play, not
+                    # just the one being undone. Let rebuild()'s output stand.
                     saved_redo = copy.deepcopy(list(state.get("redo_stack") or []))
                     saved_corrections = copy.deepcopy(list(state.get("correction_log") or []))
-                    for key, value in dict(target.get("before") or {}).items():
-                        if key not in {"events", "plays", "history", "redo_stack", "correction_log"}:
-                            state[key] = copy.deepcopy(value)
-                    state["events"] = []
-                    state["plays"] = []
-                    state["last_event"] = {}
                     state["next_play_number"] = int(target.get("play_number", 1) or 1)
                     state["redo_stack"] = saved_redo
                     state["correction_log"] = saved_corrections
