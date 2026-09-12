@@ -3676,10 +3676,29 @@ function updateRestoreControls(){
     btn.title=available?'Restore the most recently undone event.':'No safely restorable undone event is available.';
   });
 }
+function describeUndoTarget(){
+  // Mirrors EventService.undo()'s target search: the most recent not-undone
+  // event with a "before" snapshot. "Undo Last" is not necessarily "the last
+  // thing the operator did" if something in between was already undone, so
+  // preview exactly what will be undone rather than assuming.
+  const events=(currentState&&Array.isArray(currentState.events))?currentState.events:[];
+  for(let i=events.length-1;i>=0;i--){
+    const ev=events[i];
+    if(ev&&!ev.undone&&ev.before){
+      const label=ev.label||ev.event||'event';
+      const quarter=ev.quarter?`Q${ev.quarter}`:'';
+      const desc=ev.description?` — ${ev.description}`:'';
+      return `${label}${quarter?` (${quarter})`:''}${desc}`;
+    }
+  }
+  return '';
+}
 async function undo() {
   if(coinTossUndoIsNext()){
     try{const result=await GameStateManager.mutate('/api/coin-toss/undo',{},'POST',r=>r);currentState=result.state||result;render();renderStatisticianRegister();showOperatorNotice('Coin toss undone. Coin toss setup is required again.','warning',6500);return}catch(e){showOperatorError(e,'Coin toss could not be undone.');return}
   }
+  const preview=describeUndoTarget();
+  if(preview&&!confirm(`Undo this: ${preview}?`))return;
   await GameStateManager.mutate('/api/undo', {});
 }
 async function restoreLastUndone(){
