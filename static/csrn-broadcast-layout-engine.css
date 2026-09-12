@@ -168,6 +168,48 @@
 .bl-college-field[data-has-drive-start="false"] .bl-college-drive-start,.bl-college-field[data-has-first-down="false"] .bl-college-first-down{display:none}.bl-college-field[data-field-visible="false"] .bl-college-ball-marker,.bl-college-field[data-field-visible="false"] .bl-college-line-scrimmage,.bl-college-field[data-field-visible="false"] .bl-college-direction-arrow{display:none}
 .bl-college-field-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;min-width:0}.bl-college-field-meta span{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;min-width:0;padding:8px 10px;border:1px solid rgba(255,255,255,.12);border-radius:6px;background:rgba(0,0,0,.3)}.bl-college-field-meta small{font-size:13px;line-height:1;text-transform:uppercase;color:#9fb0c4;font-weight:900;letter-spacing:.08em}.bl-college-field-meta b{font-size:19px;line-height:1;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
 
+/* T1: Collegiate Tech baseball/softball at football's structural weight.
+   Stage field art swaps to a photographed ballpark per sport (same
+   stadium-photo VS lockup treatment as football); the control bank becomes
+   an inning-by-inning line score (open-ended columns -- theme-runtime-wide
+   rule, docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md T1) with the base diamond
+   pinned right. Promoted from the R4/R5/R9 runtime-injected prototype. */
+.bl-college-stage-field[data-sport="baseball"]{background-image:linear-gradient(90deg,color-mix(in srgb,var(--visitor-primary,#064624) 35%,transparent),transparent 44% 56%,color-mix(in srgb,var(--home-primary,#0A2342) 35%,transparent)),url('/static/friday-night-stadium/clash/baseball-ballpark-background.png')}
+.bl-college-stage-field[data-sport="softball"]{background-image:linear-gradient(90deg,color-mix(in srgb,var(--visitor-primary,#064624) 35%,transparent),transparent 44% 56%,color-mix(in srgb,var(--home-primary,#0A2342) 35%,transparent)),url('/static/friday-night-stadium/clash/softball-ballpark-background.png')}
+.bl-college-inning-row span b{color:#ffd23c}
+.bl-college-baseball-bank{grid-template-columns:minmax(0,1fr) 320px}
+.bl-college-line-score{position:relative;display:grid;grid-template-rows:repeat(3,minmax(0,1fr));gap:6px;min-width:0;padding:12px 16px;border:1px solid var(--glass-line);border-radius:8px;background:linear-gradient(150deg,rgba(10,24,39,.72),rgba(2,8,16,.9) 55%,rgba(12,28,42,.7));box-shadow:0 18px 38px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 0 1px rgba(255,255,255,.06);backdrop-filter:blur(10px) saturate(1.1);font-variant-numeric:tabular-nums;overflow:hidden}
+.bl-cls-head,.bl-cls-row{display:grid;grid-template-columns:78px minmax(0,1fr) auto;align-items:center;gap:10px;min-width:0}
+.bl-cls-head{color:#9fb3ca;font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,.16)}
+.bl-cls-row{padding:6px 8px;border-radius:6px;background:linear-gradient(90deg,color-mix(in srgb,var(--team-primary,#0A2342) 22%,rgba(6,14,24,.6)),rgba(2,8,16,.55))}
+.bl-cls-team{min-width:0;font-size:16px;font-weight:950;letter-spacing:.06em;color:#f8fbff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase}
+.bl-cls-innings{display:grid;grid-template-columns:repeat(var(--csrn-inning-count,9),minmax(18px,1fr));min-width:0;overflow:hidden}
+.bl-cls-innings span{display:grid;place-items:center;font-size:16px;font-weight:900;line-height:1;color:#dce9f8}
+.bl-cls-head .bl-cls-innings span{color:#9fb3ca;font-size:12px}
+.bl-cls-innings span.is-current{background:rgba(101,183,255,.22);border-radius:4px;color:#fff;box-shadow:inset 0 0 0 1px rgba(101,183,255,.5)}
+.bl-cls-rolled{opacity:.6;font-style:normal}
+.bl-cls-rhe{display:grid;grid-template-columns:repeat(3,30px);gap:4px;padding-left:8px;border-left:1px solid rgba(255,255,255,.16)}
+.bl-cls-rhe span{display:grid;place-items:center;font-size:17px;font-weight:950;color:#ffd23c}
+.bl-cls-head .bl-cls-rhe span{color:#ffe38a;font-size:12px}
+.bl-college-diamond{--cd-accent:var(--visitor-primary,#064624);position:relative;display:grid;grid-template-rows:minmax(0,1fr) 46px;gap:9px;min-width:0;padding:10px;border:1px solid var(--glass-line);border-radius:8px;background:linear-gradient(180deg,rgba(13,54,36,.78),rgba(4,22,18,.84));box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 0 30px rgba(0,0,0,.28);overflow:hidden}
+.bl-college-diamond[data-inning-half="bottom"]{--cd-accent:var(--home-primary,#0A2342)}
+.bl-college-diamond-grid{position:relative;overflow:hidden;border-radius:6px;background:radial-gradient(circle at 50% 78%,rgba(255,255,255,.08),transparent 30%),repeating-linear-gradient(115deg,rgba(255,255,255,.04) 0 2px,transparent 2px 9px),linear-gradient(180deg,#0c4a27,#176f3a 60%,#0c4a27)}
+.bl-college-diamond-art{position:absolute;inset:0;width:100%;height:100%}
+.bl-college-diamond-art .bl-cd-grass{fill:#1c6f39}
+.bl-college-diamond-art .bl-cd-dirt{fill:#b07b3f;opacity:.92}
+.bl-college-diamond-art .bl-cd-infield{fill:#2b8a4c}
+.bl-college-diamond-art .bl-cd-foul{stroke:rgba(255,255,255,.8);stroke-width:2.5;fill:none;stroke-linecap:round}
+.bl-college-diamond-art .bl-cd-mound{fill:#c68a4c}
+.bl-college-diamond-art .bl-cd-base{fill:#fff;opacity:.94}
+.bl-college-diamond-art .bl-cd-home{fill:#fff;opacity:.94}
+.bl-college-diamond-art .bl-cd-runner{fill:transparent;stroke:rgba(255,255,255,.5);stroke-width:3;transition:fill .15s ease,filter .15s ease}
+.bl-college-diamond-art .bl-cd-runner.on{fill:var(--cd-accent);stroke:#fff;filter:drop-shadow(0 0 5px color-mix(in srgb,var(--cd-accent) 75%,transparent))}
+.bl-college-diamond-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;min-width:0}
+.bl-college-diamond-meta span{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:6px;min-width:0;padding:6px 8px;border:1px solid rgba(255,255,255,.12);border-radius:6px;background:rgba(0,0,0,.3)}
+.bl-college-diamond-meta small{font-size:11px;line-height:1;text-transform:uppercase;color:#9fb0c4;font-weight:900;letter-spacing:.06em}
+.bl-college-diamond-meta b{font-size:16px;line-height:1;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
+.bl-cd-inning-arrow{position:absolute;top:8px;right:10px;font-size:20px;color:#ffd23c;text-shadow:0 2px 6px rgba(0,0,0,.6)}
+
 /* Classic */
 .bl-classic{display:grid;grid-template-columns:1fr 115px 260px 115px 1fr;background:#111;border:5px solid #f2f2f2;box-shadow:10px 10px 0 #000}
 .bl-classic>section{display:flex;align-items:center;padding:0 14px;background:#202020}.bl-classic>section:last-child{flex-direction:row-reverse;text-align:right}

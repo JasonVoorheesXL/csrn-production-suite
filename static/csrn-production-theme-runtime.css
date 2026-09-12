@@ -1687,77 +1687,11 @@ html.csrn-production-theme-player-active #playerGraphic{
   text-shadow:none!important;
 }
 
-/* Phase C (commissioned): Collegiate Tech baseball / softball diamond
-   field-position graphic. Same idiom as .bl-college-field -- dark green
-   panel, inset shadow, white lines, an uppercase meta strip. Injected by
-   csrn-production-theme-runtime.js so the frozen engine files stay
-   byte-stable. */
-.bl-college-diamond{
-  --cd-accent:var(--collegiate-home-primary,#c8202b);
-  position:relative;display:grid;grid-template-rows:minmax(150px,1fr) 46px;gap:9px;
-  min-width:0;margin-top:10px;padding:10px;
-  border:1px solid var(--glass-line,rgba(225,239,255,.28));border-radius:8px;
-  background:linear-gradient(180deg,rgba(13,54,36,.78),rgba(4,22,18,.84));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 0 30px rgba(0,0,0,.28);overflow:hidden;
-}
-.bl-college-diamond-grid{
-  position:relative;overflow:hidden;border-radius:6px;
-  background:
-    radial-gradient(circle at 50% 78%,rgba(255,255,255,.08),transparent 30%),
-    repeating-linear-gradient(115deg,rgba(255,255,255,.04) 0 2px,transparent 2px 9px),
-    linear-gradient(180deg,#0c4a27,#176f3a 60%,#0c4a27);
-}
-.bl-college-diamond-art{position:absolute;inset:0;width:100%;height:100%}
-.bl-college-diamond-art .bl-cd-grass{fill:#1c6f39}
-.bl-college-diamond-art .bl-cd-dirt{fill:#b07b3f;opacity:.92}
-.bl-college-diamond-art .bl-cd-infield{fill:#2b8a4c}
-.bl-college-diamond-art .bl-cd-foul{stroke:rgba(255,255,255,.8);stroke-width:2.5;fill:none;stroke-linecap:round}
-.bl-college-diamond-art .bl-cd-mound{fill:#c68a4c}
-.bl-college-diamond-art .bl-cd-base{fill:#fff;opacity:.94}
-.bl-college-diamond-art .bl-cd-home{fill:#fff;opacity:.94}
-.bl-college-diamond-art .bl-cd-runner{
-  fill:transparent;stroke:rgba(255,255,255,.5);stroke-width:3;
-  transition:fill .15s ease,filter .15s ease;
-}
-.bl-college-diamond-art .bl-cd-runner.on{
-  fill:var(--cd-accent);stroke:#fff;
-  filter:drop-shadow(0 0 5px color-mix(in srgb,var(--cd-accent) 75%,transparent));
-}
-.bl-college-diamond-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;min-width:0}
-.bl-college-diamond-meta span{
-  display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;min-width:0;
-  padding:8px 10px;border:1px solid rgba(255,255,255,.12);border-radius:6px;background:rgba(0,0,0,.3);
-}
-.bl-college-diamond-meta small{font-size:13px;line-height:1;text-transform:uppercase;color:#9fb0c4;font-weight:900;letter-spacing:.08em}
-.bl-college-diamond-meta b{font-size:19px;line-height:1;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
-.bl-college-diamond[data-inning-half="bottom"] .bl-cd-inning{color:#ffd23c}
-
-/* Phase C R9 -- THROWAWAY PROTOTYPE. Collegiate baseball bottom bar: the
-   football yard-line strip's slot re-cast as an inning-by-inning line score
-   with the base diamond pinned right. Runtime-injected into the compact
-   baseballLineScore board; the real version routes baseball through
-   collegiateFootballScorebug in the pinned engine (see T1 in
-   docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md). No engine edit, no re-pin. */
-.bl-college-baseball-bar{
-  grid-column:1 / -1;
-  display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px;
-  align-items:stretch;margin-top:9px;padding:0;border:0;background:none;
-}
-.bl-college-line-score{
-  display:flex;align-items:center;min-width:0;overflow-x:auto;
-  padding:10px 14px;border:1px solid rgba(255,255,255,.14);border-radius:8px;
-  background:linear-gradient(180deg,rgba(13,54,36,.82),rgba(4,22,18,.88));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 0 30px rgba(0,0,0,.28);
-}
-.bl-cls-table{border-collapse:collapse;width:100%;color:#fff;font-family:Rockwell,Georgia,serif;font-variant-numeric:tabular-nums}
-.bl-cls-table th,.bl-cls-table td{padding:6px 9px;text-align:center;font-size:18px;font-weight:900;line-height:1}
-.bl-cls-table thead th{font-size:12px;color:#9fb3ca;letter-spacing:.1em;border-bottom:1px solid rgba(255,255,255,.16)}
-.bl-cls-table .bl-cls-team{text-align:left;min-width:60px;font-size:15px;letter-spacing:.06em;color:#d6e4f6}
-.bl-cls-table .bl-cls-rhe{color:#ffd23c}
-.bl-cls-table thead .bl-cls-rhe{color:#ffe38a}
-.bl-cls-table td.is-current,.bl-cls-table th.is-current{background:rgba(101,183,255,.18);border-radius:4px}
-.bl-college-bar-diamond{display:flex;min-width:0}
-.bl-college-baseball-bar .bl-college-diamond{flex:1;margin:0;grid-template-rows:1fr}
-/* the right cell is just the base picture -- inning/count/outs live in the
-   line score and the top-right state chip, so drop the meta strip here */
-.bl-college-baseball-bar .bl-college-diamond-meta{display:none}
+/* T1 (docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md): the Collegiate baseball
+   diamond graphic and inning line score are now rendered natively by the
+   frozen engine (collegiateBaseballDiamond / collegiateBaseballLineScore in
+   csrn-broadcast-layout-engine.js/.css) as part of the structurally-
+   prominent control bank -- see .bl-college-diamond / .bl-cls-* there.
+   Supersedes the R4/R5/R9 runtime-injected prototype that used to live in
+   this file entirely (the throwaway bottom-bar shell and its plain-table
+   line score are gone, not just restyled). */

@@ -7,13 +7,13 @@ CSS_PATH = ROOT / "static" / "csrn-broadcast-layout-engine.css"
 JS_PATH = ROOT / "static" / "csrn-broadcast-layout-engine.js"
 BIBLE = (ROOT / "CSRN_PROJECT_BIBLE.md").read_text(encoding="utf-8")
 
-# Re-pinned Round 9 (2026-08-31): the Neon renderer files were intentionally
-# evolved after the Gate 11.6 freeze (Neon disabled as a selectable option in
-# Round 6; shared broadcast-layout engine rebuilt for the "Collegiate Tech"
-# series). No renderer change in Round 9 -- these constants now match the
-# shipped bytes and the BIBLE record.
-CSS_SHA256 = "C170F0B6039C75A10FE6DB0EA847990064608D4A591F8021B4A61ED0A74F734A"
-JS_SHA256 = "81D127814510042D4360BC30189D8F0D8A513D699287AA5F93490326EE6FEEF5"
+# Re-pinned T1 (2026-09-12): Round 26's Canadian field geometry, the
+# Player Spotlight redesign, and T1's Collegiate baseball/softball
+# structural-parity work all landed in the shared broadcast-layout engine
+# since the Round 9 pin above. No Neon-renderer-specific change; these
+# constants now match the shipped bytes and the BIBLE record.
+CSS_SHA256 = "794331F3AB2B3E55960CBC679A7D255543880F06777EDCDD32B1C196805F2171"
+JS_SHA256 = "CC276B125466B3B4DD6C71CE6BD291DAE2698C9501D99994F22CD0DF793B0868"
 
 
 def _digest(path: Path) -> str:
