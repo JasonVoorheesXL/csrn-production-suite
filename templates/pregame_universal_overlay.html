@@ -18,20 +18,29 @@
 .main{display:grid;grid-template-columns:36% 64%;min-height:0}
 .hero{padding:34px 46px 24px 64px;border-right:1px solid var(--line);display:flex;flex-direction:column;justify-content:center}
 .eyebrow{font-family:"CSRN Michroma","Arial",sans-serif;font-size:26px;letter-spacing:.09em;text-transform:uppercase;color:var(--brand-primary);font-weight:400;margin-bottom:26px}
-.matchup{display:grid;gap:18px}.team{display:grid;grid-template-columns:84px 1fr;align-items:center;gap:18px}.team img{width:84px;height:84px;object-fit:contain}.teamname{font-size:40px;font-weight:900;line-height:1.02}.teammeta{color:var(--muted);font-size:17px;margin-top:6px}
+.matchup{display:grid;gap:18px}.team{display:grid;grid-template-columns:252px 1fr auto;align-items:center;gap:18px}.team img{width:252px;height:252px;object-fit:contain}.teamname{font-size:40px;font-weight:900;line-height:1.02}.teamname.hidden{display:none}.teammeta{color:var(--muted);font-size:34px;margin-top:6px}.team-score{font-family:"Arial Black",Arial,sans-serif;font-size:88px;font-weight:900;line-height:1;text-shadow:3px 4px 0 rgba(0,0,0,.6)}.team-score:empty{display:none}.hidden{display:none!important}
 .team-social{display:flex;align-items:center;gap:10px;margin-top:9px;min-height:24px}
 .team-social:empty{display:none}
 .team-social-item{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border:1px solid rgba(255,255,255,.20);border-radius:999px;background:rgba(255,255,255,.055);color:#f5f7fa;font-family:"CSRN Michroma","Arial",sans-serif;font-size:10px;letter-spacing:.045em;white-space:nowrap}
 .team-social-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--brand-primary);color:#fff;font-family:Arial Black,Arial,sans-serif;font-size:12px;line-height:1}
 .at{font-size:20px;color:var(--muted);font-weight:800;padding-left:102px}
 .countdown-wrap{margin-top:26px;padding-top:26px;border-top:1px solid rgba(255,255,255,.18)}.count-label{font-family:"CSRN Michroma","Arial",sans-serif;font-size:26px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:400}.countdown{font-family:"Arial Black",Arial,sans-serif;font-size:68px;font-weight:900;letter-spacing:.055em;margin-top:9px;text-shadow:3px 4px 0 #050609}.delay-note{font-size:20px;line-height:1.35;margin-top:10px;color:#ffd6c5}
-.content{padding:36px 64px 28px 52px;min-width:0;display:flex;align-items:center}.card{width:100%;display:none;animation:fade .4s ease}.card.active{display:block}@keyframes fade{from{opacity:.25;transform:translateY(8px)}to{opacity:1;transform:none}}
-.card-kicker{font-family:"CSRN Michroma","Arial",sans-serif;font-size:12px;color:var(--brand-primary);text-transform:uppercase;letter-spacing:.11em;font-weight:400}.card h1{font-size:44px;margin:9px 0 24px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}.info{background:rgba(255,255,255,.055);border:1px solid var(--line);border-radius:14px;padding:22px}.info span{display:block;color:var(--muted);font-size:14px;text-transform:uppercase;letter-spacing:.09em}.info strong{display:block;font-size:25px;margin-top:8px;overflow-wrap:anywhere}
-.spotlight-row{display:flex;gap:28px;align-items:center}
+.content{padding:36px 64px 28px 52px;min-width:0;min-height:0;display:flex;align-items:flex-start;overflow-y:auto}.card{width:100%;display:none;animation:fade .4s ease}.card.active{display:block}@keyframes fade{from{opacity:.25;transform:translateY(8px)}to{opacity:1;transform:none}}
+.card-kicker{font-family:"CSRN Michroma","Arial",sans-serif;font-size:24px;color:var(--brand-primary);text-transform:uppercase;letter-spacing:.11em;font-weight:400}.card h1{font-size:72px;margin:12px 0 28px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}.info{background:rgba(255,255,255,.055);border:1px solid var(--line);border-radius:14px;padding:22px}.info span{display:block;color:var(--muted);font-size:14px;text-transform:uppercase;letter-spacing:.09em}.info strong{display:block;font-size:25px;margin-top:8px;overflow-wrap:anywhere}
+.spotlight-row{display:flex;gap:36px;align-items:center}
 .spotlight-portrait{flex:0 0 auto;width:132px;height:132px;border-radius:14px;object-fit:cover;border:1px solid var(--line);background:rgba(255,255,255,.055)}
 .spotlight-meta{min-width:0}
 .spotlight-meta .teammeta{font-size:20px;margin-top:10px}
 .spotlight-credit{font-size:18px;color:var(--muted);margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+/* Every card -- pregame or halftime -- now shares this one large,
+   readable-at-a-glance type scale (.card-kicker / .card h1, above).
+   Spotlight and sponsor cards additionally scale up their image + meta
+   row, since only those two card types use that spotlight-row layout. */
+.card-spotlight .spotlight-portrait{width:280px;height:280px}
+.card-spotlight .spotlight-meta .teammeta{font-size:36px;margin-top:16px}
+.card-spotlight .spotlight-credit{font-size:30px;margin-top:20px;padding-top:20px}
+.card-sponsor .spotlight-portrait{width:340px;height:210px;object-fit:contain;background:#fff;padding:14px}
+.card-sponsor .spotlight-meta .teammeta{font-size:36px;margin-top:16px}
 .profile-team{min-height:220px}
 .profile-team>span{font-size:18px}
 .profile-team>strong{font-size:34px;margin-top:10px}
@@ -82,11 +91,11 @@
       <aside class="hero">
         <div id="heroEyebrow" class="eyebrow">Tonight's Matchup</div>
         <div class="matchup">
-          <div class="team"><img id="visitorLogo" src="/static/csrn-logo.png"><div><div id="visitorName" class="teamname">Visitor</div><div id="visitorMeta" class="teammeta"></div></div></div>
+          <div class="team"><img id="visitorLogo" src="/static/csrn-logo.png"><div><div id="visitorName" class="teamname">Visitor</div><div id="visitorMeta" class="teammeta"></div></div><div id="visitorScoreBox" class="team-score"></div></div>
           <div class="at">AT</div>
-          <div class="team"><img id="homeLogo" src="/static/csrn-logo.png"><div><div id="homeName" class="teamname">Home</div><div id="homeMeta" class="teammeta"></div></div></div>
+          <div class="team"><img id="homeLogo" src="/static/csrn-logo.png"><div><div id="homeName" class="teamname">Home</div><div id="homeMeta" class="teammeta"></div></div><div id="homeScoreBox" class="team-score"></div></div>
         </div>
-        <div class="countdown-wrap">
+        <div id="countdownWrap" class="countdown-wrap">
           <div id="countLabel" class="count-label">Kickoff In</div>
           <div id="countdown" class="countdown">--:--:--</div>
           <div id="delayNote" class="delay-note"></div>
@@ -122,6 +131,7 @@ let data=null,cards=[],cardIndex=0,lastCardSwitch=0,weatherCache=null,weatherFet
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function logo(identity){return identity?.logo||identity?.primary_logo||identity?.logo_url||'/static/csrn-logo.png'}
+function hasLogo(identity){return Boolean(identity?.logo||identity?.primary_logo||identity?.logo_url)}
 function teamLabel(identity,fallback){return identity?.broadcast_name||identity?.team_name||identity?.name||fallback}
 function recordText(r){if(!r)return'';return `${Number(r.wins||0)}-${Number(r.losses||0)}${Number(r.ties||0)?'-'+Number(r.ties||0):''}`}
 function clockText(sec){sec=Math.max(0,Number(sec||0));return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`}
@@ -179,7 +189,7 @@ function weatherCard(){
   const desc=pick(kickoff,['short_forecast'])||pick(w,['description','conditions','text','short_forecast','summary']);
   const wind=[pick(kickoff,['wind_direction']),pick(kickoff,['wind_speed'])].filter(Boolean).join(' ')||pick(w,['wind','wind_speed','windSpeed','wind_mph']);
   const precip=pick(kickoff,['precipitation_probability'])||pick(w,['precipitation_probability','precip_chance','rain_chance','probability_of_precipitation']);
-  const humidity=pick(w,['humidity','relative_humidity']);
+  const humidity=pick(kickoff,['humidity'])||pick(w,['humidity','relative_humidity']);
   const venue=raw.venue||{};
   if(temp===''&&desc===''&&wind===''&&precip===''&&!periods.length){
   const resolution=raw.location_resolution||{};
@@ -348,7 +358,7 @@ function spotlightCard(entry){
  const fallback=esc(entry.team_logo||'/static/csrn-logo.png');
  const img=esc(entry.headshot||entry.team_logo||'/static/csrn-logo.png');
  return `
-   <section class="card">
+   <section class="card card-spotlight">
      <div class="card-kicker">${esc(entry.eyebrow||'SPOTLIGHT')}${entry.quarter?' · Q'+esc(entry.quarter):''}</div>
      <h1>${name}</h1>
      <div class="spotlight-row">
@@ -369,7 +379,7 @@ function sponsorCard(sp){
  if(!sp||!sp.name)return null;
  const logo=esc(sp.logo||'/static/csrn-logo.png');
  return `
-   <section class="card">
+   <section class="card card-sponsor">
      <div class="card-kicker">${esc(sp.lead_in||'Proud sponsor of tonight’s broadcast')}</div>
      <h1>${esc(sp.name)}</h1>
      <div class="spotlight-row">
@@ -392,7 +402,7 @@ function rebuildCards(){
    const spotlights=Array.isArray(data.first_half_spotlights)?data.first_half_spotlights:[];
    list=[weather,...spotlights.map(spotlightCard),...sponsors];
  }else{
-   list=[gameDetailsCard(),weather,teamProfilesCard(),storylinesCard(),nextWeekCard()];
+   list=[gameDetailsCard(),weather,teamProfilesCard(),storylinesCard(),nextWeekCard(),...sponsors];
  }
  cards=list.filter(Boolean);
  document.getElementById('cards').innerHTML=cards.join('')||`<div class="empty">${halftime?'Halftime coverage is loading.':'Pregame information is loading.'}</div>`;
@@ -455,6 +465,10 @@ function renderStatic(){
  // brand label used to be a hard-coded "PREGAME" that stayed on screen
  // during halftime/delay -- that is the literal "PREGAME" seen live.
  const stateWord=delayed?(weatherDelay?'WEATHER DELAY':'GAME DELAYED'):halftime?'HALFTIME':'PREGAME';
+ // The state pill in the top-right is redundant with "HALFTIME" already
+ // shown large in the brand lockup and as the hero eyebrow below -- only
+ // needed for pregame/delay, where nothing else on screen announces it.
+ document.getElementById('stateBadge').classList.toggle('hidden',halftime);
  document.getElementById('stateBadge').textContent=stateWord;
  const brandStateLabel=document.getElementById('brandStateLabel');
  if(brandStateLabel)brandStateLabel.textContent=stateWord;
@@ -464,9 +478,21 @@ function renderStatic(){
  document.getElementById('visitorName').textContent=teamLabel(v,g.visitor_team||'Visitor');
  document.getElementById('homeName').textContent=teamLabel(h,g.home_team||'Home');
  document.getElementById('visitorLogo').src=logo(v);document.getElementById('homeLogo').src=logo(h);
+ // A real team logo already identifies the team -- only fall back to the
+ // team name label when there is no logo (the CSRN placeholder mark) to
+ // show instead.
+ document.getElementById('visitorName').classList.toggle('hidden',hasLogo(v));
+ document.getElementById('homeName').classList.toggle('hidden',hasLogo(h));
  document.getElementById('visitorMeta').textContent=[g.visitor_classification,recordText(g.visitor_record)].filter(Boolean).join(' · ');
  document.getElementById('homeMeta').textContent=[g.home_classification,recordText(g.home_record)].filter(Boolean).join(' · ');
-document.getElementById('countLabel').textContent=delayed?(cfg.estimated_start?'Estimated Resume In':'Game Delayed'):halftime?'Score at the Half':'Kickoff In';
+ // "Score at the half" as one combined number (e.g. "21-7") left it
+ // ambiguous which figure belonged to which team -- each team's own score
+ // now sits beside that team instead, and the old countdown/score block is
+ // dropped entirely at halftime.
+ document.getElementById('countdownWrap').classList.toggle('hidden',halftime);
+ document.getElementById('visitorScoreBox').textContent=halftime?String(Number(g.visitor_score||0)):'';
+ document.getElementById('homeScoreBox').textContent=halftime?String(Number(g.home_score||0)):'';
+ document.getElementById('countLabel').textContent=delayed?(cfg.estimated_start?'Estimated Resume In':'Game Delayed'):'Kickoff In';
  document.getElementById('delayNote').textContent=delayed?(cfg.delay_note||'Awaiting an update from game officials.'):'';
  document.getElementById('footerText').textContent=[g.date,g.scheduled_start,g.venue].filter(Boolean).join(' · ')||(halftime?'CSRN Halftime':delayed?'CSRN':'CSRN Pregame');
  document.getElementById('root').classList.toggle('visible',shouldShow());
@@ -478,9 +504,10 @@ function tick(){
  const cfg=data.settings||{},g=data.game||{},delayed=cfg.mode==='delayed';
  const phase=String(g.broadcast_phase||g.status||'').toLowerCase();
  const halftime=!delayed&&phase==='halftime';
- if(halftime){
-   document.getElementById('countdown').textContent=`${Number(g.home_score||0)}-${Number(g.visitor_score||0)}`;
- }else{
+ if(!halftime){
+   // countdownWrap (and #countdown with it) is hidden entirely at
+   // halftime -- see renderStatic() -- each team's own score is shown
+   // beside that team instead, so there's nothing to tick here.
    const target=parseScheduled(g,delayed?cfg.estimated_start:'');
    document.getElementById('countdown').textContent=(delayed&&!cfg.estimated_start)?'DELAYED':countdownText(target);
  }
