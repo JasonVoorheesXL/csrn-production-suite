@@ -9,7 +9,8 @@ from penalty_service import PenaltyService
 
 
 def _reset_cache():
-    PenaltyService._penalty_rules_cache = None
+    # Round 26 6/7: caches are now keyed by ruleset id.
+    PenaltyService._penalty_rules_cache = {}
 
 
 def test_penalty_rules_come_from_the_ruleset_and_match_the_literal_exactly() -> None:
@@ -26,10 +27,10 @@ def test_falls_back_to_the_literal_if_the_ruleset_engine_is_unavailable(monkeypa
 
     import ruleset_service
 
-    def boom(**_kw):
+    def boom(*_a, **_kw):
         raise RuntimeError("no rulesets on this box")
 
-    monkeypatch.setattr(ruleset_service, "resolve", boom)
+    monkeypatch.setattr(ruleset_service, "load_ruleset", boom)
     resolved = PenaltyService._penalty_rules()
     assert resolved == PenaltyService.RULES
     _reset_cache()

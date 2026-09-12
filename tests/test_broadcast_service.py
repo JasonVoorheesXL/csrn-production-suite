@@ -237,6 +237,39 @@ def test_create_supports_manual_teams_and_defaults() -> None:
     assert result.data["warnings"] == []
 
 
+def test_create_defaults_jurisdiction_to_generic_us() -> None:
+    # Round 26 Phase B 2/5: a broadcast created with no jurisdiction picker
+    # value (every broadcast before this phase) records country "US" and
+    # empty region/association -> ruleset_service resolves the generic NFHS
+    # ruleset, identical engine behaviour to today.
+    record = Harness().service().create(
+        {"home_team": "Alumni", "visitor_team": "Faculty"}
+    ).data["broadcast"]
+    assert record["country"] == "US"
+    assert record["region"] == ""
+    assert record["association"] == ""
+
+    import ruleset_service
+    assert ruleset_service.active_ruleset_id(record) == "football/us-nfhs"
+
+
+def test_create_records_a_canadian_jurisdiction_tuple_and_it_resolves() -> None:
+    record = Harness().service().create(
+        {
+            "home_team": "Ottawa",
+            "visitor_team": "Hamilton",
+            "country": "ca",
+            "region": "on",
+            "association": "cjfl",
+        }
+    ).data["broadcast"]
+    assert (record["country"], record["region"], record["association"]) == ("CA", "ON", "CJFL")
+
+    import ruleset_service
+    assert ruleset_service.active_ruleset_id(record) == "football/ca-cjfl-ofc"
+    assert ruleset_service.active_ruleset(record)["field"]["length_yards"] == 110
+
+
 def test_create_normalizes_records_ties_policy_and_designations() -> None:
     harness = Harness()
     result = harness.service().create(

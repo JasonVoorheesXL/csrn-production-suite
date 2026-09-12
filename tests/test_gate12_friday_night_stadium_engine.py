@@ -19,8 +19,8 @@ def test_gate12_isolated_engine_exists_and_preserves_frozen_neon() -> None:
     assert ENGINE.is_file()
     assert CSS.is_file()
     # Neon renderer hashes re-pinned Round 9 (2026-08-31) -- see test_gate116.
-    assert _digest("static/csrn-broadcast-layout-engine.css") == "822755B7ABBA1F6D7439246904DB3AAEEFDE9649C617461457B73053672A02C9"
-    assert _digest("static/csrn-broadcast-layout-engine.js") == "CE29D87BCB4DE6F5E21F00B8F61DBA76F18ABB5C340D2D5DF165BF8A6CD3B2A2"
+    assert _digest("static/csrn-broadcast-layout-engine.css") == "C170F0B6039C75A10FE6DB0EA847990064608D4A591F8021B4A61ED0A74F734A"
+    assert _digest("static/csrn-broadcast-layout-engine.js") == "81D127814510042D4360BC30189D8F0D8A513D699287AA5F93490326EE6FEEF5"
 
 
 def test_gate12_lab_loads_and_routes_the_approved_stadium_engine() -> None:

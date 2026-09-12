@@ -617,6 +617,12 @@ last_obs_status: dict[str, Any] = {
 DEFAULT_STATE: dict[str, Any] = {
     "broadcast_created": False,
     "sport": "Football",
+    # Jurisdiction the rules engine resolves against
+    # (ruleset_service.active_ruleset). Default "US" / "" / "" -> the
+    # generic NFHS ruleset, i.e. today's behaviour before any picker.
+    "country": "US",
+    "region": "",
+    "association": "",
     "level": "Varsity",
     "division": "Boys",
     # Placeholder identity shown before a broadcast is loaded -- from the
@@ -1348,6 +1354,10 @@ def _five_a_classification_rules() -> tuple[str, list[tuple[str, str]]]:
     try:
         import ruleset_service
 
+        # Intentionally pinned to us-ms-mhsaa, not routed through
+        # ruleset_service.active_ruleset(): this is the Mississippi 5A
+        # school-ID pilot (reserved CSRN IDs, id_format) -- jurisdiction-
+        # specific by nature, not a per-game engine rule.
         cls_rules = ruleset_service.resolve(
             country="US", region="MS", association="MHSAA", sport="football"
         ).get("classification", {})
@@ -4001,6 +4011,7 @@ def get_event_service() -> EventService:
             show_player_graphic=show_automation_player_graphic,
             apply_penalty=apply_penalty_enforcement,
             spot_to_coord=spot_to_coord,
+            coord_to_spot=coord_to_spot,
             team_direction=team_direction,
             normalize_state=normalize_state,
             default_player_graphic=lambda: copy.deepcopy(
@@ -4021,12 +4032,12 @@ def authority_rejection(state: dict[str, Any]):
     return jsonify(EventService.locked_payload(state)), 409
 
 
-def spot_to_coord(value: Any) -> int:
-    return RulesService.spot_to_coord(value)
+def spot_to_coord(value: Any, state: dict[str, Any] | None = None) -> int:
+    return RulesService.spot_to_coord(value, state)
 
 
-def coord_to_spot(coord: int) -> str:
-    return RulesService.coord_to_spot(coord)
+def coord_to_spot(coord: int, state: dict[str, Any] | None = None) -> str:
+    return RulesService.coord_to_spot(coord, state)
 
 
 def team_direction(state: dict[str, Any], team: str) -> int:

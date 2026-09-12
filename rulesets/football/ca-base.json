@@ -1,0 +1,48 @@
+{
+  "id": "football/ca-base",
+  "extends": "football/us-nfhs",
+  "label": "Canadian Football (generic amateur)",
+  "sport": "football",
+  "jurisdiction": {
+    "country": "CA",
+    "region": null,
+    "association": null
+  },
+  "period": {
+    "downs_per_set": 3,
+    "quarter_length_seconds": 900,
+    "overtime_format": "cfl_modified"
+  },
+  "field": {
+    "length_yards": 110,
+    "end_zone_depth_yards": 20,
+    "no_fair_catch": true,
+    "field_goal_play": false,
+    "no_yards_halo_yards": 5,
+    "kickoff_spot": "own_35",
+    "free_kick_spot": "own_25",
+    "try_spot": "opp_5",
+    "touchback_spot": "own_25",
+    "single_restart_spot": "own_35"
+  },
+  "scoring": {
+    "single": 1
+  },
+  "penalties": {
+    "Special Teams/No Yards": {"yards": 5}
+  },
+  "defaults": {
+    "timezone": null,
+    "association": null
+  },
+  "_source_notes": {
+    "field_goal_play": "Deliberately false. CSRN has no field-goal play-type engine handler yet -- a play_type of \"field_goal\" would be mis-processed as a punt and canonical_state_service would no-op it. Real Canadian rules do have field goals; flip this to true only when the engine handler ships.",
+    "no_yards_halo_yards": "5 = the common restraining-zone radius for a bouncing kick (Wikipedia; matches CFL). A ball caught on the fly is a 15-yard No Yards, not modelled here. Verify the exact amateur value against a current Football Canada rulebook.",
+    "try_spot": "opp_5 is a PLACEHOLDER. Convert-kick and two-point scrimmage yardage differ by level (e.g. CFL kick from the 25 / two-point from the 3; amateur commonly 5). Verify against a Football Canada rulebook / OFC bylaw before any live Canadian broadcast.",
+    "single_restart_spot": "own_35 follows CFL practice (the team scored upon scrimmages from its own 35 after a single). NOT verified for CJFL / OFC, and the restart may differ by how the single was conceded (punt vs missed field goal vs kickoff through the end zone). Verify against a Football Canada rulebook / OFC bylaw.",
+    "kickoff_spot / free_kick_spot / touchback_spot": "own_35 / own_25 / own_25 follow CFL practice. Amateur levels vary. Verify.",
+    "quarter_length_seconds": "900 (15 minutes) follows CFL / U Sports / CJFL. Minor-football levels play shorter quarters. Verify.",
+    "penalties": "Only the No Yards foul is Canadian-specific here; the rest of the catalogue is inherited from us-nfhs as a rough approximation. Canadian penalty yardages (offside, holding, pass interference as a spot foul, etc.) are NOT verified -- pass a Football Canada rulebook before relying on penalty enforcement for a Canadian game.",
+    "field_graphic": "The broadcast field graphic (.bl-college-field) is a LENGTH-ONLY drive strip: its horizontal axis is goal-line to goal-line plus end zones, driven by length_yards (110) and end_zone_depth_yards (20), both of which are real Canadian figures. It does NOT render field width -- the Canadian 65-yard width vs the American 53 1/3 is not drawn, and the two hash-mark rows sit at fixed cosmetic pixel offsets, not at any spec-derived lateral inset (NFHS ~53'4\" apart vs CFL ~51'). The per-yard tick cadence (--csrn-hash-count = round(length)) and the 5-yard-line cadence (--csrn-yl-count = round(length/5)) are the American cadence rules re-applied to the Canadian length; they happen to match Canadian practice (every yard is hashed, lines every 5 yards) but were NOT verified against a Football Canada field diagram. If a future round adds a true-to-scale aerial field, the 65-yard width and the CFL hash inset need a Football Canada rulebook check."
+  }
+}

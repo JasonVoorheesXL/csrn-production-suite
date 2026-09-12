@@ -149,6 +149,11 @@
             <option disabled>Softball (future)</option>
           </select>
         </label>
+        <label>Rules / Jurisdiction
+          <select id="rulesetJurisdiction" data-country="US" data-region="MS" data-association="MHSAA" onchange="syncRulesetJurisdictionDataset()">
+            <option value="football/us-ms-mhsaa" data-country="US" data-region="MS" data-association="MHSAA" selected>Mississippi HS Football (MHSAA)</option>
+          </select>
+        </label>
         <label>Season
           <input id="season" type="number" min="2020" max="2100">
         </label>
@@ -1842,6 +1847,7 @@ async function initializeAuthenticatedApp() {
   }
 
   await loadConfig();
+  await loadRulesetOptions();
   await loadBroadcasters();
   await loadCaptionControls();
   await loadGameManager();
@@ -2896,8 +2902,13 @@ async function createBroadcast() {
         }
       }
     }
+    const jurisdictionSelect = document.getElementById('rulesetJurisdiction');
+    const jurisdictionOption = jurisdictionSelect?.selectedOptions?.[0];
     const broadcastPayload = {
     sport: document.getElementById('sport').value,
+      country: (jurisdictionOption?.dataset.country ?? jurisdictionSelect?.dataset.country) || 'US',
+      region: (jurisdictionOption?.dataset.region ?? jurisdictionSelect?.dataset.region) || '',
+      association: (jurisdictionOption?.dataset.association ?? jurisdictionSelect?.dataset.association) || '',
       season: document.getElementById('season').value,
       classification: document.getElementById('classification').value,
       week: document.getElementById('week').value,
@@ -3035,8 +3046,12 @@ async function submitPenalty(){
     showOperatorNotice(friendly,'error',7000);
   }
 }
-function coordFromSpot(s){const text=String(s||'').trim().toUpperCase();if(['LEFT GOAL','HOME GOAL','0'].includes(text))return 0;if(['RIGHT GOAL','VISITOR GOAL','100'].includes(text))return 100;if(text==='50')return 50;let m=text.match(/^(LEFT|HOME)\s+(\d{1,2})$/);if(m)return Number(m[2]);m=text.match(/^(RIGHT|VISITOR)\s+(\d{1,2})$/);if(m)return 100-Number(m[2]);const n=Number(text);return Number.isFinite(n)?Math.max(0,Math.min(100,n)):50}
-function spotFromCoord(coord){const c=Math.max(0,Math.min(100,Math.round(Number(coord)||0)));if(c===0)return'LEFT GOAL';if(c===100)return'RIGHT GOAL';if(c===50)return'50';return c<50?`LEFT ${c}`:`RIGHT ${100-c}`}
+// The Command Center field sliders are a 0-100 % scale; yard-line strings
+// convert against the active ruleset's field length (100 US / 110 Canadian)
+// so a play at the Canadian 55 (centre) is expressible and round-trips.
+function activeFieldLength(){const n=Number(currentState?.canonical_field_state?.length_yards);return n>0?n:100}
+function coordFromSpot(s,length){const L=Number(length)>0?Number(length):activeFieldLength();const mid=L/2;const text=String(s||'').trim().toUpperCase();if(['LEFT GOAL','HOME GOAL','0'].includes(text))return 0;if(['RIGHT GOAL','VISITOR GOAL','100',String(L)].includes(text))return 100;if(text==='50'||text===String(mid))return 50;let m=text.match(/^(LEFT|HOME)\s+(\d{1,2})$/);if(m)return Math.round((Number(m[2])/L)*100);m=text.match(/^(RIGHT|VISITOR)\s+(\d{1,2})$/);if(m)return Math.round(100-(Number(m[2])/L)*100);const n=Number(text);return Number.isFinite(n)?Math.max(0,Math.min(100,n)):50}
+function spotFromCoord(coord,length){const L=Number(length)>0?Number(length):activeFieldLength();const c=Math.max(0,Math.min(100,Math.round(Number(coord)||0)));if(c===0)return'LEFT GOAL';if(c===100)return'RIGHT GOAL';if(c===50)return String(Math.round(L/2));return c<50?`LEFT ${Math.round((c/100)*L)}`:`RIGHT ${Math.round(L-(c/100)*L)}`}
 function teamSpotFromCoord(coord){const c=Math.max(1,Math.min(99,Math.round(Number(coord)||50)));if(c===50)return'50';const leftName=currentState?.home_team||'HOME',rightName=currentState?.visitor_team||'VISITOR';return c<50?`${leftName} ${c}`:`${rightName} ${100-c}`}
 function fieldSourceIds(source){return source==='statistician'?{slider:'statisticianFieldSlider',ball:'statisticianFieldBall',label:'statisticianBallSpotLabel'}:{slider:'broadcasterFieldSlider',ball:'broadcasterFieldBall',label:'broadcasterBallSpotLabel'}}
 function previewFieldSpot(source,value){const ids=fieldSourceIds(source),coord=Math.max(1,Math.min(99,Math.round(Number(value)||50)));const slider=document.getElementById(ids.slider),ball=document.getElementById(ids.ball),label=document.getElementById(ids.label);if(slider&&String(slider.value)!==String(coord))slider.value=coord;if(ball)ball.style.left=`${6 + (coord * 0.88)}%`;if(label)label.textContent=`Ball: ${teamSpotFromCoord(coord)}`}
@@ -3130,7 +3145,7 @@ async function openPlayEntry(team,kind){
 function closePlayEntry(){document.getElementById('playEntryModal').classList.add('hidden')}
 function turnoverEntryChanged(){const fumble=document.getElementById('playFumble'),lost=document.getElementById('playFumbleLost');if(lost.checked)fumble.checked=true;if(!fumble.checked)lost.checked=false;playOutcomeChanged()}
 function playOutcomeChanged(){const kind=document.getElementById('playEntryType').value;const o=document.getElementById('playPassOutcome').value;const turnover=(kind==='pass'&&o==='interception')||document.getElementById('playFumbleLost').checked;document.getElementById('playReceiverWrap').classList.toggle('hidden',!(kind==='pass'&&['complete','incomplete'].includes(o)));document.getElementById('playSackerWrap').classList.toggle('hidden',!(kind==='pass'&&o==='sack'));document.getElementById('playReturnerWrap').classList.toggle('hidden',!(['kickoff','punt'].includes(kind)||turnover));document.getElementById('playTurnoverSpotWrap').classList.toggle('hidden',!turnover);document.getElementById('playEndCoord').disabled=kind==='pass'&&['incomplete','spike'].includes(o);if(kind==='pass'&&['incomplete','spike'].includes(o))setSpotControl('end',document.getElementById('playStartCoord').value);if(turnover&&document.getElementById('playTurnoverCoord').value===document.getElementById('playStartCoord').value)setSpotControl('turnover',document.getElementById('playEndCoord').value);updatePlayPreview()}
-function updatePlayPreview(){const kind=document.getElementById('playEntryType').value,team=document.getElementById('playEntryTeam').value;const dir=currentState?.[team+'_direction']==='left'?-1:1;const s=Number(document.getElementById('playStartCoord').value),e=Number(document.getElementById('playEndCoord').value),l=Number(document.getElementById('playLandingCoord').value);let text=`Calculated result: ${(e-s)*dir} yards.`;if(['kickoff','punt'].includes(kind))text=`Kick distance: ${Math.abs(l-s)} yards · Return: ${Math.max(0,(e-l)*(-dir))} yards.`;const o=document.getElementById('playPassOutcome').value,turnover=(kind==='pass'&&o==='interception')||document.getElementById('playFumbleLost').checked;if(turnover){const t=Number(document.getElementById('playTurnoverCoord').value),defDir=-dir;text=`Turnover at ${spotFromCoord(t)} · Return: ${Math.max(0,(e-t)*defDir)} yards · New possession.`;}document.getElementById('playEntryPreview').textContent=text+' Down, distance, first down and scoring will be derived automatically.'}
+function updatePlayPreview(){const kind=document.getElementById('playEntryType').value,team=document.getElementById('playEntryTeam').value;const dir=currentState?.[team+'_direction']==='left'?-1:1;const L=activeFieldLength();const yd=pct=>Math.round(pct/100*L);const s=Number(document.getElementById('playStartCoord').value),e=Number(document.getElementById('playEndCoord').value),l=Number(document.getElementById('playLandingCoord').value);let text=`Calculated result: ${yd((e-s)*dir)} yards.`;if(['kickoff','punt'].includes(kind))text=`Kick distance: ${yd(Math.abs(l-s))} yards · Return: ${Math.max(0,yd((e-l)*(-dir)))} yards.`;const o=document.getElementById('playPassOutcome').value,turnover=(kind==='pass'&&o==='interception')||document.getElementById('playFumbleLost').checked;if(turnover){const t=Number(document.getElementById('playTurnoverCoord').value),defDir=-dir;text=`Turnover at ${spotFromCoord(t)} · Return: ${Math.max(0,yd((e-t)*defDir))} yards · New possession.`;}document.getElementById('playEntryPreview').textContent=text+' Down, distance, first down and scoring will be derived automatically.'}
 function rulesPlayStateExtractor(r){return {...currentState,...(r.state||{}),plays:Array.isArray(currentState?.plays)?currentState.plays:[],events:Array.isArray(currentState?.events)?currentState.events:[]}}
 async function finishCommittedPlayEntry(reason='rules-play-commit'){const msg=document.getElementById('playEntryMessage');if(msg)msg.textContent='Play recorded.';showOperatorNotice('Play recorded.','success',2500);closePlayEntry();const register=await refreshPlayRegister(reason,true);if(!register)showOperatorNotice('Play recorded. Updating play register...','warning',5000);return register}
 async function submitPlayEntry(){if(blockForPriorUnresolvedCommand('rules-play'))return;const kind=document.getElementById('playEntryType').value;const entryTeam=document.getElementById('playEntryTeam').value;const roles=currentState?.team_roles||{};if(['run','pass'].includes(kind)&&roles.offense&&entryTeam!==roles.offense){document.getElementById('playEntryMessage').textContent='Offensive play blocked: selected team does not have possession.';return}const defenseTeam=entryTeam==='home'?'visitor':'home';const named=(team,id)=>{const p=resolveRosterPlayer(team,document.getElementById(id).value);return p?playerDisplayName(p):''};const payload={team:entryTeam,play_type:kind,player_name:named(entryTeam,'playBallCarrier'),passer_name:named(entryTeam,'playPasser'),receiver_name:named(entryTeam,'playReceiver'),sacker_name:named(defenseTeam,'playSacker'),kicker_name:named(entryTeam,'playKicker'),returner_name:named(defenseTeam,'playReturner'),start_spot:spotFromCoord(document.getElementById('playStartCoord').value),landing_spot:spotFromCoord(document.getElementById('playLandingCoord').value),end_spot:spotFromCoord(document.getElementById('playEndCoord').value),turnover_spot:spotFromCoord(document.getElementById('playTurnoverCoord').value),return_end_spot:spotFromCoord(document.getElementById('playEndCoord').value),player_number:document.getElementById('playBallCarrier').value,passer_number:document.getElementById('playPasser').value,receiver_number:kind==='pass'?document.getElementById('playReceiver').value:'',sacker_number:document.getElementById('playSacker').value,kicker_number:document.getElementById('playKicker').value,returner_number:document.getElementById('playReturner').value,pass_outcome:document.getElementById('playPassOutcome').value,kneel:document.getElementById('playKneel').checked,fumble:document.getElementById('playFumble').checked,fumble_lost:document.getElementById('playFumbleLost').checked,muffed_punt:document.getElementById('playMuffedPunt').checked,out_of_bounds:document.getElementById('playOutOfBounds').checked,touchback:document.getElementById('playTouchback').checked,fair_catch:document.getElementById('playFairCatch').checked,blocked:document.getElementById('playBlocked').checked,notes:document.getElementById('playNotes').value};const msg=document.getElementById('playEntryMessage');if(msg)msg.textContent='RECORDING...';try{await GameStateManager.mutate('/api/rules-play',payload,'POST',rulesPlayStateExtractor)}catch(e){if(e?.commitStatus==='UNKNOWN_COMMIT'){if(msg)msg.textContent='Connection delayed — checking play...';showOperatorNotice('Connection delayed — checking play...','warning',0);try{await window.CommandClient.retryUnknown('rules-play',rulesPlayStateExtractor)}catch(retryError){if(retryError?.commitStatus==='UNKNOWN_COMMIT'){if(msg)msg.textContent='Connection delayed — checking play...';showOperatorNotice('Connection delayed — checking play...','warning',0);return}const retryFriendly=operatorErrorMessage(retryError,'Play was not recorded.');if(msg)msg.textContent=retryFriendly;showOperatorNotice(retryFriendly,'error',7000);return}}else{const friendly=operatorErrorMessage(e,'Play was not recorded.');if(msg)msg.textContent=friendly;showOperatorNotice(friendly,'error',7000);return}}await finishCommittedPlayEntry('rules-play-commit')}
@@ -3546,7 +3561,7 @@ function closeQuickCorrection(){document.getElementById('quickCorrectionModal').
 async function submitQuickCorrection(){try{await GameStateManager.mutate('/api/game-correction',{source:'statistician',down:document.getElementById('correctDown').value,distance:document.getElementById('correctDistance').value,ball_spot:document.getElementById('correctBallSpot').value,possession:document.getElementById('correctPossession').value,quarter:document.getElementById('correctQuarter').value,note:document.getElementById('correctNote').value});closeQuickCorrection();loadCorrections()}catch(e){document.getElementById('correctMessage').textContent=e.data?.message||e.message}}
 function setEditSpot(which,coord){const id=which==='start'?'editStartCoord':'editEndCoord';const label=which==='start'?'editStartSpotLabel':'editEndSpotLabel';const el=document.getElementById(id);el.value=Math.max(0,Math.min(100,Math.round(Number(coord)||0)));document.getElementById(label).textContent=spotFromCoord(el.value);updateEditCalculation()}
 function nudgeEditSpot(which,delta){const el=document.getElementById(which==='start'?'editStartCoord':'editEndCoord');setEditSpot(which,Number(el.value)+delta)}
-function updateEditCalculation(){const ev=(currentState.events||[]).find(e=>e.id===document.getElementById('editEventId').value);if(!ev)return;const team=ev.team||currentState.possession||'home';const dir=currentState?.[team+'_direction']==='left'?-1:1;const yards=(Number(document.getElementById('editEndCoord').value)-Number(document.getElementById('editStartCoord').value))*dir;document.getElementById('editEventYards').value=yards;document.getElementById('editCalculatedSummary').textContent=`Calculated result: ${yards} yards · Ball at ${spotFromCoord(document.getElementById('editEndCoord').value)}`}
+function updateEditCalculation(){const ev=(currentState.events||[]).find(e=>e.id===document.getElementById('editEventId').value);if(!ev)return;const team=ev.team||currentState.possession||'home';const dir=currentState?.[team+'_direction']==='left'?-1:1;const L=activeFieldLength();const yards=Math.round(((Number(document.getElementById('editEndCoord').value)-Number(document.getElementById('editStartCoord').value))/100*L)*dir);document.getElementById('editEventYards').value=yards;document.getElementById('editCalculatedSummary').textContent=`Calculated result: ${yards} yards · Ball at ${spotFromCoord(document.getElementById('editEndCoord').value)}`}
 function quickEditLastPlay(){const plays=Array.isArray(currentState?.plays)?currentState.plays:[];const last=plays.slice().reverse().find(p=>!p.undone);if(!last){alert('No plays recorded yet.');return}const ev=(currentState.events||[]).find(e=>e.id===last.event_id);if(!ev){alert('Could not find the event for the last play.');return}openEditEvent(ev.id)}
 function openEditEvent(id){const ev=(currentState.events||[]).find(e=>e.id===id);if(!ev)return;const play=(currentState.plays||[]).find(p=>p.event_id===id||p.play_id===ev.play_id)||{};document.getElementById('editEventId').value=id;document.getElementById('editEventDescription').value=ev.description||'';document.getElementById('editEventQuarter').value=ev.quarter||'';document.getElementById('editEventDown').value=ev.after?.down||'';document.getElementById('editEventDistance').value=ev.after?.distance||'';document.getElementById('editEventPossession').value=ev.after?.possession||'';document.getElementById('editEventNote').value='';const team=ev.team||play.offense||'home';const teamName=team==='home'?currentState.home_team:currentState.visitor_team;const abbr=(team==='home'?currentState.home_abbreviation:currentState.visitor_abbreviation)||teamName.split(/\s+/).map(x=>x[0]).join('').slice(0,4).toUpperCase();const arrow=currentState?.[team+'_direction']==='left'?'←':'→';document.getElementById('editDriveIndicator').textContent=arrow==='←'?`${arrow} ${abbr}`:`${abbr} ${arrow}`;setEditSpot('start',coordFromSpot(play.ball_spot||ev.before?.ball_spot||currentState.ball_spot||'50'));setEditSpot('end',coordFromSpot(play.end_spot||ev.after?.ball_spot||currentState.ball_spot||'50'));document.getElementById('editStartCoord').oninput=()=>setEditSpot('start',document.getElementById('editStartCoord').value);document.getElementById('editEndCoord').oninput=()=>setEditSpot('end',document.getElementById('editEndCoord').value);document.getElementById('editEventModal').classList.remove('hidden');updateEditCalculation()}
 function closeEditEvent(){document.getElementById('editEventModal').classList.add('hidden')}
@@ -5215,6 +5230,63 @@ function updateOrganizationLogoPreview(){
   preview.onerror=()=>{preview.onerror=null;preview.src='/static/csrn-logo.png';preview.classList.add('using-fallback')};
 }
 document.getElementById('cfgOrgLogo')?.addEventListener('input',updateOrganizationLogoPreview);
+
+// Broadcast-creation Rules / Jurisdiction picker. Options are grouped by
+// country; each carries its ruleset's (country, region, association) tuple
+// in data-* attributes, which createBroadcast()/editGame() read. The tuple
+// is what the backend resolves against (ruleset_service.active_ruleset).
+async function loadRulesetOptions() {
+  const select = document.getElementById('rulesetJurisdiction');
+  if (!select) return;
+  let rows;
+  try {
+    rows = (await api('/api/rulesets'))?.rulesets;
+  } catch (_) {
+    return; // keep the static MHSAA option on failure
+  }
+  if (!Array.isArray(rows) || !rows.length) return;
+  const previous = select.value || 'football/us-ms-mhsaa';
+  const countryLabel = (code) => ({US: 'United States', CA: 'Canada'}[code] || code || 'Other');
+  const groups = new Map();
+  for (const r of rows) {
+    const key = r.country || 'ZZ';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+  const orderedKeys = [...groups.keys()].sort((a, b) => (a === 'US' ? -1 : b === 'US' ? 1 : a.localeCompare(b)));
+  select.innerHTML = orderedKeys.map((key) => {
+    const opts = groups.get(key).map((r) => {
+      const c = r.country || '', reg = r.region || '', assoc = r.association || '';
+      return `<option value="${escapeHtml(r.id)}" data-country="${escapeHtml(c)}" data-region="${escapeHtml(reg)}" data-association="${escapeHtml(assoc)}">${escapeHtml(r.label || r.id)}</option>`;
+    }).join('');
+    return `<optgroup label="${escapeHtml(countryLabel(key))}">${opts}</optgroup>`;
+  }).join('');
+  const restore = [...select.options].some((o) => o.value === previous) ? previous : 'football/us-ms-mhsaa';
+  select.value = [...select.options].some((o) => o.value === restore) ? restore : (select.options[0]?.value || '');
+  syncRulesetJurisdictionDataset();
+}
+
+// Mirror the selected <option>'s jurisdiction tuple onto the <select> itself
+// so callers can read it without walking selectedOptions.
+function syncRulesetJurisdictionDataset() {
+  const select = document.getElementById('rulesetJurisdiction');
+  const opt = select?.selectedOptions?.[0];
+  if (!select || !opt) return;
+  select.dataset.country = opt.dataset.country || '';
+  select.dataset.region = opt.dataset.region || '';
+  select.dataset.association = opt.dataset.association || '';
+}
+
+function selectRulesetJurisdiction(country, region, association) {
+  const select = document.getElementById('rulesetJurisdiction');
+  if (!select) return;
+  const want = (v) => String(v || '').trim().toUpperCase();
+  const [wc, wr, wa] = [want(country) || 'US', want(region), want(association)];
+  const match = [...select.options].find((o) =>
+    want(o.dataset.country) === wc && want(o.dataset.region) === wr && want(o.dataset.association) === wa);
+  if (match) select.value = match.value;
+  syncRulesetJurisdictionDataset();
+}
 
 async function loadConfig() {
   currentConfig = await api('/api/config');
@@ -7100,6 +7172,7 @@ function renderGameManager(){
 async function editGame(id){
   const r=gameManagerRecords.find(x=>x.broadcast_id===id); if(!r) return; editingBroadcastId=id; moveSetupPanelToGameManager(); const p=document.getElementById('setupPanel'); p.classList.remove('hidden');
   for(const [k,v] of Object.entries({sport:r.sport||'Football',season:r.season||String(new Date().getFullYear()),classification:r.classification||'5A',week:r.week||'1',level:r.level||'Varsity',division:r.division||'Boys',date:r.date||'',venue:r.venue||'',visualMode:r.visual_mode||'graphic',homeTeam:r.home_team||'',visitorTeam:r.visitor_team||''})){const e=document.getElementById(k);if(e)e.value=v;}
+  selectRulesetJurisdiction(r.country||'US', r.region||'', r.association||'');
   document.getElementById('homeSchoolSelect').value=r.home_school_id||'__manual__'; document.getElementById('visitorSchoolSelect').value=r.visitor_school_id||'__manual__'; const m=(r.scheduled_start||'7:00 PM').match(/(\d+):(\d+)\s*(AM|PM)/i); if(m){startHour.value=String(Number(m[1]));startMinute.value=m[2];startAmPm.value=m[3].toUpperCase();}
   populateBroadcastPlanning(r);
   await loadGamePregameStorylines(id);

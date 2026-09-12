@@ -102,9 +102,11 @@ class CanonicalStateFoundation:
         toward -- i.e. yards to score, NOT distance into the labeled team's
         territory.
 
-        ball_spot coord runs 0 (LEFT/HOME goal) .. 100 (RIGHT/VISITOR goal).
-        A team driving "right" attacks coord 100, so it has (100 - coord) to
-        go; a team driving "left" attacks coord 0, so it has (coord) to go.
+        ball_spot coord runs 0 (LEFT/HOME goal) .. length (RIGHT/VISITOR
+        goal), where length is the ruleset field length (100 NFHS / 110
+        Canadian). A team driving "right" attacks coord length, so it has
+        (length - coord) to go; a team driving "left" attacks coord 0, so
+        it has (coord) to go.
         Possession direction already flips at halftime, so this is correct in
         both halves without any special-casing.
 
@@ -114,12 +116,13 @@ class CanonicalStateFoundation:
         """
 
         roles = cls.team_roles(state)
-        coord = cls._spot_to_coord(state.get("ball_spot") or 50)
+        length = cls._field_length(state)
+        coord = cls._spot_to_coord(state.get("ball_spot") or (length // 2), state)
         direction = str(
             state.get(f"{roles.possessing_team}_direction", "right") or "right"
         ).strip().lower()
-        to_goal = coord if direction == "left" else 100 - coord
-        return max(0, min(100, int(to_goal)))
+        to_goal = coord if direction == "left" else length - coord
+        return max(0, min(length, int(to_goal)))
 
     @classmethod
     def field_state(cls, state: Mapping[str, Any]) -> dict[str, Any]:
@@ -133,7 +136,9 @@ class CanonicalStateFoundation:
             "down": str(state.get("down", "1st") or "1st"),
             "distance": str(state.get("distance", "10") or "10"),
             "yards_to_goal": to_goal,
-            "red_zone": 0 < to_goal <= 20,
+            "red_zone": 0 < to_goal <= cls._field_geometry(state).get("red_zone_yards", 20),
+            "length_yards": cls._field_geometry(state).get("length_yards", 100),
+            "end_zone_depth_yards": cls._field_geometry(state).get("end_zone_depth_yards", 10),
             "drive_direction": str(
                 state.get(f"{roles.possessing_team}_direction", "right") or "right"
             ),
@@ -180,57 +185,84 @@ class CanonicalStateFoundation:
             return roles.receiving_team or roles.defense
         return ""
 
-    @staticmethod
-    def _spot_to_coord(value: Any) -> int:
+    @classmethod
+    def _spot_to_coord(cls, value: Any, state: Mapping[str, Any] | None = None) -> int:
+        length = cls._field_length(state)
+        mid = length // 2
         text = str(value or "").strip().upper()
         if text in {"LEFT GOAL", "HOME GOAL", "0"}:
             return 0
-        if text in {"RIGHT GOAL", "VISITOR GOAL", "100"}:
-            return 100
-        if text == "50":
-            return 50
+        if text in {"RIGHT GOAL", "VISITOR GOAL", str(length)}:
+            return length
+        if text == str(mid):
+            return mid
         parts = text.split()
         if len(parts) == 2 and parts[1].isdigit():
-            yard = max(0, min(50, int(parts[1])))
+            yard = max(0, min(mid, int(parts[1])))
             if parts[0] in {"LEFT", "HOME"}:
                 return yard
             if parts[0] in {"RIGHT", "VISITOR"}:
-                return 100 - yard
+                return length - yard
         try:
-            return max(0, min(100, int(float(text))))
+            return max(0, min(length, int(float(text))))
         except (TypeError, ValueError):
-            return 50
-
-    @staticmethod
-    def _coord_to_spot(coord: Any) -> str:
-        try:
-            value = max(0, min(100, int(round(float(coord)))))
-        except (TypeError, ValueError):
-            value = 50
-        if value == 0:
-            return "LEFT GOAL"
-        if value == 100:
-            return "RIGHT GOAL"
-        if value == 50:
-            return "50"
-        return f"LEFT {value}" if value < 50 else f"RIGHT {100 - value}"
-
-
-    # Kickoff / free-kick / try spots, sourced once from the football ruleset
-    # (US/MS/MHSAA). The literals are the frozen fallback + golden anchor.
-    _FIELD_YARDS_FALLBACK = {"kickoff": 40, "free_kick": 20, "try": 3}
-    _field_yards_cache: dict[str, int] | None = None
+            return mid
 
     @classmethod
-    def _field_yards(cls) -> dict[str, int]:
-        if cls._field_yards_cache is None:
+    def _coord_to_spot(cls, coord: Any, state: Mapping[str, Any] | None = None) -> str:
+        length = cls._field_length(state)
+        mid = length // 2
+        try:
+            value = max(0, min(length, int(round(float(coord)))))
+        except (TypeError, ValueError):
+            value = mid
+        if value == 0:
+            return "LEFT GOAL"
+        if value == length:
+            return "RIGHT GOAL"
+        if value == mid:
+            return str(mid)
+        return f"LEFT {value}" if value < mid else f"RIGHT {length - value}"
+
+
+    # Down cycle / field spots / geometry / point values are all resolved
+    # from the active football ruleset (ruleset_service.active_ruleset), and
+    # every derived value is cached keyed by that ruleset's id -- so a
+    # process that ever serves more than one jurisdiction keeps them
+    # separate. Absent jurisdiction fields on the state, active_ruleset
+    # falls back to the generic US base, whose values equal us-ms-mhsaa, so
+    # this is a no-op for every current broadcast. The *_FALLBACK literals
+    # are the frozen anchor used only if the ruleset engine raises.
+    _FIELD_YARDS_FALLBACK = {"kickoff": 40, "free_kick": 20, "try": 3}
+    _DOWNS_SEQUENCE_FALLBACK = ["1st", "2nd", "3rd", "4th"]
+    _FIELD_GEOMETRY_FALLBACK = {
+        "length_yards": 100,
+        "end_zone_depth_yards": 10,
+        "red_zone_yards": 20,
+    }
+    _SCORING_FALLBACK = {
+        "touchdown": 6,
+        "field_goal": 3,
+        "safety": 2,
+        "convert_kick": 1,
+        "convert_major": 2,
+        "single": 1,
+    }
+    _field_yards_cache: dict[str, dict[str, int]] = {}
+    _downs_sequence_cache: dict[str, list[str]] = {}
+    _field_geometry_cache: dict[str, dict[str, int]] = {}
+    _scoring_cache: dict[str, dict[str, int]] = {}
+
+    @classmethod
+    def _field_yards(cls, state: Mapping[str, Any] | None = None) -> dict[str, int]:
+        import ruleset_service
+
+        rid = ruleset_service.active_ruleset_id(state)
+        if rid not in cls._field_yards_cache:
             resolved = dict(cls._FIELD_YARDS_FALLBACK)
             try:
-                import ruleset_service
-
-                field = ruleset_service.resolve(
-                    country="US", region="MS", association="MHSAA", sport="football"
-                ).get("field", {})
+                field = ruleset_service.active_ruleset(state).get("field", {})
+                length_yards = int(field.get("length_yards", 100) or 100)
                 mapping = {
                     "kickoff": field.get("kickoff_spot"),
                     "free_kick": field.get("free_kick_spot"),
@@ -238,24 +270,75 @@ class CanonicalStateFoundation:
                 }
                 for key, spec in mapping.items():
                     if spec:
-                        _side, yard = ruleset_service.field_spot_yardage(spec)
+                        _side, yard = ruleset_service.field_spot_yardage(spec, length_yards)
                         resolved[key] = yard
             except Exception:
                 resolved = dict(cls._FIELD_YARDS_FALLBACK)
-            cls._field_yards_cache = resolved
-        return cls._field_yards_cache
+            cls._field_yards_cache[rid] = resolved
+        return cls._field_yards_cache[rid]
+
+    @classmethod
+    def _downs_sequence(cls, state: Mapping[str, Any] | None = None) -> list[str]:
+        import ruleset_service
+
+        rid = ruleset_service.active_ruleset_id(state)
+        if rid not in cls._downs_sequence_cache:
+            try:
+                resolved = ruleset_service.downs_sequence(
+                    ruleset_service.active_ruleset(state)
+                ) or list(cls._DOWNS_SEQUENCE_FALLBACK)
+            except Exception:
+                resolved = list(cls._DOWNS_SEQUENCE_FALLBACK)
+            cls._downs_sequence_cache[rid] = resolved
+        return cls._downs_sequence_cache[rid]
+
+    @classmethod
+    def _field_geometry(cls, state: Mapping[str, Any] | None = None) -> dict[str, int]:
+        import ruleset_service
+
+        rid = ruleset_service.active_ruleset_id(state)
+        if rid not in cls._field_geometry_cache:
+            try:
+                resolved = ruleset_service.field_geometry(
+                    ruleset_service.active_ruleset(state)
+                ) or dict(cls._FIELD_GEOMETRY_FALLBACK)
+            except Exception:
+                resolved = dict(cls._FIELD_GEOMETRY_FALLBACK)
+            cls._field_geometry_cache[rid] = resolved
+        return cls._field_geometry_cache[rid]
+
+    @classmethod
+    def _field_length(cls, state: Mapping[str, Any] | None = None) -> int:
+        return int(cls._field_geometry(state).get("length_yards", 100) or 100)
+
+    @classmethod
+    def _scoring(cls, state: Mapping[str, Any] | None = None) -> dict[str, int]:
+        import ruleset_service
+
+        rid = ruleset_service.active_ruleset_id(state)
+        if rid not in cls._scoring_cache:
+            try:
+                resolved = ruleset_service.scoring_values(
+                    ruleset_service.active_ruleset(state)
+                ) or dict(cls._SCORING_FALLBACK)
+            except Exception:
+                resolved = dict(cls._SCORING_FALLBACK)
+            cls._scoring_cache[rid] = resolved
+        return cls._scoring_cache[rid]
 
     @classmethod
     def _team_own_yard_spot(cls, state: Mapping[str, Any], team: str, yard: int) -> str:
         direction = str(state.get(f"{team}_direction", "right" if team == "home" else "left") or "right").lower()
-        coord = yard if direction == "right" else 100 - yard
-        return cls._coord_to_spot(coord)
+        length = cls._field_length(state)
+        coord = yard if direction == "right" else length - yard
+        return cls._coord_to_spot(coord, state)
 
     @classmethod
     def _opponent_yard_spot(cls, state: Mapping[str, Any], team: str, yard: int) -> str:
         direction = str(state.get(f"{team}_direction", "right" if team == "home" else "left") or "right").lower()
-        coord = 100 - yard if direction == "right" else yard
-        return cls._coord_to_spot(coord)
+        length = cls._field_length(state)
+        coord = length - yard if direction == "right" else yard
+        return cls._coord_to_spot(coord, state)
 
     @classmethod
     def enter_pending_try(cls, state: dict[str, Any], scoring_team: str) -> None:
@@ -342,7 +425,8 @@ class CanonicalStateFoundation:
             play["invalid_during_special_phase"] = True
             return
         direction = -1 if str(state.get(f"{team}_direction", "right")) == "left" else 1
-        start = cls._spot_to_coord(state.get("ball_spot") or play.get("ball_spot") or 50)
+        length = cls._field_length(state)
+        start = cls._spot_to_coord(state.get("ball_spot") or play.get("ball_spot") or (length // 2), state)
         try:
             yards = int(play.get("yards", 0) or 0)
         except (TypeError, ValueError):
@@ -350,9 +434,9 @@ class CanonicalStateFoundation:
         outcome = str(play.get("pass_outcome", "") or "").lower()
         if kind == "pass" and outcome in {"incomplete", "spike"}:
             yards = 0
-        end = max(0, min(100, start + (yards * direction)))
-        play["ball_spot"] = cls._coord_to_spot(start)
-        play["end_spot"] = cls._coord_to_spot(end)
+        end = max(0, min(length, start + (yards * direction)))
+        play["ball_spot"] = cls._coord_to_spot(start, state)
+        play["end_spot"] = cls._coord_to_spot(end, state)
 
         old_down = str(state.get("down", "1st") or "1st")
         old_distance_text = str(state.get("distance", "10") or "10")
@@ -360,20 +444,22 @@ class CanonicalStateFoundation:
             distance = 10 if old_distance_text in {"Off", "Goal", ""} else max(1, int(old_distance_text))
         except ValueError:
             distance = 10
-        touchdown = (direction == 1 and end == 100) or (direction == -1 and end == 0)
-        safety = (direction == 1 and end == 0) or (direction == -1 and end == 100)
+        touchdown = (direction == 1 and end == length) or (direction == -1 and end == 0)
+        safety = (direction == 1 and end == 0) or (direction == -1 and end == length)
         turnover = bool(play.get("turnover"))
         turnover_type = str(play.get("turnover_type", "") or "").lower()
         if turnover:
             turnover_spot = cls._spot_to_coord(
-                play.get("turnover_spot") or play.get("end_spot") or cls._coord_to_spot(end)
+                play.get("turnover_spot") or play.get("end_spot") or cls._coord_to_spot(end, state),
+                state,
             )
             return_end = cls._spot_to_coord(
-                play.get("return_end_spot") or play.get("end_spot") or cls._coord_to_spot(turnover_spot)
+                play.get("return_end_spot") or play.get("end_spot") or cls._coord_to_spot(turnover_spot, state),
+                state,
             )
             end = return_end
-            play["turnover_spot"] = cls._coord_to_spot(turnover_spot)
-            play["return_end_spot"] = cls._coord_to_spot(return_end)
+            play["turnover_spot"] = cls._coord_to_spot(turnover_spot, state)
+            play["return_end_spot"] = cls._coord_to_spot(return_end, state)
             gaining_team = str(play.get("turnover_team", "") or cls.opposite(team)).lower()
             if gaining_team not in cls.VALID_TEAMS:
                 gaining_team = cls.opposite(team)
@@ -384,20 +470,22 @@ class CanonicalStateFoundation:
             return_direction = -1 if str(state.get(f"{gaining_team}_direction", "left")) == "left" else 1
             play["return_yards"] = max(0, (return_end - turnover_spot) * return_direction)
             turnover_touchdown = bool(play.get("touchdown")) or (
-                (return_direction == 1 and return_end == 100)
+                (return_direction == 1 and return_end == length)
                 or (return_direction == -1 and return_end == 0)
             )
             touchdown = turnover_touchdown
             safety = False
+        td_points = cls._scoring(state).get("touchdown", 6)
+        safety_points = cls._scoring(state).get("safety", 2)
         if turnover and touchdown:
-            state[f"{play['turnover_team']}_score"] = int(state.get(f"{play['turnover_team']}_score", 0) or 0) + 6
+            state[f"{play['turnover_team']}_score"] = int(state.get(f"{play['turnover_team']}_score", 0) or 0) + td_points
             cls.enter_pending_try(state, play["turnover_team"])
         elif touchdown:
-            state[f"{team}_score"] = int(state.get(f"{team}_score", 0) or 0) + 6
+            state[f"{team}_score"] = int(state.get(f"{team}_score", 0) or 0) + td_points
             cls.enter_pending_try(state, team)
         elif safety:
             other = cls.opposite(team)
-            state[f"{other}_score"] = int(state.get(f"{other}_score", 0) or 0) + 2
+            state[f"{other}_score"] = int(state.get(f"{other}_score", 0) or 0) + safety_points
             cls.enter_free_kick(state, team)
         elif turnover:
             state["possession"] = str(play.get("turnover_team") or cls.opposite(team))
@@ -409,21 +497,23 @@ class CanonicalStateFoundation:
                 state["down"] = "1st"
                 state["distance"] = "10"
             else:
-                order = {"1st": "2nd", "2nd": "3rd", "3rd": "4th", "4th": "1st"}
-                state["down"] = order.get(old_down, "1st")
+                import ruleset_service
+
+                downs = cls._downs_sequence(state)
+                state["down"] = ruleset_service.next_down(old_down, downs)
                 state["distance"] = str(max(1, distance - yards))
-                if old_down == "4th":
+                if ruleset_service.is_terminal_down(old_down, downs):
                     state["possession"] = cls.opposite(team)
                     state["down"] = "1st"
                     state["distance"] = "10"
                     turnover = True
                     play["turnover_type"] = "downs"
                     play["turnover_team"] = cls.opposite(team)
-                    play["turnover_spot"] = cls._coord_to_spot(end)
-                    play["return_end_spot"] = cls._coord_to_spot(end)
+                    play["turnover_spot"] = cls._coord_to_spot(end, state)
+                    play["return_end_spot"] = cls._coord_to_spot(end, state)
                     play["return_yards"] = 0
             play["first_down"] = first_down
-        state["ball_spot"] = cls._coord_to_spot(end)
+        state["ball_spot"] = cls._coord_to_spot(end, state)
         play["touchdown"] = touchdown
         play["safety"] = safety
         play["turnover"] = turnover

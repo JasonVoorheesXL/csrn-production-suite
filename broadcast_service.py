@@ -48,6 +48,9 @@ class BroadcastService:
     )
     _EDITABLE_KEYS = (
         "sport",
+        "country",
+        "region",
+        "association",
         "season",
         "classification",
         "week",
@@ -304,6 +307,12 @@ class BroadcastService:
             "updated_at": now,
             "status": "planned",
             "sport": sport,
+            # Jurisdiction tuple -> ruleset_service.active_ruleset(state).
+            # "" (the default) means the generic ruleset for the sport;
+            # "US"/"MS"/"MHSAA" reproduces today's only behaviour.
+            "country": self.jurisdiction_code(data.get("country")) or "US",
+            "region": self.jurisdiction_code(data.get("region")),
+            "association": self.jurisdiction_code(data.get("association")),
             "season": season,
             "classification": classification,
             "week": week,
@@ -392,6 +401,11 @@ class BroadcastService:
         for key in self._EDITABLE_KEYS:
             if key in data:
                 item[key] = copy.deepcopy(data[key])
+        for key in ("country", "region", "association"):
+            if key in data:
+                item[key] = self.jurisdiction_code(data[key]) or (
+                    "US" if key == "country" else ""
+                )
 
         sport = str(item.get("sport", "Football") or "Football")
         item.update(
@@ -631,6 +645,13 @@ class BroadcastService:
             if key in broadcast:
                 state[key] = copy.deepcopy(broadcast[key])
         self._save_state(state)
+
+    @staticmethod
+    def jurisdiction_code(value: Any) -> str:
+        """A country / region / association code as an upper-cased token, or
+        "" when unset. The ruleset engine (ruleset_service.active_ruleset)
+        treats "" as absent and falls back to the generic ruleset."""
+        return str(value or "").strip().upper()
 
     @staticmethod
     def normalize_record(value: Any) -> dict[str, int]:

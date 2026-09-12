@@ -19,7 +19,7 @@ def base_state():
     }
 
 
-def _spot(v): return RulesService.spot_to_coord(v)
+def _spot(v, *_a): return RulesService.spot_to_coord(v)
 def _dir(st,team): return RulesService.team_direction(st,team)
 
 

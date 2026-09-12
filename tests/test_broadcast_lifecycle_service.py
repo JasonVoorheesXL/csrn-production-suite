@@ -194,6 +194,25 @@ def test_load_builds_new_state_and_team_identities() -> None:
     assert state["special_designations"] == ["homecoming", "rivalry"]
 
 
+def test_load_carries_jurisdiction_onto_state_for_the_rules_engine() -> None:
+    # Round 26 Phase B 2/5: the jurisdiction tuple on a broadcast record
+    # reaches game state, so ruleset_service.active_ruleset(state) resolves
+    # the right ruleset.
+    import ruleset_service
+
+    # legacy record (no jurisdiction fields) -> generic US / NFHS
+    state = build_service()["service"].load("FB-2026-01").data["state"]
+    assert (state["country"], state["region"], state["association"]) == ("US", "", "")
+    assert ruleset_service.active_ruleset_id(state) == "football/us-nfhs"
+
+    # Canadian record -> ca-cjfl-ofc
+    ca_row = record()
+    ca_row.update({"country": "CA", "region": "ON", "association": "CJFL"})
+    ca_state = build_service(records=[ca_row])["service"].load("FB-2026-01").data["state"]
+    assert (ca_state["country"], ca_state["region"], ca_state["association"]) == ("CA", "ON", "CJFL")
+    assert ruleset_service.active_ruleset_id(ca_state) == "football/ca-cjfl-ofc"
+
+
 def test_load_completed_record_restores_final_score_and_review_mode() -> None:
     built = build_service(records=[record("completed")])
     result = built["service"].load("FB-2026-01")

@@ -658,3 +658,56 @@ def test_play_marks_game_live_and_advances_play_number() -> None:
     assert len(saved) == 1
 
 
+
+
+def test_fair_catch_signal_is_honoured_under_the_default_nfhs_ruleset() -> None:
+    # Round 26 5/7 dormancy: NFHS keeps the fair catch, so the signal must
+    # still land in the play result and suppress the return exactly as before.
+    service, _, _, _, _ = build_service()
+    result = service.play(
+        {
+            "team": "home",
+            "play_type": "punt",
+            "start_spot": "LEFT 20",
+            "landing_spot": "RIGHT 30",
+            "end_spot": "RIGHT 30",
+            "kicker_number": "7",
+            "returner_number": "4",
+            "fair_catch": True,
+        }
+    )
+    assert result.ok
+    play = result.data["play"]
+    assert "fair catch" in play["result"].lower()
+    assert play["return_yards"] == 0
+
+
+def test_no_fair_catch_ruleset_drops_the_fair_catch_signal() -> None:
+    # Round 26 5/7: with a no-fair-catch ruleset (Canadian) the same payload
+    # must ignore fair_catch entirely -- the returner runs it. (Round 26 6/7:
+    # the cache is keyed by ruleset id, so seed the active id's entry.)
+    import ruleset_service
+
+    RulesService._no_fair_catch_cache = {
+        ruleset_service.active_ruleset_id(): True
+    }
+    try:
+        service, _, _, _, _ = build_service()
+        result = service.play(
+            {
+                "team": "home",
+                "play_type": "punt",
+                "start_spot": "LEFT 20",
+                "landing_spot": "RIGHT 30",
+                "end_spot": "RIGHT 20",
+                "kicker_number": "7",
+                "returner_number": "4",
+                "fair_catch": True,
+            }
+        )
+        assert result.ok
+        play = result.data["play"]
+        assert "fair catch" not in play["result"].lower()
+        assert "returned by" in play["result"].lower()
+    finally:
+        RulesService._no_fair_catch_cache = {}

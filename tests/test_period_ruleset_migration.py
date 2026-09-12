@@ -9,7 +9,8 @@ from period_service import PeriodService
 
 
 def _reset():
-    PeriodService._period_cache = None
+    # Round 26 6/7: caches are now keyed by ruleset id.
+    PeriodService._period_cache = {}
 
 
 def test_period_values_come_from_the_ruleset_and_match_the_literals() -> None:
@@ -42,10 +43,10 @@ def test_stop_clock_reset_uses_the_ruleset_quarter_length() -> None:
 def test_falls_back_to_literals_if_the_ruleset_engine_is_unavailable(monkeypatch) -> None:
     _reset()
 
-    def boom(**_kw):
+    def boom(*_a, **_kw):
         raise RuntimeError("no rulesets")
 
-    monkeypatch.setattr(ruleset_service, "resolve", boom)
+    monkeypatch.setattr(ruleset_service, "load_ruleset", boom)
     period = PeriodService._period()
     assert period["quarter_seconds"] == 720
     assert period["quarters"] == ["1", "2", "3", "4", "OT"]

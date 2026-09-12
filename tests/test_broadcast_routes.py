@@ -122,6 +122,24 @@ def broadcast_client(monkeypatch: pytest.MonkeyPatch):
         yield client, service
 
 
+def test_rulesets_route_returns_shipped_rulesets_with_jurisdiction(
+    broadcast_client,
+) -> None:
+    # Round 26 Phase B 3/5: the jurisdiction picker fetches /api/rulesets.
+    client, _ = broadcast_client
+
+    response = client.get("/api/rulesets")
+
+    assert response.status_code == 200
+    rows = response.get_json()["rulesets"]
+    by_id = {r["id"]: r for r in rows}
+    assert "football/us-ms-mhsaa" in by_id
+    assert "football/ca-cjfl-ofc" in by_id
+    assert (by_id["football/ca-cjfl-ofc"]["country"],
+            by_id["football/ca-cjfl-ofc"]["region"],
+            by_id["football/ca-cjfl-ofc"]["association"]) == ("CA", "ON", "CJFL")
+
+
 def test_list_broadcasts_preserves_array_contract_and_archive_option(
     broadcast_client,
 ) -> None:

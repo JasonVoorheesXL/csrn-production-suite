@@ -26,8 +26,10 @@ layer has since been fixed or rebuilt.
 """
 from __future__ import annotations
 
+import json
 from typing import Any
 
+import ruleset_service
 from statistics_service import StatisticsService
 
 
@@ -426,3 +428,121 @@ def test_report_still_counts_a_legitimate_touchdown_outside_any_special_phase() 
     assert result.data["statistics"]["teams"]["home"]["touchdowns"] == 1
     players_by_name = {p["name"]: p for p in result.data["statistics"]["players"]}
     assert players_by_name["Tyler Long"]["rushing_touchdowns"] == 1
+
+
+# --------------------------------------------------------------------------
+# Round 26 (Phase A 4/7): the single (rouge) and a PAT are both +1-point
+# events, so the report layer must classify them by EVENT CODE, never by
+# the delta. This proves the disambiguation now -- against a test-only
+# Canadian-shaped ruleset -- before the real ca-base.json exists (7/7).
+# --------------------------------------------------------------------------
+
+
+def _write_test_ca_ruleset(tmp_path) -> str:
+    football = tmp_path / "football"
+    football.mkdir()
+    (football / "test-ca.json").write_text(
+        json.dumps(
+            {
+                "id": "football/test-ca",
+                "sport": "football",
+                "period": {"downs_per_set": 3},
+                "field": {"no_fair_catch": True, "field_goal_play": True},
+                "scoring": {"single": 1},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return "football/test-ca"
+
+
+def test_single_and_pat_in_the_same_game_are_never_cross_attributed(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("CSRN_RULESETS_DIR", str(tmp_path))
+    ruleset_service.clear_cache()
+    try:
+        ca = ruleset_service.load_ruleset(_write_test_ca_ruleset(tmp_path))
+        # The fixture really does enable the Canadian shape.
+        assert ruleset_service.no_fair_catch(ca) is True
+        assert ruleset_service.scoring_values(ca)["single"] == 1
+        assert "field_goal" in ruleset_service.valid_play_types(ca)
+
+        # One game, one kicker (#9). He kicks the PAT after a TD (an "XP"
+        # event, recorded during pending_try) AND, on a later drive, a rouge
+        # (a "SINGLE" event, in open play). Both deltas are +1.
+        state = _incident_base_state(
+            home_score=8,
+            visitor_score=0,
+            events=[
+                {
+                    "id": "e-td",
+                    "event": "TD",
+                    "team": "home",
+                    "score_delta": 6,
+                    "before": {"special_game_phase": ""},
+                    "automation": {"player_number": "20", "player_name": "RB One"},
+                },
+                {
+                    "id": "e-xp",
+                    "event": "XP",
+                    "team": "home",
+                    "score_delta": 1,
+                    "conversion_outcome": "good",
+                    "before": {"special_game_phase": "pending_try"},
+                    "automation": {"player_number": "9", "player_name": "K Nine"},
+                },
+                {
+                    "id": "e-single",
+                    "event": "SINGLE",
+                    "team": "home",
+                    "score_delta": 1,
+                    "before": {"special_game_phase": ""},
+                    "automation": {"player_number": "9", "player_name": "K Nine"},
+                },
+            ],
+        )
+        result = StatisticsService().report(state)
+        home = result.data["statistics"]["teams"]["home"]
+
+        # The PAT is a PAT and only a PAT.
+        assert home["extra_points"] == 1
+        assert home["extra_point_attempts"] == 1  # the SINGLE added no attempt
+        # The single is a single and only a single.
+        assert home["singles"] == 1
+        assert home["two_point_conversions"] == 0
+        assert home["field_goals"] == 0
+        assert home["field_goal_attempts"] == 0
+
+        players = {p["name"]: p for p in result.data["statistics"]["players"]}
+        assert players["K Nine"]["extra_points"] == 1
+        assert players["K Nine"]["extra_point_attempts"] == 1
+        assert players["K Nine"]["singles"] == 1
+        assert players["K Nine"]["points"] == 2  # 1 (PAT) + 1 (rouge)
+    finally:
+        ruleset_service.clear_cache()
+
+
+def test_a_single_is_not_counted_as_a_pat_even_with_no_conversion_context() -> None:
+    # A bare SINGLE event with a +1 delta and no pending_try / conversion
+    # fields at all must still never touch the extra-point tallies.
+    state = _incident_base_state(
+        home_score=1,
+        visitor_score=0,
+        events=[
+            {
+                "id": "e-single",
+                "event": "SINGLE",
+                "team": "home",
+                "score_delta": 1,
+                "automation": {"player_number": "12", "player_name": "P Twelve"},
+            }
+        ],
+    )
+    result = StatisticsService().report(state)
+    home = result.data["statistics"]["teams"]["home"]
+    assert home["singles"] == 1
+    assert home["extra_points"] == 0
+    assert home["extra_point_attempts"] == 0
+    players = {p["name"]: p for p in result.data["statistics"]["players"]}
+    assert players["P Twelve"]["singles"] == 1
+    assert players["P Twelve"]["extra_points"] == 0
+    assert players["P Twelve"]["points"] == 1

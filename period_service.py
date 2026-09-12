@@ -27,23 +27,24 @@ class PeriodService:
 
     VALID_TEAMS = {"home", "visitor"}
 
-    # Period structure + quarter length, sourced once from the football
-    # ruleset (US/MS/MHSAA). Literals are the frozen fallback + golden anchor.
+    # Period structure + quarter length from ruleset_service.active_ruleset
+    # (the game's jurisdiction, generic US base when absent -- identical to
+    # us-ms-mhsaa, so a no-op today), cached keyed by the resolved ruleset
+    # id. Literals are the frozen fallback + golden anchor.
     _QUARTERS_FALLBACK = ("1", "2", "3", "4", "OT")
     _QUARTER_SECONDS_FALLBACK = 720
-    _period_cache: dict[str, Any] | None = None
+    _period_cache: dict[str, dict[str, Any]] = {}
 
     @classmethod
-    def _period(cls) -> dict[str, Any]:
-        if cls._period_cache is None:
+    def _period(cls, state: Any | None = None) -> dict[str, Any]:
+        import ruleset_service
+
+        rid = ruleset_service.active_ruleset_id(state)
+        if rid not in cls._period_cache:
             quarters = list(cls._QUARTERS_FALLBACK)
             seconds = cls._QUARTER_SECONDS_FALLBACK
             try:
-                import ruleset_service
-
-                period = ruleset_service.resolve(
-                    country="US", region="MS", association="MHSAA", sport="football"
-                ).get("period", {})
+                period = ruleset_service.active_ruleset(state).get("period", {})
                 if isinstance(period.get("quarters"), list) and period["quarters"]:
                     quarters = [str(q).strip().upper() for q in period["quarters"]]
                 if isinstance(period.get("quarter_length_seconds"), int):
@@ -51,8 +52,8 @@ class PeriodService:
             except Exception:
                 quarters = list(cls._QUARTERS_FALLBACK)
                 seconds = cls._QUARTER_SECONDS_FALLBACK
-            cls._period_cache = {"quarters": quarters, "quarter_seconds": seconds}
-        return cls._period_cache
+            cls._period_cache[rid] = {"quarters": quarters, "quarter_seconds": seconds}
+        return cls._period_cache[rid]
 
     @classmethod
     def _quarter(cls, value: Any) -> str:
@@ -72,7 +73,7 @@ class PeriodService:
         state["clock_running"] = False
         state["clock_started_at"] = 0
         if reset:
-            state["clock_seconds"] = cls._period()["quarter_seconds"]
+            state["clock_seconds"] = cls._period(state)["quarter_seconds"]
 
     @classmethod
     def _period_hold_reason(cls, state: Mapping[str, Any]) -> str:
