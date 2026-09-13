@@ -176,12 +176,41 @@ class BroadcastService:
                 continue
         return f"{prefix}{max(used, default=0) + 1:03d}"
 
-    def list_records(self, *, include_archived: bool = False) -> BroadcastResult:
+    @staticmethod
+    def _broadcast_sport_context(item: Mapping[str, Any]) -> str:
+        """The exact sport CONTEXT a broadcast record belongs to --
+        distinct from its bare ``sport`` field, which reads "Football" for
+        both American and Canadian games (the ruleset/jurisdiction is a
+        per-broadcast choice, not a separate ``sport`` value). Mirrors
+        ``sport_context`` the operator picks: a football-sport broadcast
+        played under a Canadian (``country == "CA"``) jurisdiction is the
+        ``canadian_football`` context; everything else passes through
+        ``normalize_sport`` unchanged, so this generalises cleanly once
+        baseball/basketball broadcasts exist (they have no American/
+        Canadian split, so their own sport value is already the context).
+        """
+        import sport_families
+
+        raw_sport = str(item.get("sport", "")).strip()
+        sport = sport_families.normalize_sport(raw_sport) or raw_sport.casefold()
+        if sport == "football" and str(item.get("country", "")).strip().upper() == "CA":
+            return "canadian_football"
+        return sport
+
+    def list_records(
+        self, *, include_archived: bool = False, sport_scope: str = ""
+    ) -> BroadcastResult:
         rows = [
             copy.deepcopy(item)
             for item in self._load_broadcasts()
             if include_archived or not item.get("archived")
         ]
+        scope = str(sport_scope or "").strip().casefold()
+        if scope:
+            import sport_families
+
+            target = sport_families.normalize_sport(scope) or scope
+            rows = [item for item in rows if self._broadcast_sport_context(item) == target]
         rows.sort(
             key=lambda item: (
                 str(item.get("date", "")),

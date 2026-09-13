@@ -87,6 +87,7 @@ def _mixed_sport_store() -> MemoryStore:
         schools=[{"id": "caledonia", "broadcast_name": "Caledonia"}],
         rosters=[
             roster_record(id="chs-fb", sport="Football"),
+            roster_record(id="chs-cfb", sport="Canadian Football"),
             roster_record(id="chs-bb", sport="Basketball"),
             roster_record(id="chs-vb", sport="Volleyball"),
         ],
@@ -97,7 +98,7 @@ def test_list_rosters_unscoped_returns_every_sport() -> None:
     # Round 27: an empty sport is the single-sport install's behaviour --
     # nothing is filtered.
     ids = {r["id"] for r in make_service(_mixed_sport_store()).list_rosters()}
-    assert ids == {"chs-fb", "chs-bb", "chs-vb"}
+    assert ids == {"chs-fb", "chs-cfb", "chs-bb", "chs-vb"}
     assert {r["id"] for r in make_service(_mixed_sport_store()).list_rosters("")} == ids
 
 
@@ -107,11 +108,11 @@ def test_list_rosters_scoped_to_a_family() -> None:
     assert [r["id"] for r in service.list_rosters("Football")] == ["chs-fb"]
 
 
-def test_list_rosters_canadian_football_scope_shows_football_rosters() -> None:
-    # Invariant 2: rosters are tagged "Football" regardless of ruleset, so a
-    # canadian_football context (scope "football") must not come back empty.
+def test_list_rosters_canadian_football_scope_is_fully_separate_from_football() -> None:
+    # Post-Friday design reversal: American and Canadian football no longer
+    # share a roster pool -- each context only ever sees its own tag.
     service = make_service(_mixed_sport_store())
-    assert [r["id"] for r in service.list_rosters("canadian_football")] == ["chs-fb"]
+    assert [r["id"] for r in service.list_rosters("canadian_football")] == ["chs-cfb"]
     assert [r["id"] for r in service.list_rosters("football")] == ["chs-fb"]
 
 

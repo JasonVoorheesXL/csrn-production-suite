@@ -169,6 +169,42 @@ def test_list_records_filters_archived_and_sorts_schedule_descending() -> None:
     assert len(all_rows.data["broadcasts"]) == 3
 
 
+def test_list_records_scopes_by_exact_sport_context_not_base_family() -> None:
+    # Bug report item 2: Game Manager fully separates American and Canadian
+    # football broadcasts, matching the roster/sponsor fix -- a "Football"
+    # broadcast with country="CA" is the canadian_football context, not the
+    # football one, even though its bare sport field reads "Football" for
+    # both.
+    harness = Harness()
+    harness.broadcasts = [
+        {"broadcast_id": "us-fb", "sport": "Football", "country": "US", "date": "2026-09-01"},
+        {"broadcast_id": "ca-fb", "sport": "Football", "country": "CA", "date": "2026-09-01"},
+        {"broadcast_id": "bball", "sport": "Basketball", "date": "2026-09-01"},
+    ]
+    service = harness.service()
+
+    unscoped = {row["broadcast_id"] for row in service.list_records().data["broadcasts"]}
+    assert unscoped == {"us-fb", "ca-fb", "bball"}
+
+    football_only = {
+        row["broadcast_id"]
+        for row in service.list_records(sport_scope="football").data["broadcasts"]
+    }
+    assert football_only == {"us-fb"}
+
+    canadian_only = {
+        row["broadcast_id"]
+        for row in service.list_records(sport_scope="canadian_football").data["broadcasts"]
+    }
+    assert canadian_only == {"ca-fb"}
+
+    basketball_only = {
+        row["broadcast_id"]
+        for row in service.list_records(sport_scope="basketball").data["broadcasts"]
+    }
+    assert basketball_only == {"bball"}
+
+
 def test_read_returns_copy_or_not_found() -> None:
     harness = Harness()
     harness.broadcasts = [{"broadcast_id": "game-1", "status": "planned"}]

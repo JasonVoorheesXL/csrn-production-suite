@@ -63,15 +63,18 @@ class SponsorService:
 
     @staticmethod
     def _normalized_sport(raw: Any) -> str:
-        """Collapse a sport value to its family ("Canadian Football" ->
-        "football"); pass through an unknown token lower-cased; "" stays "".
+        """Canonicalize a sport value ("Canadian Football" -> "canadian_
+        football") WITHOUT collapsing it to a base family -- post-Friday
+        design reversal: American and Canadian football no longer share a
+        sponsor pool. Pass through an unknown token lower-cased; "" stays
+        "".
         """
         text = str(raw or "").strip()
         if not text:
             return ""
         import sport_families
 
-        return sport_families.base_family(text) or text.casefold()[:40]
+        return sport_families.normalize_sport(text) or text.casefold()[:40]
 
     def clean_record(
         self,
@@ -94,10 +97,11 @@ class SponsorService:
             "id": sponsor_id
             or str(source.get("id") or f"sponsor-{now}-{self._token_factory()}"),
             "name": str(source.get("name", "")).strip()[:160],
-            # Round 27: the sport family this sponsor is scoped to. Tagged
-            # like rosters -- "football" covers American and Canadian, the
-            # ruleset is a per-broadcast choice. "" = shown in every sport
-            # context (a single-sport install never sets this).
+            # Post-Friday design reversal: the EXACT sport context this
+            # sponsor is scoped to, tagged like rosters -- "football" and
+            # "canadian_football" are separate pools, no longer collapsed.
+            # "" = shown in every sport context (a single-sport install
+            # never sets this).
             "sport": self._normalized_sport(source.get("sport", "")),
             "category": str(source.get("category", "Local Business"))[:80],
             "status": str(source.get("status", "Prospect"))[:40],
@@ -135,13 +139,15 @@ class SponsorService:
         ]
 
     def list_payload(self, sport: str = "") -> dict[str, Any]:
-        """Decorated sponsors, optionally scoped to one sport family.
+        """Decorated sponsors, optionally scoped to one sport context.
 
-        Round 27: ``sport`` is the operator's active sport scope
-        (``base_family(sport_context)``). A sponsor tagged with a different
-        family is hidden; a sponsor with no / blank ``sport`` (a
-        cross-sport sponsor, and every sponsor on a single-sport install)
-        is always shown. An empty ``sport`` returns every sponsor.
+        Post-Friday design reversal: ``sport`` is the operator's *exact*
+        active sport context (``normalize_sport(sport_context)``, no
+        ``base_family`` collapse) -- ``football`` and ``canadian_football``
+        are separate pools. A sponsor tagged with a different context is
+        hidden; a sponsor with no / blank ``sport`` (a cross-sport sponsor,
+        and every sponsor on a single-sport install) is always shown. An
+        empty ``sport`` returns every sponsor.
         """
 
         assets = {

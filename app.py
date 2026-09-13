@@ -2597,16 +2597,18 @@ def pin_is_configured() -> bool:
 def authenticated() -> bool:
     return bool(session.get("authenticated"))
 
-def current_sport_scope() -> str:
+def current_exact_sport_scope() -> str:
     """The operator's active sport scope for roster / sponsor filtering.
 
-    ``base_family(session["sport_context"])`` -- a canadian_football
-    context resolves to ``"football"`` so it shares the football pool
-    (Round 27 invariant 2). Empty when no context is set, which leaves
-    every management list unfiltered (the single-sport default)."""
+    ``normalize_sport(session["sport_context"])`` -- NOT collapsed through
+    ``base_family``, so ``football`` and ``canadian_football`` are distinct
+    pools (post-Friday design reversal of Round 27 invariant 2: rosters,
+    headshots, and sponsors no longer share between American and Canadian
+    football). Empty when no context is set, which leaves every management
+    list unfiltered (the single-sport install's behaviour, unchanged)."""
     import sport_families
 
-    return sport_families.base_family(session.get("sport_context", ""))
+    return sport_families.normalize_sport(session.get("sport_context", ""))
 
 def require_auth(func: Callable):
     @wraps(func)
@@ -2705,7 +2707,7 @@ SPONSOR_ROUTES_BLUEPRINT = create_sponsor_blueprint(
         get_sponsor_upload_dir=lambda: SPONSOR_UPLOAD_DIR,
         clock=lambda: time.time(),
         token_hex=lambda length: secrets.token_hex(length),
-        sport_scope=current_sport_scope,
+        sport_scope=current_exact_sport_scope,
     )
 )
 APPLICATION_BLUEPRINTS.append(SPONSOR_ROUTES_BLUEPRINT)
@@ -2738,7 +2740,7 @@ ROSTER_ROUTES_BLUEPRINT = create_roster_blueprint(
     RosterRoutesDependencies(
         require_auth=require_auth,
         get_roster_service=get_roster_service,
-        sport_scope=current_sport_scope,
+        sport_scope=current_exact_sport_scope,
     )
 )
 APPLICATION_BLUEPRINTS.append(ROSTER_ROUTES_BLUEPRINT)
@@ -3145,6 +3147,7 @@ BROADCAST_ROUTES_BLUEPRINT = create_broadcast_blueprint(
         get_broadcast_service=get_broadcast_service,
         get_broadcaster_print_service=get_broadcaster_print_service,
         get_social_media_preview_service=get_social_media_preview_service,
+        sport_scope=current_exact_sport_scope,
     )
 )
 APPLICATION_BLUEPRINTS.append(BROADCAST_ROUTES_BLUEPRINT)

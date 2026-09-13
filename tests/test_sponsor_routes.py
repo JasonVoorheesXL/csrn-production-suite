@@ -110,8 +110,9 @@ def test_list_sponsors_route_passes_the_session_sport_scope(sponsor_client) -> N
 
     client.get("/api/sponsors")
 
-    # Invariant 2: a canadian_football context scopes to the football pool.
-    assert service.calls == [("list_payload", "football")]
+    # Post-Friday design reversal: a canadian_football context scopes to
+    # its own exact pool, not the collapsed football one.
+    assert service.calls == [("list_payload", "canadian_football")]
 
 
 def test_create_sponsor_route_preserves_success_and_validation_contracts(

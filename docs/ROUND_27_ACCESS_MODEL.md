@@ -47,15 +47,20 @@ item 2 — the module-dispatch half of that is not built in Round 27.
    `test_one_football_license_covers_both_football_contexts`,
    `test_canadian_football_context_is_covered_by_the_football_license`,
    `test_login_accepts_canadian_football_under_the_football_license`.
-2. **Roster / sponsor scoping is shared.** Rosters and sponsors are tagged
-   `football` regardless of American vs Canadian (the ruleset is a
-   per-broadcast choice — Round 26). `sport_scope` for a `canadian_football`
-   context is `football`, so `RosterService.list_rosters("canadian_football")`
-   and `SponsorService.list_payload("canadian_football")` return the
-   football pool, never empty. Tests:
-   `test_list_rosters_canadian_football_scope_shows_football_rosters`,
-   `test_list_payload_canadian_football_scope_matches_football_sponsors`,
-   plus the `/api/rosters` + `/api/sponsors` route tests.
+2. **Roster / sponsor scoping is shared. — REVERSED, see below.** As
+   originally designed, rosters and sponsors were tagged `football`
+   regardless of American vs Canadian, sharing one pool. **The owner
+   reversed this decision** (CSRN_FIVE_ISSUES_BUGREPORT.md item 1, five-
+   issues-bugfix-20260912): American and Canadian football now get fully
+   separate roster/sponsor/headshot/Game-Manager pools. `sport_families.py`
+   still collapses `canadian_football` → `football` for **licensing only**
+   (`base_family`, unchanged); roster/sponsor/broadcast scoping instead
+   reads the operator's *exact* context (`app.py`'s
+   `current_exact_sport_scope()`, `normalize_sport`, no collapse). Tests:
+   `test_list_rosters_canadian_football_scope_is_fully_separate_from_football`,
+   `test_list_payload_canadian_football_scope_is_fully_separate_from_football`,
+   `test_list_records_scopes_by_exact_sport_context_not_base_family`, plus
+   the `/api/rosters` + `/api/sponsors` + `/api/broadcasts` route tests.
 
 ## Byte-identical single-sport path
 

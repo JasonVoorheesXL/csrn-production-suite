@@ -93,8 +93,9 @@ def test_list_rosters_route_passes_the_session_sport_scope(roster_client) -> Non
 
     client.get("/api/rosters")
 
-    # Invariant 2: a canadian_football context scopes to the football pool.
-    assert service.calls == [("list_rosters", "football")]
+    # Post-Friday design reversal: a canadian_football context scopes to
+    # its own exact pool, not the collapsed football one.
+    assert service.calls == [("list_rosters", "canadian_football")]
 
 
 def test_create_roster_route_preserves_success_contract(roster_client) -> None:

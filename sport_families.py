@@ -20,11 +20,17 @@ Two invariants from the design:
    ``football`` license entry -- never a separate purchase. Every licence
    check goes through :func:`base_family`, which collapses
    ``canadian_football`` -> ``football``.
-2. **Roster / sponsor scoping is shared.** A roster or sponsor is tagged
-   ``football`` regardless of American vs Canadian (the ruleset is a
-   per-broadcast choice, Round 26). So scoping keys off :func:`base_family`
-   too -- ``sport_context = "canadian_football"`` surfaces the football
-   pool, not an empty one.
+2. **Roster / sponsor scoping is fully separate (reversed post-Friday).**
+   Round 27 originally shared one pool between American and Canadian
+   football via :func:`base_family`. The owner has since decided the two
+   should never mix: a roster or sponsor is tagged with the operator's
+   *exact* context (``football`` or ``canadian_football``, not collapsed),
+   and scoping compares that raw tag directly -- see
+   ``app.py``'s ``current_exact_sport_scope()`` (used by both the roster
+   and sponsor routes) and ``roster_service.list_rosters`` /
+   ``sponsor_service._normalized_sport``, none of which call
+   :func:`base_family` any more. Licensing (invariant 1) is unaffected --
+   one football license still covers both contexts.
 
 This module is a leaf: it imports nothing from the app.
 """

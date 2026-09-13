@@ -595,10 +595,11 @@ class RosterService:
     def list_rosters(self, sport: str = "") -> list[Roster]:
         """All roster summaries, optionally scoped to one sport family.
 
-        Round 27: ``sport`` is the operator's active sport *scope*
-        (``base_family(sport_context)``), so a ``canadian_football`` and a
-        ``football`` context both pass ``"football"`` here and see the same
-        football rosters. An empty ``sport`` returns every roster -- the
+        Post-Friday design reversal: ``sport`` is the operator's *exact*
+        active sport context (``normalize_sport(sport_context)``, no
+        ``base_family`` collapse) -- a ``canadian_football`` context only
+        ever sees rosters tagged ``canadian_football``, never ``football``
+        ones, and vice versa. An empty ``sport`` returns every roster -- the
         single-sport install's behaviour is unchanged.
         """
 
@@ -608,11 +609,11 @@ class RosterService:
         if scope:
             import sport_families
 
-            target = sport_families.base_family(scope) or scope
+            target = sport_families.normalize_sport(scope) or scope
 
             def _roster_family(roster: Roster) -> str:
                 raw = str(roster.get("sport", "")).strip()
-                return sport_families.base_family(raw) or raw.casefold()
+                return sport_families.normalize_sport(raw) or raw.casefold()
 
             rosters = [
                 roster for roster in rosters if _roster_family(roster) == target
