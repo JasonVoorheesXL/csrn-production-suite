@@ -91,14 +91,26 @@ def test_collegiate_player_spotlight_is_sized_up_and_never_truncates():
     js = read("static/csrn-broadcast-layout-engine.js")
     css = read("static/csrn-broadcast-layout-engine.css")
 
-    # 1.5x sizing pass, scoped to the player card specifically (.bl-college-player)
+    # Sizing pass, scoped to the player card specifically (.bl-college-player)
     # so it doesn't also inflate the highlight/sponsor cards that share the same
     # base .bl-college-video-copy/.bl-college-player-portrait classes.
-    assert ".bl-college-player .bl-college-player-portrait{width:177px;height:177px}" in css
-    assert ".bl-college-player .bl-college-player-portrait b{font-size:48px}" in css
-    assert ".bl-college-player .bl-college-video-copy small{font-size:24px}" in css
-    assert ".bl-college-player .bl-college-video-copy strong{font-size:51px}" in css
-    assert ".bl-college-player .bl-college-video-copy span{font-size:27px}" in css
+    #
+    # Values updated (commit 9095cf6, "Checkpoint: owner's in-progress work"):
+    # that checkpoint restructured the player card's eyebrow line out of
+    # .bl-college-video-copy into its own full-width .bl-college-player-eyebrow
+    # banner (see collegiateVideoBoardContent()'s "player" branch and its
+    # accompanying comment in csrn-broadcast-layout-engine.js) and re-tuned
+    # the portrait/name/detail sizing to match -- portrait 177->354px,
+    # portrait-b 48->96px, video-copy strong 51->64px, span 27->32px. The old
+    # ".bl-college-video-copy small{font-size:24px}" rule is gone because
+    # that element no longer has a <small> in the player card at all (the
+    # eyebrow moved out); its role is now covered by the eyebrow assertion
+    # below instead of a video-copy-scoped one.
+    assert ".bl-college-player .bl-college-player-portrait{width:354px;height:354px}" in css
+    assert ".bl-college-player .bl-college-player-portrait b{font-size:96px}" in css
+    assert ".bl-college-player-eyebrow{font-size:32px" in css
+    assert ".bl-college-player .bl-college-video-copy strong{font-size:64px}" in css
+    assert ".bl-college-player .bl-college-video-copy span{font-size:32px}" in css
 
     # A long real name at 51px can exceed the card width -- auto-fit shrinks it
     # (never below the pre-1.5x 34px) instead of letting the ellipsis cut it off,

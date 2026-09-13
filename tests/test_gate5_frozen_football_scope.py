@@ -30,12 +30,18 @@ def test_program_visual_controls_expose_highlight_spotlight_and_queue() -> None:
     assert 'id="pvhPlayer"' in command_center
     assert 'id="pvhDetail"' in command_center
     assert 'id="pvhDuration"' in command_center
+    # Default duration bumped 8->45 seconds (commit 9095cf6, "Checkpoint:
+    # owner's in-progress work") -- changed consistently in three places at
+    # once (this markup default, the currentState.player_graphic.duration
+    # restore fallback, and programHighlightPayload()'s own fallback), so a
+    # Player Spotlight graphic stays up long enough to actually be read.
     assert (
         'id="pvhDuration"><option value="5">5 seconds</option>'
-        '<option value="8" selected>8 seconds</option>'
+        '<option value="8">8 seconds</option>'
         '<option value="12">12 seconds</option>'
         '<option value="15">15 seconds</option>'
         '<option value="30">30 seconds</option>'
+        '<option value="45" selected>45 seconds</option>'
         in command_center
     )
     assert (
@@ -76,14 +82,25 @@ def test_sponsor_spotlight_stays_below_the_scorebug() -> None:
         "s.overlay_revision&&s.overlay_revision!==OVERLAY_SCHEMA_REVISION"
         in overlay
     )
+    # #scorebug grew from height:112px to height:200px (normal) / 224px to
+    # 340px (graphic-mode) in commit 9095cf6 ("Checkpoint: owner's
+    # in-progress work") -- see test_gate6_visual_regression.py's own
+    # updated assertion for that. Every "clear the taller scorebug" bottom
+    # offset shifted by the exact matching delta in the same commit: +88px
+    # for the plain scorebug-active state (176->264, and #lowerThird.
+    # scorebug-active's own 196->284 -- same +88), +116px for the
+    # graphic-mode variant (310->426, and #lowerThird's 348->464 -- same
+    # +116). That consistency across independent rules for two different
+    # elements is what confirms this is one deliberate, coherent resize
+    # rather than a partial/broken edit.
     assert (
         "#sponsorSpotlight.scorebug-active,"
-        "#playerHighlight.scorebug-active{bottom:176px}"
+        "#playerHighlight.scorebug-active{bottom:264px}"
         in overlay
     )
     assert (
         "#sponsorSpotlight.scorebug-active.graphic-mode,"
-        "#playerHighlight.scorebug-active.graphic-mode{bottom:310px}"
+        "#playerHighlight.scorebug-active.graphic-mode{bottom:426px}"
         in overlay
     )
     assert (

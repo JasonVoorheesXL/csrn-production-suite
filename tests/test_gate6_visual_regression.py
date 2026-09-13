@@ -33,8 +33,16 @@ def test_empty_identity_rows_collapse_without_geometry_changes() -> None:
 
     assert ".mascot:empty{display:none}" in overlay
     assert ".team-record:empty{display:none}" in overlay
-    assert "grid-template-columns:484px 174px 484px;height:112px" in overlay
-    assert "grid-template-columns:738px 248px 738px;height:224px" in overlay
+    # #scorebug grew height:112px->200px (normal) / 224px->340px (wide/
+    # graphic-mode) in commit 9095cf6 ("Checkpoint: owner's in-progress
+    # work") -- grid-template-columns is unchanged, only the height. See
+    # test_gate5_frozen_football_scope.py::test_sponsor_spotlight_stays_
+    # below_the_scorebug's own updated assertions for the matching +88px/
+    # +116px shift in every dependent "clear the scorebug" bottom offset,
+    # which is what confirms this was one deliberate, coherent resize
+    # rather than a partial/broken edit.
+    assert "grid-template-columns:484px 174px 484px;height:200px" in overlay
+    assert "grid-template-columns:738px 248px 738px;height:340px" in overlay
 
 
 def test_score_elements_remain_outside_identity_stacks() -> None:
@@ -94,10 +102,21 @@ def test_halftime_keeps_scorebug_and_replaces_center_game_status() -> None:
 
 
 def test_fast_ticker_speed_is_one_and_a_half_times_the_prior_preset() -> None:
+    # Test name is now historical (it pinned a specific 1.5x derivation from
+    # an even earlier preset, not an invariant that still holds). Commit
+    # 9095cf6 ("Checkpoint: owner's in-progress work") reworked the ticker
+    # crawl-speed FORMULA itself, not just these constants: the old
+    # `Math.max(18, distance/pixelsPerSecond)` clamped the scroll DURATION,
+    # which silently sped the crawl up as ticker content grew instead of
+    # just taking longer per pass; the fix keeps a minimum on-screen cycle
+    # time by extending the pause dwell at each end instead (see the
+    # matching comment in static/csrn-production-theme-runtime.js's
+    # tickerSpeed() caller). The speed constants were retuned to match:
+    # 24/36/84/189 -> 22/32/76/170.
     overlay = (ROOT / "templates" / "overlay.html").read_text(encoding="utf-8")
 
-    assert "{very_slow:24,slow:36,normal:84,fast:189}" in overlay
-    assert "{very_slow:24,slow:36,normal:84,fast:126}" not in overlay
+    assert "{very_slow:22,slow:32,normal:76,fast:170}" in overlay
+    assert "{very_slow:24,slow:36,normal:84,fast:189}" not in overlay
 
 def test_scorebug_logo_fallback_handles_valid_missing_and_broken_media() -> None:
     overlay = (ROOT / "templates" / "overlay.html").read_text(encoding="utf-8")

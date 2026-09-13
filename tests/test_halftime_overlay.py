@@ -55,9 +55,21 @@ def test_delay_badge_distinguishes_weather_delay_from_generic() -> None:
 
 
 def test_halftime_countdown_area_shows_score_not_a_stale_countdown() -> None:
+    # Redesigned in commit 0e75553 ("Pregame overlay: fix info-panel layout
+    # overflow + add sponsor rotation"), per its own code comment: a single
+    # combined "score at the half" figure (e.g. "21-7") left it ambiguous
+    # which number belonged to which team. Replaced with each team's own
+    # score sitting beside that team (#visitorScoreBox/#homeScoreBox,
+    # verified present in the team markup), and the countdown area
+    # (#countdownWrap, containing #countdown) is now hidden entirely at
+    # halftime instead of being repurposed to show a score -- still "never
+    # a stale countdown", just via hiding rather than relabeling.
     html = read("templates/pregame_universal_overlay.html")
-    assert "document.getElementById('countdown').textContent=`${Number(g.home_score||0)}-${Number(g.visitor_score||0)}`;" in html
-    assert "'Score at the Half'" in html
+    assert "document.getElementById('countdownWrap').classList.toggle('hidden',halftime);" in html
+    assert "document.getElementById('visitorScoreBox').textContent=halftime?String(Number(g.visitor_score||0)):'';" in html
+    assert "document.getElementById('homeScoreBox').textContent=halftime?String(Number(g.home_score||0)):'';" in html
+    assert 'id="visitorScoreBox" class="team-score"' in html
+    assert 'id="homeScoreBox" class="team-score"' in html
 
 
 def test_spotlight_card_reuses_page_native_markup_idiom() -> None:
