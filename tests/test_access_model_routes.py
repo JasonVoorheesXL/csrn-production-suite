@@ -125,10 +125,15 @@ def test_sport_context_switch_licensed_but_engineless_family_is_not_ready(client
 
 
 def test_sport_context_switch_unlicensed_engineless_family_is_coming_soon(client) -> None:
+    # "baseball" used to be this scenario's example (unlicensed AND no
+    # engine); P5 gave baseball/softball a real engine
+    # (sport_families.ENGINE_READY), so a sport genuinely still lacking
+    # both is needed -- "soccer" is unlicensed in this fixture (licensed =
+    # ["football", "basketball"]) and still has no broadcast engine.
     test_client, _ = client
     _authenticate(test_client)
 
-    response = test_client.post("/api/sport-context", json={"sport": "baseball"})
+    response = test_client.post("/api/sport-context", json={"sport": "soccer"})
 
     assert response.status_code == 400
     assert response.get_json()["error"] == "SPORT_COMING_SOON"

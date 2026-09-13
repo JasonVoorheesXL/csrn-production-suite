@@ -47,14 +47,15 @@ def test_base_family_collapses_canadian_football_onto_football() -> None:
     assert sf.base_family("hockey") == "hockey"
 
 
-def test_engine_ready_is_football_and_canadian_football_only() -> None:
-    # Only football (+ canadian_football, same module) has a broadcast
+def test_engine_ready_is_football_baseball_and_softball() -> None:
+    # Football (+ canadian_football, same module) plus baseball and softball
+    # (P5: docs/BASEBALL_SOFTBALL_ENGINE_SCOPING_PLAN.md) have a broadcast
     # engine today. The other families are real/licensable but not ready.
     assert sf.is_engine_ready("football") is True
     assert sf.is_engine_ready("canadian_football") is True
+    assert sf.is_engine_ready("baseball") is True
+    assert sf.is_engine_ready("softball") is True
     assert sf.is_engine_ready("basketball") is False
-    assert sf.is_engine_ready("baseball") is False
-    assert sf.is_engine_ready("softball") is False
     assert sf.is_engine_ready("soccer") is False
     assert sf.is_engine_ready("hockey") is False
 

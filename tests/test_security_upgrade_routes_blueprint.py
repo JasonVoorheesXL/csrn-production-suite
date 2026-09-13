@@ -140,8 +140,8 @@ def test_security_status_is_public_and_reports_lock_time(route_client) -> None:
         "family_sports": [
             {"family": "football", "label": "Football", "licensed": True, "engine_ready": True, "available": True},
             {"family": "basketball", "label": "Basketball", "licensed": False, "engine_ready": False, "available": False},
-            {"family": "baseball", "label": "Baseball", "licensed": False, "engine_ready": False, "available": False},
-            {"family": "softball", "label": "Softball", "licensed": False, "engine_ready": False, "available": False},
+            {"family": "baseball", "label": "Baseball", "licensed": False, "engine_ready": True, "available": False},
+            {"family": "softball", "label": "Softball", "licensed": False, "engine_ready": True, "available": False},
             {"family": "soccer", "label": "Soccer", "licensed": False, "engine_ready": False, "available": False},
         ],
         "other_sports": [

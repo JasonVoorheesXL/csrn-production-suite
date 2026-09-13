@@ -236,6 +236,29 @@ def test_load_stamps_effective_profile_id_and_version_at_creation() -> None:
     assert sb_state["effective_profile_id"] == "softball/us-nfhs"
 
 
+def test_load_stamps_a_fresh_diamond_substate_for_baseball_and_softball() -> None:
+    # P5: a freshly-loaded baseball/softball broadcast gets a clean
+    # namespaced diamond sub-state (inning 1, TOP, empty lineups) the
+    # moment it's loaded, same standard as every other field _state_from_
+    # record() stamps -- no separate "initialize" step required before the
+    # operator UI has something sane to render.
+    bb_row = record()
+    bb_row.update({"sport": "Baseball", "country": "US", "association": "NFHS"})
+    bb_state = build_service(records=[bb_row])["service"].load("FB-2026-01").data["state"]
+    assert bb_state["diamond"]["inning"] == 1
+    assert bb_state["diamond"]["inning_half"] == "TOP"
+    assert bb_state["diamond"]["lineup"]["home"]["slots"] == {}
+
+    sb_row = record()
+    sb_row.update({"sport": "Softball", "country": "US"})
+    sb_state = build_service(records=[sb_row])["service"].load("FB-2026-01").data["state"]
+    assert sb_state["diamond"]["inning"] == 1
+
+    # Football is untouched -- no "diamond" key appears at all.
+    fb_state = build_service()["service"].load("FB-2026-01").data["state"]
+    assert "diamond" not in fb_state
+
+
 def test_load_never_restamps_a_resumed_live_snapshot() -> None:
     # Sec.3.2 continued: "Changing a master profile affects only future
     # games unless an explicit migration is performed." A resumed snapshot
@@ -256,6 +279,23 @@ def test_load_never_restamps_a_resumed_live_snapshot() -> None:
     state = result.data["state"]
     assert state["effective_profile_id"] == "baseball/us-nfhs"
     assert state["effective_profile_version"] == 7
+
+
+def test_load_never_overwrites_a_resumed_diamond_snapshot() -> None:
+    # Same principle as the profile-stamp test above, for the diamond
+    # sub-state: a resumed snapshot's in-progress game (outs recorded,
+    # runners on base) must survive unchanged -- the fresh-diamond stamp
+    # only ever applies on the "build from record" branch.
+    row = record("live")
+    row.update({"sport": "Baseball", "country": "US", "association": "NFHS"})
+    row["live_state"] = {
+        "broadcast_created": True,
+        "broadcast_id": "FB-2026-01",
+        "diamond": {"inning": 5, "inning_half": "BOTTOM", "outs": 2},
+    }
+    built = build_service(records=[row])
+    state = built["service"].load("FB-2026-01").data["state"]
+    assert state["diamond"] == {"inning": 5, "inning_half": "BOTTOM", "outs": 2}
 
 
 def test_load_completed_record_restores_final_score_and_review_mode() -> None:

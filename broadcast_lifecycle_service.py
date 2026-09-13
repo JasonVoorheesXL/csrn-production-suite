@@ -4,6 +4,7 @@ import copy
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
+import engine_router
 import ruleset_service
 
 
@@ -290,4 +291,17 @@ class BroadcastLifecycleService:
             "visitor_score": item.get("final_visitor_score", 0)
             if completed
             else 0,
+            # P5: a freshly-loaded baseball/softball broadcast gets a clean
+            # namespaced diamond sub-state immediately (inning 1, TOP, 0-0,
+            # empty lineups) rather than waiting on lazy creation at the
+            # first diamond route call -- same "state is correct the moment
+            # it exists" standard football's own fields above already get.
+            # Only this branch (a fresh record, never a resumed live-state
+            # snapshot -- see load()'s other branch) stamps it; a resumed
+            # snapshot already carries whatever diamond state that game had.
+            **(
+                {"diamond": engine_router.default_diamond_state()}
+                if engine_router.is_diamond_sport(sport)
+                else {}
+            ),
         }
