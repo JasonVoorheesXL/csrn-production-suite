@@ -241,21 +241,22 @@ class HoopsRulesService:
         return HoopsResult("OK", state, {"event": event, "possession_arrow": hoops.get("possession_arrow")})
 
     @classmethod
-    def foul(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> HoopsResult:
-        """payload: {team, playerId?, foulType}. Computes
-        countsTowardTeam/countsTowardPersonal from foulType + the active
-        ruleset (never guessed -- see _COUNTS_TOWARD_TEAM_FOULS and the
-        ruleset's own technical_counts_toward_personal flag), applies via
-        hoops_state_service.apply_foul() (bonus + foul-out are derived
-        there, not here), and returns a PROPOSED free-throw count
-        (propose_free_throw_count()) as INFO for the caller to act on --
-        this method never records a free throw itself."""
+    def _resolve_foul_payload(
+        cls, state: Mapping[str, Any], ruleset: Mapping[str, Any], payload: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], list[ValidationMessage]]:
+        """The ruleset-resolution step foul() and correct_foul() (below)
+        both need: computes countsTowardTeam/countsTowardPersonal from
+        foulType + the active ruleset (never guessed -- see
+        _COUNTS_TOWARD_TEAM_FOULS and the ruleset's own
+        technical_counts_toward_personal flag) and attaches bonusRule/
+        foulOutThreshold. Kept in one place so a corrected foul is
+        resolved by the exact same logic as the original, not a
+        hand-copied approximation of it."""
         foul_type = str(payload.get("foulType", ""))
         if foul_type not in _FOUL_TYPES:
             raise ValueError(f"unknown foulType: {foul_type!r}")
         team = str(payload.get("team", ""))
-        ruleset = cls.active_ruleset(state)
-        hoops = state.setdefault("hoops", {})
+        hoops = state.get("hoops") or {}
 
         messages = cls.validate_foul(hoops, team, ruleset.get("fouls", {}).get("bonus_rule", {})) if team else []
 
@@ -263,29 +264,52 @@ class HoopsRulesService:
         technical_counts_toward_personal = bool(ruleset.get("fouls", {}).get("technical_counts_toward_personal"))
         counts_toward_personal = foul_type != "technical" or technical_counts_toward_personal
 
-        applied_payload = dict(payload)
-        applied_payload["countsTowardTeam"] = counts_toward_team
-        applied_payload["countsTowardPersonal"] = counts_toward_personal
+        resolved = dict(payload)
+        resolved["countsTowardTeam"] = counts_toward_team
+        resolved["countsTowardPersonal"] = counts_toward_personal
         if counts_toward_team:
-            applied_payload["bonusRule"] = dict(ruleset.get("fouls", {}).get("bonus_rule", {}))
+            resolved["bonusRule"] = dict(ruleset.get("fouls", {}).get("bonus_rule", {}))
         if counts_toward_personal:
-            applied_payload["foulOutThreshold"] = int(ruleset.get("fouls", {}).get("personal_foul_disqualification", 5))
+            resolved["foulOutThreshold"] = int(ruleset.get("fouls", {}).get("personal_foul_disqualification", 5))
+        return resolved, messages
 
-        HoopsStateFoundation.apply_foul(state, hoops, applied_payload)
-        event = HoopsStateFoundation.append_event(hoops, "FOUL", applied_payload)
-
+    @classmethod
+    def _propose_foul_free_throws(
+        cls, hoops: Mapping[str, Any], ruleset: Mapping[str, Any], team: str, payload: Mapping[str, Any],
+    ) -> int:
         # Free throws for a non-shooting foul go to the FOULED team, based
         # on ITS bonus status (which reflects the fouling team's -- `team`
-        # here -- own foul count; see apply_foul()'s bonus comment).
-        opponent_bonus = str(hoops.get(f"{HoopsStateFoundation.opposite(team)}_bonus", "NONE")) if team in ("home", "visitor") else "NONE"
-        proposed_free_throws = cls.propose_free_throw_count(
-            foul_type,
+        # -- own foul count; see hoops_state_service.apply_foul()'s bonus
+        # comment). Read AFTER apply_foul() has already run, so a foul
+        # that itself triggers the bonus is reflected immediately.
+        opponent_bonus = (
+            str(hoops.get(f"{HoopsStateFoundation.opposite(team)}_bonus", "NONE")) if team in ("home", "visitor") else "NONE"
+        )
+        return cls.propose_free_throw_count(
+            str(payload.get("foulType", "")),
             is_shooting_foul=bool(payload.get("isShootingFoul")),
             shot_points=int(payload.get("shotPoints", 2)),
             and_one=bool(payload.get("andOne")),
             bonus_state=opponent_bonus,
             ruleset=ruleset,
         )
+
+    @classmethod
+    def foul(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> HoopsResult:
+        """payload: {team, playerId?, foulType}. Resolution (counts-toward-
+        team/personal, bonusRule, foulOutThreshold) via
+        _resolve_foul_payload(); applies via hoops_state_service.
+        apply_foul() (bonus + foul-out are derived there, not here); and
+        returns a PROPOSED free-throw count as INFO for the caller to act
+        on -- this method never records a free throw itself."""
+        team = str(payload.get("team", ""))
+        ruleset = cls.active_ruleset(state)
+        hoops = state.setdefault("hoops", {})
+
+        applied_payload, messages = cls._resolve_foul_payload(state, ruleset, payload)
+        HoopsStateFoundation.apply_foul(state, hoops, applied_payload)
+        event = HoopsStateFoundation.append_event(hoops, "FOUL", applied_payload)
+        proposed_free_throws = cls._propose_foul_free_throws(hoops, ruleset, team, payload)
 
         tail = cls._after_play(state)
         player_id = str(payload.get("playerId", ""))
@@ -295,6 +319,29 @@ class HoopsRulesService:
             {"messages": messages, "event": event, "free_throws_proposed": proposed_free_throws,
              "fouled_out": fouled_out, **tail},
         )
+
+    @classmethod
+    def correct_event_for_foul(
+        cls, state: dict[str, Any], event_id: str, payload: Mapping[str, Any], *, reason: str = "",
+    ) -> HoopsResult:
+        """The gate example: 'a foul entered late and corrected keeps team
+        fouls + bonus + DQ right.' Re-resolves the corrected foul (team/
+        foulType may differ from the original) through the SAME
+        _resolve_foul_payload() the original foul() call used, then
+        delegates to hoops_event_service.correct_event() -- which voids
+        the original event and appends the newly-resolved one, then does
+        a full HoopsStateFoundation.rebuild(). Team fouls/bonus/
+        disqualification end up correct by construction: the same
+        apply_foul() interpreter recomputes them from the corrected fact
+        during replay, nothing is hand-patched."""
+        from hoops_event_service import HoopsEventService  # local import: avoids a cross-module import cycle
+
+        ruleset = cls.active_ruleset(state)
+        resolved_payload, messages = cls._resolve_foul_payload(state, ruleset, payload)
+        result = HoopsEventService.correct_event(state, event_id, resolved_payload, reason=reason)
+        if not result.ok:
+            return HoopsResult(result.code, result.state, result.data)
+        return HoopsResult("OK", result.state, {**result.data, "messages": messages})
 
     # --- game end (mirrors game_end_evaluator.GameEndEvaluator) --------------
 

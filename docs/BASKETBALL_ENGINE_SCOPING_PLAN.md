@@ -479,10 +479,82 @@ builds sequence.
     rather than modeling what happens next, since the scoping doc itself
     never specifies it.
 
+- **P2 — DONE (2026-09-13).** `hoops_event_service.py` (operator
+  correction boundary), `hoops_lineup_service.py` (lightweight, per Sec.6),
+  `hoops_box_score_service.py` (PTS/REB/AST/STL/BLK/TO/PF, FG/3P/FT
+  splits, team totals).
+  - **A real P1 gap found and closed as part of this phase:**
+    `hoops_period_service.start_game()` used to mutate period/clock/
+    shot-clock/timeouts directly rather than through a replayable event.
+    That's invisible until you build the thing that actually needs full
+    replay-from-ledger -- `hoops_event_service`'s undo()/redo() -- which
+    exposed it immediately: undoing back past the first real play reset
+    those ruleset-derived values to zero/blank, since
+    `HoopsStateFoundation.default_state()`'s structural defaults don't
+    know the ruleset at all. Fixed by giving `start_game()` a proper
+    `GAME_START` structural interpreter (`apply_game_start()`) and having
+    it append that as the ledger's own first event, same as every other
+    mutation -- `hoops_event_service.undo()`/`void_event()`/
+    `correct_event()` all explicitly refuse to touch `GAME_START` itself
+    (there's nothing before it to return to). Substitutions and the
+    starting-five call also got the same treatment (`LINEUP_SET` /
+    `SUBSTITUTION` structural interpreters + ledger events) rather than
+    being left as unlogged mutations, once the pattern was clear.
+  - `hoops_event_service.py`: `undo()`/`redo()` (void the most recent
+    contributing event / un-void the most recently voided one, full
+    rebuild each time -- same contract as `diamond_event_service.py`),
+    `void_event()` (a specific, not-necessarily-latest event),
+    `correct_event()` (voids the original, appends a replacement of the
+    same type referencing it, rebuilds).
+  - `hoops_rules_service.correct_event_for_foul()`: a foul-specific
+    wrapper around `correct_event()` that re-resolves
+    countsTowardTeam/countsTowardPersonal/bonusRule/foulOutThreshold
+    through the SAME resolution helper (`_resolve_foul_payload()`,
+    extracted from `foul()`) the original call used -- a corrected foul
+    is never a hand-patched approximation of the original's bookkeeping.
+  - `hoops_lineup_service.py`: `set_starting_five()` (exactly 5 distinct,
+    none disqualified), `substitute()` (free/unlimited, gated only by
+    structural checks -- out-player actually on the floor, in-player not
+    already on it, a disqualified player can never re-enter),
+    `players_needing_substitution()` (surfaces Sec.3.1's "must sub for a
+    disqualified player before resuming" without itself gating the
+    clock -- that stays a caller/UI responsibility).
+  - `hoops_box_score_service.py`: team totals straight from
+    `hoops_state_service`'s own canonical fields; per-player PTS/REB/AST/
+    TO/PF from each event's own payload. STL/BLK ride as optional,
+    additive `stealPlayerId`/`blockPlayerId` fields on TURNOVER/SHOT
+    payloads rather than new event types (Sec.5.1 groups "turnover / steal
+    / block" as one operator-entry row, and a steal/block has no
+    canonical-state effect beyond the turnover/missed-shot itself) --
+    same "additive attribution field, not a new event type" pattern
+    baseball's own box score uses for batterId/pitcherId/resultCode.
+    Always rebuilds from the ledger first, so a box score is correct
+    whether requested mid-game or after a correction.
+  - Gate passed exactly as specified:
+    `tests/test_basketball_engine_p2.py` (12 tests) -- undo/redo/void
+    behavior structurally identical to `diamond_event_service`'s (itself
+    already football-EventService-shaped); a foul entered late, corrected
+    to the right player, keeps team fouls/bonus/disqualification correct
+    both immediately and across LATER fouls building on the corrected
+    attribution; lineup starting-five/substitution/DQ-gating; a full
+    box-score scenario covering every stat category plus a
+    correction-reflected-in-the-box-score case.
+  - Full suite: 2882 passed (2869 + 1 P1 no-baseline-rebuild test + 12 P2
+    tests), 2 known-environmental failures, zero regressions.
+  - **Flagged, not resolved this phase:** flagrant-2-ejection and
+    two-technicals-ejection are not modeled as automatic disqualification
+    triggers (Sec.4.3's `double_technical_ejection` ruleset flag is read
+    by no code yet) -- P1's `apply_foul()` only auto-disqualifies via the
+    personal-foul-count threshold; an explicit ejection event/pathway is
+    real, additional scope, not silently folded into the foul-count
+    mechanism, and deferred to whichever round actually wires the
+    operator-facing foul-entry UI (P5) and can settle what an ejection
+    payload should look like.
+
 ---
 
-*P0 and P1 done. P2 (`hoops_event_service`, lightweight lineup,
-`box_score_service`) is next. MHSAA-specific numbers (shot clock, bonus
-rule, timeouts) still pending owner confirmation against the current
-handbook -- shipped as `_source_notes` placeholders in P0, to be finalized
-in P6.*
+*P0, P1, and P2 done. P3 (overlay-state serializer emitting the
+HOOPS_OVERLAY_CONTRACT.md keys) is next. MHSAA-specific numbers (shot
+clock, bonus rule, timeouts) still pending owner confirmation against the
+current handbook -- shipped as `_source_notes` placeholders in P0, to be
+finalized in P6.*

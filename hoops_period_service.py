@@ -76,36 +76,40 @@ class HoopsPeriodService:
         team, so that's the only thing modeled here; which of a team's
         remaining timeouts is "full" vs "short" is not tracked -- flagged
         as a deliberate simplification, not an oversight), and zeroed team/
-        player fouls."""
+        player fouls.
+
+        P2 finding: this is applied via hoops_state_service's own
+        GAME_START structural interpreter and appended as the ledger's
+        first event -- not an unlogged setup mutation -- so
+        hoops_event_service's undo/redo (a full rebuild from the ledger
+        alone, same discipline as diamond_event_service) can reproduce it.
+        Before this, a rebuild() with no explicit baseline would have
+        reset these ruleset-derived values to zero/blank, since they are
+        not part of HoopsStateFoundation.default_state()'s structural
+        defaults the way baseball's inning=1/outs=0 are."""
         hoops = state.setdefault("hoops", {})
         labels = cls.regulation_labels(ruleset)
         period_cfg = ruleset.get("period", {})
         length = int(period_cfg.get("length_seconds", 0))
 
-        HoopsStateFoundation.set_period_format(hoops, str(period_cfg.get("format", "quarters")))
-        state["period"] = labels[0]
-        HoopsStateFoundation.set_period_length(hoops, length)
-        state["clock_seconds"] = length
-        state["clock_running"] = False
-        state["clock_started_at"] = 0
-
         shot_clock_cfg = ruleset.get("shot_clock", {})
-        if bool(shot_clock_cfg.get("enabled")):
-            HoopsStateFoundation.set_shot_clock(
-                hoops, int(shot_clock_cfg.get("length_seconds") or 0), running=False, visible=True,
-            )
-        else:
-            HoopsStateFoundation.set_shot_clock(hoops, None, running=False, visible=False)
+        shot_clock_enabled = bool(shot_clock_cfg.get("enabled"))
 
         timeouts_cfg = ruleset.get("timeouts", {})
         combined = int(timeouts_cfg.get("full", 0)) + int(timeouts_cfg.get("short", 0))
-        HoopsStateFoundation.set_timeouts(hoops, "home", combined)
-        HoopsStateFoundation.set_timeouts(hoops, "visitor", combined)
 
-        HoopsStateFoundation.reset_team_fouls(hoops)
-        hoops["player_fouls"] = {}
-        hoops["disqualified"] = []
-        return PeriodResult("OK", state, {"period": labels[0], "period_length_seconds": length})
+        payload = {
+            "firstPeriod": labels[0],
+            "periodFormat": str(period_cfg.get("format", "quarters")),
+            "periodLengthSeconds": length,
+            "shotClockSeconds": int(shot_clock_cfg.get("length_seconds") or 0) if shot_clock_enabled else None,
+            "shotClockVisible": shot_clock_enabled,
+            "homeTimeouts": combined,
+            "visitorTimeouts": combined,
+        }
+        HoopsStateFoundation.apply_game_start(state, hoops, payload)
+        event = HoopsStateFoundation.append_event(hoops, "GAME_START", payload)
+        return PeriodResult("OK", state, {"period": labels[0], "period_length_seconds": length, "event": event})
 
     @classmethod
     def period_is_over(cls, state: Mapping[str, Any]) -> bool:

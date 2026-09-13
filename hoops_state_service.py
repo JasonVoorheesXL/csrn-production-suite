@@ -344,6 +344,38 @@ class HoopsStateFoundation:
     # by rebuild() for a replay. Same function, same result, always.
 
     @classmethod
+    def apply_game_start(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
+        """payload: {firstPeriod, periodFormat, periodLengthSeconds,
+        shotClockSeconds, shotClockVisible, homeTimeouts, visitorTimeouts}.
+        P2 finding (hoops_event_service's undo/redo needs a full
+        DiamondStateFoundation-style rebuild from JUST the ledger, same as
+        diamond's own undo/redo -- see diamond_event_service.py): unlike
+        diamond, this module's ruleset-derived initial values
+        (period_length_seconds, shot clock, timeouts) are NOT reproducible
+        from default_state() alone, since they come from the active
+        ruleset, not structural defaults. Without this as a real,
+        replayable event, rebuild()-with-no-baseline (undo/redo's normal
+        mode) would reset them to zero/blank on every correction.
+        hoops_period_service.start_game() applies this AND appends it as
+        the ledger's own first event, exactly like every other mutation --
+        it does not special-case itself as an unlogged setup step."""
+        state["period"] = str(payload.get("firstPeriod", ""))
+        state["clock_seconds"] = int(payload.get("periodLengthSeconds", 0))
+        state["clock_running"] = False
+        state["clock_started_at"] = 0
+        cls.set_period_format(hoops, str(payload.get("periodFormat", "quarters")))
+        cls.set_period_length(hoops, int(payload.get("periodLengthSeconds", 0)))
+        cls.set_shot_clock(
+            hoops, payload.get("shotClockSeconds"),
+            running=False, visible=bool(payload.get("shotClockVisible")),
+        )
+        cls.set_timeouts(hoops, "home", int(payload.get("homeTimeouts", 0)))
+        cls.set_timeouts(hoops, "visitor", int(payload.get("visitorTimeouts", 0)))
+        cls.reset_team_fouls(hoops)
+        hoops["player_fouls"] = {}
+        hoops["disqualified"] = []
+
+    @classmethod
     def apply_shot(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
         """payload: {team, made: bool, points: 2|3, shooterId?, assistId?,
         andOne?}. Recorded exactly as reported (made/missed, 2-vs-3,
@@ -413,6 +445,30 @@ class HoopsStateFoundation:
             cls.set_possession(state, cls.opposite(team))
 
     @classmethod
+    def apply_lineup_set(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
+        """payload: {team, playerIds: [5 ids]}. hoops_lineup_service has
+        already validated the count and disqualification-freedom before
+        appending this -- this interpreter only applies it, same "record
+        the ruling" split as every other event type here."""
+        team = str(payload.get("team", ""))
+        if team in TEAMS:
+            cls.set_on_floor(hoops, team, list(payload.get("playerIds", [])))
+
+    @classmethod
+    def apply_substitution(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
+        """payload: {team, outPlayerId, inPlayerId}. hoops_lineup_service
+        validates the out-player is on the floor, the in-player isn't
+        already, and the in-player isn't disqualified, before appending
+        this -- this interpreter only applies the already-validated swap."""
+        team = str(payload.get("team", ""))
+        if team not in TEAMS:
+            return
+        out_id = str(payload.get("outPlayerId", ""))
+        in_id = str(payload.get("inPlayerId", ""))
+        on_floor = list(hoops.get(f"{team}_on_floor", []))
+        hoops[f"{team}_on_floor"] = [in_id if p == out_id else p for p in on_floor]
+
+    @classmethod
     def apply_period_transition(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
         """payload: {nextPeriod, nextPeriodLengthSeconds, resetTeamFouls: bool,
         shotClockSeconds, shotClockVisible}. Called by
@@ -471,12 +527,15 @@ class HoopsStateFoundation:
     # --- replay -------------------------------------------------------------
 
     _INTERPRETERS = {
+        "GAME_START": "apply_game_start",
         "SHOT": "apply_shot",
         "FREE_THROW": "apply_free_throw",
         "REBOUND": "apply_rebound",
         "FOUL": "apply_foul",
         "HELD_BALL": "apply_held_ball",
         "TURNOVER": "apply_turnover",
+        "LINEUP_SET": "apply_lineup_set",
+        "SUBSTITUTION": "apply_substitution",
         "PERIOD_TRANSITION": "apply_period_transition",
     }
 

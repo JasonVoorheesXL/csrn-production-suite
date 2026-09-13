@@ -164,6 +164,28 @@ def test_replay_by_hash_reproduces_the_live_result():
     assert rebuilt["hoops"]["visitor_team_fouls"] == state["hoops"]["visitor_team_fouls"] == 1
 
 
+def test_rebuild_with_no_explicit_baseline_still_reproduces_ruleset_derived_setup():
+    # The realistic undo/redo scenario (hoops_event_service, P2): a
+    # rebuild from JUST the ledger, no baseline snapshot passed in.
+    # start_game()'s ruleset-derived values (period length, timeouts,
+    # shot clock) are not part of HoopsStateFoundation.default_state()'s
+    # structural defaults -- they must be replayed from the ledger's own
+    # GAME_START event, or a bare rebuild(state, events) would silently
+    # reset them to zero/blank.
+    state, ruleset = _new_game()
+    HoopsRulesService.shot(state, {"team": "home", "made": True, "points": 2, "shooterId": "H1"})
+
+    events = copy.deepcopy(state["hoops"]["hoops_events"])
+    assert events[0]["event_type"] == "GAME_START"
+    rebuilt = HoopsStateFoundation.rebuild(state, events)  # no baseline=
+
+    assert rebuilt["period"] == "1"
+    assert rebuilt["clock_seconds"] == 480
+    assert rebuilt["hoops"]["period_length_seconds"] == 480
+    assert rebuilt["hoops"]["home_timeouts"] == 5
+    assert rebuilt["home_score"] == 2
+
+
 def test_voiding_an_event_and_replaying_reproduces_the_result_without_it():
     state, ruleset = _new_game()
     baseline = HoopsStateFoundation.snapshot(state)
