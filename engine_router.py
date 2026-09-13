@@ -269,16 +269,49 @@ def hoops_view(state: dict[str, Any]) -> dict[str, Any]:
 def commit_hoops_view(state: dict[str, Any], view: dict[str, Any]) -> dict[str, Any]:
     """Folds a hoops_view() back into state: hoops-owned keys go back into
     state["hoops"]. Unlike commit_diamond_view(), there is no shared
-    "status" write-back and no sync_shared_fields() call here -- no P0-era
-    basketball service writes status through this view, and basketball's
+    "status" write-back and no sync_shared_fields() call here -- basketball's
     scores were never namespaced to begin with (see HOOPS_OWNED_KEYS's own
-    comment). Add a status write-back here if/when basketball P1 actually
-    needs one; this scaffold does not guess at that shape now."""
+    comment), and the P1/P2 services (hoops_rules_service.confirm_game_end())
+    write state["status"] directly, not through this function.
+
+    P3 finding, worth flagging plainly: hoops_view()/commit_hoops_view()
+    are currently UNUSED by hoops_state_service/hoops_rules_service/
+    hoops_period_service/hoops_event_service/hoops_lineup_service/
+    hoops_box_score_service -- every one of those was designed from P1
+    onward to take `(state, hoops)` as two explicit parameters and operate
+    on the nested state["hoops"] shape directly, rather than needing a
+    flattening adapter the way baseball's P0-P3 modules needed
+    diamond_view() (those predate the state["diamond"] namespacing
+    decision; basketball's P1 was written for the namespaced+shared split
+    from day one). These two functions are not dead in the sense of being
+    wrong -- the P0 addendum's own reasoning for adding them still holds --
+    just not yet exercised by anything real. Left in place rather than
+    removed: a future consumer (a P4 routes layer, say) may still prefer a
+    flat single-dict view; deleting P0-era scaffolding on a P3 round's own
+    say-so is a bigger call than this round's own gate calls for."""
     state.setdefault("hoops", {})
     for key in HOOPS_OWNED_KEYS:
         if key in view:
             state["hoops"][key] = view[key]
     return state
+
+
+def hoops_overlay_payload(state: dict[str, Any]) -> dict[str, Any]:
+    """The HOOPS_OVERLAY_CONTRACT.md wire payload for this game (P3).
+    Unlike overlay_payload() (baseball), this is called on the raw state
+    directly, not hoops_view(state) -- see commit_hoops_view()'s own note
+    on why the flattening adapter is unused here."""
+    from hoops_overlay_serializer import HoopsOverlaySerializer
+
+    return HoopsOverlaySerializer.serialize(state)
+
+
+def hoops_box_score_report(state: dict[str, Any]) -> dict[str, Any]:
+    """Dispatch for basketball's statistics/box-score reporting path,
+    mirroring box_score_report() (baseball)."""
+    from hoops_box_score_service import HoopsBoxScoreService
+
+    return HoopsBoxScoreService.report(state)
 
 
 def overlay_payload(state: dict[str, Any], *, pitcher_name: str = "", batter_name: str = "", batter_position: str = "") -> dict[str, Any]:

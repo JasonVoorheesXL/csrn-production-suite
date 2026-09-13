@@ -551,10 +551,56 @@ builds sequence.
     operator-facing foul-entry UI (P5) and can settle what an ejection
     payload should look like.
 
+- **P3 — DONE (2026-09-13).** `hoops_overlay_serializer.py` +
+  `engine_router.hoops_overlay_payload()`/`hoops_box_score_report()`.
+  - Narrower than baseball's P3 by design: docs/HOOPS_OVERLAY_CONTRACT.md
+    Sec.1's own "shared with football" table means period/clock/
+    possession/scores are already correct on the flat state with zero
+    engine action needed -- this serializer only projects the fields
+    basketball alone produces (shot_clock, home/visitor_fouls, home/
+    visitor_bonus, home/visitor_timeouts) onto the wire's
+    already-formatted-string shape, and a dedicated test confirms it
+    does NOT also emit the shared fields (a second, driftable source for
+    something the renderer already reads directly would be a real risk,
+    not a convenience).
+  - Cross-checked the serializer's own output keys directly against
+    `productionBasketballState()`'s actual source (a regex read of the
+    real, already-shipped JS function, not a re-transcription of the
+    contract doc) -- confirmed exact match, both directions.
+  - The bonus enum is enforced, not just documented: `serialize()` raises
+    if `home_bonus`/`visitor_bonus` is ever anything outside
+    `{NONE, ONE_AND_ONE, DOUBLE}` -- this engine is the enum's first and
+    only producer (Sec.1), so a value outside it is a real upstream bug,
+    not something to coerce or pass through to a renderer with no badge
+    for it.
+  - **P3 finding, worth flagging plainly (not an action needed now):**
+    `engine_router.hoops_view()`/`commit_hoops_view()` (built in the P0
+    engine_router addendum) turn out to be unused by every one of
+    hoops_state_service/hoops_rules_service/hoops_period_service/
+    hoops_event_service/hoops_lineup_service/hoops_box_score_service --
+    all of P1/P2 was designed from day one to take `(state, hoops)` as
+    two explicit parameters and operate on the nested
+    `state["hoops"]` shape directly, unlike baseball's diamond_view(),
+    which is a genuinely necessary adapter reconciling namespaced storage
+    with P0-P3 modules that predate the namespacing decision. Not
+    deleted -- a future P4 routes layer may still want a flat single-dict
+    view -- but flagged rather than silently left looking load-bearing
+    when it isn't yet.
+  - Gate passed: `tests/test_basketball_engine_p3.py` (8 tests) --
+    field-name cross-check against the real renderer source, shot-clock
+    blank-when-disabled and formatted-when-enabled, fouls/timeouts as
+    formatted strings, the bonus-enum guard (both the pinned-3-values
+    case and the reaches-DOUBLE-and-serializes-correctly case), the
+    engine_router dispatch functions producing identical payloads to
+    calling the services directly, and the shared-fields-untouched check.
+  - Full suite: 2890 passed (2882 + 8 new), 2 known-environmental
+    failures, zero regressions.
+
 ---
 
-*P0, P1, and P2 done. P3 (overlay-state serializer emitting the
-HOOPS_OVERLAY_CONTRACT.md keys) is next. MHSAA-specific numbers (shot
-clock, bonus rule, timeouts) still pending owner confirmation against the
-current handbook -- shipped as `_source_notes` placeholders in P0, to be
+*P0 through P3 done. P4 (`routes/hoops_game_routes.py` blueprint,
+`engine_router` dispatch wiring, `app.py`/`phase5_architecture.py`
+wiring) is next. MHSAA-specific numbers (shot clock, bonus rule,
+timeouts) still pending owner confirmation against the current
+handbook -- shipped as `_source_notes` placeholders in P0, to be
 finalized in P6.*
