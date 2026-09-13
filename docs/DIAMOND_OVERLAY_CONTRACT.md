@@ -72,18 +72,18 @@ either):
 played = max(regulation, current_inning, len(line_score.home), len(line_score.visitor))
 ```
 
-- `regulation` -- **not yet wired to the ruleset.** Both renderer copies
-  default it to `9` when `game.regulationInnings` / `runtime.
-  regulation_innings` is absent. **P1 action item:** once
-  `engine_router.py` publishes live state, it should set
-  `regulation_innings` from `active_ruleset(state, sport=...)
-  ["regulation"]["scheduledInnings"]` (currently `7` for both baseball and
-  softball per `rulesets/bat-ball-base.json`) so the shrink/roll math uses
-  the real regulation length instead of the hardcoded fallback. Until then,
-  the renderer's `9` default is silently wrong for a 7-inning NFHS/MHSAA
-  game whenever `current_inning` is between 7 and 9 (columns won't yet
-  shrink at the *true* regulation boundary) — cosmetic only, not a crash,
-  but worth fixing in the same P1 commit that wires other live fields.
+- `regulation` -- **FIXED (P3).** Both renderer copies still default it to
+  `9` when `game.regulationInnings` / `runtime.regulation_innings` is
+  absent, but that fallback is no longer reached once the engine publishes
+  state: `overlay_serializer.py`'s `OverlaySerializer.regulation_innings()`
+  resolves `active_ruleset(state, sport=...)["regulation"]
+  ["scheduledInnings"]` (`7` for both baseball and softball per
+  `rulesets/bat-ball-base.json`) and `OverlaySerializer.serialize()` stamps
+  it onto every payload as `regulation_innings`, so the shrink/roll math
+  uses the real regulation length from the first live payload onward. When
+  `engine_router.py` wires this (P4), it should publish
+  `OverlaySerializer.serialize(state, ...)` verbatim rather than
+  reassembling these fields by hand.
 - `current_inning` = `Number(inning)` from Sec.1.
 - Columns beyond `played` are simply not drawn (not "drawn as empty") --
   the plan object's `innings` array has exactly `played - start + 1`
@@ -160,3 +160,5 @@ inventing a second resolution path.
 | `patchCollegiateBaseballRails`, `baseballBattingSide` (rail content) | `static/csrn-production-theme-runtime.js` | T1 item 4 |
 | `effective_profile_id`/`effective_profile_version` stamp | `broadcast_lifecycle_service.py` | This round (P0) |
 | `bat-ball-base` / `baseball/us-nfhs` / `softball/us-nfhs` rulesets, `_CATALOG` rows | `rulesets/`, `ruleset_service.py` | This round (P0) |
+| Wire-shape overlay payload (Sec.1 fields), `regulation_innings` fix | `overlay_serializer.py` | This round (P3) |
+| Line score / batting box / pitching box (Sec.2 "Stat Engine") | `box_score_service.py` | This round (P3) |

@@ -256,12 +256,24 @@ class DiamondStateFoundation:
     def apply_plate_appearance(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> None:
         """Sec.7.2 plate-appearance output contract. payload:
         {battingTeam, runnerOutcomes: [{from: "batter"|base, to: base|"out"|
-        "score", runId?}], outsRecorded, hits?, errors?}. Runner movement is
-        applied base-to-base from HOME side first (third -> home) so a
-        chain advance (single scores the runner from third, moves 1st to
-        2nd) never double-occupies a base mid-application."""
+        "score", runId?}], outsRecorded, hits?, errors?, batterId?,
+        pitcherId?, resultCode?}. Runner movement is applied base-to-base
+        from HOME side first (third -> home) so a chain advance (single
+        scores the runner from third, moves 1st to 2nd) never double-
+        occupies a base mid-application. batterId/pitcherId/resultCode are
+        additive (P3): box_score_service reads them straight off each
+        event's own payload for per-player attribution -- they don't
+        change how the play itself is applied, only what gets recorded
+        alongside it. current_batter_id/current_pitcher_id are updated
+        here for the same reason DIAMOND_OVERLAY_CONTRACT.md's wire fields
+        exist: something downstream (the overlay serializer, box scores)
+        needs "who" without re-deriving it from lineup state."""
         team = str(payload.get("battingTeam") or cls.batting_team(state))
         outcomes = list(payload.get("runnerOutcomes") or [])
+        if payload.get("batterId"):
+            state["current_batter_id"] = str(payload["batterId"])
+        if payload.get("pitcherId"):
+            state["current_pitcher_id"] = str(payload["pitcherId"])
 
         def _apply_one(outcome: Mapping[str, Any]) -> None:
             src = str(outcome.get("from", ""))
