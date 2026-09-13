@@ -369,7 +369,44 @@ builds sequence.
 
 ---
 
-*Scoping only. No engine code, ruleset JSON, or UI written this round.
-Branch holds at scoping until R26 + R27 + Phase C merge to trunk; first
-build action is the P0 rebase. MHSAA-specific numbers pending owner
-confirmation against the current handbook.*
+### Phase status
+
+- **P0 — DONE.** Rebased onto merged trunk (baseball P0-P5 + video-mode,
+  2026-09-13) -- confirmed clean: `sport_families.ENGINE_READY`,
+  `ruleset_service._CATALOG`, and Phase C's basketball display contract
+  (`productionBasketballState()`) all still exactly as this doc's own
+  audit described. `docs/HOOPS_OVERLAY_CONTRACT.md` (pins the wire fields
+  `productionBasketballState()` already reads, plus the `home_bonus`/
+  `visitor_bonus` 3-value enum -- the first and only producer of that
+  enum, since no theme currently maps it to anything). `rulesets/
+  basketball/us-nfhs.json` + `basketball/us-nfhs-subvarsity.json` +
+  `basketball/us-ms-mhsaa.json` (unlike baseball P0, an MHSAA overlay
+  ships now per this doc's own P0 row -- its 3 flagged values carried as
+  unconfirmed `_source_notes` placeholders, not omitted).
+  `ruleset_service._CATALOG` rows appended cleanly (baseball's rows
+  already there, exactly the shape this doc expected to append onto).
+  `effective_profile_id`/`effective_profile_version` stamping needed zero
+  code changes -- already fully generic from baseball P0.
+  Gate passed: `tests/test_basketball_engine_p0_rulesets.py` (6 tests) +
+  `test_ruleset_golden.py`'s `available_rulesets()` golden updated for
+  the 3 new documents. Full suite: 2836 passed (2830 + 6 new), 2 known
+  environmental failures, zero regressions.
+  **Flagged, not resolved this phase:** `engine_router.py` (built by
+  baseball P4) turned out to be a baseball/softball-specific `state
+  ["diamond"]` namespacing adapter, not the generic "one file, each sport
+  appends a case" dispatch table this doc's Sec.9.2 assumed -- this
+  doc's own Sec.3 already independently proposed the same `state["hoops"]`
+  namespacing pattern, so the *architecture* still fits, but the actual
+  *file* isn't shared generic infrastructure. Needs a decision before P1
+  (not a P0 blocker): generalize `engine_router.py`, add parallel
+  basketball-specific functions alongside baseball's in the same file, or
+  give basketball its own adapter module.
+- **P1 onward — not started.**
+
+---
+
+*P0 done. First real build phase (P1: `hoops_state_service`/
+`hoops_rules_service`/`hoops_period_service`) is next. MHSAA-specific
+numbers (shot clock, bonus rule, timeouts) still pending owner
+confirmation against the current handbook -- shipped as `_source_notes`
+placeholders in P0, to be finalized in P6.*

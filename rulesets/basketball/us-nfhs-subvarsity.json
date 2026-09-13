@@ -1,0 +1,27 @@
+{
+  "id": "basketball/us-nfhs-subvarsity",
+  "version": 1,
+  "extends": "basketball/us-nfhs",
+  "label": "NFHS Basketball, sub-varsity (generic U.S. high school JV/middle school)",
+  "sport": "basketball",
+  "jurisdiction": {
+    "country": "US",
+    "region": null,
+    "association": "NFHS"
+  },
+  "period": {
+    "format": "quarters",
+    "count": 4,
+    "length_seconds": 360,
+    "ot_length_seconds": 240,
+    "ot_count_cap": null
+  },
+  "defaults": {
+    "timezone": null,
+    "association": "NFHS"
+  },
+  "_source_notes": {
+    "period.format": "Scoping doc Sec.4.3 flags sub-varsity/middle-school levels as running '6-minute quarters or halves' -- genuinely uncertain WHICH shape (quarters vs halves) a given sub-varsity level uses. This document assumes quarters (matching varsity's own structure, just shorter) as the safer default since it changes fewer downstream assumptions (team-foul-per-quarter reset, bonus scope) than switching to halves would. Needs owner confirmation before this stops being a placeholder; a level that actually uses halves needs its own further overlay.",
+    "period.length_seconds": "360 (6:00) per quarter is the commonly-cited sub-varsity/JV length the scoping doc names (Sec.4.3) -- not yet confirmed against a specific MHSAA sub-varsity rule, and this document is not itself resolved by any (country, region, association, sport) catalog tuple yet (see ruleset_service._CATALOG -- no sub-varsity row exists in P0); it exists so the shape is ready once a level/classification concept selects it."
+  }
+}

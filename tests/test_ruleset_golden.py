@@ -413,6 +413,11 @@ def test_available_rulesets_exposes_jurisdiction_for_the_picker() -> None:
     # groups on available_rulesets()' country / region / association.
     # Baseball engine P0 adds bat-ball-base (never itself resolved -- an
     # extends-parent only) plus baseball/us-nfhs and softball/us-nfhs.
+    # Basketball engine P0 adds basketball/us-nfhs, basketball/us-nfhs-
+    # subvarsity (not yet catalog-resolvable -- same "shipped but not a
+    # catalog target yet" situation as bat-ball-base, just for a different
+    # reason: no level/classification concept routes to it in P0), and
+    # basketball/us-ms-mhsaa.
     rows = {r["id"]: r for r in ruleset_service.available_rulesets()}
     assert set(rows) == {
         "football/us-nfhs",
@@ -422,6 +427,9 @@ def test_available_rulesets_exposes_jurisdiction_for_the_picker() -> None:
         "bat-ball-base",
         "baseball/us-nfhs",
         "softball/us-nfhs",
+        "basketball/us-nfhs",
+        "basketball/us-nfhs-subvarsity",
+        "basketball/us-ms-mhsaa",
     }
     football_rows = {k: v for k, v in rows.items() if k.startswith("football/")}
     assert (rows["football/us-nfhs"]["country"], rows["football/us-nfhs"]["region"],

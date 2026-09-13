@@ -50,6 +50,13 @@ _CATALOG: tuple[tuple[tuple[str | None, str | None, str | None, str], str], ...]
     (("US", None, None, "baseball"), "baseball/us-nfhs"),
     (("US", None, "NFHS", "softball"), "softball/us-nfhs"),
     (("US", None, None, "softball"), "softball/us-nfhs"),
+    # Basketball engine P0 -- unlike baseball, MHSAA gets its own overlay
+    # already (basketball/us-ms-mhsaa), since the scoping doc's own P0 row
+    # calls for it; its 3 flagged values (shot clock, bonus rule, timeouts)
+    # are unconfirmed placeholders carried via _source_notes, not omitted.
+    (("US", "MS", "MHSAA", "basketball"), "basketball/us-ms-mhsaa"),
+    (("US", None, "NFHS", "basketball"), "basketball/us-nfhs"),
+    (("US", None, None, "basketball"), "basketball/us-nfhs"),
 )
 
 # What resolve() falls back to when nothing in the catalogue matches. Keep

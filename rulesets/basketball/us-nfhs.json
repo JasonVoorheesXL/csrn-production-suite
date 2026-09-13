@@ -1,0 +1,64 @@
+{
+  "id": "basketball/us-nfhs",
+  "version": 1,
+  "label": "NFHS Basketball (generic U.S. high school)",
+  "rulesAuthority": "NFHS",
+  "nfhsSeasonYear": 2026,
+  "sport": "basketball",
+  "jurisdiction": {
+    "country": "US",
+    "region": null,
+    "association": "NFHS"
+  },
+  "period": {
+    "format": "quarters",
+    "count": 4,
+    "length_seconds": 480,
+    "ot_length_seconds": 240,
+    "ot_count_cap": null
+  },
+  "fouls": {
+    "team_foul_scope": "quarter",
+    "bonus_rule": {
+      "type": "TWO_SHOT_ON_FIFTH_FOUL",
+      "scope": "quarter",
+      "threshold": 5
+    },
+    "personal_foul_disqualification": 5,
+    "technical_counts_toward_personal": true,
+    "double_technical_ejection": true
+  },
+  "shot_clock": {
+    "enabled": false,
+    "length_seconds": null,
+    "reset_offensive_rebound_seconds": null
+  },
+  "timeouts": {
+    "full": 3,
+    "short": 2,
+    "carryover_ot": 1,
+    "media_format": null
+  },
+  "overtime": {
+    "length_seconds": 240,
+    "untimed_final_period": false
+  },
+  "technical": {
+    "shots_awarded": 2,
+    "possession_after": "division_line",
+    "administrative_vs_contact_distinction": false
+  },
+  "defaults": {
+    "timezone": null,
+    "association": "NFHS"
+  },
+  "_source_notes": {
+    "fouls.bonus_rule": "NFHS 2023-24 rule change (scoping doc Sec.4.2): team fouls now reset each quarter, and the bonus is two free throws on the opponent's 5th team foul of the quarter -- the old 7th-foul one-and-one / 10th-foul double-bonus (half-scope) model was eliminated at the NFHS-generic tier. A state that has NOT adopted the current rule (retaining the older half-scope 1-and-1/double-bonus model) would need its own association overlay, not this generic document -- this is the current NFHS baseline, not a placeholder guess.",
+    "shot_clock.enabled": "false at the NFHS-generic tier. NFHS made a 35-second shot clock a STATE-ADOPTION OPTION starting 2022-23 -- it is not part of the base NFHS rule set, so the generic document defaults it off. A state that has adopted it needs its own association overlay with enabled=true and the chosen length_seconds (30 or 35).",
+    "period.format": "quarters at the NFHS-generic (varsity) tier -- NFHS varsity basketball is four 8-minute quarters. Sub-varsity/middle-school levels often run shorter quarters or halves instead (scoping doc Sec.4.3); see basketball/us-nfhs-subvarsity.json for that variant.",
+    "overtime.length_seconds": "240 (4:00) is the NFHS standard overtime period length -- a plain structural fact, not a placeholder guess, but listed here since it's one of the values the scoping doc's Sec.4.3 asked to double-check.",
+    "fouls.personal_foul_disqualification": "5 personal fouls disqualifies a player under NFHS rules -- a plain structural fact (scoping doc Sec.4.3), listed for the same double-check reason as overtime.length_seconds.",
+    "technical.shots_awarded": "NFHS technical fouls award 2 free throws with the ball returning to play at the division line -- a plain structural fact (scoping doc Sec.4.3), not a placeholder.",
+    "timeouts": "3 full + 2 short (60/30-second) per team per game is the commonly-cited NFHS allotment (scoping doc Sec.4.2), but the doc explicitly flags this as needing confirmation -- broadcast/media-timeout formats can vary the exact count. carryover_ot=1 (one timeout carries into overtime) is the typical NFHS convention; media_format is left null pending confirmation of whether a broadcast-timeout format applies."
+  }
+}
