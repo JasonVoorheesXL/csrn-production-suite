@@ -102,6 +102,14 @@ def test_runtime_state_endpoint_returns_runtime_service_state(state_client) -> N
         "home_score": 6,
         "overlay_revision": "gate6-logo-fallback-v1",
         "runtime": True,
+        # Layout Builder P0: app.py's runtime_state() now always adds the
+        # identity profile's layouts document (empty default here, since
+        # this fixture's IDENTITY_PROFILE carries none) -- see
+        # test_layout_builder_p0.py for the override-present cases.
+        "layouts": {
+            "active": "default",
+            "presets": {"default": {"in_game": {}, "pregame": {}, "halftime": {}}},
+        },
     }
     assert service.calls == [
         ("load", None),

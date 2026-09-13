@@ -393,3 +393,109 @@ customer-visible UI."** That shape touches:
 Builder P0 waits for the R26+R27+Phase C trunk merge (one additive hook in
 Phase C's file), then runs in parallel with — not behind — the baseball
 engine P0. Two P0-blocking decisions flagged in §6.*
+
+---
+
+## 8. Phase status: P0 — DONE (2026-09-13)
+
+Built off the merged trunk (post video-mode-build-20260913, commit
+`7223956`), same branch/worktree, in parallel with the baseball engine P0.
+Both §7 pre-conditions accepted (named-preset storage, proportional
+1080p-basis scaling). Full regression suite green throughout — final run:
+2843 passed, 2 known-environmental failures (unrelated to this branch),
+zero regressions.
+
+**Deliverables, against the §7 kickoff prompt:**
+
+1. **Data model** — `layouts` section added to `identity_profile.json`
+   (`identity_service.py`: `_template()` / `_normalize()`), shape exactly
+   as specified: `layouts[preset][scene][base_family][element] = {visible,
+   zone|rect, ...}` + `layouts.active`. Seeds to the same empty `default`
+   preset on both existing and fresh installs (module docstring: no legacy
+   layout to seed from).
+2. **`layout_builder_service.py`** (new, Flask-independent) — `SCENES`,
+   `ELEMENTS`, `CONTRACT_BOUND_ELEMENTS`, `default_preset()` /
+   `default_layouts_document()`, `resolve_override()` /
+   `scene_overrides_for_family()` (the per-base_family-then-"default"-key
+   fallback every consumer shares).
+3. **In-Game application hook** — `applyLayoutOverrides(root, runtime)` in
+   `csrn-production-theme-runtime.js`, called from both the "signature
+   unchanged" fast path and the full-render path. `app.py`'s
+   `runtime_state()` now includes the `layouts` document on every poll.
+4. **Pregame/Halftime application hook** — `pregame_presentation.py`'s
+   `_payload()` gains a `layout: {pregame, halftime}` key
+   (`_layout_overrides()`); `pregame_universal_overlay.html`'s
+   `rebuildCards()`/`applyLayoutOverrides()` consume it (sponsor_slot /
+   spotlight_zone visibility, background transparency for OBS
+   compositing).
+5. **Scene ↔ scenario reconciliation** — documented in code
+   (`layout_builder_service.py`, above `SCENES`) as well as here (§2):
+   `PRESENTATION_SCENARIOS` untouched, `behavior` only *names* one of its
+   states.
+6. **Tests** — `tests/test_layout_builder_p0.py` (13 tests): the default
+   preset's golden "zero overrides ⇒ reproduces resolvePlacements()
+   exactly" proof, identity_service round-trip (+ malformed-input
+   fallback), static-source wiring/contract assertions on the runtime JS
+   and overlay template, and the pregame/halftime read-hook's
+   fallback/family-resolution behavior. Two pre-existing tests
+   (`test_pregame_overlay_layout_fix.py`,
+   `test_state_routes.py::test_runtime_state_endpoint_returns_runtime_service_state`)
+   had hardcoded exact-shape assertions that needed updating for the new
+   (additive, non-behavioral) `layouts`/`sponsorsHidden` shape — same
+   category of fix as `test_ruleset_golden.py` needed on the basketball
+   track, not a design change.
+
+**Gate:** confirmed by code path — a hand-authored preset with
+`ticker: {zone: "bottom-center"}` and `sponsor_slot: {visible: false}` is
+honored by `applyLayoutOverrides()`: the ticker host is repositioned to
+the frozen engine's own lower-third zone rect and the sponsor board host
+is hidden, for every theme/base_family combination the hook resolves for.
+Absent a `layouts` section (or the shipped empty default), nothing in the
+render path is touched. (Verified by static-source/unit test this round —
+see the live-verification caveat below.)
+
+**P0 scope decisions made during the build (flagged for confirmation, not
+silently assumed — full reasoning in code comments at each site):**
+
+- **`zone` is a named-zone string** (from
+  `window.CSRNBroadcastLayoutEngine.zones`) **or an explicit `rect`** (% of
+  1920×1080), rect taking precedence — the kickoff prompt's own
+  `zone|rect` wording, made concrete. `layout_builder_service.py` documents
+  this convention but does not validate it (still no mirrored engine
+  geometry in Python, per the module's original design decision).
+- **Repositioning coverage is real but partial, not full-vocabulary.**
+  Investigating the actual render pipeline (not assumed from the kickoff
+  prompt's wording) found the frozen engine's own component vocabulary
+  (`scorebug`/`ticker`/`playerCard`/`highlightVideo`/`sponsor`/`captions`)
+  does not line up 1:1 with the layout document's element vocabulary
+  (`score_box`/`clock_period`/`game_fields`/`sponsor_slot`/`spotlight_zone`/
+  `video_zone`/…), and only *this* runtime call site ever requests
+  `["scorebug", "captions"]` — ticker/sponsor/player/highlight are mounted
+  by separate, per-theme, mode-exclusive DOM paths
+  (`patchThemeTicker`/`nativeVideoBoardHost`), not through
+  `resolvePlacements()`/`applyRect()`. Given that:
+  - `visible:false` is honored for every element whose host resolves,
+    theme-agnostically (a plain display toggle).
+  - `zone`/`rect` repositioning is honored for `score_box` (the single
+    bonded scorebug component — `clock_period`/`game_fields` are
+    schema-only, same as this doc's own §5.1 "actually splitting the
+    render is a P1/theme-runtime concern") and for `ticker` (works across
+    all 5 themes via `getBoundingClientRect()`-relative math, independent
+    of each theme's own DOM nesting).
+  - `zone`/`rect` on `sponsor_slot`/`spotlight_zone`/`video_zone` stores
+    and round-trips correctly but is **not yet applied as a reposition** —
+    `nativeVideoBoardHost()` only exposes a mode-independent wrapper for 3
+    of 5 themes plus a heritage_press special case (`digital_neon` has
+    none). This is genuine per-theme geometry work best owned by whoever
+    holds Phase C's video-board contract next — a P1 decision, not a
+    guess made here. The stated P0 gate (ticker + sponsor) does not
+    require it.
+  - `score_box` repositioning itself only resolves for 4 of 5 themes
+    (`digital_neon`'s own engine file never stamps a
+    `bl-component`/`data-component` node) — silently a no-op there, never
+    a crash.
+- **Live visual/pixel verification was not performed this round** — the
+  hook was verified by static-source assertion + the full regression
+  suite's byte-identical-by-default guarantee, not by rendering a live
+  broadcast in a browser and confirming the ticker/sponsor actually moved
+  on screen. Worth a manual spot-check before treating P0 as fully closed.

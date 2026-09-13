@@ -2608,6 +2608,14 @@ def runtime_state(state: dict[str, Any]) -> dict[str, Any]:
     result = get_state_service().runtime_view(state).data["state"]
     _merge_opening_setup_state(result, state)
     result["overlay_revision"] = OVERLAY_SCHEMA_REVISION
+    # Layout Builder P0 (docs/LAYOUT_BUILDER_RECONCILIATION.md): the
+    # runtime-side apply hook (csrn-production-theme-runtime.js) reads this
+    # to resolve per-element overrides. No customer-visible editing UI
+    # exists yet in P0 -- the identity profile's layouts document is
+    # loaded once at process start, same as organization/broadcast_
+    # defaults above; a preset change takes effect on the next restart
+    # until a later round adds a live-editing endpoint.
+    result["layouts"] = copy.deepcopy(IDENTITY_PROFILE.get("layouts") or {})
     return result
 
 def load_security() -> dict[str, Any]:

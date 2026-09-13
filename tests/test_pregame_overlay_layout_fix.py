@@ -67,8 +67,11 @@ def test_pregame_branch_of_rebuild_cards_includes_sponsor_rotation() -> None:
     html = _read("templates/pregame_universal_overlay.html")
     fn = html[html.index("function rebuildCards()"):]
     fn = fn[: fn.index("\nfunction showCard", 1)]
-    # sponsors is computed unconditionally...
-    assert "const sponsors=Array.isArray(data.halftime_sponsors)" in fn
+    # sponsors is computed unconditionally (Layout Builder P0 added a
+    # sponsor_slot visibility check ahead of it -- see
+    # test_layout_builder_p0.py -- but the variable itself is still always
+    # assigned here, not skipped per-branch)...
+    assert "const sponsors=sponsorsHidden?[]:(Array.isArray(data.halftime_sponsors)" in fn
     # ...and now spliced into BOTH the halftime branch and the pregame
     # (else) branch, not halftime only.
     else_branch = fn[fn.index("}else{"):]

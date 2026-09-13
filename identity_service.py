@@ -21,6 +21,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+import layout_builder_service
+
 
 # --- Today's exact literals (moved verbatim out of app.py DEFAULT_CONFIG /
 #     CSRN_GAME_DAY_LAUNCHER.ps1). Used only to seed an existing install. ---
@@ -101,12 +103,18 @@ _FLAG_DEFAULTS: dict[str, Any] = {"onboarding_complete": False}
 
 
 def _template(existing_install: bool) -> dict[str, Any]:
+    # Layout Builder P0 (docs/LAYOUT_BUILDER_RECONCILIATION.md): the same
+    # empty "default" preset regardless of existing-install vs fresh --
+    # there is no legacy layout to seed from (layouts are new; every
+    # broadcast up to now rendered with no layout system at all, which is
+    # exactly what an empty "default" preset reproduces).
     if existing_install:
         return {
             "organization": copy.deepcopy(LEGACY_ORGANIZATION),
             "broadcast_defaults": copy.deepcopy(LEGACY_BROADCAST_DEFAULTS),
             "streaming": copy.deepcopy(LEGACY_STREAMING),
             "state_defaults": copy.deepcopy(LEGACY_STATE_DEFAULTS),
+            "layouts": layout_builder_service.default_layouts_document(),
             "onboarding_complete": True,
         }
     return {
@@ -114,6 +122,7 @@ def _template(existing_install: bool) -> dict[str, Any]:
         "broadcast_defaults": copy.deepcopy(BLANK_BROADCAST_DEFAULTS),
         "streaming": copy.deepcopy(BLANK_STREAMING),
         "state_defaults": copy.deepcopy(BLANK_STATE_DEFAULTS),
+        "layouts": layout_builder_service.default_layouts_document(),
         "onboarding_complete": False,
     }
 
@@ -146,6 +155,12 @@ def _normalize(raw: Mapping[str, Any] | None, existing_install: bool) -> dict[st
                 base[section] = {**base[section], **{
                     str(k): v for k, v in value.items()
                 }}
+        # "layouts" is deeply nested (presets -> scene -> base_family ->
+        # element), unlike the other sections' flat key/value shape, so it
+        # gets layout_builder_service's own normalization rather than the
+        # shallow merge above (which would silently drop everything below
+        # the first level).
+        base["layouts"] = layout_builder_service.normalize_layouts(raw.get("layouts"))
         for flag in _FLAG_DEFAULTS:
             if flag in raw:
                 base[flag] = bool(raw[flag])

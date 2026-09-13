@@ -15,6 +15,9 @@ from typing import Any
 
 from flask import Blueprint, Response, jsonify, request
 
+import layout_builder_service
+import sport_families
+
 
 _LOCK = threading.RLock()
 _NWS_CACHE: dict[str, Any] = {"key": "", "at": 0, "periods": []}
@@ -823,6 +826,39 @@ def _organization_branding() -> dict[str, Any]:
     }
 
 
+def _layouts_document() -> dict[str, Any] | None:
+    # The Layout Builder document lives only in identity_profile.json (the
+    # IDENTITY_PROFILE module-level dict app.py loads once at startup),
+    # never in Data/Settings/config.json's own repository -- _config() /
+    # CONFIG_REPOSITORY above only ever mirrors organization /
+    # broadcast_defaults / streaming (_persist_identity_sections), so this
+    # reads the profile directly rather than through _config(). Defensive:
+    # an app module without IDENTITY_PROFILE (unit tests importing this
+    # module standalone) reads no overrides, never raises.
+    try:
+        profile = getattr(_csrn_app(), "IDENTITY_PROFILE", None)
+    except Exception:
+        return None
+    if not isinstance(profile, dict):
+        return None
+    return profile.get("layouts")
+
+
+def _layout_overrides(sport: Any, scene: str) -> dict[str, dict[str, Any]]:
+    """Layout Builder P0 (docs/LAYOUT_BUILDER_RECONCILIATION.md) --
+    additive Pregame/Halftime read hook (kickoff prompt deliverable 4):
+    the active preset's resolved (scene, base_family) element overrides,
+    for `pregame_universal_overlay.html`'s own JS to apply. Absent a
+    `layouts` section or an override for a given element, that element is
+    simply not a key in the returned dict -- the template's existing
+    behavior for it is untouched, byte-identical to today (same contract
+    the in-game runtime hook honors)."""
+    family = sport_families.base_family(sport) or "football"
+    return layout_builder_service.scene_overrides_for_family(
+        _layouts_document(), scene=scene, base_family=family,
+    )
+
+
 def _payload() -> dict[str, Any]:
     state = _state()
     active = _record_for_state(state)
@@ -874,6 +910,15 @@ def _payload() -> dict[str, Any]:
         "next_matchup": next_matchup,
         "automatic_storylines": automatic_storylines,
         "organization": _organization_branding(),
+        # Layout Builder P0: both scenes' resolved overrides, keyed by
+        # scene -- pregame_universal_overlay.html decides which applies
+        # from game.broadcast_phase, the same convention already used for
+        # first_half_spotlights/halftime_sponsors above (both always
+        # present; the template picks).
+        "layout": {
+            "pregame": _layout_overrides(game.get("sport"), "pregame"),
+            "halftime": _layout_overrides(game.get("sport"), "halftime"),
+        },
         "pregame_diagnostics": {
             "broadcast_records": len(_broadcast_records()),
             "primary_school_found": bool(_primary_school()),

@@ -10,6 +10,13 @@
 #root{position:fixed;inset:0;opacity:0;pointer-events:none;transition:opacity .35s ease}
 #root.visible{opacity:1}
 .stage{position:absolute;inset:0;border:2px solid color-mix(in srgb,var(--brand-primary) 90%,#ff243d);background:radial-gradient(circle at 14% 22%,rgba(160,8,27,.18),transparent 30%),radial-gradient(circle at 96% 86%,rgba(150,6,24,.16),transparent 22%),linear-gradient(135deg,#06080b,#0f141b 60%,#07090d);display:grid;grid-template-rows:auto 1fr auto auto}
+/* Layout Builder P0: a `background` override with visible:false clears the
+   branded stage background/border so OBS can composite a live camera feed
+   underneath -- same "transparent-for-video" idea as the in-game overlay's
+   video_zone contract, applied here to the whole pregame/halftime stage.
+   Absent an override, this class is never added -- byte-identical to
+   today. */
+.stage.csrn-layout-transparent-bg{background:transparent!important;border-color:transparent!important}
 .topbar{height:220px;display:flex;align-items:center;justify-content:space-between;padding:0 58px;border-bottom:3px solid var(--brand-primary);background:linear-gradient(90deg,color-mix(in srgb,var(--brand-secondary) 92%,#10141b),#090c11 70%);box-shadow:0 8px 28px rgba(0,0,0,.28)}
 .brand{display:flex;align-items:center;gap:24px;min-width:0}.brand img{width:132px;height:132px;object-fit:cover;border-radius:50%;clip-path:circle(50% at 50% 50%);background:transparent;filter:drop-shadow(0 4px 9px rgba(0,0,0,.45))}.brand-copy{min-width:0}.brand-line{display:flex;align-items:flex-end;gap:30px;white-space:nowrap;min-height:112px}.brand-short{position:relative;display:inline-block;font-family:"CSRN Karantina","Arial Black",sans-serif;font-size:144px;font-weight:700;letter-spacing:.005em;line-height:.69;text-transform:uppercase;color:var(--brand-primary);-webkit-text-stroke:1.8px #f7f7f7;paint-order:stroke fill;text-shadow:none;transform:skewX(-6deg);transform-origin:left center}.brand-short::after{content:attr(data-text);position:absolute;inset:0;color:transparent;-webkit-text-stroke:.45px rgba(255,255,255,.28);transform:translate(-1px,-1px);pointer-events:none}.brand-pregame{font-family:"CSRN Michroma","Arial Black",sans-serif;font-size:50px;font-weight:400;letter-spacing:.025em;line-height:.92;background:linear-gradient(180deg,#ffffff 0%,#d4d7dc 55%,#90959e 100%);-webkit-background-clip:text;background-clip:text;color:transparent;text-transform:uppercase;text-shadow:3px 4px 0 rgba(0,0,0,.82);transform:skewX(-5deg);transform-origin:left center}.brand-long{display:block;color:var(--brand-primary);font-family:"CSRN Michroma","Arial",sans-serif;font-weight:400;letter-spacing:.09em;font-size:15px;margin-top:10px;text-transform:uppercase;font-style:italic}
 .statebadge{font-family:"CSRN Michroma","Arial",sans-serif;font-weight:400;letter-spacing:.12em;border:1px solid color-mix(in srgb,var(--brand-primary) 60%,#ffffff);border-radius:999px;padding:13px 22px;background:color-mix(in srgb,var(--brand-primary) 25%,transparent)}
@@ -388,18 +395,47 @@ function sponsorCard(sp){
      </div>
    </section>`;
 }
+// Layout Builder P0 (docs/LAYOUT_BUILDER_RECONCILIATION.md) -- additive
+// read of pregame_presentation.py's `data.layout[scene]` (kickoff prompt
+// deliverable 4). Absent a `layouts` section, or no override for a given
+// element, elementHidden() is false for everything -- byte-identical to
+// today.
+function layoutSceneOverrides(scene){
+ const doc=data?.layout?.[scene];
+ return (doc&&typeof doc==='object')?doc:{};
+}
+function elementHidden(scene,element){
+ const ov=layoutSceneOverrides(scene)[element];
+ return Boolean(ov&&typeof ov==='object'&&ov.visible===false);
+}
+function applyLayoutOverrides(scene){
+ // `background` clears the stage's own branded background/border so OBS
+ // can composite a live feed underneath (see the .csrn-layout-transparent-bg
+ // rule above). sponsor_slot/spotlight_zone visibility is read directly by
+ // rebuildCards() instead, since it changes which cards exist, not styling.
+ document.querySelector('.stage')?.classList.toggle('csrn-layout-transparent-bg',elementHidden(scene,'background'));
+}
 function rebuildCards(){
  const weather=weatherCard(),delayState=delayGameStateCard();
  const phase=String(data.game?.broadcast_phase||data.game?.status||'').toLowerCase();
  const halftime=data.settings?.mode!=='delayed'&&phase==='halftime';
- const sponsors=Array.isArray(data.halftime_sponsors)?data.halftime_sponsors.map(sponsorCard):[];
+ // Layout Builder P0: a sponsor_slot/spotlight_zone override with
+ // visible:false drops that card type from the rotation entirely -- there
+ // is no fixed-position "zone" concept in this rotating-card overlay, so
+ // visibility is the whole of what P0 applies here (see
+ // pregame_presentation.py's _layout_overrides()). Absent an override,
+ // both are exactly the arrays already built below -- untouched.
+ const layoutScene=halftime?'halftime':'pregame';
+ const sponsorsHidden=elementHidden(layoutScene,'sponsor_slot');
+ const sponsors=sponsorsHidden?[]:(Array.isArray(data.halftime_sponsors)?data.halftime_sponsors.map(sponsorCard):[]);
  let list;
  if(data.settings?.mode==='delayed'&&data.settings?.delay_type==='weather'){
    list=[weather,delayState,gameDetailsCard(),teamProfilesCard(),storylinesCard(),nextWeekCard()];
  }else if(data.settings?.mode==='delayed'){
    list=[delayState,gameDetailsCard(),weather,teamProfilesCard(),storylinesCard(),nextWeekCard()];
  }else if(halftime){
-   const spotlights=Array.isArray(data.first_half_spotlights)?data.first_half_spotlights:[];
+   const spotlightsHidden=elementHidden('halftime','spotlight_zone');
+   const spotlights=spotlightsHidden?[]:(Array.isArray(data.first_half_spotlights)?data.first_half_spotlights:[]);
    list=[weather,...spotlights.map(spotlightCard),...sponsors];
  }else{
    list=[gameDetailsCard(),weather,teamProfilesCard(),storylinesCard(),nextWeekCard(),...sponsors];
@@ -496,6 +532,7 @@ function renderStatic(){
  document.getElementById('delayNote').textContent=delayed?(cfg.delay_note||'Awaiting an update from game officials.'):'';
  document.getElementById('footerText').textContent=[g.date,g.scheduled_start,g.venue].filter(Boolean).join(' · ')||(halftime?'CSRN Halftime':delayed?'CSRN':'CSRN Pregame');
  document.getElementById('root').classList.toggle('visible',shouldShow());
+ applyLayoutOverrides(halftime?'halftime':'pregame');
  rebuildCards();
  if(!lastCardSwitch)lastCardSwitch=Date.now();
 }

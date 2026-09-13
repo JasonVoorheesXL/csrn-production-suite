@@ -3133,6 +3133,209 @@ function patchVideoWindowGuide(root, runtime) {
   label.textContent = `VIDEO WINDOW\n${w}×${h} @ (${x}, ${y})\nreference: 1920×1080`;
 }
 
+// Layout Builder P0 (docs/LAYOUT_BUILDER_RECONCILIATION.md) -- the In-Game
+// application hook (kickoff prompt deliverable 3). Additive: resolves the
+// active preset's in_game[base_family] overrides out of runtime.layouts
+// (the layouts document app.py's runtime_state() now includes on every
+// poll -- see identity_service.py / layout_builder_service.py) and applies
+// visibility / zone on top of whatever renderPackage() or the lightweight
+// patch-only path already produced. Absent an override for an element,
+// this function touches nothing -- byte-identical to today, exactly as
+// the kickoff prompt requires. Called from both the "signature unchanged"
+// fast path and the full-render path below, same cadence as
+// patchCollegiateRails()/patchVideoWindowGuide().
+//
+// P0 scope decision (flagged for confirmation, not silently assumed --
+// mirrors the reconciliation doc's own score_box precedent, Sec.5.1):
+//   - `visible:false` is honored for every element below whose host node
+//     resolves for the current theme/alias: a plain display:none/restore
+//     toggle, safe and theme-agnostic regardless of DOM nesting.
+//   - `zone` (a named zone from window.CSRNBroadcastLayoutEngine.zones,
+//     e.g. "bottom-center") or an explicit `rect` (% of 1920x1080) is
+//     applied as a reposition for `score_box` (the single bonded
+//     `.bl-component[data-component="scorebug"]` node -- clock_period/
+//     game_fields are NOT independently addressable inside it yet, same
+//     as the doc's own "actually splitting the render is a P1/theme-
+//     runtime concern" note) and for `ticker` (resolveTickerHostR0()
+//     below, using getBoundingClientRect()-relative math so it works
+//     regardless of each theme's own tickerKind/DOM nesting). Confirmed:
+//     friday_night_stadium / eight_bit_gameday / heritage_press /
+//     collegiate_traditional all stamp dataset.component="scorebug" on
+//     their rendered node; digital_neon does not (its own engine file
+//     never sets a bl-component/data-component convention), so a
+//     score_box override silently no-ops there (querySelector finds
+//     nothing -> untouched, never a crash) -- a real, partial-coverage
+//     gap, not a hidden assumption.
+//   - `zone`/`rect` on `sponsor_slot` / `spotlight_zone` / `video_zone` is
+//     stored and round-trips correctly (P0 deliverables 1/2/6) but is NOT
+//     applied as a reposition here: these three live inside the mode-
+//     exclusive video-board region, and nativeVideoBoardHost() only
+//     exposes a mode-independent wrapper for 3 of 5 themes plus a
+//     heritage_press special case -- digital_neon has none. Repositioning
+//     these safely is per-theme geometry work for the Phase C owner (the
+//     kickoff prompt: "Coordinate the merge with the Phase C owner (same
+//     file)") -- flagged for a P1 decision, not guessed at here. This
+//     still satisfies the P0 gate exactly as written (ticker moved to a
+//     lower-third, sponsor slot hidden, across all five themes).
+//   - `clock_period` / `game_fields` / `logo` overrides are schema-only in
+//     P0: no independently addressable DOM node exists for them yet.
+//   - `video_zone`'s data-module="video.board" / [data-video-mode] markup
+//     is never stripped by a visibility override (contract-bound, see
+//     CONTRACT_BOUND_ELEMENTS in layout_builder_service.py) -- display:none
+//     hides the node; nothing ever removes it or its attributes.
+const LAYOUT_DEFAULT_FAMILY_KEY_R0 = "default";
+
+function resolveLayoutOverrideR0(layouts, family, element) {
+  if (!layouts || typeof layouts !== "object") return null;
+  const presets = layouts.presets;
+  const active = layouts.active;
+  if (!presets || typeof presets !== "object" || !active) return null;
+  const preset = presets[active];
+  if (!preset || typeof preset !== "object") return null;
+  const scene = preset.in_game;
+  if (!scene || typeof scene !== "object") return null;
+
+  const familyDoc = scene[family];
+  if (familyDoc && typeof familyDoc === "object" && Object.prototype.hasOwnProperty.call(familyDoc, element)) {
+    const value = familyDoc[element];
+    return (value && typeof value === "object") ? value : null;
+  }
+  const fallbackDoc = scene[LAYOUT_DEFAULT_FAMILY_KEY_R0];
+  if (fallbackDoc && typeof fallbackDoc === "object" && Object.prototype.hasOwnProperty.call(fallbackDoc, element)) {
+    const value = fallbackDoc[element];
+    return (value && typeof value === "object") ? value : null;
+  }
+  return null;
+}
+
+function layoutTargetPxR0(override) {
+  if (!override || typeof override !== "object") return null;
+  const rect = override.rect;
+  if (rect && typeof rect === "object") {
+    const x = Number(rect.x), y = Number(rect.y), w = Number(rect.w), h = Number(rect.h);
+    if ([x, y, w, h].every(Number.isFinite)) {
+      return {x: (x / 100) * 1920, y: (y / 100) * 1080, w: (w / 100) * 1920, h: (h / 100) * 1080};
+    }
+  }
+  const zoneName = override.zone;
+  if (typeof zoneName === "string" && zoneName) {
+    const engine = window.CSRNBroadcastLayoutEngine;
+    const zone = engine && engine.zones && engine.zones[zoneName];
+    if (zone) return {x: zone.x, y: zone.y, w: zone.w, h: zone.h};
+  }
+  return null;
+}
+
+function setNodeVisibilityR0(node, visible) {
+  if (!node) return;
+  if (visible === false) {
+    if (node.style.display !== "none") {
+      if (node.dataset.csrnLayoutPrevDisplay === undefined) {
+        node.dataset.csrnLayoutPrevDisplay = node.style.display || "";
+      }
+      node.style.display = "none";
+    }
+  } else if (node.dataset.csrnLayoutPrevDisplay !== undefined) {
+    node.style.display = node.dataset.csrnLayoutPrevDisplay;
+    delete node.dataset.csrnLayoutPrevDisplay;
+  }
+}
+
+// Repositions `node` to `targetPx` (1920x1080-basis px) using the browser's
+// own layout (getBoundingClientRect() / offsetParent) rather than assuming
+// any particular theme's DOM nesting or which ancestor is CSS-positioned --
+// this is what lets one function reposition both a direct canvas child
+// (the scorebug component) and a deeply-nested per-theme ticker node
+// correctly.
+function setNodeZonePxR0(node, canvasRoot, targetPx) {
+  if (!node || !canvasRoot || !targetPx) return;
+  const canvasRect = canvasRoot.getBoundingClientRect();
+  if (!canvasRect.width || !canvasRect.height) return;
+  const scaleX = canvasRect.width / 1920;
+  const scaleY = canvasRect.height / 1080;
+  const onScreen = {
+    left: canvasRect.left + targetPx.x * scaleX,
+    top: canvasRect.top + targetPx.y * scaleY,
+    width: targetPx.w * scaleX,
+    height: targetPx.h * scaleY
+  };
+  const parent = node.offsetParent || canvasRoot;
+  const parentRect = parent.getBoundingClientRect();
+  node.style.position = "absolute";
+  node.style.left = (onScreen.left - parentRect.left) + "px";
+  node.style.top = (onScreen.top - parentRect.top) + "px";
+  node.style.width = onScreen.width + "px";
+  node.style.height = onScreen.height + "px";
+}
+
+// tickerKind "replace-sibling" hides the tickerSelector node and mounts the
+// live scroller as its sibling (mountScroller()); tickerKind "inside"
+// mounts the scroller as its child. Either way, repositioning the node
+// identified here moves the ticker as a whole, regardless of which of the
+// five themes is active.
+function resolveTickerHostR0(root, alias) {
+  const spec = PACKAGE_ALIASES[alias];
+  if (!spec) return null;
+  const frozenTarget = root.querySelector(spec.tickerSelector);
+  if (!frozenTarget) return null;
+  if (spec.tickerKind === "replace-sibling") {
+    return frozenTarget.parentElement || frozenTarget;
+  }
+  return frozenTarget;
+}
+
+function applyLayoutOverrides(root, runtime) {
+  if (!root || !runtime) return;
+  const layouts = runtime.layouts;
+  if (!layouts || typeof layouts !== "object") return; // no section -> untouched
+  const family = productionSportFamily(runtime.sport);
+  const alias = currentAlias;
+  const canvas = root.closest(".csrn-broadcast-layout") || root;
+
+  // score_box: the single bonded scorebug component (clock_period /
+  // game_fields are schema-only in P0 -- see module note above).
+  const scorebugOverride = resolveLayoutOverrideR0(layouts, family, "score_box");
+  if (scorebugOverride) {
+    const scorebugNode = root.querySelector('.bl-component[data-component="scorebug"]');
+    if (scorebugNode) {
+      setNodeVisibilityR0(scorebugNode, scorebugOverride.visible !== false);
+      const px = layoutTargetPxR0(scorebugOverride);
+      if (px) setNodeZonePxR0(scorebugNode, canvas, px);
+    }
+  }
+
+  // ticker
+  const tickerOverride = resolveLayoutOverrideR0(layouts, family, "ticker");
+  if (tickerOverride) {
+    const tickerNode = resolveTickerHostR0(root, alias);
+    if (tickerNode) {
+      setNodeVisibilityR0(tickerNode, tickerOverride.visible !== false);
+      const px = layoutTargetPxR0(tickerOverride);
+      if (px) setNodeZonePxR0(tickerNode, canvas, px);
+    }
+  }
+
+  // sponsor_slot / spotlight_zone: visibility-only in P0 (see module note
+  // -- reposition deferred, DOM anchor theme-inconsistent). Only acted on
+  // when the override actually hides the element; an active mode's host
+  // only exists once that mode is mounted, so there is nothing to show/
+  // reposition here for the `visible !== false` case.
+  const modeElementMapR0 = Object.freeze({sponsor_slot: "sponsor", spotlight_zone: "player"});
+  for (const element of Object.keys(modeElementMapR0)) {
+    const override = resolveLayoutOverrideR0(layouts, family, element);
+    if (!override || override.visible !== false) continue;
+    setNodeVisibilityR0(nativeVideoBoardHost(root, alias, modeElementMapR0[element]), false);
+  }
+
+  // video_zone: contract-bound (CONTRACT_BOUND_ELEMENTS) -- visibility only,
+  // never strips data-module="video.board" / [data-video-mode].
+  const videoZoneOverride = resolveLayoutOverrideR0(layouts, family, "video_zone");
+  if (videoZoneOverride && videoZoneOverride.visible === false) {
+    const mode = themeVideoModeFor(alias, runtime);
+    if (mode) setNodeVisibilityR0(nativeVideoBoardHost(root, alias, mode), false);
+  }
+}
+
 async function renderSelected() {
   if (renderBusy) return "busy";
   renderBusy = true;
@@ -3208,6 +3411,7 @@ async function renderSelected() {
       patchLiveGameState(runtime);
       patchCollegiateRails(scoreLayout(), runtime, collegiateStatistics);
       patchVideoWindowGuide(scoreLayout(), runtime);
+      applyLayoutOverrides(scoreLayout(), runtime);
       patchThemeTicker(runtime);
       patchCaptionDom(alias, captionState);
       return "unchanged";
@@ -3257,6 +3461,11 @@ async function renderSelected() {
     mountCentralBoardMedia(scoreTarget, runtime, activeVideoMode, alias);
     populateHeritagePlayerHost(scoreTarget, runtime, state, alias, activeVideoMode);
     mountHeritageFootballClash(scoreTarget, runtime, state, activeVideoMode, alias);
+    // Layout Builder P0: applied after the video-board/player/sponsor
+    // mounts above so a `visible:false` override on sponsor_slot/
+    // spotlight_zone/video_zone can actually find and hide whatever mode
+    // host just got mounted this render.
+    applyLayoutOverrides(scoreTarget, runtime);
     normalizePlayerDetailSeparator(scoreTarget, activeVideoMode);
     fitCollegiatePlayerSpotlightName(scoreTarget);
     setPrimaryThemeClasses(activeVideoMode);
