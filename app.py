@@ -662,6 +662,29 @@ DEFAULT_STATE: dict[str, Any] = {
     "second_half_receiving_team": "",
     "scorebug_visible": False,
     "visual_mode": "graphic",
+    # Video-mode support (CSRN_VIDEO_MODE_BUILD_PROMPT.md): CSRN never
+    # ingests video -- this only tells a theme's video-board region (a
+    # supporting theme's own declared rect) to render transparent instead
+    # of its idle "clash" art, so a camera feed composited in OBS behind
+    # CSRN's graphic shows through cleanly. Distinct from visual_mode
+    # (Graphic vs Camera -- which OBS *scene* is live) and from
+    # per-component videoMode (highlight/sponsor/player/clash dispatch,
+    # unaffected either way -- an active Program Visual graphic still
+    # renders opaquely over the video window). False (off/opaque) is the
+    # existing byte-identical default for every current broadcast.
+    "video_mode": False,
+    # Independent of video_mode -- collapses a supporting theme's player/
+    # stat side rails so its video-board region can go full width. Kept
+    # separate per the owner's own call: video-mode-on-with-sidebars-still-
+    # visible must stay a valid combination, not something video_mode
+    # itself forces.
+    "sidebars_hidden": False,
+    # Calibration guide: swaps a theme's video-board region's real
+    # transparency for a highly visible guide box (position/size labelled
+    # on screen) so an operator can size/position their OBS camera source
+    # against it live, then flip back to true transparency for air. Only
+    # meaningful when video_mode is on.
+    "video_calibration_guide": False,
     "broadcast_phase": "pregame",
     "crew": {"play_by_play": "", "color_analyst": "", "sideline_reporter": "", "statistician": "", "producer": ""},
     "broadcast_id": "",

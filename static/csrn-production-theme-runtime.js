@@ -166,7 +166,16 @@ const CSRN_SIGNATURE_FIELDS_R4 = Object.freeze([
   "player_graphic",
   "player_highlight",
   "sponsor_spotlight",
-  "player_activation_key"
+  "player_activation_key",
+  // Video-mode support (CSRN_VIDEO_MODE_BUILD_PROMPT.md). NOTE: the
+  // "video_mode" label above (index 13) is the pre-existing, unrelated
+  // per-component highlight/sponsor/player/clash dispatch value
+  // (polledVideoMode in the real signature array below) -- a coincidental
+  // name reuse discovered while wiring this feature, not a mislabel this
+  // change introduced. These three are the actual new state fields.
+  "raw_video_mode",
+  "sidebars_hidden",
+  "video_calibration_guide"
 ]);
 
 function csrnLogThemeSignatureDiffR4(nextSignature) {
@@ -716,6 +725,15 @@ function mergeRuntimeState(base, runtime, captionState = null) {
   base.ticker = {...(base.ticker || {})};
   base.ticker.text = eventPlainText(source) || "CSRN LIVE";
   base.captionsActive = mergeCaptionState(base, captionState);
+
+  // Video-mode support (CSRN_VIDEO_MODE_BUILD_PROMPT.md). Named
+  // "videoWindowActive"/etc, NOT "videoMode", to stay clearly distinct from
+  // this file's own videoMode (the highlight/sponsor/player/clash per-
+  // component dispatch parameter threaded through renderPackage/
+  // componentFrame/collegiateStage below) -- same word, unrelated concept.
+  base.videoWindowActive = Boolean(source.video_mode);
+  base.sidebarsHidden = Boolean(source.sidebars_hidden);
+  base.videoCalibrationGuide = Boolean(source.video_calibration_guide);
 
   return mergePlayerState(base, source);
 }
@@ -3091,6 +3109,30 @@ function patchCollegiateRails(root, runtime, statistics) {
   });
 }
 
+// Video-mode support (CSRN_VIDEO_MODE_BUILD_PROMPT.md): the calibration
+// guide's on-screen pixel-rect label is a live DOM measurement
+// (getBoundingClientRect(), relative to the canvas root's own 1920x1080
+// coordinate space), so it belongs in this unpinned runtime rather than
+// the frozen engine, which only declares the guide's markup/class
+// (collegiateVideoWindow() in csrn-broadcast-layout-engine.js). Called
+// from the same patch cadence as patchCollegiateRails()/patchThemeTicker()
+// so the label stays current across the lightweight patch-only path too,
+// not just a full re-render.
+function patchVideoWindowGuide(root, runtime) {
+  if (currentAlias !== "collegiate_traditional" || !root) return;
+  const label = root.querySelector(".bl-college-video-window-guide .bl-college-video-window-label");
+  if (!label) return;
+  const canvas = root.closest(".csrn-broadcast-layout") || root;
+  const canvasRect = canvas.getBoundingClientRect();
+  const windowRect = label.closest(".bl-college-video-window").getBoundingClientRect();
+  const scale = canvasRect.width ? 1920 / canvasRect.width : 1;
+  const x = Math.round((windowRect.left - canvasRect.left) * scale);
+  const y = Math.round((windowRect.top - canvasRect.top) * scale);
+  const w = Math.round(windowRect.width * scale);
+  const h = Math.round(windowRect.height * scale);
+  label.textContent = `VIDEO WINDOW\n${w}×${h} @ (${x}, ${y})\nreference: 1920×1080`;
+}
+
 async function renderSelected() {
   if (renderBusy) return "busy";
   renderBusy = true;
@@ -3149,13 +3191,23 @@ async function renderSelected() {
       runtime.player_graphic,
       runtime.player_highlight,
       runtime.sponsor_spotlight,
-      activationKey
+      activationKey,
+      // Video-mode support: these change the rendered DOM structure itself
+      // (opaque clash <-> transparent window, 3-column <-> full-width
+      // grid), so a toggle must force a full renderPackage() rebuild, not
+      // just the lightweight patch-only path below (that path never calls
+      // mergeRuntimeState()/renderPackage() again, so a signature that
+      // didn't include these would silently ignore the toggle entirely).
+      runtime.video_mode,
+      runtime.sidebars_hidden,
+      runtime.video_calibration_guide
     ]);
 
     csrnLogThemeSignatureDiffR4(signature);
     if (alias === currentAlias && signature === renderSignature) {
       patchLiveGameState(runtime);
       patchCollegiateRails(scoreLayout(), runtime, collegiateStatistics);
+      patchVideoWindowGuide(scoreLayout(), runtime);
       patchThemeTicker(runtime);
       patchCaptionDom(alias, captionState);
       return "unchanged";
@@ -3200,6 +3252,7 @@ async function renderSelected() {
 
     applyBoardOverrides(scoreTarget, alias, runtime);
     patchCollegiateRails(scoreTarget, runtime, collegiateStatistics);
+    patchVideoWindowGuide(scoreTarget, runtime);
     repairRenderedPlayerMedia(scoreTarget, state);
     mountCentralBoardMedia(scoreTarget, runtime, activeVideoMode, alias);
     populateHeritagePlayerHost(scoreTarget, runtime, state, alias, activeVideoMode);

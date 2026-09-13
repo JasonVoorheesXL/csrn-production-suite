@@ -64,20 +64,33 @@ def test_dispatcher_routes_baseball_and_softball_through_the_real_structure():
 
 
 def test_baseball_scorebug_reuses_the_football_skeleton_at_full_weight():
+    # Video-mode support (CSRN_VIDEO_MODE_BUILD_PROMPT.md) extracted the
+    # main-display composition (team panels + stage, with a sidebars_hidden
+    # variant) into a shared collegiateMainDisplay() helper, called
+    # identically by both collegiateFootballScorebug() and this function --
+    # a STRONGER form of the same "same shell" guarantee this test already
+    # checked (literally the same call, not just similar-looking source),
+    # so the assertions moved from this function's own body to the shared
+    # helper's.
     assert "function collegiateBaseballScorebug(state, sport, videoMode)" in JS
     body = _fn(JS, "function collegiateBaseballScorebug(state, sport, videoMode) {")
-    # Same cabinet / live-strip / score-clock-row / main-display shell as
-    # collegiateFootballScorebug -- not a re-cast of the compact baseballLineScore.
     assert "bl-college-cabinet" in body
     assert "bl-college-live-strip" in body
     assert "collegiateBaseballScoreClockRow(state)" in body
-    assert "bl-college-main-display" in body
-    assert "collegiateTeamPanel(state.visitor, \"visitor\", sport)" in body
-    assert "collegiateTeamPanel(state.home, \"home\", sport)" in body
-    assert "collegiateStage(state, videoMode, sport)" in body
+    assert "collegiateMainDisplay(state, sport, videoMode)" in body
     assert "collegiateBaseballLineScoreBank(state)" in body
     # Structural prominence, not the old compact board.
     assert "bl-collegiate-tech" in body
+
+    assert "function collegiateFootballScorebug(state, sport, videoMode)" in JS
+    football_body = _fn(JS, "function collegiateFootballScorebug(state, sport, videoMode) {")
+    assert "collegiateMainDisplay(state, \"football\", videoMode)" in football_body
+
+    main_display_body = _fn(JS, "function collegiateMainDisplay(state, sport, videoMode) {")
+    assert "bl-college-main-display" in main_display_body
+    assert "collegiateTeamPanel(state.visitor, \"visitor\", sport)" in main_display_body
+    assert "collegiateTeamPanel(state.home, \"home\", sport)" in main_display_body
+    assert "collegiateStage(state, videoMode, sport)" in main_display_body
 
 
 def test_stage_field_art_swaps_per_sport_like_footballs_stadium_photo():

@@ -639,6 +639,13 @@
         <button class="danger" onclick="endGame()">End Game</button>
       </section>
 
+      <section class="panel compact utility-row live-operator-controls">
+        <div class="section-heading compact"><div><h3>Video Mode</h3><p class="section-note">CSRN never ingests video -- a composited camera feed in OBS shows through a transparent window this theme's video-board region opens. Live-togglable at any point in the broadcast. Currently built for Collegiate Tech only; other themes report the toggle as inert until they add their own video-window geometry.</p></div></div>
+        <button id="videoModeToggle" onclick="setState('video_mode',!Boolean(currentState.video_mode))">Video Mode: <span id="videoModeToggleState">Off</span></button>
+        <button id="sidebarsHiddenToggle" onclick="setState('sidebars_hidden',!Boolean(currentState.sidebars_hidden))">Hide Sidebars: <span id="sidebarsHiddenToggleState">Off</span></button>
+        <button id="videoCalibrationGuideToggle" class="warning" onclick="setState('video_calibration_guide',!Boolean(currentState.video_calibration_guide))">Calibration Guide: <span id="videoCalibrationGuideToggleState">Off</span></button>
+      </section>
+
       <section id="finalPanel" class="panel compact final-panel hidden">
         <h2>Broadcast Complete</h2>
         <p id="finalScoreText"></p>
@@ -4224,6 +4231,17 @@ function render() {
 
   document.getElementById('matchup').textContent =
     `${currentState.home_team} vs ${currentState.visitor_team}`;
+
+  // Video mode (CSRN_VIDEO_MODE_BUILD_PROMPT.md) is cross-sport/cross-theme
+  // by design -- update its toggle labels here, ahead of the diamond-sport
+  // branch below, so a baseball/softball broadcast's buttons stay in sync
+  // too (not just football's).
+  const videoModeState = document.getElementById('videoModeToggleState');
+  if (videoModeState) videoModeState.textContent = currentState.video_mode ? 'On' : 'Off';
+  const sidebarsHiddenState = document.getElementById('sidebarsHiddenToggleState');
+  if (sidebarsHiddenState) sidebarsHiddenState.textContent = currentState.sidebars_hidden ? 'On' : 'Off';
+  const videoCalibrationGuideState = document.getElementById('videoCalibrationGuideToggleState');
+  if (videoCalibrationGuideState) videoCalibrationGuideState.textContent = currentState.video_calibration_guide ? 'On' : 'Off';
 
   // P5: baseball/softball get an entirely separate control surface
   // (diamondControlPanel, static/csrn-diamond-controls.js) rather than

@@ -44,6 +44,13 @@ class GameOperationsService:
         "ticker_speed",
         "ticker_pause",
         "ball_spot_visible",
+        # Video-mode support (CSRN_VIDEO_MODE_BUILD_PROMPT.md) -- live-
+        # mutable like every other broadcast-level display toggle above
+        # (scorebug_visible, ticker_visible, ...); a game could plausibly
+        # start radio-only and switch to video mid-broadcast, or back.
+        "video_mode",
+        "sidebars_hidden",
+        "video_calibration_guide",
     }
     GAME_DATA_FIELDS = {"quarter", "down", "distance", "possession"}
     RESET_PRESERVED_FIELDS = (

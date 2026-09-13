@@ -761,11 +761,41 @@
         </div>
       </div>`;
     }
+    // Video-mode support (CSRN_VIDEO_MODE_BUILD_PROMPT.md): only the idle
+    // "clash" fallback becomes the transparent video window -- an active
+    // Program Visual graphic (highlight/sponsor/player, handled above)
+    // still renders opaquely regardless of video_mode, so triggering a
+    // Player Spotlight etc. still cuts in over the camera exactly as it
+    // already does today.
+    if (state.videoWindowActive) {
+      return collegiateVideoWindow(state);
+    }
     return collegiateClashStage(state);
   }
 
+  function collegiateVideoWindow(state) {
+    const guide = Boolean(state.videoCalibrationGuide);
+    // Real air mode: a bare, fully transparent div (collegiateStage() below
+    // also strips the opaque stage background/field-art for this same
+    // state) -- nothing here but the empty hole OBS's composited camera
+    // shows through. Calibration guide mode swaps that for a highly visible
+    // box; csrn-production-theme-runtime.js's patchVideoWindowGuide() fills
+    // in the measured pixel-rect label after render (a live DOM
+    // measurement belongs in the unpinned runtime, not this frozen engine).
+    return `<div class="bl-college-video-window${guide ? " bl-college-video-window-guide" : ""}" data-module="video.window" data-video-mode="camera">${guide ? '<span class="bl-college-video-window-label" data-role="rect-label"></span>' : ""}</div>`;
+  }
+
   function collegiateStage(state, videoMode, sport = "football") {
-    return `<section class="bl-college-stage" data-module="video.board">
+    // Video-mode support: this class strips the stage's own opaque
+    // background/border/field-art (CSS) whenever the video window is
+    // active AND idle (i.e. collegiateVideoBoardContent() actually
+    // returned the window, not an active highlight/sponsor/player
+    // graphic) -- so the window sits on a truly clean transparent stage,
+    // not just a transparent div over an opaque backdrop. Mirrors that
+    // function's own dispatch check (mode highlight/sponsor/player wins
+    // over the window) rather than a second, separately-maintained rule.
+    const videoWindowShowing = Boolean(state.videoWindowActive) && !["highlight", "sponsor", "player"].includes(videoMode);
+    return `<section class="bl-college-stage${videoWindowShowing ? " bl-college-stage-video-active" : ""}" data-module="video.board">
       <div class="bl-college-stage-field" data-sport="${esc(sport)}" aria-hidden="true"></div>
       ${collegiateVideoBoardContent(state, videoMode)}
     </section>`;
@@ -854,12 +884,30 @@
     </section>`;
   }
 
+  function collegiateMainDisplay(state, sport, videoMode) {
+    // Video-mode support: sidebars_hidden collapses both player/stat rail
+    // panels so collegiateStage()'s video-board region can go full width.
+    // Independent of video_mode itself (kept as its own flag per the
+    // owner's call -- video-mode-on-with-sidebars-still-visible stays a
+    // valid combination) -- this only omits the rails, it never touches
+    // whether the stage itself is transparent. grid-template-columns must
+    // actually change here (CSS), not just hide the rail content, or the
+    // stage would sit in the same narrow middle track leaving two blank
+    // 330px gutters instead of truly going full width.
+    const sidebarsHidden = Boolean(state.sidebarsHidden);
+    const stage = collegiateStage(state, videoMode, sport);
+    const className = `bl-college-main-display${sidebarsHidden ? " bl-college-main-display-full" : ""}`;
+    return sidebarsHidden
+      ? `<main class="${className}">${stage}</main>`
+      : `<main class="${className}">${collegiateTeamPanel(state.visitor, "visitor", sport)}${stage}${collegiateTeamPanel(state.home, "home", sport)}</main>`;
+  }
+
   function collegiateFootballScorebug(state, sport, videoMode) {
     return `<div class="bl-scorebug bl-collegiate bl-collegiate-tech bl-sport-${sport}" data-possession="${esc(state.game.possession || "home")}" ${collegiateThemeVars(state)}>
       <div class="bl-college-cabinet" aria-hidden="true"></div>
       <div class="bl-college-live-strip"><b>LIVE</b><span class="bl-college-ticker-copy">${esc(state.ticker.text || "CSRN LIVE")}</span><em>CSRN</em></div>
       ${collegiateScoreClockRow(state)}
-      <main class="bl-college-main-display">${collegiateTeamPanel(state.visitor, "visitor", "football")}${collegiateStage(state, videoMode, "football")}${collegiateTeamPanel(state.home, "home", "football")}</main>
+      ${collegiateMainDisplay(state, "football", videoMode)}
       <section class="bl-college-control-bank" data-module="game.state">
         ${collegiateField(state)}
       </section>
@@ -1003,7 +1051,7 @@
       <div class="bl-college-cabinet" aria-hidden="true"></div>
       <div class="bl-college-live-strip"><b>LIVE</b><span class="bl-college-ticker-copy">${esc(state.ticker.text || "CSRN LIVE")}</span><em>CSRN</em></div>
       ${collegiateBaseballScoreClockRow(state)}
-      <main class="bl-college-main-display">${collegiateTeamPanel(state.visitor, "visitor", sport)}${collegiateStage(state, videoMode, sport)}${collegiateTeamPanel(state.home, "home", sport)}</main>
+      ${collegiateMainDisplay(state, sport, videoMode)}
       ${collegiateBaseballLineScoreBank(state)}
     </div>`;
   }

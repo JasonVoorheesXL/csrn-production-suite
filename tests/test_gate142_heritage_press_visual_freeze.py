@@ -18,7 +18,13 @@ HERITAGE_OWNED_FROZEN = {
     # again for T1's Collegiate baseball/softball structural-parity work
     # (see test_gate116 / CSRN_PROJECT_BIBLE.md's Gate 11.6 entry for the
     # full rationale). No Heritage assertion changed.
-    'tests/test_gate14_heritage_press_engine.py': 'E8EA49E08298D489FE05BB4D18A79DD3DA3E291F3043C2BA5D32443F348F4758',
+    # re-pinned again Video-mode round (2026-09-13): test_gate14's copy of
+    # the shared csrn-broadcast-layout-engine.css/.js SHA-256 constants was
+    # re-pinned again for Collegiate Tech's video-mode transparency/
+    # sidebar-hide/calibration-guide build (CSRN_VIDEO_MODE_BUILD_PROMPT.md
+    # -- see test_gate116 / CSRN_PROJECT_BIBLE.md's Gate 11.6 entry for the
+    # full rationale). No Heritage assertion changed.
+    'tests/test_gate14_heritage_press_engine.py': '760DC6736F7ADBD28BAACB6C17572BDF5A003587C1A2A30B6035938A9C478C60',
     'static/heritage/press-batter-1920s.png': 'F2D6174D757D36EDC2075A395FEEFC11ED0E970E12E5B4166EA3EFC3DD787DD6',
     'static/heritage/press-pitcher-1920s.png': 'AF9F23C6F9B15F3B10087B9D2D22C8CA1B26C0E7E29DD8521CA12C4905CAFBAF',
     'static/heritage/press-softball-batter-1920s.png': '0DDC8966DED0DCA3FDE396E2BF00C5BC4A2AFE22029FB1BA42D01C365BA24026',

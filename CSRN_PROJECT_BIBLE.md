@@ -2381,10 +2381,41 @@ Phase B, still the value shipped through Round 27 and Phase C's merge):
 - `static/csrn-broadcast-layout-engine.css`: `C170F0B6039C75A10FE6DB0EA847990064608D4A591F8021B4A61ED0A74F734A`
 - `static/csrn-broadcast-layout-engine.js`: `81D127814510042D4360BC30189D8F0D8A513D699287AA5F93490326EE6FEEF5`
 
-Current fingerprint:
+Re-pinned again 2026-09-13, video-mode support (CSRN_VIDEO_MODE_BUILD_
+PROMPT.md) — Collegiate Tech's video-board region (`.bl-college-stage`)
+gains a per-theme, operator-toggleable transparent "video window" so a
+camera feed composited in OBS behind CSRN's graphic can show through
+cleanly. `state.videoWindowActive` (mapped from the new raw `video_mode`
+field) makes the idle "clash" fallback (`collegiateVideoBoardContent()`)
+render a transparent `.bl-college-video-window` div instead of the VS
+lockup, and `collegiateStage()` strips the stage's own opaque
+background/field-art via a `.bl-college-stage-video-active` class for
+that same state -- an active Program Visual graphic (highlight/sponsor/
+player) is unaffected either way, still rendering opaquely over the
+window exactly as before. A second, independent field
+(`state.sidebarsHidden`, from raw `sidebars_hidden`) collapses both
+`.bl-college-team` rail panels via a new shared `collegiateMainDisplay()`
+helper (now called identically by both `collegiateFootballScorebug()`
+and `collegiateBaseballScorebug()`, a stronger form of the T1 "same
+shell" parity above) and switches `.bl-college-main-display`'s grid to a
+single full-width column so the stage actually reflows into the freed
+space rather than leaving blank gutters. A third field
+(`state.videoCalibrationGuide`) swaps real transparency for a highly
+visible guide box (`.bl-college-video-window-guide`) with its live-
+measured pixel rect labeled on screen (measured in the unpinned runtime's
+`patchVideoWindowGuide()`, not this frozen engine). Football's own
+rendering, every other sport/theme, and Collegiate's own rendering when
+all three fields are false/absent (every existing broadcast) are
+unchanged -- verified byte-identical by test. Prior fingerprint (T1,
+still the value shipped through baseball engine P0-P5):
 
 - `static/csrn-broadcast-layout-engine.css`: `794331F3AB2B3E55960CBC679A7D255543880F06777EDCDD32B1C196805F2171`
 - `static/csrn-broadcast-layout-engine.js`: `CC276B125466B3B4DD6C71CE6BD291DAE2698C9501D99994F22CD0DF793B0868`
+
+Current fingerprint:
+
+- `static/csrn-broadcast-layout-engine.css`: `8C36E5E5DAEFBDE3E040F81363CDC02211AA6FFDBE557340A8CCB9BDDD83548B`
+- `static/csrn-broadcast-layout-engine.js`: `C99D631349B9EA60F86D9825A0F338B5580BFEAAC011842DCF52F26BB6BB7DB4`
 
 Future Neon changes require an explicit unfreeze decision, a new isolated
 checkpoint, visual comparison against the approved concept, the complete
