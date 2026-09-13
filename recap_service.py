@@ -83,6 +83,238 @@ class GroundedGameRecapService:
         "updated_at": 0,
     }
 
+    # Bug report item 5: the article read as generic/mechanical because
+    # every recap picked from the SAME shared 4-way variant, regardless of
+    # article_style, and every section past the lead/closing had exactly
+    # one fixed phrasing. Below, every section of the article gets its own
+    # phrase bank per style (a genuinely different voice per style, not a
+    # synonym swap), and each section's variant is picked independently
+    # (_variant_index) so the combinations compound instead of moving in
+    # lockstep -- two recaps sharing a lead phrasing won't also share every
+    # other section's. Every template still only ever fills in already-
+    # grounded facts (team names, scores, counts) -- nothing here invents
+    # content; it only varies how the same facts are phrased.
+    ARTICLE_STYLES = ("straight_news", "local_sports", "feature_recap", "brief_report")
+
+    _LEAD_WIN_PHRASES: dict[str, list[str]] = {
+        "straight_news": [
+            "{winner} defeated {loser}{venue_phrase}, {hi}-{lo}.",
+            "{winner} topped {loser}, {hi}-{lo}.",
+            "Final score: {winner} {hi}, {loser} {lo}.",
+            "{winner} won {hi}-{lo} over {loser}.",
+            "The final was {winner} {hi}, {loser} {lo}.",
+        ],
+        "local_sports": [
+            "{winner} put together a {hi}-{lo} win over {loser}{venue_phrase}.",
+            "It was {winner}'s night, closing out {loser} {hi}-{lo}.",
+            "{winner} had the answers all night, beating {loser} {hi}-{lo}.",
+            "Behind a full team effort, {winner} downed {loser}, {hi}-{lo}.",
+            "{winner} left no doubt, taking care of {loser} {hi}-{lo}.",
+        ],
+        "feature_recap": [
+            "Under the lights{venue_phrase}, {winner} did just enough to put away {loser}, {hi}-{lo}.",
+            "By the time the clock ran out, {winner} had turned back {loser}, {hi}-{lo}, in a game that had a little bit of everything.",
+            "{winner} and {loser} traded blows deep into the night before {winner} pulled away, {hi}-{lo}.",
+            "It took the full four quarters, but {winner} eventually separated from {loser}, {hi}-{lo}.",
+            "{winner} left{venue_phrase} with a {hi}-{lo} win over {loser} that was closer than the final line suggests.",
+        ],
+        "brief_report": [
+            "{winner} {hi}, {loser} {lo}.",
+            "Final: {winner} {hi} -- {loser} {lo}.",
+            "{winner} won, {hi}-{lo}.",
+            "{winner} def. {loser}, {hi}-{lo}.",
+            "Score: {winner} {hi}, {loser} {lo}.",
+        ],
+    }
+    _LEAD_TIE_PHRASES: dict[str, list[str]] = {
+        "straight_news": [
+            "{home} and {visitor} played to a {home_score}-{visitor_score} tie.",
+            "{home} and {visitor} finished tied, {home_score}-{visitor_score}.",
+            "The final score was {home_score}-{visitor_score} between {home} and {visitor}.",
+        ],
+        "local_sports": [
+            "{home} and {visitor} couldn't be separated, ending the night tied {home_score}-{visitor_score}.",
+            "Neither side could find the go-ahead score, and {home} and {visitor} settled for a {home_score}-{visitor_score} tie.",
+            "It ended the way it started -- even, with {home} and {visitor} tied {home_score}-{visitor_score}.",
+        ],
+        "feature_recap": [
+            "For all the back-and-forth, {home} and {visitor} had nothing to show for it but a {home_score}-{visitor_score} deadlock.",
+            "Two teams, one scoreboard, no winner: {home} and {visitor} finished level at {home_score}-{visitor_score}.",
+            "{home} and {visitor} fought to a standstill, {home_score}-{visitor_score}.",
+        ],
+        "brief_report": [
+            "{home} {home_score}, {visitor} {visitor_score} -- tie.",
+            "Tied: {home} {home_score}, {visitor} {visitor_score}.",
+            "Final: {home_score}-{visitor_score} tie.",
+        ],
+    }
+    _HALFTIME_LEAD_PHRASES: dict[str, list[str]] = {
+        "straight_news": [
+            "{leader} led {trailer} {hi}-{lo} at halftime.",
+            "{leader} carried a {hi}-{lo} lead into the break.",
+            "At the half, {leader} led {trailer}, {hi}-{lo}.",
+            "Halftime score: {leader} {hi}, {trailer} {lo}.",
+        ],
+        "local_sports": [
+            "{leader} took a {hi}-{lo} lead into the locker room.",
+            "{leader} had the edge at the break, up {hi}-{lo} on {trailer}.",
+            "{leader} controlled the first half, leading {trailer} {hi}-{lo} at intermission.",
+            "{leader} was in front at the half, {hi}-{lo}.",
+        ],
+        "feature_recap": [
+            "By halftime, {leader} had built a {hi}-{lo} cushion over {trailer}.",
+            "{leader} spent the first two quarters building a lead, taking a {hi}-{lo} edge into halftime.",
+            "The first half belonged to {leader}, who led {trailer} {hi}-{lo} at the break.",
+            "Halftime found {leader} in control, {hi}-{lo}.",
+        ],
+        "brief_report": [
+            "Half: {leader} {hi}, {trailer} {lo}.",
+            "{leader} led {hi}-{lo} at half.",
+            "Halftime: {leader} {hi}-{lo}.",
+            "HT: {leader} {hi}, {trailer} {lo}.",
+        ],
+    }
+    _HALFTIME_TIE_PHRASES: dict[str, list[str]] = {
+        "straight_news": [
+            "The game was tied {tied_score}-{tied_score} at halftime.",
+            "Halftime score was tied at {tied_score}.",
+            "Neither team led at the break, tied {tied_score}-{tied_score}.",
+        ],
+        "local_sports": [
+            "It was even at the break, {tied_score}-{tied_score}.",
+            "Both teams headed to the locker room tied at {tied_score}.",
+            "Nobody had an edge at halftime -- {tied_score}-{tied_score}.",
+        ],
+        "feature_recap": [
+            "The first half settled nothing, tied at {tied_score} apiece.",
+            "Halftime arrived with the scoreboard reading {tied_score}-{tied_score}, answering nothing.",
+            "Two evenly matched sides went to the locker room knotted at {tied_score}.",
+        ],
+        "brief_report": [
+            "Half: {tied_score}-{tied_score}.",
+            "Tied {tied_score} at half.",
+            "HT: {tied_score}-{tied_score}.",
+        ],
+    }
+    _SCORING_INTRO_PHRASES: dict[str, list[str]] = {
+        "straight_news": ["The scoring:", "Scoring summary:", "Here is how the scoring unfolded:", "Recorded scoring plays:"],
+        "local_sports": ["Here's how it all went down:", "The scoreboard tells the story:", "Both teams found the end zone throughout the night:", "It didn't take long for the scoring to pile up:"],
+        "feature_recap": ["The game swung on a handful of key possessions:", "Every score told part of the story:", "It was a night of answered scores:", "The scoring came in bursts:"],
+        "brief_report": ["Scoring:", "Scoring plays:", "Scores:", "Recorded scores:"],
+    }
+    _LEAD_CHANGES_PHRASES: dict[str, list[str]] = {
+        "straight_news": [
+            "The recorded scoring sequence produced {count} lead change{plural}.",
+            "There were {count} lead change{plural} in the recorded sequence.",
+            "The lead changed hands {count} time{plural}.",
+            "{count} lead change{plural} were recorded.",
+        ],
+        "local_sports": [
+            "The lead changed hands {count} time{plural} before it was over.",
+            "This one had {count} lead change{plural} -- nobody let the other team feel comfortable.",
+            "{count} lead change{plural} kept everyone on their toes.",
+            "Momentum swung back and forth, with {count} lead change{plural} along the way.",
+        ],
+        "feature_recap": [
+            "Neither team could pull away for good -- the lead changed {count} time{plural}.",
+            "The game refused to settle, flipping leads {count} time{plural}.",
+            "{count} lead change{plural} kept the outcome in doubt deep into the night.",
+            "Back and forth it went, {count} lead change{plural} in all.",
+        ],
+        "brief_report": [
+            "Lead changes: {count}.",
+            "{count} lead change{plural}.",
+            "Lead changed {count}x.",
+            "{count} total lead change{plural}.",
+        ],
+    }
+    _TURNOVERS_INTRO_PHRASES: dict[str, list[str]] = {
+        "straight_news": ["Turnovers:", "Recorded turnovers:", "The turnover log:", "Ball security was a factor:"],
+        "local_sports": ["Turnovers played a role too:", "There were a few costly giveaways:", "Both sides had their share of miscues:", "The turnover battle mattered:"],
+        "feature_recap": ["The game had its share of momentum-changing turnovers:", "A few key giveaways shaped the night:", "Turnovers had their fingerprints on this one:", "The ball changed hands more than once, and it mattered:"],
+        "brief_report": ["Turnovers:", "TOs:", "Giveaways:", "Turnover log:"],
+    }
+    _TURNOVERS_COUNT_PHRASES: dict[str, list[str]] = {
+        "straight_news": ["The recorded game log included {count} turnover{plural}.", "{count} turnover{plural} were recorded.", "The game log shows {count} turnover{plural}."],
+        "local_sports": ["The teams combined for {count} turnover{plural}.", "There were {count} turnover{plural} on the night.", "{count} turnover{plural} were part of the story."],
+        "feature_recap": ["Ball security mattered, with {count} turnover{plural} changing hands.", "The game log records {count} turnover{plural} along the way.", "{count} turnover{plural} shaped the flow of the night."],
+        "brief_report": ["Turnovers: {count}.", "{count} turnover{plural}.", "TOs: {count}."],
+    }
+    _WEATHER_INTRO_PHRASES: dict[str, list[str]] = {
+        "straight_news": ["Weather:", "Weather note:", "Weather and delays:", "A weather event was recorded:"],
+        "local_sports": ["The weather got involved too:", "Mother Nature had a say in this one:", "There was a weather delay to work around:", "Weather played a part in the broadcast:"],
+        "feature_recap": ["The weather had its own say in how the night went:", "Before it was over, the skies had a role to play:", "A pause for weather added its own chapter to the night:", "The elements briefly took over the broadcast:"],
+        "brief_report": ["Weather:", "Delay:", "Weather delay recorded.", "Weather note:"],
+    }
+    _TEAM_STATS_INTRO_PHRASES: dict[str, list[str]] = {
+        "straight_news": ["Team statistics:", "By the numbers:", "Recorded team statistics:", "Statistical summary:"],
+        "local_sports": ["Here's how the numbers stacked up:", "The stat sheet tells its own story:", "On the stat sheet:", "A look at how each team performed statistically:"],
+        "feature_recap": ["The box score fills in the rest of the picture:", "Numbers only tell part of it, but here's what the stat sheet shows:", "For those who like the details, the stat sheet had this to say:", "Beneath the final score, the numbers paint their own picture:"],
+        "brief_report": ["Team stats:", "Stats:", "By the numbers:", "Team totals:"],
+    }
+    _PLAYER_STATS_INTRO_PHRASES: dict[str, list[str]] = {
+        "straight_news": ["Individual leaders:", "Recorded statistical leaders:", "Leaders by category:", "Statistical leaders:"],
+        "local_sports": ["A few players stood out individually:", "Some standout individual performances:", "Individually, a handful of players made their mark:", "Here's who led the way statistically:"],
+        "feature_recap": ["A handful of individual performances were worth a second look:", "Some players did their best work in stretches the box score can't fully capture:", "Individually, a few names carried extra weight in this one:", "Behind the team numbers, a few individual efforts stood out:"],
+        "brief_report": ["Leaders:", "Individual leaders:", "Top performers:", "Stat leaders:"],
+    }
+    _POG_PHRASES: dict[str, list[str]] = {
+        "straight_news": [
+            "{name} was selected as the Player of the Game.",
+            "{name} earned Player of the Game honors.",
+            "{name} was named Player of the Game.",
+            "Player of the Game: {name}.",
+        ],
+        "local_sports": [
+            "{name} was the easy pick for Player of the Game.",
+            "It's hard to argue with {name} taking home Player of the Game.",
+            "{name} earned every bit of the Player of the Game nod.",
+            "The Player of the Game honors went to {name}.",
+        ],
+        "feature_recap": [
+            "When it was over, {name} stood out as the Player of the Game.",
+            "If one name defined the night, it was Player of the Game honoree {name}.",
+            "{name}'s performance made the Player of the Game selection an easy one.",
+            "{name} was the night's Player of the Game, and it wasn't particularly close.",
+        ],
+        "brief_report": [
+            "POG: {name}.",
+            "Player of the Game: {name}.",
+            "{name} -- Player of the Game.",
+            "Top performer: {name}.",
+        ],
+    }
+    _CLOSING_PHRASES: dict[str, list[str]] = {
+        "straight_news": [
+            "The result moves {winner_or_home} forward as attention turns to the next game.",
+            "With the final recorded, both teams now turn their attention to next week.",
+            "The game concluded with {home} at {home_score} and {visitor} at {visitor_score}.",
+            "The recap is based entirely on events and statistics recorded during the broadcast.",
+            "Both teams will review the film before their next contest.",
+        ],
+        "local_sports": [
+            "Both sides will look ahead to next week after tonight's result.",
+            "It's on to the next one for both programs after tonight.",
+            "Final: {home} {home_score}, {visitor} {visitor_score} -- both teams turn the page.",
+            "That wraps tonight's broadcast -- thanks for tuning in.",
+            "{winner_or_home} will look to carry the momentum into next week.",
+        ],
+        "feature_recap": [
+            "When the lights finally went down, {home} {home_score}, {visitor} {visitor_score} was what remained.",
+            "Both teams will have film to study before the next one comes around.",
+            "For tonight, at least, the story ended {home} {home_score}, {visitor} {visitor_score}.",
+            "The scoreboard will fade, but tonight's effort won't be forgotten by either sideline.",
+            "And that's how it finished -- {home} {home_score}, {visitor} {visitor_score}.",
+        ],
+        "brief_report": [
+            "Final: {home} {home_score}, {visitor} {visitor_score}.",
+            "Game complete. {home} {home_score}, {visitor} {visitor_score}.",
+            "End of game.",
+            "Recap based on recorded broadcast data only.",
+            "{home} {home_score} -- {visitor} {visitor_score}. Final.",
+        ],
+    }
+
     def __init__(
         self,
         *,
@@ -139,6 +371,23 @@ class GroundedGameRecapService:
     def _canonical_hash(value: Mapping[str, Any]) -> str:
         encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
+
+    @staticmethod
+    def _variant_index(broadcast_id: str, section: str, count: int) -> int:
+        """Deterministic per-(broadcast, section) pick -- stable across
+        regenerations of the same broadcast, but independent of every other
+        section's pick, so two recaps sharing one section's phrasing won't
+        also share the rest (unlike hashing broadcast_id+style alone into a
+        single shared index for the whole article)."""
+        if count <= 0:
+            return 0
+        digest = hashlib.sha256(f"{broadcast_id}:{section}".encode("utf-8")).hexdigest()
+        return int(digest[:8], 16) % count
+
+    def _phrase(self, broadcast_id: str, style: str, bank: Mapping[str, list[str]], section: str, **context: Any) -> str:
+        templates = bank.get(style) or bank.get("local_sports") or next(iter(bank.values()))
+        index = self._variant_index(broadcast_id, section, len(templates))
+        return templates[index].format(**context)
 
     @staticmethod
     def _event_code(event: Mapping[str, Any]) -> str:
@@ -444,30 +693,46 @@ class GroundedGameRecapService:
         elif not team_paragraphs and not player_paragraphs:
             omitted.append("unavailable team and player statistic fields")
 
-        # Build a readable article from the same grounded facts. Sentence choice is
-        # deterministic for a broadcast so regeneration is stable while different
-        # games receive some natural variation.
-        article_style = article_style if article_style in {"straight_news", "local_sports", "feature_recap", "brief_report"} else "local_sports"
-        variant = int(hashlib.sha256((broadcast_id + article_style).encode("utf-8")).hexdigest()[:2], 16) % 4
+        # Build a readable article from the same grounded facts. Every
+        # section below picks its own phrasing independently and
+        # deterministically (see _phrase/_variant_index) -- stable across
+        # regenerations of the same broadcast, genuinely varied across
+        # different broadcasts and article_styles, and every template only
+        # ever fills in already-grounded facts (team names, scores, counts).
+        article_style = article_style if article_style in self.ARTICLE_STYLES else "local_sports"
+        venue = str(snapshot.get("venue", "")).strip()
+        venue_phrase = f" at {venue}" if venue else ""
+        hi, lo = max(home_score, visitor_score), min(home_score, visitor_score)
+
         if winner:
-            lead_variants = [
-                f"{winner} came away with a {max(home_score, visitor_score)}-{min(home_score, visitor_score)} victory over {loser}.",
-                f"{winner} closed the night with a {max(home_score, visitor_score)}-{min(home_score, visitor_score)} win against {loser}.",
-                f"A complete-game effort carried {winner} past {loser}, {max(home_score, visitor_score)}-{min(home_score, visitor_score)}.",
-                f"{winner} secured a {max(home_score, visitor_score)}-{min(home_score, visitor_score)} decision over {loser}."
-            ]
-            lead = lead_variants[variant]
+            lead = self._phrase(
+                broadcast_id, article_style, self._LEAD_WIN_PHRASES, "lead",
+                winner=winner, loser=loser, hi=hi, lo=lo, venue_phrase=venue_phrase,
+            )
         else:
-            lead = f"{home} and {visitor} played to a {home_score}-{visitor_score} tie."
+            lead = self._phrase(
+                broadcast_id, article_style, self._LEAD_TIE_PHRASES, "lead",
+                home=home, visitor=visitor, home_score=home_score, visitor_score=visitor_score,
+            )
 
         article_paragraphs: list[str] = [lead]
         if halftime_pair:
-            if halftime_pair[0] > halftime_pair[1]:
-                article_paragraphs.append(f"{home} carried a {halftime_pair[0]}-{halftime_pair[1]} lead into halftime.")
-            elif halftime_pair[1] > halftime_pair[0]:
-                article_paragraphs.append(f"{visitor} led {halftime_pair[1]}-{halftime_pair[0]} at the break.")
+            if halftime_pair[0] != halftime_pair[1]:
+                leader, trailer = (home, visitor) if halftime_pair[0] > halftime_pair[1] else (visitor, home)
+                halftime_hi, halftime_lo = max(halftime_pair), min(halftime_pair)
+                article_paragraphs.append(
+                    self._phrase(
+                        broadcast_id, article_style, self._HALFTIME_LEAD_PHRASES, "halftime",
+                        leader=leader, trailer=trailer, hi=halftime_hi, lo=halftime_lo,
+                    )
+                )
             else:
-                article_paragraphs.append(f"The teams went to halftime tied at {halftime_pair[0]}.")
+                article_paragraphs.append(
+                    self._phrase(
+                        broadcast_id, article_style, self._HALFTIME_TIE_PHRASES, "halftime",
+                        tied_score=halftime_pair[0],
+                    )
+                )
 
         if scoring:
             flow_sentences = []
@@ -478,12 +743,16 @@ class GroundedGameRecapService:
                 when = " ".join(part for part in [str(row.get("quarter") or "").strip(), str(row.get("clock") or "").strip()] if part)
                 flow_sentences.append(f"{description}{f' ({when})' if when else ''}.")
             if flow_sentences:
-                article_paragraphs.append(" ".join(flow_sentences))
+                intro = self._phrase(broadcast_id, article_style, self._SCORING_INTRO_PHRASES, "scoring_intro")
+                article_paragraphs.append(intro + " " + " ".join(flow_sentences))
 
         if lead_changes:
+            plural = "s" if lead_changes != 1 else ""
             article_paragraphs.append(
-                f"The recorded scoring sequence produced {lead_changes} lead change"
-                f"{'s' if lead_changes != 1 else ''}."
+                self._phrase(
+                    broadcast_id, article_style, self._LEAD_CHANGES_PHRASES, "lead_changes",
+                    count=lead_changes, plural=plural,
+                )
             )
 
         if turnovers:
@@ -492,12 +761,18 @@ class GroundedGameRecapService:
                 for row in turnovers
                 if self._event_description(row)
             ]
-            article_paragraphs.append(
-                " ".join(f"{description.rstrip('.')}." for description in turnover_descriptions)
-                if turnover_descriptions
-                else f"The recorded game log included {len(turnovers)} turnover"
-                f"{'s' if len(turnovers) != 1 else ''}."
-            )
+            if turnover_descriptions:
+                intro = self._phrase(broadcast_id, article_style, self._TURNOVERS_INTRO_PHRASES, "turnovers_intro")
+                joined = " ".join(f"{description.rstrip('.')}." for description in turnover_descriptions)
+                article_paragraphs.append(f"{intro} {joined}")
+            else:
+                plural = "s" if len(turnovers) != 1 else ""
+                article_paragraphs.append(
+                    self._phrase(
+                        broadcast_id, article_style, self._TURNOVERS_COUNT_PHRASES, "turnovers_count",
+                        count=len(turnovers), plural=plural,
+                    )
+                )
 
         weather_descriptions = [
             self._event_description(row)
@@ -505,14 +780,16 @@ class GroundedGameRecapService:
             if self._event_description(row)
         ]
         if weather_descriptions:
-            article_paragraphs.append(
-                " ".join(f"{description.rstrip('.')}." for description in weather_descriptions)
-            )
+            intro = self._phrase(broadcast_id, article_style, self._WEATHER_INTRO_PHRASES, "weather_intro")
+            joined = " ".join(f"{description.rstrip('.')}." for description in weather_descriptions)
+            article_paragraphs.append(f"{intro} {joined}")
 
         if team_paragraphs:
-            article_paragraphs.append(" ".join(team_paragraphs))
+            intro = self._phrase(broadcast_id, article_style, self._TEAM_STATS_INTRO_PHRASES, "team_stats_intro")
+            article_paragraphs.append(f"{intro} " + " ".join(team_paragraphs))
         if player_paragraphs:
-            article_paragraphs.append(" ".join(player_paragraphs))
+            intro = self._phrase(broadcast_id, article_style, self._PLAYER_STATS_INTRO_PHRASES, "player_stats_intro")
+            article_paragraphs.append(f"{intro} " + " ".join(player_paragraphs))
 
         pog = snapshot.get("player_of_game") if isinstance(snapshot.get("player_of_game"), Mapping) else {}
         pog_name = str(pog.get("name") or pog.get("player_name") or "").strip()
@@ -524,15 +801,15 @@ class GroundedGameRecapService:
                         event_ids.append(str(event.get("id") or ""))
                         break
         if pog_name:
-            article_paragraphs.append(f"{pog_name} was selected as the Player of the Game.")
+            article_paragraphs.append(
+                self._phrase(broadcast_id, article_style, self._POG_PHRASES, "pog", name=pog_name)
+            )
 
-        closing_variants = [
-            f"The result moves {winner or home} forward as attention turns to the next game.",
-            f"With the final recorded, both teams now turn their attention to the next week.",
-            f"The game concluded with {home} at {home_score} and {visitor} at {visitor_score}.",
-            "The recap is based entirely on events and statistics recorded during the broadcast."
-        ]
-        closing = closing_variants[variant]
+        closing = self._phrase(
+            broadcast_id, article_style, self._CLOSING_PHRASES, "closing",
+            winner_or_home=winner or home, home=home, visitor=visitor,
+            home_score=home_score, visitor_score=visitor_score,
+        )
         body = "\n\n".join(article_paragraphs[1:])
         social_summary = f"FINAL: {home} {home_score}, {visitor} {visitor_score}."
         if pog_name:
@@ -565,6 +842,7 @@ class GroundedGameRecapService:
             "facts": {
                 "home_team": home,
                 "visitor_team": visitor,
+                "date": str(snapshot.get("date", "")).strip(),
                 "home_score": home_score,
                 "visitor_score": visitor_score,
                 "winner": winner,
@@ -597,6 +875,15 @@ class GroundedGameRecapService:
     def _safe_id(broadcast_id: str) -> str:
         value = re.sub(r"[^A-Za-z0-9_.-]+", "-", broadcast_id).strip("-")
         return (value or "GAME")[:80]
+
+    @staticmethod
+    def _slug_team_name(name: str) -> str:
+        # Same sanitization spirit as _safe_id, but concatenated
+        # TitleCase (no separators) so "New Hope" -> "NewHope" reads as one
+        # word in a filename's "HomeVsVisitor" segment.
+        words = re.findall(r"[A-Za-z0-9]+", str(name or ""))
+        slug = "".join(word[:1].upper() + word[1:] for word in words)
+        return slug[:40]
 
     def _current_hash(self, broadcast_id: str) -> str:
         snapshot = self._source_snapshot()
@@ -762,7 +1049,20 @@ class GroundedGameRecapService:
         sponsor = str(recap.get("sponsor_name") or "").strip()
         parts = [f"Presented by {sponsor}" if sponsor else "", recap.get("headline", ""), recap.get("lead", ""), recap.get("body", ""), recap.get("closing", "")]
         text = "\n\n".join(str(part).strip() for part in parts if str(part).strip()) + "\n"
-        return RecapResult("OK", {"text": text, "filename": f"{recap['id']}.txt"})
+        return RecapResult("OK", {"text": text, "filename": self._export_filename(recap)})
+
+    def _export_filename(self, recap: Mapping[str, Any]) -> str:
+        # Bug report item 5: RECAP-<broadcast_id>.txt alone is hard to
+        # identify at a glance. Extend the FILENAME only -- recap_id/the
+        # internal key is untouched so nothing keyed off it breaks.
+        facts = recap.get("facts") if isinstance(recap.get("facts"), Mapping) else {}
+        home_slug = self._slug_team_name(facts.get("home_team", ""))
+        visitor_slug = self._slug_team_name(facts.get("visitor_team", ""))
+        date_slug = re.sub(r"[^0-9]", "", str(facts.get("date", "")))
+        matchup = f"{home_slug}Vs{visitor_slug}" if home_slug and visitor_slug else ""
+        suffix = "-".join(part for part in (matchup, date_slug) if part)
+        base = str(recap.get("id", "") or "GAME")
+        return f"{base}-{suffix}.txt" if suffix else f"{base}.txt"
 
     def create_social_final_draft(self, recap_id: Any) -> RecapResult:
         recap_id = str(recap_id or "").strip()

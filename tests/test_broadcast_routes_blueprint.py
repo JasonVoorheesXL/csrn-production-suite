@@ -38,8 +38,10 @@ class StubBroadcastService:
             {"broadcast": self.broadcast, "warnings": ["warning"]},
         )
 
-    def list_records(self, *, include_archived: bool = False) -> StubResult:
-        self.calls.append(("list", include_archived))
+    def list_records(
+        self, *, include_archived: bool = False, sport_scope: str = ""
+    ) -> StubResult:
+        self.calls.append(("list", include_archived, sport_scope))
         return StubResult("OK", {"broadcasts": [self.broadcast]})
 
     def read(self, broadcast_id: str) -> StubResult:
@@ -120,7 +122,38 @@ def test_list_broadcasts_maps_archive_option(broadcast_client) -> None:
         headers=auth_headers(),
     )
     assert response.get_json() == [service.broadcast]
-    assert service.calls == [("list", True)]
+    assert service.calls == [("list", True, "")]
+
+
+def test_list_broadcasts_threads_the_operators_exact_sport_scope() -> None:
+    # Game Manager: scoped by the operator's exact sport context (not
+    # base_family-collapsed), same session-injected-callable pattern as the
+    # roster/sponsor routes -- no query parameter needed.
+    service = StubBroadcastService()
+
+    def require_auth(view: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(view)
+        def protected(*args: Any, **kwargs: Any):
+            return view(*args, **kwargs)
+
+        return protected
+
+    app = Flask(__name__)
+    app.config.update(TESTING=True)
+    app.register_blueprint(
+        create_broadcast_blueprint(
+            BroadcastRoutesDependencies(
+                require_auth=require_auth,
+                get_broadcast_service=lambda: service,
+                get_broadcaster_print_service=lambda: None,
+                get_social_media_preview_service=lambda: None,
+                sport_scope=lambda: "canadian_football",
+            )
+        )
+    )
+    with app.test_client() as client:
+        client.get("/api/broadcasts")
+    assert service.calls == [("list", False, "canadian_football")]
 
 
 def test_create_broadcast_preserves_payload(broadcast_client) -> None:

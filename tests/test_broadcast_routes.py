@@ -52,8 +52,10 @@ class StubBroadcastService:
             {"deleted": BROADCAST_ID},
         )
 
-    def list_records(self, *, include_archived: bool = False) -> BroadcastResult:
-        self.calls.append(("list_records", include_archived))
+    def list_records(
+        self, *, include_archived: bool = False, sport_scope: str = ""
+    ) -> BroadcastResult:
+        self.calls.append(("list_records", include_archived, sport_scope))
         return self.list_result
 
     def read(self, broadcast_id: str) -> BroadcastResult:
@@ -149,7 +151,23 @@ def test_list_broadcasts_preserves_array_contract_and_archive_option(
 
     assert response.status_code == 200
     assert response.get_json() == [service.broadcast]
-    assert service.calls == [("list_records", True)]
+    # No sport_context on the session -> unscoped Game Manager.
+    assert service.calls == [("list_records", True, "")]
+
+
+def test_list_broadcasts_route_passes_the_session_sport_scope(
+    broadcast_client,
+) -> None:
+    # Bug report item 2: Game Manager fully separates football and
+    # canadian_football broadcasts, same session-injected-callable pattern
+    # as the roster/sponsor routes.
+    client, service = broadcast_client
+    with client.session_transaction() as active_session:
+        active_session["sport_context"] = "canadian_football"
+
+    client.get("/api/broadcasts")
+
+    assert service.calls == [("list_records", False, "canadian_football")]
 
 
 def test_read_broadcast_preserves_success_and_not_found_contracts(

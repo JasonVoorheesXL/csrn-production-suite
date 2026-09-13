@@ -9,12 +9,20 @@ from flask import Blueprint, Response, jsonify, request
 RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
 
 
+def _no_sport_scope() -> str:
+    return ""
+
+
 @dataclass(frozen=True)
 class BroadcastRoutesDependencies:
     require_auth: RouteDecorator
     get_broadcast_service: Callable[[], Any]
     get_broadcaster_print_service: Callable[[], Any]
     get_social_media_preview_service: Callable[[], Any]
+    # The operator's exact active sport context (not base_family-collapsed --
+    # Game Manager fully separates football/canadian_football broadcasts,
+    # matching the roster/sponsor fix). "" -> list every broadcast.
+    sport_scope: Callable[[], str] = _no_sport_scope
 
 
 def create_broadcast_blueprint(
@@ -46,7 +54,8 @@ def create_broadcast_blueprint(
             request.args.get("include_archived", "false")
         ).strip().lower() in {"1", "true", "yes", "y", "on"}
         result = dependencies.get_broadcast_service().list_records(
-            include_archived=include_archived
+            include_archived=include_archived,
+            sport_scope=dependencies.sport_scope(),
         )
         return jsonify(result.data["broadcasts"])
 
