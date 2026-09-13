@@ -277,8 +277,11 @@ slot: {
 
 Pitch-count / innings-pitched eligibility enforcement and days-rest
 tracking (NFHS baseball has real limits; softball does not). Model
-`pitch_count` and `bf` as **displayed counters** in P1; enforcement is a
-later round with its own association-specific ruleset values.
+`pitch_count` and `bf` as **displayed counters** only — P4 permanently
+descoped any eligibility/rest-band engine (§12's "Pitch count" row):
+that determination belongs to the coaching staff, not the broadcast
+platform. If a future round ever revisits this, it would need its own
+explicit request rather than falling out of "later."
 
 ---
 
@@ -446,7 +449,7 @@ differ).
 | **P1** | `diamond_state_service` (canonical fields + pure mutators + `stateHash`) + append-only event reducer with start-of-game / end-of-half-inning snapshots + `at_bat_rules_service` (PA outcomes, `runnerOutcomes[]`, operator-override base-running, `UmpireRulingPayload` / `NEEDS_RULING` path) + `inning_service` + `game_end_evaluator` (regulation / run-rule / walk-off / time-limit / tiebreaker, `TIEBREAKER_RUNNER_PLACED` as a first-class event) + `rules_validator` (HARD_ERROR / SOFT_WARNING / NEEDS_RULING / INFO). No UI. | A scripted 9-inning game reaches a correct `final` state + line score through service calls; spec §19 `END-*`, `RUL-01` and the §19.1 replay/void invariants pass. |
 | **P2** | `lineup_service` — **baseball sub-engine** (starter-centric re-entry, NONE / TRADITIONAL_DH / PLAYER_DH, `PLAYER_DEFENSIVE_MEETING` vs `CHARGED_CONFERENCE`) and **softball sub-engine** (any-player re-entry, full DP/FLEX transition table + guided wizard, HARD invariant *DP+FLEX never both on offense*); courtesy runners (role-at-time snapshot); batting-out-of-order `BattingOrderAlert` + `AppealRuling` (detection ≠ enforcement); due-up. `diamond_event_service` (operator boundary; `EVENT_VOIDED` / `EVENT_CORRECTED` ledger events). Suspension snapshot / resume (spec §11.4). `game_operations_service` baseball extensions. | Spec §19 `BB-01…BB-06`, `SB-01…SB-06`, `CR-01/02`, `BOO-01/02`, `SUS-01`, `COR-01` pass; undo/redo parity with football. |
 | **P3** | `box_score_service` (line score + batting/pitching boxes from the ledger). Overlay-state serializer emitting the §7 contract (incl. the T1 rail gaps). | `box_score_service.report(state)` matches a hand-scored test game; overlay payload validates against `DIAMOND_OVERLAY_CONTRACT.md`. |
-| **P4** | `routes/diamond_game_routes.py` blueprint (mirror `live_game_routes.py`). `app.py` + `phase5_architecture.py` wiring. `engine_router` dispatch on `state["sport"]`. **Pitch-count eligibility engine** — `PitchCountPolicy` (rest bands, finish-batter exception, same-day aggregation), status `ELIGIBLE / WARNING / INELIGIBLE_BY_PROFILE / UNKNOWN_HISTORY`, off-platform prior history imported not assumed, **never auto-forfeit**. | Football routes untouched; new routes covered; architecture audit passes; spec §19 `MS-01` (rest-band status) passes. |
+| **P4** | `routes/diamond_game_routes.py` blueprint (mirror `live_game_routes.py`). `app.py` + `phase5_architecture.py` wiring. `engine_router` dispatch on `state["sport"]`. `game_operations_service` baseball extension (deferred from P2). | Football routes untouched; new routes covered; architecture audit passes. |
 
 ### Phase status
 
@@ -509,19 +512,23 @@ following places — the build (P0+) follows the spec where the two differ:
 | **Softball DP/FLEX** | "later round" | **In scope**: full transition table (spec §9.3), HARD invariant *DP and FLEX never both on offense*, guided transition **wizard** (no free-form position picker), 9/10 living-lineup count. | P2 `lineup_service` (softball sub-engine — genuinely separate from baseball). |
 | **Courtesy runner** | ruleset flag, temporary role | Same, plus: store **role-at-time snapshot** (PITCHER/CATCHER) on entry, never derive later; do not close the pitcher/catcher lineup appearance; `eligibilitySnapshot`; **version the first-inning/first-batter conditions** (NFHS softball changes this for 2027). | P2. |
 | **Game-ending engine** | walk-off / mercy / extras in `inning_service.transition()` | Add: `timeLimit` policy (expiry ≠ result unless profile defines the follow-on), **suspension/resumption** with an exact restoration snapshot (spec §11.4), `TIEBREAKER_RUNNER_PLACED` as a **first-class event** (not a silent 2B mutation). Evaluation order fixed (spec §11.1). | P1 `inning_service` + a `game_end_evaluator`; P2 suspension snapshot/restore. |
-| **Pitch count** | display-only counters; enforcement "later" | Build the **eligibility engine**: `PitchCountPolicy{restBands, finishBatterException, multipleGameDayAggregation}`, status `ELIGIBLE / WARNING / INELIGIBLE_BY_PROFILE / UNKNOWN_HISTORY`. Still **never auto-forfeits**; `UNKNOWN_HISTORY` beats a false "eligible". Off-platform prior-game history is imported, not assumed. | Promote to **P4** (was "later"): counters + rest-band status + the four-state eligibility flag. Auto-forfeit stays out permanently. |
+| **Pitch count** | display-only counters; enforcement "later" | **Descoped (owner decision, P4).** Rest-band eligibility (`ELIGIBLE`/`WARNING`/`INELIGIBLE_BY_PROFILE`/`UNKNOWN_HISTORY`) is a coaching decision, not something CSRN adjudicates or warns on — building an "eligibility" signal risks reading as the platform making that call. Pitch count stays exactly what P3 already gives it: a raw per-pitcher counter reported in the post-game box score (`box_score_service.py`), nothing enforced or flagged live. | **Removed from P4.** No `PitchCountPolicy`, no rest-band engine, no prior-history import. `pitching.appearances_limit` in the rulesets stays informational-only metadata, same as P0/P1 already had it. |
 | **Batting out of order / appeals** | not covered | `BattingOrderAlert` (detection ≠ enforcement — no auto-out, no cursor advance on detection) + `AppealRuling` (BOO / missed base / left early). | P2. |
 | **2026 rule specifics** | — | `PLAYER_DEFENSIVE_MEETING` vs `CHARGED_CONFERENCE` are distinct events (baseball 2026); softball one-way coach→catcher comms (2026). | P1 event taxonomy; mostly cosmetic/counter state. |
 | **Acceptance tests** | "mirror the football test files" | Spec §19 is a ready **30-scenario matrix** (BB-01…MS-02, SUS-01, BOO-*, RUL-01, COR-01) + §19.1 property tests (deterministic replay by `stateHash`, void-and-replay equivalence, profile-version immutability, no-two-runners-one-base, DP/FLEX offensive exclusivity, suspend/resume equivalence). | Adopt verbatim as the P1–P5 acceptance gate. |
 | **MHSAA 2026-27 values** | flagged, unsourced | Spec §17 supplies them **with citations**: varsity pitch bands 1-25/26-50/51-75/76-105/106-120 → 0/1/2/3/4 days, max 120; MS baseball postseason run-rule 10 after 5 (or 4½ if trailing team completed its turn); MHSAA softball **double first base required 2026-27**, international tiebreaker on, 10-run-after-5 championship rule; JV baseball 1½ hr / 5 innings. **Still pending the user's licensed-book confirmation** (the spec itself carries a "Mississippi profile caution" — store the handbook revision date). | P6 inputs, still `_source_notes`-flagged until confirmed. |
 | **2027 future-proofing** | noted lineup/subs deferrals | Spec §18: double first base, dugout→pitcher/catcher one-way comms, softball courtesy-runner first-batter removal, softball comms expansion — **version, never retrofit** into a 2026 game. | Post-engine; profile-version feature flags. |
 
-**Net scope change:** P4 gains the pitch-count eligibility engine; P2 gains
-softball DP/FLEX, all baseball DH modes, batting-out-of-order/appeals, and
-suspension snapshot/restore. Nothing shrinks. The architecture (§2–§3, the
-`diamond_*` parallel services, `engine_router` dispatch, zero football-file
-edits, zero theme re-pins) is unchanged. The spec's §19 test matrix
-replaces "mirror the football tests" as the P1–P5 gate.
+**Net scope change:** P2 gains softball DP/FLEX, all baseball DH modes,
+batting-out-of-order/appeals, and suspension snapshot/restore. P4's
+pitch-count scope was walked back down from an eligibility engine to
+informational-only stats (owner decision — see the Pitch count row
+above): no `PitchCountPolicy`, no rest-band status, no prior-history
+import. The architecture (§2–§3, the `diamond_*` parallel services,
+`engine_router` dispatch, zero football-file edits, zero theme re-pins)
+is unchanged. The spec's §19 test matrix replaces "mirror the football
+tests" as the P1–P5 gate, minus the `MS-*` pitch-eligibility scenarios,
+which do not apply now that eligibility isn't built.
 
 ---
 
