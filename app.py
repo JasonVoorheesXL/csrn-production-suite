@@ -60,6 +60,7 @@ from penalty_service import PenaltyService
 from rules_service import RulesService
 from statistics_service import StatisticsService
 from game_operations_service import GameOperationsService
+from diamond_game_operations_service import DiamondGameOperationsService
 from support_media_service import SupportMediaService
 from game_day_safety_service import GameDaySafetyService
 from recovery_service import RecoveryService
@@ -156,6 +157,10 @@ from routes.obs_routes import (
 from routes.live_game_routes import (
     LiveGameRoutesDependencies,
     create_live_game_blueprint,
+)
+from routes.diamond_game_routes import (
+    DiamondGameRoutesDependencies,
+    create_diamond_game_blueprint,
 )
 from routes.page_routes import (
     PageRoutesDependencies,
@@ -3188,6 +3193,36 @@ LIVE_GAME_ROUTES_BLUEPRINT = create_live_game_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(LIVE_GAME_ROUTES_BLUEPRINT)
+
+
+DIAMOND_GAME_OPERATIONS_SERVICE: DiamondGameOperationsService | None = None
+
+
+def get_diamond_game_operations_service() -> DiamondGameOperationsService:
+    # Baseball/softball's own persistence/locking boundary (P4) -- reuses
+    # the same load_state/save_state/transaction_lock as football's
+    # GameOperationsService above, but is otherwise a completely separate
+    # service; see diamond_game_operations_service.py's module docstring
+    # for why this is a new module rather than an edit to
+    # game_operations_service.py.
+    global DIAMOND_GAME_OPERATIONS_SERVICE
+    if DIAMOND_GAME_OPERATIONS_SERVICE is None:
+        DIAMOND_GAME_OPERATIONS_SERVICE = DiamondGameOperationsService(
+            load_state=load_state,
+            save_state=save_state,
+            transaction_lock=lock,
+        )
+    return DIAMOND_GAME_OPERATIONS_SERVICE
+
+
+DIAMOND_GAME_ROUTES_BLUEPRINT = create_diamond_game_blueprint(
+    DiamondGameRoutesDependencies(
+        require_auth=require_auth,
+        get_diamond_operations_service=lambda: get_diamond_game_operations_service(),
+        load_state=lambda: load_state(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(DIAMOND_GAME_ROUTES_BLUEPRINT)
 
 
 GAME_DAY_SAFETY_SERVICE: GameDaySafetyService | None = None
