@@ -3145,44 +3145,57 @@ function patchVideoWindowGuide(root, runtime) {
 // fast path and the full-render path below, same cadence as
 // patchCollegiateRails()/patchVideoWindowGuide().
 //
-// P0 scope decision (flagged for confirmation, not silently assumed --
-// mirrors the reconciliation doc's own score_box precedent, Sec.5.1):
-//   - `visible:false` is honored for every element below whose host node
-//     resolves for the current theme/alias: a plain display:none/restore
-//     toggle, safe and theme-agnostic regardless of DOM nesting.
-//   - `zone` (a named zone from window.CSRNBroadcastLayoutEngine.zones,
-//     e.g. "bottom-center") or an explicit `rect` (% of 1920x1080) is
-//     applied as a reposition for `score_box` (the single bonded
+// P0 scope (revised 2026-09-14 after a real manual browser smoke test --
+// see docs/LAYOUT_BUILDER_RECONCILIATION.md Sec.8 for the full account.
+// The scope below is what was actually LIVE-VERIFIED to render correctly,
+// not what was originally assumed; two real bugs were caught and fixed/
+// walked back rather than shipped):
+//   - `visible:false` is honored for `score_box` (the whole bonded
 //     `.bl-component[data-component="scorebug"]` node -- clock_period/
 //     game_fields are NOT independently addressable inside it yet, same
-//     as the doc's own "actually splitting the render is a P1/theme-
-//     runtime concern" note) and for `ticker` (resolveTickerHostR0()
-//     below, using getBoundingClientRect()-relative math so it works
-//     regardless of each theme's own tickerKind/DOM nesting). Confirmed:
-//     friday_night_stadium / eight_bit_gameday / heritage_press /
-//     collegiate_traditional all stamp dataset.component="scorebug" on
-//     their rendered node; digital_neon does not (its own engine file
-//     never sets a bl-component/data-component convention), so a
-//     score_box override silently no-ops there (querySelector finds
-//     nothing -> untouched, never a crash) -- a real, partial-coverage
-//     gap, not a hidden assumption.
-//   - `zone`/`rect` on `sponsor_slot` / `spotlight_zone` / `video_zone` is
-//     stored and round-trips correctly (P0 deliverables 1/2/6) but is NOT
-//     applied as a reposition here: these three live inside the mode-
-//     exclusive video-board region, and nativeVideoBoardHost() only
-//     exposes a mode-independent wrapper for 3 of 5 themes plus a
-//     heritage_press special case -- digital_neon has none. Repositioning
-//     these safely is per-theme geometry work for the Phase C owner (the
-//     kickoff prompt: "Coordinate the merge with the Phase C owner (same
-//     file)") -- flagged for a P1 decision, not guessed at here. This
-//     still satisfies the P0 gate exactly as written (ticker moved to a
-//     lower-third, sponsor slot hidden, across all five themes).
+//     as the reconciliation doc's own "actually splitting the render is a
+//     P1/theme-runtime concern" note, Sec.5.1) and for `ticker`
+//     (resolveTickerHostR0()) -- both plain display:none/restore toggles,
+//     live-verified safe. Confirmed: friday_night_stadium /
+//     eight_bit_gameday / heritage_press / collegiate_traditional all
+//     stamp dataset.component="scorebug" on their rendered node;
+//     digital_neon does not (its own engine file never sets a
+//     bl-component/data-component convention), so a score_box override
+//     silently no-ops there -- a real, partial-coverage gap, not a hidden
+//     assumption.
+//   - `zone`/`rect` repositioning is honored ONLY for `ticker`, and only
+//     via the isolated `.bl-component[data-component="ticker"]` node
+//     (resolveIsolatedTickerComponentR0()), never the broader visibility
+//     host (resolveTickerHostR0()). Live-verified: the broader host is an
+//     internal flex/grid row shared with the LIVE badge and CSRN "ticker
+//     bug" -- forcing IT to position:absolute at a small fixed size
+//     collapsed shared layout. Only friday_night_stadium and
+//     eight_bit_gameday place ticker as its own isolated top-level
+//     component; heritage_press bundles it inside the single whole-board
+//     scorebug component (no isolated node to reposition, so a zone/rect
+//     override is a no-op there); collegiate_traditional and digital_neon
+//     have no data-component="ticker" node either.
+//   - `zone`/`rect` on `score_box` is explicitly NOT applied (reverted
+//     after live-verification): the bonded scorebug component is nearly
+//     canvas-sized, not tightly fitted, so forcing it into a smaller
+//     target zone visually crushes the whole board illegible rather than
+//     resizing it. See the code comment at its call site below.
+//   - `sponsor_slot` / `spotlight_zone` / `video_zone` are SCHEMA-ONLY --
+//     no DOM effect at all, for both visibility and zone/rect. This is
+//     narrower than the kickoff prompt's stated gate ("hides the sponsor
+//     slot"), which the first pass of this hook DID implement -- and which
+//     the live smoke test caught as actually producing a blank hole where
+//     the whole scoreboard should be, not a graceful hide. See the code
+//     comment at its (now-removed) call site below for the full root
+//     cause and the real fix this needs (upstream of this hook, in
+//     themeVideoModeFor()) -- flagged for a P1/Phase-C-owner decision, not
+//     guessed at or shipped broken here.
 //   - `clock_period` / `game_fields` / `logo` overrides are schema-only in
 //     P0: no independently addressable DOM node exists for them yet.
 //   - `video_zone`'s data-module="video.board" / [data-video-mode] markup
-//     is never stripped by a visibility override (contract-bound, see
-//     CONTRACT_BOUND_ELEMENTS in layout_builder_service.py) -- display:none
-//     hides the node; nothing ever removes it or its attributes.
+//     is untouched by this hook entirely now (see above) -- the contract
+//     (CONTRACT_BOUND_ELEMENTS in layout_builder_service.py) was never at
+//     risk, since nothing here removes a node or its attributes.
 const LAYOUT_DEFAULT_FAMILY_KEY_R0 = "default";
 
 function resolveLayoutOverrideR0(layouts, family, element) {
@@ -3270,9 +3283,10 @@ function setNodeZonePxR0(node, canvasRoot, targetPx) {
 
 // tickerKind "replace-sibling" hides the tickerSelector node and mounts the
 // live scroller as its sibling (mountScroller()); tickerKind "inside"
-// mounts the scroller as its child. Either way, repositioning the node
-// identified here moves the ticker as a whole, regardless of which of the
-// five themes is active.
+// mounts the scroller as its child. Either way, the node identified here
+// is what a visibility toggle should hide -- see
+// resolveIsolatedTickerComponentR0() below for why REPOSITIONING needs a
+// different, stricter host.
 function resolveTickerHostR0(root, alias) {
   const spec = PACKAGE_ALIASES[alias];
   if (!spec) return null;
@@ -3284,6 +3298,35 @@ function resolveTickerHostR0(root, alias) {
   return frozenTarget;
 }
 
+// Repositioning needs a STRICTER host than visibility does. Live-verified
+// (2026-09-14 manual smoke test, friday_night_stadium): resolveTickerHostR0()
+// above returns an internal flex/grid row (".bl-fns-top-ticker" /
+// ".bl-8bit-top-ticker") that also holds the LIVE badge and CSRN "ticker
+// bug" -- forcing THAT node to position:absolute at a small fixed size
+// collapsed the shared layout hard enough to zero out the scorebug's own
+// score digits elsewhere on the page. The frozen engine already places
+// ticker as its OWN independent top-level component
+// (`.bl-component[data-component="ticker"]`) for friday_night_stadium and
+// eight_bit_gameday -- THAT node is what's actually safe to reposition,
+// since applyRect() already governs its box independently of any sibling.
+// heritage_press bundles its ticker text inside the single whole-board
+// scorebug component (one `.bl-component` for everything) -- there is no
+// isolated ticker node to reposition there, so a `zone`/`rect` override is
+// a no-op for that theme rather than risking the entire board; visibility
+// (hiding just the LED text) is unaffected and still works via
+// resolveTickerHostR0() above.
+function resolveIsolatedTickerComponentR0(root, alias) {
+  const spec = PACKAGE_ALIASES[alias];
+  if (!spec) return null;
+  const frozenTarget = root.querySelector(spec.tickerSelector);
+  if (!frozenTarget) return null;
+  // The exact-value attribute selector only matches an ancestor whose
+  // data-component is literally "ticker" -- a heritage_press-style board
+  // (whose only data-component ancestor is "scorebug") correctly yields
+  // null here rather than matching the wrong, much larger node.
+  return frozenTarget.closest('[data-component="ticker"]') || null;
+}
+
 function applyLayoutOverrides(root, runtime) {
   if (!root || !runtime) return;
   const layouts = runtime.layouts;
@@ -3292,48 +3335,72 @@ function applyLayoutOverrides(root, runtime) {
   const alias = currentAlias;
   const canvas = root.closest(".csrn-broadcast-layout") || root;
 
-  // score_box: the single bonded scorebug component (clock_period /
-  // game_fields are schema-only in P0 -- see module note above).
+  // score_box: visibility only (clock_period/game_fields are schema-only
+  // in P0 -- see module note above). Repositioning is deliberately NOT
+  // applied here: live-verified (2026-09-14), the bonded scorebug
+  // component is nearly canvas-sized (it's a loose hit-area wrapper, not
+  // a tightly-fitted box), so forcing it into a smaller target zone (e.g.
+  // "top-left") visually crushes the whole board into an illegible strip
+  // rather than resizing it sensibly. A real fix needs theme-aware
+  // internal scaling, not a naive left/top/width/height override -- P1/
+  // theme-runtime work, not guessed at here.
   const scorebugOverride = resolveLayoutOverrideR0(layouts, family, "score_box");
   if (scorebugOverride) {
     const scorebugNode = root.querySelector('.bl-component[data-component="scorebug"]');
     if (scorebugNode) {
       setNodeVisibilityR0(scorebugNode, scorebugOverride.visible !== false);
-      const px = layoutTargetPxR0(scorebugOverride);
-      if (px) setNodeZonePxR0(scorebugNode, canvas, px);
     }
   }
 
-  // ticker
+  // ticker: visibility uses the broader host (safe -- a display toggle
+  // doesn't disturb shared layout); repositioning uses ONLY the isolated
+  // top-level ticker component, when the theme has one (see
+  // resolveIsolatedTickerComponentR0()'s module note -- forcing the
+  // broader host to position:absolute at a fixed size was live-verified
+  // to collapse shared sibling layout).
   const tickerOverride = resolveLayoutOverrideR0(layouts, family, "ticker");
   if (tickerOverride) {
     const tickerNode = resolveTickerHostR0(root, alias);
     if (tickerNode) {
       setNodeVisibilityR0(tickerNode, tickerOverride.visible !== false);
-      const px = layoutTargetPxR0(tickerOverride);
-      if (px) setNodeZonePxR0(tickerNode, canvas, px);
+    }
+    const px = layoutTargetPxR0(tickerOverride);
+    if (px) {
+      const isolatedTicker = resolveIsolatedTickerComponentR0(root, alias);
+      if (isolatedTicker) setNodeZonePxR0(isolatedTicker, canvas, px);
     }
   }
 
-  // sponsor_slot / spotlight_zone: visibility-only in P0 (see module note
-  // -- reposition deferred, DOM anchor theme-inconsistent). Only acted on
-  // when the override actually hides the element; an active mode's host
-  // only exists once that mode is mounted, so there is nothing to show/
-  // reposition here for the `visible !== false` case.
-  const modeElementMapR0 = Object.freeze({sponsor_slot: "sponsor", spotlight_zone: "player"});
-  for (const element of Object.keys(modeElementMapR0)) {
-    const override = resolveLayoutOverrideR0(layouts, family, element);
-    if (!override || override.visible !== false) continue;
-    setNodeVisibilityR0(nativeVideoBoardHost(root, alias, modeElementMapR0[element]), false);
-  }
-
-  // video_zone: contract-bound (CONTRACT_BOUND_ELEMENTS) -- visibility only,
-  // never strips data-module="video.board" / [data-video-mode].
-  const videoZoneOverride = resolveLayoutOverrideR0(layouts, family, "video_zone");
-  if (videoZoneOverride && videoZoneOverride.visible === false) {
-    const mode = themeVideoModeFor(alias, runtime);
-    if (mode) setNodeVisibilityR0(nativeVideoBoardHost(root, alias, mode), false);
-  }
+  // sponsor_slot / spotlight_zone / video_zone: SCHEMA-ONLY in P0 -- no
+  // DOM effect. Round-trips correctly through identity_service (P0
+  // deliverables 1/2/6) but is deliberately not applied here.
+  //
+  // This was NOT the original plan -- P0 first shipped with a
+  // display:none toggle on nativeVideoBoardHost(root, alias, mode), and
+  // that is what the kickoff prompt's stated gate ("hides the sponsor
+  // slot") assumed would work. Live-verified (2026-09-14, friday_night_
+  // stadium, sponsor mode forced active): hiding it left a BLANK HOLE
+  // where the entire scoreboard should be, not a graceful fallback to the
+  // normal board. Root cause: these three modes (sponsor/player/highlight)
+  // REPLACE the video-board region's visible content in this theme's
+  // markup (class "bl-fns-video-replacement") rather than overlaying on
+  // top of an always-present scoreboard -- when sponsor mode is active,
+  // the normal board simply isn't concurrently rendered underneath, so
+  // display:none on the sponsor host reveals nothing.
+  //
+  // The real fix is upstream of this hook: themeVideoModeFor() (which
+  // picks "sponsor"/"player"/"highlight" purely from game state --
+  // runtime.player_highlight / runtime.sponsor_spotlight / playerVisible())
+  // would need to also treat a hidden layout element as unavailable, so
+  // mode selection falls through to the theme's own idle/neutral mode
+  // (which DOES show the normal board) instead of picking a mode this
+  // hook then has to blank out after the fact. themeVideoModeFor()'s
+  // return value feeds the render SIGNATURE array (`polledVideoMode`)
+  // that gates full-rebuild-vs-patch-only, so changing its selection
+  // logic is real, correctness-sensitive surgery on an already-tested,
+  // high-blast-radius function -- deliberately NOT attempted in this
+  // additive P0 hook. Flagged for a P1/Phase-C-owner decision, not
+  // guessed at here (docs/LAYOUT_BUILDER_RECONCILIATION.md Sec.8).
 }
 
 async function renderSelected() {

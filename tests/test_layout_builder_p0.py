@@ -4,8 +4,9 @@ called for by the finalized Phase 0 kickoff prompt (Sec.7, deliverable 6):
   * The generated `default` preset, for every (theme x base_family),
     reproduces resolvePlacements() output exactly (golden).
   * Layout-doc round-trips through identity_service load/save.
-  * An override that hides or repositions video_zone keeps
-    data-module="video.board" / [data-video-mode] in the rendered DOM.
+  * video_zone's data-module="video.board" / [data-video-mode] contract is
+    untouched (this hook no longer applies any override to video_zone at
+    all -- see below).
   * Football live overlay rendering is byte-identical with no `layouts`
     section and with a `default` preset present.
   * Pregame/Halftime overlays unchanged with no override.
@@ -14,6 +15,16 @@ Static-source assertions on the .js/.html runtime files below follow this
 repo's own established convention for exercising unpinned JS from Python
 (see e.g. tests/test_gate166_production_render_binding.py) rather than
 executing the JS -- no test harness in this repo runs it.
+
+Sec.8's real manual browser smoke test (2026-09-14, required before
+merging -- not the golden/round-trip tests above) caught two live bugs in
+the FIRST version of the in-game hook: repositioning score_box or hiding
+sponsor_slot/spotlight_zone/video_zone both broke the rendered page rather
+than degrading gracefully. Both were reverted (not shipped, not silently
+downgraded to "best effort") -- see csrn-production-theme-runtime.js's own
+module docstring above applyLayoutOverrides() for the full root-cause
+account. The tests below assert the NARROWER, live-verified-safe final
+scope, not the originally-planned one.
 """
 
 from __future__ import annotations
@@ -119,8 +130,7 @@ def test_apply_layout_overrides_is_wired_into_both_render_paths():
     assert "function applyLayoutOverrides(root, runtime)" in js
     # the lightweight "signature unchanged" patch path
     assert "applyLayoutOverrides(scoreLayout(), runtime);" in js
-    # the full renderPackage() path, after the video-board/player/sponsor
-    # mounts so a visible:false override can find what just got mounted
+    # the full renderPackage() path
     assert "applyLayoutOverrides(scoreTarget, runtime);" in js
 
 
@@ -129,22 +139,44 @@ def test_apply_layout_overrides_no_ops_with_no_layouts_section():
     assert 'if (!layouts || typeof layouts !== "object") return; // no section -> untouched' in js
 
 
-def test_video_zone_override_never_strips_the_video_board_contract():
+def test_sponsor_spotlight_and_video_zone_are_schema_only_after_live_verification():
+    # 2026-09-14 manual smoke test caught a real bug: hiding
+    # sponsor_slot/spotlight_zone/video_zone via nativeVideoBoardHost() left
+    # a blank hole where the whole scoreboard should be (sponsor/player/
+    # highlight modes REPLACE the board's visible content in at least one
+    # theme's markup, rather than overlaying on top of an always-present
+    # board). That code path was removed rather than shipped broken --
+    # confirm it stays removed, not silently reintroduced.
     js = _read("static/csrn-production-theme-runtime.js")
-    # video_zone handling only ever calls setNodeVisibilityR0 (a display
-    # toggle) -- there is no code path that removes the node, its
-    # data-module, or its [data-video-mode] attribute for a layout
-    # override. nativeVideoBoardHost() (Phase C, unmodified by this round)
-    # is the sole source of that node.
-    assert 'const videoZoneOverride = resolveLayoutOverrideR0(layouts, family, "video_zone");' in js
-    assert "setNodeVisibilityR0(nativeVideoBoardHost(root, alias, mode), false);" in js
-    assert "removeAttribute" not in js.split("function applyLayoutOverrides")[1].split("\nfunction ")[0]
+    hook = js.split("function applyLayoutOverrides")[1].split("\nasync function renderSelected")[0]
+    # These exact call/lookup patterns are what the removed code path used
+    # (a prose mention of the bare function name in the explanatory comment
+    # that replaced it doesn't match these stricter patterns).
+    assert "setNodeVisibilityR0(nativeVideoBoardHost(" not in hook
+    assert 'resolveLayoutOverrideR0(layouts, family, "sponsor_slot")' not in hook
+    assert 'resolveLayoutOverrideR0(layouts, family, "spotlight_zone")' not in hook
+    assert 'resolveLayoutOverrideR0(layouts, family, "video_zone")' not in hook
+    # video_zone's data-module/[data-video-mode] contract was never at risk
+    # in the first place -- nothing in this hook removes a node or attribute.
+    assert "removeAttribute" not in hook
 
 
-def test_score_box_and_ticker_are_the_only_zone_repositioned_elements():
+def test_ticker_is_the_only_zone_repositioned_element():
     js = _read("static/csrn-production-theme-runtime.js")
-    hook = js.split("function applyLayoutOverrides")[1]
-    assert hook.count("setNodeZonePxR0(") == 2
+    hook = js.split("function applyLayoutOverrides")[1].split("\nasync function renderSelected")[0]
+    # score_box repositioning was live-verified to crush the whole board
+    # into an illegible strip and was reverted -- only ticker (via the
+    # isolated top-level component) still repositions.
+    assert hook.count("setNodeZonePxR0(") == 1
+    assert "resolveIsolatedTickerComponentR0(root, alias)" in hook
+
+
+def test_score_box_visibility_still_works_but_reposition_does_not():
+    js = _read("static/csrn-production-theme-runtime.js")
+    hook = js.split("function applyLayoutOverrides")[1].split("\nasync function renderSelected")[0]
+    scorebug_block = hook.split('"score_box"')[1].split("ticker: visibility")[0]
+    assert "setNodeVisibilityR0(scorebugNode" in scorebug_block
+    assert "setNodeZonePxR0(scorebugNode" not in scorebug_block
 
 
 # --- Pregame/Halftime read hook ---------------------------------------------

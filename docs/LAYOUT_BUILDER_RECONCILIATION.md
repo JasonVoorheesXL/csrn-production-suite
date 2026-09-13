@@ -402,8 +402,9 @@ Built off the merged trunk (post video-mode-build-20260913, commit
 `7223956`), same branch/worktree, in parallel with the baseball engine P0.
 Both §7 pre-conditions accepted (named-preset storage, proportional
 1080p-basis scaling). Full regression suite green throughout — final run:
-2843 passed, 2 known-environmental failures (unrelated to this branch),
-zero regressions.
+2844 passed, 2 known-environmental failures (unrelated to this branch),
+zero regressions. Merged into trunk only after §8.1's real manual browser
+smoke test, per standing discipline for a change like this.
 
 **Deliverables, against the §7 kickoff prompt:**
 
@@ -432,7 +433,7 @@ zero regressions.
    (`layout_builder_service.py`, above `SCENES`) as well as here (§2):
    `PRESENTATION_SCENARIOS` untouched, `behavior` only *names* one of its
    states.
-6. **Tests** — `tests/test_layout_builder_p0.py` (13 tests): the default
+6. **Tests** — `tests/test_layout_builder_p0.py` (14 tests): the default
    preset's golden "zero overrides ⇒ reproduces resolvePlacements()
    exactly" proof, identity_service round-trip (+ malformed-input
    fallback), static-source wiring/contract assertions on the runtime JS
@@ -445,14 +446,81 @@ zero regressions.
    category of fix as `test_ruleset_golden.py` needed on the basketball
    track, not a design change.
 
-**Gate:** confirmed by code path — a hand-authored preset with
-`ticker: {zone: "bottom-center"}` and `sponsor_slot: {visible: false}` is
-honored by `applyLayoutOverrides()`: the ticker host is repositioned to
-the frozen engine's own lower-third zone rect and the sponsor board host
-is hidden, for every theme/base_family combination the hook resolves for.
-Absent a `layouts` section (or the shipped empty default), nothing in the
-render path is touched. (Verified by static-source/unit test this round —
-see the live-verification caveat below.)
+### 8.1 Manual browser smoke test (2026-09-14) — two real bugs caught, both fixed by narrowing scope
+
+The static-source/unit tests above were never a substitute for actually
+rendering a broadcast and looking at it — the same bar as baseball P5's
+and video-mode's manual verification. Running that test **before merging**
+(worktree server, friday_night_stadium, a forced `sponsor_spotlight`
+active) caught two real problems the unit tests could not have caught,
+because they were about visual correctness, not code shape:
+
+1. **Ticker repositioning first broke the whole scoreboard.** The first
+   implementation repositioned the ticker's *visibility* host
+   (`resolveTickerHostR0()` — an internal flex/grid row shared with the
+   theme's "● LIVE" badge and "CSRN" ticker bug). Forcing that row to
+   `position:absolute` at a small fixed size collapsed shared layout
+   badly enough that the scoreboard's own score digits vanished
+   elsewhere on the page. **Fix:** repositioning now uses ONLY the
+   frozen engine's own isolated `.bl-component[data-component="ticker"]`
+   node (`resolveIsolatedTickerComponentR0()`), which `applyRect()`
+   already sizes independently — confirmed correct after the fix:
+   `getBoundingClientRect()` on the ticker landed exactly on
+   `ZONES["bottom-center"]` (`{x:255,y:765,w:1410,h:245}`) with the rest
+   of the board fully intact. Only friday_night_stadium and
+   eight_bit_gameday have this isolated node; heritage_press bundles
+   ticker inside its single whole-board component (reposition is a
+   no-op there); collegiate_traditional and digital_neon have neither.
+   Ticker *visibility* (hiding it) was unaffected throughout — it never
+   needed the isolated node.
+2. **Hiding sponsor_slot left a blank hole, not a graceful hide — and
+   this could not be fixed by picking a better selector.** With sponsor
+   mode forced active, `display:none` on the sponsor board host removed
+   the ENTIRE visible scoreboard, not just the sponsor graphic. Root
+   cause: friday_night_stadium's sponsor/player/highlight modes carry
+   class `bl-fns-video-replacement` — they REPLACE the video-board
+   region's visible content rather than overlaying on top of an
+   always-present board, so once sponsor mode is selected there is
+   nothing else rendered underneath to reveal by hiding it. The actual
+   fix is upstream of this hook, in `themeVideoModeFor()` (which picks
+   "sponsor"/"player"/"highlight" from game state alone, with no
+   knowledge of layout overrides) — it would need to treat a hidden
+   layout element as making that mode unavailable, falling through to
+   the theme's own idle/neutral mode instead. `themeVideoModeFor()`'s
+   return value feeds the render **signature** array that gates
+   full-rebuild-vs-patch-only, so changing its selection logic is real
+   surgery on an already-tested, high-blast-radius function — deliberately
+   NOT attempted in this additive P0 hook. **Fix applied instead:**
+   `sponsor_slot` / `spotlight_zone` / `video_zone` are now fully
+   schema-only in the runtime hook — no DOM effect at all, for either
+   visibility or zone/rect. Also live-verified separately: `score_box`
+   *repositioning* has the same class of problem (the bonded scorebug
+   component is nearly canvas-sized, not tightly fitted — forcing it into
+   a smaller zone crushed the whole board illegible) and was reverted the
+   same way; `score_box` *visibility* (a plain hide/restore, no resize)
+   was live-verified safe and is kept.
+
+**Net effect on the stated gate:** the kickoff prompt's literal gate
+("moves the ticker to a lower-third and hides the sponsor slot") is only
+**half** live-verified-safe to ship. Ticker repositioning is real, tested,
+and confirmed pixel-correct (2 of 5 themes for reposition; visibility on
+all 5). Sponsor-hiding as originally imagined does not work without the
+`themeVideoModeFor()` surgery described above, and shipping the naive
+version was live-confirmed to actively break the broadcast overlay rather
+than degrade gracefully — so it was pulled rather than merged broken. This
+is a genuine, narrower P0 than originally scoped, decided from evidence
+gathered by actually looking at the rendered page, not guessed at or
+silently shipped either way.
+
+**Revised gate, actually met:** with a hand-authored preset moving the
+in-game ticker to `zone: "bottom-center"`, `getBoundingClientRect()` on
+the isolated ticker component lands exactly on the frozen engine's
+`ZONES["bottom-center"]` rect, with the rest of the board (score, team
+identity, down/distance) unaffected — live-verified, friday_night_stadium,
+sponsor mode both active and inactive. Absent a `layouts` section (or the
+shipped empty default), nothing in the render path is touched — confirmed
+both by the full regression suite's byte-identical guarantee and by the
+same live session with an empty override.
 
 **P0 scope decisions made during the build (flagged for confirmation, not
 silently assumed — full reasoning in code comments at each site):**
@@ -463,39 +531,22 @@ silently assumed — full reasoning in code comments at each site):**
   `zone|rect` wording, made concrete. `layout_builder_service.py` documents
   this convention but does not validate it (still no mirrored engine
   geometry in Python, per the module's original design decision).
-- **Repositioning coverage is real but partial, not full-vocabulary.**
-  Investigating the actual render pipeline (not assumed from the kickoff
-  prompt's wording) found the frozen engine's own component vocabulary
-  (`scorebug`/`ticker`/`playerCard`/`highlightVideo`/`sponsor`/`captions`)
-  does not line up 1:1 with the layout document's element vocabulary
-  (`score_box`/`clock_period`/`game_fields`/`sponsor_slot`/`spotlight_zone`/
-  `video_zone`/…), and only *this* runtime call site ever requests
-  `["scorebug", "captions"]` — ticker/sponsor/player/highlight are mounted
-  by separate, per-theme, mode-exclusive DOM paths
-  (`patchThemeTicker`/`nativeVideoBoardHost`), not through
-  `resolvePlacements()`/`applyRect()`. Given that:
-  - `visible:false` is honored for every element whose host resolves,
-    theme-agnostically (a plain display toggle).
-  - `zone`/`rect` repositioning is honored for `score_box` (the single
-    bonded scorebug component — `clock_period`/`game_fields` are
-    schema-only, same as this doc's own §5.1 "actually splitting the
-    render is a P1/theme-runtime concern") and for `ticker` (works across
-    all 5 themes via `getBoundingClientRect()`-relative math, independent
-    of each theme's own DOM nesting).
-  - `zone`/`rect` on `sponsor_slot`/`spotlight_zone`/`video_zone` stores
-    and round-trips correctly but is **not yet applied as a reposition** —
-    `nativeVideoBoardHost()` only exposes a mode-independent wrapper for 3
-    of 5 themes plus a heritage_press special case (`digital_neon` has
-    none). This is genuine per-theme geometry work best owned by whoever
-    holds Phase C's video-board contract next — a P1 decision, not a
-    guess made here. The stated P0 gate (ticker + sponsor) does not
-    require it.
-  - `score_box` repositioning itself only resolves for 4 of 5 themes
-    (`digital_neon`'s own engine file never stamps a
-    `bl-component`/`data-component` node) — silently a no-op there, never
-    a crash.
-- **Live visual/pixel verification was not performed this round** — the
-  hook was verified by static-source assertion + the full regression
-  suite's byte-identical-by-default guarantee, not by rendering a live
-  broadcast in a browser and confirming the ticker/sponsor actually moved
-  on screen. Worth a manual spot-check before treating P0 as fully closed.
+- **Repositioning coverage is real but narrow, not full-vocabulary** —
+  see §8.1. Only `ticker`, only via its isolated top-level component,
+  only where one exists (2 of 5 themes). `score_box`/`sponsor_slot`/
+  `spotlight_zone`/`video_zone` repositioning is schema-only.
+- **Visibility coverage is broader and live-verified safe**: `score_box`
+  and `ticker` both work correctly (all applicable themes).
+  `sponsor_slot`/`spotlight_zone`/`video_zone` visibility is schema-only
+  too, for the reason in §8.1 item 2 (a P1/Phase-C-owner decision on
+  `themeVideoModeFor()`, not guessed at here).
+- **A next round on this should be scoped together with video-mode's
+  per-theme geometry work**, not separately: both are ultimately about
+  the same "video_zone" concept (the mode-exclusive video-board region
+  video-mode support already made transparent-for-OBS), and both need
+  the same kind of per-theme, per-mode DOM investigation this round did
+  for ticker. Whoever picks up `themeVideoModeFor()`-aware mode
+  suppression for sponsor/player/highlight is well-placed to also finish
+  `video_zone`/`sponsor_slot`/`spotlight_zone` repositioning in the same
+  pass, rather than two separate rounds re-deriving the same board
+  structure.
