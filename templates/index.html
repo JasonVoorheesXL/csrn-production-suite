@@ -149,11 +149,11 @@
       <h1>Create Broadcast</h1>
       <div class="setup-grid">
         <label>Sport
-          <select id="sport">
+          <select id="sport" onchange="syncCreateBroadcastRulesetOptions()">
             <option>Football</option>
             <option disabled>Basketball (future)</option>
-            <option disabled>Baseball (future)</option>
-            <option disabled>Softball (future)</option>
+            <option>Baseball</option>
+            <option>Softball</option>
           </select>
         </label>
         <label>Rules / Jurisdiction
@@ -364,7 +364,7 @@
           <div class="button-row event-buttons possession-aware-actions"><button data-role="offense" onclick="openAutomationEvent('visitor','TD')">TD</button><button data-role="offense" onclick="openAutomationEvent('visitor','FG')">FG</button><button data-role="defense" onclick="openAutomationEvent('visitor','TURNOVER')">Turnover</button><button data-role="offense" onclick="recordFirstDown('visitor','broadcaster')">1st Down</button><button data-role="both" onclick="openPenalty('visitor','broadcaster')">Penalty</button></div>
         </article>
       </div>
-      <div class="button-row primary-undo-row"><button class="warning" onclick="undo()">Undo Last Event</button><button class="restore-undone-btn" onclick="restoreLastUndone()" disabled>Restore Last Undone</button></div>
+      <div id="broadcasterUndoRow" class="button-row primary-undo-row"><button class="warning" onclick="undo()">Undo Last Event</button><button class="restore-undone-btn" onclick="restoreLastUndone()" disabled>Restore Last Undone</button></div>
 
       <section id="broadcasterStateControls" class="panel compact live-operator-controls">
         <div id="broadcasterStateLockNotice" class="status authority-lock-notice hidden">Statistician Control is active. Broadcaster game-data controls are locked; clock visibility remains available.</div>
@@ -402,6 +402,174 @@
           <button data-value="OT" onclick="setState('quarter','OT')">OT</button>
         </div>
       </section>
+
+      <section id="diamondControlPanel" class="panel compact live-operator-controls hidden">
+        <style id="csrn-diamond-controls-p5">
+          .diamond-scoreboard{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:12px 0}
+          .diamond-team{text-align:center;min-width:120px}
+          .diamond-team strong{display:block;font-size:18px}
+          .diamond-team span{display:block;font-size:34px;font-weight:900}
+          .diamond-situation{text-align:center;font-weight:700}
+          .diamond-bases{display:inline-grid;grid-template-columns:repeat(3,18px);gap:3px;margin-top:6px}
+          .diamond-bases span{width:18px;height:18px;border:2px solid var(--muted,#8a94a3);transform:rotate(45deg);display:inline-block}
+          .diamond-bases span.occupied{background:var(--accent,#ef5b68);border-color:var(--accent,#ef5b68)}
+          .diamond-wizard-field{display:none}
+          .diamond-wizard-field.shown{display:block}
+          .diamond-slot-info{font-size:13px;color:var(--muted,#8a94a3);white-space:pre-line;margin-top:6px}
+          .diamond-lineup-table{width:100%;border-collapse:collapse}
+          .diamond-lineup-table td{padding:3px 4px}
+          #diamondBoxScoreModal.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:500}
+          #diamondBoxScoreModal .modal-panel{background:var(--panel-bg,#1b2028);color:var(--text,#fff);border-radius:10px;padding:18px 22px;max-width:900px;max-height:80vh;overflow:auto;width:90%}
+        </style>
+        <div class="section-heading compact"><div><h3>Diamond Control</h3><p class="section-note">Baseball/softball live-game operations.</p></div><span id="diamondPhaseBadge" class="phase-badge">LIVE</span></div>
+
+        <div id="diamondScoreboard" class="diamond-scoreboard">
+          <div class="diamond-team" data-team="visitor"><strong id="diamondVisitorName">VISITOR</strong><span id="diamondVisitorScore">0</span></div>
+          <div class="diamond-situation">
+            <div id="diamondInning">TOP 1</div>
+            <div id="diamondCount">0-0 · 0 OUT</div>
+            <div id="diamondBases" class="diamond-bases"><span data-base="third"></span><span data-base="second"></span><span data-base="first"></span></div>
+          </div>
+          <div class="diamond-team" data-team="home"><strong id="diamondHomeName">HOME</strong><span id="diamondHomeScore">0</span></div>
+        </div>
+
+        <details id="diamondLineupSetup" class="program-visual-activity">
+          <summary><strong>Starting Lineups</strong><small>Set the batting order, defense, and DH/DP-FLEX mode before the first pitch.</small></summary>
+          <div class="setup-grid">
+            <label>Side<select id="dlSide" onchange="diamondRenderLineupBuilder()"><option value="home">Home</option><option value="visitor">Visitor</option></select></label>
+            <label>DH Mode (baseball only)<select id="dlDhMode"><option value="NONE">None</option><option value="TRADITIONAL_DH">Traditional DH</option><option value="PLAYER_DH">Player/DH</option></select></label>
+          </div>
+          <div id="diamondLineupRows"></div>
+          <div class="button-row"><button class="success" onclick="diamondStartLineup()">Save Starting Lineup</button></div>
+          <div id="diamondLineupStatus" class="status"></div>
+        </details>
+
+        <details open class="program-visual-activity">
+          <summary><strong>Plate Appearance</strong><small>Record the outcome of the current batter's plate appearance.</small></summary>
+          <div class="setup-grid">
+            <label>Batting Team<select id="paBattingTeam"><option value="visitor">Visitor</option><option value="home">Home</option></select></label>
+            <label>Batter<select id="paBatter"></select></label>
+            <label>Pitcher<select id="paPitcher"></select></label>
+            <label>Result<select id="paResultCode">
+              <option value="1B">Single</option>
+              <option value="2B">Double</option>
+              <option value="3B">Triple</option>
+              <option value="HR">Home Run</option>
+              <option value="BB">Walk</option>
+              <option value="HBP">Hit By Pitch</option>
+              <option value="SO">Strikeout</option>
+              <option value="OUT">Out (in play)</option>
+              <option value="SAC">Sacrifice</option>
+              <option value="E">Reached on Error</option>
+              <option value="CI">Catcher's Interference</option>
+              <option value="FC">Fielder's Choice</option>
+            </select></label>
+            <label>Outs Recorded This Play<input id="paOutsRecorded" type="number" min="0" max="3" value="0"></label>
+            <label>Hits<input id="paHits" type="number" min="0" max="1" value="0"></label>
+            <label>Errors<input id="paErrors" type="number" min="0" max="1" value="0"></label>
+          </div>
+          <p class="section-note">Runner movement (who advanced/scored) -- leave a row's "To" blank for no movement.</p>
+          <table class="diamond-lineup-table" id="paRunnerOutcomes">
+            <tr><td>Batter</td><td><select data-from="batter"><option value="">No advance</option><option value="first">to 1B</option><option value="second">to 2B</option><option value="third">to 3B</option><option value="score">Scores</option><option value="out">Out on the bases</option></select></td></tr>
+            <tr><td>Runner on 1st</td><td><select data-from="first"><option value="">No advance</option><option value="second">to 2B</option><option value="third">to 3B</option><option value="score">Scores</option><option value="out">Out on the bases</option></select></td></tr>
+            <tr><td>Runner on 2nd</td><td><select data-from="second"><option value="">No advance</option><option value="third">to 3B</option><option value="score">Scores</option><option value="out">Out on the bases</option></select></td></tr>
+            <tr><td>Runner on 3rd</td><td><select data-from="third"><option value="">No advance</option><option value="score">Scores</option><option value="out">Out on the bases</option></select></td></tr>
+          </table>
+          <div class="button-row"><button class="success" onclick="diamondRecordPlateAppearance()">Record Plate Appearance</button></div>
+          <div id="diamondPaStatus" class="status"></div>
+        </details>
+
+        <details class="program-visual-activity">
+          <summary><strong>Lineup Changes</strong><small>Substitution, re-entry, position change, DH/DP-FLEX, and courtesy runner -- guided by what this slot's history allows.</small></summary>
+          <div class="setup-grid">
+            <label>Side<select id="lwSide" onchange="diamondRenderSlotInfo()"><option value="home">Home</option><option value="visitor">Visitor</option></select></label>
+            <label>Slot<select id="lwSlot" onchange="diamondRenderSlotInfo()"></select></label>
+          </div>
+          <div id="diamondSlotInfo" class="diamond-slot-info">Select a side and slot.</div>
+          <div class="setup-grid">
+            <label>Action<select id="lwAction" onchange="diamondRenderWizardFields()">
+              <option value="substitute">Substitute (new player enters)</option>
+              <option value="reenter">Re-enter (player returning to this slot)</option>
+              <option value="position_change">Position Change (same player)</option>
+              <option value="replace_on_defense_only">DH: Replace Defense Only</option>
+              <option value="terminate_player_dh_role">DH: End Player-DH Role</option>
+              <option value="start_dp_flex">Softball: Start DP/FLEX</option>
+              <option value="dp_plays_defense_for_flex">Softball: DP Plays Defense (FLEX exits)</option>
+              <option value="flex_bats_for_dp">Softball: FLEX Bats for DP (DP exits)</option>
+              <option value="dp_reenters">Softball: DP Re-enters</option>
+              <option value="substitute_for_dp">Softball: Substitute for DP</option>
+              <option value="substitute_for_flex">Softball: Substitute for FLEX</option>
+              <option value="enter_courtesy_runner">Enter Courtesy Runner</option>
+              <option value="return_courtesy_runner">Return Courtesy Runner</option>
+              <option value="record_defensive_meeting">Team: Defensive Meeting</option>
+              <option value="record_charged_conference">Team: Charged Conference</option>
+            </select></label>
+          </div>
+          <div class="setup-grid">
+            <label class="diamond-wizard-field" data-fields="substitute,reenter,position_change,replace_on_defense_only,terminate_player_dh_role,substitute_for_dp,substitute_for_flex,enter_courtesy_runner,return_courtesy_runner">Player<select id="lwIncomingPlayer"></select></label>
+            <label class="diamond-wizard-field" data-fields="position_change,replace_on_defense_only">Position<select id="lwPosition">
+              <option value="P">P</option><option value="C">C</option><option value="1B">1B</option><option value="2B">2B</option><option value="3B">3B</option><option value="SS">SS</option><option value="LF">LF</option><option value="CF">CF</option><option value="RF">RF</option>
+            </select></label>
+            <label class="diamond-wizard-field" data-fields="start_dp_flex">DP Player<select id="lwDpPlayer"></select></label>
+            <label class="diamond-wizard-field" data-fields="start_dp_flex">FLEX Player (defensive sub)<select id="lwFlexPlayer"></select></label>
+            <label class="diamond-wizard-field" data-fields="dp_reenters">Resulting FLEX State<select id="lwFlexResultingState"><option value="ON_BASE">On base / off field</option><option value="ON_DEFENSE">Still on defense</option></select></label>
+            <label class="diamond-wizard-field" data-fields="enter_courtesy_runner">Runner For (player_id)<select id="lwRunnerFor"></select></label>
+            <label class="diamond-wizard-field" data-fields="enter_courtesy_runner">Role at Time of Entry<select id="lwRoleAtTime"><option value="PITCHER">Pitcher</option><option value="CATCHER">Catcher</option></select></label>
+            <label class="diamond-wizard-field" data-fields="return_courtesy_runner">Runner Player<select id="lwRunnerPlayer"></select></label>
+            <label class="diamond-wizard-field" data-fields="terminate_player_dh_role">Reason (required)<input id="lwReasonRequired" placeholder="Why the player/DH role is ending"></label>
+            <label class="diamond-wizard-field" data-fields="record_defensive_meeting,record_charged_conference,substitute,reenter,position_change,replace_on_defense_only,start_dp_flex,dp_plays_defense_for_flex,flex_bats_for_dp,dp_reenters,substitute_for_dp,substitute_for_flex,enter_courtesy_runner,return_courtesy_runner">Reason (optional)<input id="lwReason"></label>
+          </div>
+          <div class="button-row"><button class="success" onclick="diamondSubmitLineupAction()">Apply</button></div>
+          <div id="diamondLineupActionStatus" class="status"></div>
+        </details>
+
+        <details class="program-visual-activity">
+          <summary><strong>Batting Order Check</strong><small>Record who actually batted against the expected slot -- detection only, never an automatic out (spec: "detection ≠ enforcement").</small></summary>
+          <div class="setup-grid">
+            <label>Side<select id="boSide" onchange="diamondRenderBattingOrderAlerts()"><option value="visitor">Visitor</option><option value="home">Home</option></select></label>
+            <label>Expected Slot<select id="boExpectedSlot"></select></label>
+            <label>Actual Batter<select id="boActualBatter"></select></label>
+          </div>
+          <div class="button-row"><button onclick="diamondRecordBatter()">Record Batter</button></div>
+          <div id="diamondBattingOrderStatus" class="status"></div>
+          <div id="diamondBattingOrderAlerts"></div>
+        </details>
+
+        <details class="program-visual-activity">
+          <summary><strong>Umpire Ruling</strong><small>Sec.6.2 UmpireRulingPayload -- applied exactly as recorded, no engine judgment of the deserved outcome (e.g. obstruction, interference, balk, catch/no-catch).</small></summary>
+          <p class="section-note">Award any runner(s) a base per the umpire's ruling; the engine moves them exactly as recorded.</p>
+          <table class="diamond-lineup-table" id="rulingBaseAwards">
+            <tr><td>Batter</td><td><select data-from="batter"><option value="">No award</option><option value="first">to 1B</option><option value="second">to 2B</option><option value="third">to 3B</option><option value="score">Home</option></select></td></tr>
+            <tr><td>Runner on 1st</td><td><select data-from="first"><option value="">No award</option><option value="second">to 2B</option><option value="third">to 3B</option><option value="score">Home</option></select></td></tr>
+            <tr><td>Runner on 2nd</td><td><select data-from="second"><option value="">No award</option><option value="third">to 3B</option><option value="score">Home</option></select></td></tr>
+            <tr><td>Runner on 3rd</td><td><select data-from="third"><option value="">No award</option><option value="score">Home</option></select></td></tr>
+          </table>
+          <div class="setup-grid">
+            <label>Batter (if awarded a base)<select id="rulingBatter"></select></label>
+            <label>Additional Outs Ruled<input id="rulingOutsAwarded" type="number" min="0" max="3" value="0"></label>
+            <label>Ball Status<select id="rulingBallStatus"><option value="LIVE">Live</option><option value="DEAD">Dead</option></select></label>
+          </div>
+          <div class="button-row"><button onclick="diamondRecordRuling()">Record Ruling</button></div>
+          <div id="diamondRulingStatus" class="status"></div>
+        </details>
+
+        <div class="button-row utility-row">
+          <button onclick="diamondUndo()">Undo</button>
+          <button onclick="diamondRedo()">Redo</button>
+          <button class="warning" onclick="diamondSuspend()">Suspend Game</button>
+          <button class="success" onclick="diamondResume()">Resume Game</button>
+          <button class="danger" onclick="diamondConfirmGameEnd()">Confirm Official Game End</button>
+          <button onclick="openDiamondBoxScore()">Box Score</button>
+        </div>
+        <div id="diamondActionStatus" class="status"></div>
+      </section>
+
+      <div id="diamondBoxScoreModal" class="hidden modal-overlay" onclick="if(event.target===this)closeDiamondBoxScore()">
+        <div class="modal-panel">
+          <div class="section-heading compact"><h3>Box Score</h3><button onclick="closeDiamondBoxScore()">Close</button></div>
+          <div id="diamondBoxScoreContent"></div>
+        </div>
+      </div>
 
       <section class="panel compact live-operator-controls">
         <h3>Program Visual</h3>
@@ -4056,6 +4224,27 @@ function render() {
 
   document.getElementById('matchup').textContent =
     `${currentState.home_team} vs ${currentState.visitor_team}`;
+
+  // P5: baseball/softball get an entirely separate control surface
+  // (diamondControlPanel, static/csrn-diamond-controls.js) rather than
+  // branching football's own play-state/scoreboard rendering below --
+  // football's DEFAULT_STATE fields (quarter/down/distance/possession/
+  // coin_toss/special_game_phase/...) don't exist on a diamond broadcast,
+  // so running that code for one would be reading undefined fields, not
+  // just rendering the wrong thing.
+  const isDiamondSport = ['baseball', 'softball'].includes(String(currentState.sport || '').toLowerCase());
+  document.getElementById('diamondControlPanel')?.classList.toggle('hidden', !isDiamondSport);
+  document.getElementById('broadcasterStateControls')?.classList.toggle('hidden', isDiamondSport);
+  document.getElementById('broadcasterGameDataControls')?.classList.toggle('hidden', isDiamondSport);
+  document.getElementById('broadcasterPossessionStrip')?.classList.toggle('hidden', isDiamondSport);
+  document.getElementById('broadcasterUndoRow')?.classList.toggle('hidden', isDiamondSport);
+  if (isDiamondSport) {
+    document.getElementById('broadcasterCoinTossPanel')?.classList.add('hidden');
+    document.getElementById('broadcasterSpecialPhasePanel')?.classList.add('hidden');
+    if (typeof renderDiamondControlPanel === 'function') renderDiamondControlPanel();
+    return;
+  }
+
   document.getElementById('homeName').textContent = currentState.home_team;
   document.getElementById('visitorName').textContent = currentState.visitor_team;
   document.getElementById('homePossessionButton').textContent = `◀ ${currentState.home_team}`;
@@ -7649,6 +7838,7 @@ async function loadActiveGraphicsTheme(){
 }
 window.addEventListener('load',loadActiveGraphicsTheme);</script>
 <script src="/static/csrn-pregame-theme-selector.js?v=pregame-theme-r2-collegiate"></script>
+<script src="/static/csrn-diamond-controls.js?v=diamond-p5-r1"></script>
 
 <div id="pregamePresentationModal" class="modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="pregamePresentationTitle">
   <div class="modal-card pregame-presentation-control-card">
