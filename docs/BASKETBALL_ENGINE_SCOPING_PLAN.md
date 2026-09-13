@@ -401,12 +401,88 @@ builds sequence.
   (not a P0 blocker): generalize `engine_router.py`, add parallel
   basketball-specific functions alongside baseball's in the same file, or
   give basketball its own adapter module.
-- **P1 onward — not started.**
+- **P1 — DONE (2026-09-13).** `engine_router.py` decision resolved first
+  (separate round, `basketball-engine-router-p0-20260913`): extracted the
+  one genuinely sport-agnostic sliver (get-or-create a namespaced
+  sub-state) into `_ensure_namespaced_state()`, then added
+  `hoops_view()`/`commit_hoops_view()` alongside the existing diamond pair
+  in the same file -- neither a whole-module generalization nor a
+  separate adapter module, per the owner's explicit decision. `hoops_view()`
+  keeps period/clock/possession/scores SHARED with football (never
+  namespaced under `state["hoops"]`), unlike diamond's home_score/
+  visitor_score -- basketball's own contract never moved those off the top
+  level, so there is nothing to project back out the way diamond's
+  `sync_shared_fields()` does.
+  - `hoops_state_service.py`: `HOOPS_CANONICAL_FIELDS` (Sec.3, minus the
+    shared fields above) + `_SHARED_CANONICAL_FIELDS` (the outer-state
+    fields the reducer also mutates -- a real architectural difference
+    from diamond_state_service, which has no such split since all of its
+    fields live in one flat namespace); pure mutators; `bonus_for_fouls()`
+    (Sec.3.1's "pure function of team fouls + the profile bonus rule");
+    seven structural event interpreters (`SHOT`, `FREE_THROW`, `REBOUND`,
+    `FOUL`, `HELD_BALL`, `TURNOVER`, `PERIOD_TRANSITION`); `state_hash()` /
+    `snapshot()` spanning both namespaces; the append-only reducer
+    (`rebuild()`).
+  - `hoops_period_service.py`: `start_game()` (seeds period/clock/shot-clock/
+    timeouts from the active ruleset -- timeouts modeled as one combined
+    remaining-count per team, full+short summed, since the wire contract
+    only ever wants one number per team; flagged as a deliberate
+    simplification), `close_period()` (quarters/halves -> OT, per-period
+    foul reset per `fouls.team_foul_scope`, shot-clock reset). Refuses to
+    propose a next period when the game should actually end (raises,
+    rather than guessing) -- see below.
+  - `hoops_rules_service.py`: `shot()`, `free_throw()`, `rebound()`,
+    `foul()` (resolves counts-toward-team/personal from foul type + the
+    ruleset, proposes -- never applies -- a free-throw count per Sec.5.1's
+    "engine proposes, operator confirms"), `held_ball()`, `turnover()`,
+    `evaluate_game_end()` / `confirm_game_end()` (mirrors baseball's
+    GameEndEvaluator: proposes a candidate, never finalizes on its own).
+    `TIMEOUT`/`VIOLATION`/`SUBSTITUTION` are deliberately NOT first-class
+    ledger events this phase -- the doc's own P1/P2 split puts the
+    operator-entry event boundary (`hoops_event_service`) in P2, and these
+    three are exactly that boundary's job, not the pure reducer's.
+  - **Correctness note, not a mere style choice:** bonus is charged to the
+    fouling team's OPPONENT (a team's own fouls send the other team to the
+    line), not to the fouling team itself -- caught and fixed during
+    development, verified by the scripted test asserting `home_bonus`
+    reaches `DOUBLE` from the VISITOR's fifth foul.
+  - **Game-end ordering differs from baseball on purpose:** baseball's
+    `at_bat_rules_service` closes the half-inning first, then evaluates
+    game-end candidacy (using the already-advanced inning). Basketball
+    evaluates game-end candidacy BEFORE attempting to close the period:
+    once the clock reaches 0 in the final period (or an OT period) with a
+    decided score, there is no well-defined "next period" to transition
+    to at all, so `hoops_period_service.close_period()` deliberately
+    raises rather than guess at one -- `hoops_rules_service._after_play()`
+    checks for a terminal candidate first and only closes the period when
+    there isn't one.
+  - Gate passed exactly as specified: `tests/test_basketball_engine_p1.py`
+    (11 tests) scripts a full 4-quarter game reaching the DOUBLE bonus, a
+    foul-out, a held-ball arrow flip, and a tied-at-regulation trip to
+    overtime ending on a decided score; replay-by-hash and
+    void-and-replay invariants both hold. Additional tests cover the
+    halves-format period path, the OT-cap and mismatched-period-count
+    guard rails, the unrecognized-bonus-rule-type guard, and the
+    shot-clock reset on period transition -- none of which any shipped
+    ruleset exercises yet, so these would otherwise have zero coverage.
+  - Full suite: 2869 passed (2858 + 11 new), 2 known-environmental
+    failures, zero regressions.
+  - **Flagged, not resolved this phase (genuinely open, not guessed at):**
+    free-throw proposal for the old NFHS one-and-one/double-bonus model
+    (`bonus_for_fouls()` raises on any `bonus_rule.type` other than
+    `TWO_SHOT_ON_FIFTH_FOUL`, since no shipped ruleset uses the other
+    shape yet -- see Sec.4.2); `fouls.team_foul_scope` values other than
+    `"quarter"` are read generically but never exercised against a real
+    ruleset; flagrant/intentional foul ejection handling and
+    `double_technical_ejection` are not implemented (Sec.4.3, deferred to
+    P2's `hoops_event_service`); the OT-cap-reached situation raises
+    rather than modeling what happens next, since the scoping doc itself
+    never specifies it.
 
 ---
 
-*P0 done. First real build phase (P1: `hoops_state_service`/
-`hoops_rules_service`/`hoops_period_service`) is next. MHSAA-specific
-numbers (shot clock, bonus rule, timeouts) still pending owner
-confirmation against the current handbook -- shipped as `_source_notes`
-placeholders in P0, to be finalized in P6.*
+*P0 and P1 done. P2 (`hoops_event_service`, lightweight lineup,
+`box_score_service`) is next. MHSAA-specific numbers (shot clock, bonus
+rule, timeouts) still pending owner confirmation against the current
+handbook -- shipped as `_source_notes` placeholders in P0, to be finalized
+in P6.*
