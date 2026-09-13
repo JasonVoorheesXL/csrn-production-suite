@@ -61,6 +61,7 @@ from rules_service import RulesService
 from statistics_service import StatisticsService
 from game_operations_service import GameOperationsService
 from diamond_game_operations_service import DiamondGameOperationsService
+from hoops_game_operations_service import HoopsGameOperationsService
 from support_media_service import SupportMediaService
 from game_day_safety_service import GameDaySafetyService
 from recovery_service import RecoveryService
@@ -161,6 +162,10 @@ from routes.live_game_routes import (
 from routes.diamond_game_routes import (
     DiamondGameRoutesDependencies,
     create_diamond_game_blueprint,
+)
+from routes.hoops_game_routes import (
+    HoopsGameRoutesDependencies,
+    create_hoops_game_blueprint,
 )
 from routes.page_routes import (
     PageRoutesDependencies,
@@ -3254,6 +3259,36 @@ DIAMOND_GAME_ROUTES_BLUEPRINT = create_diamond_game_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(DIAMOND_GAME_ROUTES_BLUEPRINT)
+
+
+HOOPS_GAME_OPERATIONS_SERVICE: HoopsGameOperationsService | None = None
+
+
+def get_hoops_game_operations_service() -> HoopsGameOperationsService:
+    # Basketball's own persistence/locking boundary (P4) -- reuses the
+    # same load_state/save_state/transaction_lock as football's
+    # GameOperationsService (and baseball's DiamondGameOperationsService)
+    # above, but is otherwise a completely separate service; see
+    # hoops_game_operations_service.py's module docstring for why this is
+    # a new module rather than an edit to game_operations_service.py.
+    global HOOPS_GAME_OPERATIONS_SERVICE
+    if HOOPS_GAME_OPERATIONS_SERVICE is None:
+        HOOPS_GAME_OPERATIONS_SERVICE = HoopsGameOperationsService(
+            load_state=load_state,
+            save_state=save_state,
+            transaction_lock=lock,
+        )
+    return HOOPS_GAME_OPERATIONS_SERVICE
+
+
+HOOPS_GAME_ROUTES_BLUEPRINT = create_hoops_game_blueprint(
+    HoopsGameRoutesDependencies(
+        require_auth=require_auth,
+        get_hoops_operations_service=lambda: get_hoops_game_operations_service(),
+        load_state=lambda: load_state(),
+    )
+)
+APPLICATION_BLUEPRINTS.append(HOOPS_GAME_ROUTES_BLUEPRINT)
 
 
 GAME_DAY_SAFETY_SERVICE: GameDaySafetyService | None = None

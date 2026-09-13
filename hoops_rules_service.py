@@ -322,7 +322,7 @@ class HoopsRulesService:
 
     @classmethod
     def correct_event_for_foul(
-        cls, state: dict[str, Any], event_id: str, payload: Mapping[str, Any], *, reason: str = "",
+        cls, state: dict[str, Any], event_id: str, replacement_payload: Mapping[str, Any], *, reason: str = "",
     ) -> HoopsResult:
         """The gate example: 'a foul entered late and corrected keeps team
         fouls + bonus + DQ right.' Re-resolves the corrected foul (team/
@@ -333,11 +333,19 @@ class HoopsRulesService:
         a full HoopsStateFoundation.rebuild(). Team fouls/bonus/
         disqualification end up correct by construction: the same
         apply_foul() interpreter recomputes them from the corrected fact
-        during replay, nothing is hand-patched."""
+        during replay, nothing is hand-patched.
+
+        P4 naming note: this parameter is deliberately NOT named `payload`
+        (unlike shot()/foul()/etc., which take exactly one Mapping
+        argument named that) -- hoops_game_operations_service._bind_kwargs()
+        special-cases a bare `payload` parameter to mean "bind the WHOLE
+        incoming dict as this one argument," which would silently swallow
+        event_id/reason here. This function takes three real, independently
+        bound arguments, so it uses the plain by-name binding path instead."""
         from hoops_event_service import HoopsEventService  # local import: avoids a cross-module import cycle
 
         ruleset = cls.active_ruleset(state)
-        resolved_payload, messages = cls._resolve_foul_payload(state, ruleset, payload)
+        resolved_payload, messages = cls._resolve_foul_payload(state, ruleset, replacement_payload)
         result = HoopsEventService.correct_event(state, event_id, resolved_payload, reason=reason)
         if not result.ok:
             return HoopsResult(result.code, result.state, result.data)

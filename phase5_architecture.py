@@ -28,6 +28,9 @@ EXPECTED_BLUEPRINTS = {
     "diamond_game_routes",
     "graphics_routes",
     "game_day_safety_routes",
+    # Basketball's own operator routes (P4) -- new URLs under
+    # /api/hoops/..., never touching live_game_routes' football paths.
+    "hoops_game_routes",
     "live_game_routes",
     "logo_routes",
     "mhsaa_division_routes",
@@ -71,6 +74,9 @@ PUBLIC_ENDPOINTS = {
     # The baseball/softball OBS overlay has no operator login session,
     # exactly like live_game_routes.statistics_overlay_state below.
     "diamond_game_routes.diamond_overlay_state",
+    # The basketball OBS overlay has no operator login session either,
+    # same reasoning as diamond_game_routes.diamond_overlay_state above.
+    "hoops_game_routes.hoops_overlay_state",
     # POST /api/licensing/install-file: the license gate screen is shown
     # before any operator PIN exists (fresh install) and for renewals; the
     # Ed25519 signature check is the real boundary. Round 22.

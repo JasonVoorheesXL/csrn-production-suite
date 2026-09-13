@@ -596,11 +596,82 @@ builds sequence.
   - Full suite: 2890 passed (2882 + 8 new), 2 known-environmental
     failures, zero regressions.
 
+- **P4 — DONE (2026-09-13).** `hoops_game_operations_service.py` (new),
+  `routes/hoops_game_routes.py` (new blueprint, `/api/hoops/...`),
+  `app.py` + `phase5_architecture.py` wiring. First basketball work to
+  touch shared/live `app.py` code paths, mirroring baseball's own P4
+  exactly in shape.
+  - **Confirms, rather than reopens, the P3 finding**: baseball's
+    `diamond_game_operations_service.dispatch()` routes every action
+    through `engine_router.diamond_view()`/`commit_diamond_view()` --
+    the genuinely necessary flattening adapter for P0-P3 modules built
+    before the `state["diamond"]` namespacing decision. Basketball's own
+    `dispatch()` does not: every P1/P2 classmethod already takes the full
+    outer `state` dict directly and mutates it in place, so there is
+    nothing to flatten or fold back. `hoops_view()`/`commit_hoops_view()`
+    remain unused after P4 too -- not because this phase forgot to wire
+    them in, but because the P1 architecture never needed them. This is
+    now a settled fact, not an open question.
+  - `game_operations_service.py` (the SHARED, football-owned persistence
+    boundary) was deliberately NOT extended in this phase -- despite
+    Sec.2's own comparison table listing `ALLOWED_SET_FIELDS`
+    gaining basketball fields. Checked directly: baseball's actual P4
+    never touched that file either (its own generic "set an individual
+    field" escape hatch stayed football-only), and this phase's own gate
+    (Sec.10) doesn't call for it. Left for whichever round actually needs
+    a manual single-field override outside the structured ACTIONS set --
+    not guessed at here just because a broader architecture-comparison
+    table mentioned it in passing.
+  - `hoops_game_operations_service.py`: `initialize_hoops()` (unlike
+    baseball's `initialize_diamond()`, this calls
+    `hoops_period_service.start_game()` -- not just a bare default-state
+    assignment -- since basketball's initial period length/shot clock/
+    timeouts are ruleset-derived, not structural constants); `dispatch()`
+    (13 ACTIONS: shot/free_throw/rebound/foul/held_ball/turnover/
+    correct_foul/confirm_game_end from hoops_rules_service,
+    undo/redo/void_event/correct_event from hoops_event_service,
+    set_starting_five/substitute from hoops_lineup_service).
+  - A real naming collision caught and fixed:
+    `hoops_rules_service.correct_event_for_foul()`'s third parameter was
+    originally named `payload`, which `_bind_kwargs()`'s whole-payload
+    special case (built for shot/foul/etc., which take exactly one
+    `payload: Mapping` argument) would have silently matched -- swallowing
+    `event_id`/`reason` entirely. Renamed to `replacement_payload`
+    (matching `hoops_event_service.correct_event()`'s own naming) so it
+    falls through to plain by-name binding instead. Caught by exercising
+    the actual dispatch path in a test, not by inspection alone.
+  - `routes/hoops_game_routes.py`: `/api/hoops/initialize`,
+    `/api/hoops/action/<action>`, `/api/hoops/overlay-state`
+    (unauthenticated, OBS has no operator session),
+    `/api/hoops/box-score` -- new URLs only, football's and baseball's own
+    routes untouched (verified both by a blueprint test and by starting
+    the real app and confirming `/api/hoops/overlay-state` /
+    `/api/diamond/overlay-state` both correctly 409 on the current
+    football broadcast, and the auth-gated action/initialize endpoints
+    both correctly 401 with no session).
+  - Gate passed: `tests/test_basketball_engine_p4_game_operations_service.py`
+    (10 tests) + `tests/test_hoops_game_routes_blueprint.py` (10 tests) --
+    generic dispatch (including the whole-payload binding for shot/foul
+    and the by-name binding for correct_foul in the same scenario), undo
+    reversing a shot, a late foul corrected through the full dispatch
+    path keeping team fouls/personal fouls right, confirm_game_end
+    propagating the shared status field, idempotent duplicate-command
+    handling, and the Flask blueprint (auth requirements, football/
+    baseball route non-collision, error-code-to-HTTP-status mapping).
+    Football + baseball routes and the architecture audit (`phase5_
+    architecture.py`'s own tests) all still pass untouched.
+  - Full suite: 2910 passed (2890 + 20 new), 2 known-environmental
+    failures, zero regressions.
+  - **Not done in this phase, deliberately** (matches baseball's own P4
+    scope, and this phase's own gate): `sport_families.ENGINE_READY`
+    stays WITHOUT `"basketball"` -- routes exist and are fully tested, but
+    nothing in the existing UI can reach them yet; per Sec.10's own P5
+    row, turning that on is a P5, not P4, step.
+
 ---
 
-*P0 through P3 done. P4 (`routes/hoops_game_routes.py` blueprint,
-`engine_router` dispatch wiring, `app.py`/`phase5_architecture.py`
-wiring) is next. MHSAA-specific numbers (shot clock, bonus rule,
-timeouts) still pending owner confirmation against the current
-handbook -- shipped as `_source_notes` placeholders in P0, to be
-finalized in P6.*
+*P0 through P4 done. P5 (operator UI: `templates/_hoops_controls.html`
+partial, `sport_families.ENGINE_READY += {"basketball"}`) is next.
+MHSAA-specific numbers (shot clock, bonus rule, timeouts) still pending
+owner confirmation against the current handbook -- shipped as
+`_source_notes` placeholders in P0, to be finalized in P6.*
