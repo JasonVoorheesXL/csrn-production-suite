@@ -668,10 +668,137 @@ builds sequence.
     nothing in the existing UI can reach them yet; per Sec.10's own P5
     row, turning that on is a P5, not P4, step.
 
+- **P5 — DONE (2026-09-13).** `sport_families.ENGINE_READY += {"basketball"}`,
+  `broadcast_lifecycle_service.py` auto-init, and the full operator UI
+  (`templates/_hoops_controls.html` + `static/csrn-hoops-controls.js`).
+  Full scoping-doc fidelity, not an MVP subset -- confirmed via
+  AskUserQuestion with the owner before starting.
+  - **A real gap found before any UI was written**: the scoping doc's own
+    P5 row calls for "violation entry, ruling workflow, manual set-value,"
+    but none of the three had backing engine support anywhere in P1-P4 --
+    `hoops_state_service.py` had no `apply_violation`/`apply_ruling`/
+    `apply_set_value` interpreters, and `hoops_rules_service.py` had no
+    matching orchestration methods. Rather than guess at UI wired to
+    nonexistent actions, this was raised to the owner (AskUserQuestion)
+    and resolved as: design and build the missing engine methods first,
+    with the same P1-P4 discipline, then build UI on top of a tested
+    foundation. A fourth gap (timeout entry) was noticed in the same pass
+    and built alongside the other three.
+    - Committed separately as the "P5 engine addendum" (`4aee656`) before
+      any UI code: `apply_violation()` (applies only the `possessionTo`
+      the caller supplies -- goaltending/basket-interference scoring is
+      deliberately NOT modeled; a ruling that awards points needs a
+      separate `shot()` call), `apply_ruling()` (documented as
+      basketball's own general-purpose score/possession/clock correction,
+      not a transcription of an existing spec section the way baseball's
+      `apply_ruling()` mirrors one), `apply_timeout()`, and
+      `apply_set_value()` (`_SETTABLE_SHARED_FIELDS` /
+      `_SETTABLE_HOOPS_FIELDS`, split by namespace). All four registered
+      as real structural interpreters and replayable through `rebuild()`,
+      matching every prior phase's event-sourcing discipline -- not a
+      shortcut taken because P5 is "just the UI phase."
+    - `game_operations_service.py` (the shared, football-owned boundary)
+      was again deliberately left untouched for `set_value`, consistent
+      with the P4 decision on the same question.
+    - Gate passed: `tests/test_basketball_engine_p5_violation_ruling_
+      timeout_setvalue.py` (14 tests) -- all four new interpreters/
+      orchestration methods, unknown-violation-type and unsettable-field
+      guards, zero-timeout HARD_ERROR, bonus recomputation on
+      `set_value`, and full replay reconstruction of all four new event
+      types.
+  - **UI structure deliberately follows this phase's own scoping doc
+    (Sec.9.2's collision-avoidance plan) rather than blindly mirroring
+    baseball's own P5 choice.** Baseball's P5 built its diamond panel as
+    ~200 lines inlined directly into `templates/index.html` plus a
+    separate JS file. This phase instead uses a genuine
+    `{% include "_hoops_controls.html" %}` partial -- confirmed viable
+    first (this app's `templates/index.html` is rendered through Jinja2's
+    `render_template()`, so `{% include %}` works even though no other
+    template in the app currently uses it) -- keeping `index.html`'s own
+    diff to a small handful of lines: the sport-dropdown enable, the
+    `render()` branch, the include, and the script tag.
+  - `templates/index.html`: `<option>Basketball</option>` replaces the
+    disabled `(future)` placeholder; `render()` gains an `isHoopsSport`
+    branch (mirroring `isDiamondSport`'s placement and hide-list) placed
+    before any football-only rendering runs, so a basketball state
+    (missing `quarter`/`down`/`distance`/`possession`/`coin_toss`/...)
+    is never run through football-specific code that assumes those
+    fields exist.
+  - `static/csrn-diamond-controls.js`: a real, necessary fix to
+    baseball's own file -- `syncCreateBroadcastRulesetOptions()`
+    hardcoded `['baseball', 'softball']` as the only sports it re-scopes
+    the Create Broadcast form's ruleset dropdown for. Basketball would
+    have silently kept whatever ruleset options were left over from
+    the previous sport selection. Added `'basketball'` to the array;
+    confirmed live in a manual browser session that selecting Basketball
+    correctly narrows the dropdown to the 3 basketball rulesets.
+  - `static/csrn-hoops-controls.js` (new, mirrors
+    `csrn-diamond-controls.js`'s conventions -- no build step, shares
+    globals): starting five, shot, free throw, rebound, foul (with
+    shooting-foul sub-fields), substitution, turnover/held ball,
+    violation, timeout, ruling, manual set-value, undo/redo, confirm
+    game end, and a box score modal. `correct_foul`/`void_event`/
+    `correct_event` deliberately have no dedicated form -- the same
+    scope cut baseball's own P5 made for `void_event`/`correct_event`
+    ("undo/redo covers the 'runs a full game' bar; targeted correction
+    is a power-user feature for later").
+  - Gate passed: `tests/test_basketball_engine_p5_operator_ui.py` (new,
+    15 tests, mirroring `test_baseball_engine_p5_operator_ui.py`'s own
+    structure) -- sport dropdown, partial inclusion, every engine-backed
+    deliverable present in the partial, `render()` branching before
+    football-only sections, every UI action name cross-checked against
+    `hoops_game_operations_service.ACTIONS` (catches a typo'd action
+    name that would otherwise 404 silently in the browser), the
+    `correct_foul`/`void_event`/`correct_event` scope cut asserted
+    explicitly (not just absent by omission), and each form's payload
+    shape cross-checked against its engine method's actual parameters
+    (shot, foul, violation, ruling, set-value). Also fixed
+    `test_baseball_engine_p5_operator_ui.py::test_sport_dropdown_offers_
+    baseball_and_softball`, stale after this round's `ENGINE_READY` flip.
+  - **A real manual browser smoke test was run** (not skipped, matching
+    baseball's own explicit P5 precedent and Layout Builder P0's own
+    "manual smoke test caught 2 real bugs" precedent) -- created a real
+    school/roster/broadcast end to end, logged in, confirmed the
+    Basketball tile shows enabled at login (Soccer still "SOON"),
+    confirmed the Create Broadcast form's ruleset dropdown re-scopes
+    correctly, loaded the broadcast, and confirmed the Basketball
+    Control Panel renders in place of football's controls with a
+    correct auto-initialized scoreboard (period/clock/timeouts). Drove
+    starting five for both teams, a shot, several fouls (confirming
+    bonus is correctly attributed to the *fouled-against* team, not the
+    fouling team), a free throw, undo, redo, and the box score modal --
+    each action's effect confirmed in both the raw dispatched state and
+    the rendered UI.
+    - Two real bugs caught and fixed during the smoke test, neither
+      visible from static-source tests alone:
+      1. The Create Broadcast form's own "Sport" field on the Roster
+         Setup panel defaults to Football independent of the page's
+         top-level sport filter -- a roster created while that filter
+         showed "Basketball" was silently saved as a Football roster,
+         and the two P5 tests can't catch this because they only assert
+         static HTML/JS content, not a live create-then-list round trip.
+         Not a code bug (working as designed), but exactly the kind of
+         real-workflow trap only a live click-through surfaces -- noted
+         here for whoever tests P6 against the live app.
+      2. Confirmed (not a bug) that `home_school_id`/`visitor_school_id`
+         only populate when a broadcast's teams are selected from the
+         School Database dropdown, not typed as free-text "manual
+         entry" -- a manual-entry broadcast has genuinely no roster to
+         resolve, matching baseball's own diamond-controls convention
+         exactly (`hoopsRosterPlayers()` mirrors `diamondRosterPlayers()`
+         to the field name).
+    - All local-only smoke-test artifacts (a manually-set test PIN in
+      this worktree's gitignored `security.json`, the test broadcast and
+      its schools/rosters, the smoke-test broadcast's incidental
+      `pregame_presentation.json` entry, this worktree's `state.json`
+      authority file) were reverted / cleaned up before this commit --
+      none of it is part of this change.
+  - Full suite: 2942 passed (2927 + 15 new), 2 known-environmental
+    failures, zero regressions.
+
 ---
 
-*P0 through P4 done. P5 (operator UI: `templates/_hoops_controls.html`
-partial, `sport_families.ENGINE_READY += {"basketball"}`) is next.
-MHSAA-specific numbers (shot clock, bonus rule, timeouts) still pending
-owner confirmation against the current handbook -- shipped as
-`_source_notes` placeholders in P0, to be finalized in P6.*
+*P0 through P5 done. P6 (MHSAA-specific numbers -- shot clock, bonus
+rule, timeouts -- finalized against the current handbook, replacing the
+`_source_notes` placeholders shipped since P0) is next, pending owner
+confirmation.*

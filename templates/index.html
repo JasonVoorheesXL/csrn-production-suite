@@ -151,7 +151,7 @@
         <label>Sport
           <select id="sport" onchange="syncCreateBroadcastRulesetOptions()">
             <option>Football</option>
-            <option disabled>Basketball (future)</option>
+            <option>Basketball</option>
             <option>Baseball</option>
             <option>Softball</option>
           </select>
@@ -570,6 +570,8 @@
           <div id="diamondBoxScoreContent"></div>
         </div>
       </div>
+
+      {% include "_hoops_controls.html" %}
 
       <section class="panel compact live-operator-controls">
         <h3>Program Visual</h3>
@@ -4263,6 +4265,24 @@ function render() {
     return;
   }
 
+  // P5: basketball gets its own control surface too (hoopsControlPanel,
+  // static/csrn-hoops-controls.js), same reasoning as the diamond branch
+  // just above -- basketball's own state (period/clock_seconds/possession
+  // are shared fields, but home_fouls/bonus/timeouts/shot_clock live
+  // under state.hoops) doesn't match football's DEFAULT_STATE shape either.
+  const isHoopsSport = String(currentState.sport || '').toLowerCase() === 'basketball';
+  document.getElementById('hoopsControlPanel')?.classList.toggle('hidden', !isHoopsSport);
+  document.getElementById('broadcasterStateControls')?.classList.toggle('hidden', isHoopsSport);
+  document.getElementById('broadcasterGameDataControls')?.classList.toggle('hidden', isHoopsSport);
+  document.getElementById('broadcasterPossessionStrip')?.classList.toggle('hidden', isHoopsSport);
+  document.getElementById('broadcasterUndoRow')?.classList.toggle('hidden', isHoopsSport);
+  if (isHoopsSport) {
+    document.getElementById('broadcasterCoinTossPanel')?.classList.add('hidden');
+    document.getElementById('broadcasterSpecialPhasePanel')?.classList.add('hidden');
+    if (typeof renderHoopsControlPanel === 'function') renderHoopsControlPanel();
+    return;
+  }
+
   document.getElementById('homeName').textContent = currentState.home_team;
   document.getElementById('visitorName').textContent = currentState.visitor_team;
   document.getElementById('homePossessionButton').textContent = `◀ ${currentState.home_team}`;
@@ -7857,6 +7877,7 @@ async function loadActiveGraphicsTheme(){
 window.addEventListener('load',loadActiveGraphicsTheme);</script>
 <script src="/static/csrn-pregame-theme-selector.js?v=pregame-theme-r2-collegiate"></script>
 <script src="/static/csrn-diamond-controls.js?v=diamond-p5-r1"></script>
+<script src="/static/csrn-hoops-controls.js?v=hoops-p5-r1"></script>
 
 <div id="pregamePresentationModal" class="modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="pregamePresentationTitle">
   <div class="modal-card pregame-presentation-control-card">

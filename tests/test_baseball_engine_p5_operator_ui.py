@@ -26,9 +26,10 @@ def test_sport_dropdown_offers_baseball_and_softball() -> None:
     assert '<select id="sport" onchange="syncCreateBroadcastRulesetOptions()">' in index
     assert "<option>Baseball</option>" in index
     assert "<option>Softball</option>" in index
-    # Basketball stays a real, disabled "(future)" placeholder -- only
-    # baseball/softball graduated out of that state this round.
-    assert "<option disabled>Basketball (future)</option>" in index
+    # Basketball also graduated out of the disabled "(future)" placeholder
+    # in its own P5 round -- see test_basketball_engine_p5_operator_ui.py.
+    assert "<option>Basketball</option>" in index
+    assert "<option disabled>Basketball (future)</option>" not in index
     assert "<option disabled>Baseball (future)</option>" not in index
     assert "<option disabled>Softball (future)</option>" not in index
 

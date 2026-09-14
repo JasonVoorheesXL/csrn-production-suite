@@ -1,0 +1,203 @@
+{# Basketball operator controls (P5: docs/BASKETBALL_ENGINE_SCOPING_PLAN.md).
+   Included once from templates/index.html ({% include "_hoops_controls.html" %}) --
+   a separate partial, per the scoping doc's own collision-avoidance plan
+   (Sec.9.2), rather than growing index.html directly the way baseball's
+   own P5 did for its diamond panel. Behavior lives in
+   static/csrn-hoops-controls.js, loaded after the main inline <script> the
+   same way csrn-diamond-controls.js already is -- shares that script's
+   top-level globals (currentState, api(), render(), escapeHtml(),
+   playerGraphicRosters), no build step, no module system. #}
+<section id="hoopsControlPanel" class="panel compact live-operator-controls hidden">
+  <style id="csrn-hoops-controls-p5">
+    .hoops-scoreboard{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:12px 0}
+    .hoops-team{text-align:center;min-width:120px}
+    .hoops-team strong{display:block;font-size:18px}
+    .hoops-team span{display:block;font-size:34px;font-weight:900}
+    .hoops-situation{text-align:center;font-weight:700}
+    .hoops-bonus{font-size:13px;color:var(--muted,#8a94a3);min-height:1.2em}
+    #hoopsBoxScoreModal.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:500}
+    #hoopsBoxScoreModal .modal-panel{background:var(--panel-bg,#1b2028);color:var(--text,#fff);border-radius:10px;padding:18px 22px;max-width:900px;max-height:80vh;overflow:auto;width:90%}
+  </style>
+  <div class="section-heading compact"><div><h3>Basketball Control</h3><p class="section-note">Live-game operations.</p></div><span id="hoopsPhaseBadge" class="phase-badge">LIVE</span></div>
+
+  <div id="hoopsScoreboard" class="hoops-scoreboard">
+    <div class="hoops-team" data-team="visitor"><strong id="hoopsVisitorName">VISITOR</strong><span id="hoopsVisitorScore">0</span><div class="hoops-bonus" id="hoopsVisitorFoulsBonus"></div></div>
+    <div class="hoops-situation">
+      <div id="hoopsPeriod">1</div>
+      <div id="hoopsClock">8:00</div>
+      <div id="hoopsShotClock"></div>
+      <div id="hoopsPossessionArrow"></div>
+    </div>
+    <div class="hoops-team" data-team="home"><strong id="hoopsHomeName">HOME</strong><span id="hoopsHomeScore">0</span><div class="hoops-bonus" id="hoopsHomeFoulsBonus"></div></div>
+  </div>
+
+  <details id="hoopsLineupSetup" class="program-visual-activity">
+    <summary><strong>Starting Five</strong><small>Set each team's 5 starters before tip-off. Free substitution any time after (Sec.6 -- no re-entry limit).</small></summary>
+    <div class="setup-grid">
+      <label>Side<select id="hlSide" onchange="hoopsRenderLineupBuilder()"><option value="home">Home</option><option value="visitor">Visitor</option></select></label>
+    </div>
+    <div id="hoopsLineupRows"></div>
+    <div class="button-row"><button class="success" onclick="hoopsSetStartingFive()">Save Starting Five</button></div>
+    <div id="hoopsLineupStatus" class="status"></div>
+  </details>
+
+  <details open class="program-visual-activity">
+    <summary><strong>Shot</strong><small>Record a made or missed field-goal attempt.</small></summary>
+    <div class="setup-grid">
+      <label>Team<select id="shTeam" onchange="hoopsPopulateOnFloorSelects()"><option value="home">Home</option><option value="visitor">Visitor</option></select></label>
+      <label>Shooter<select id="shShooter"></select></label>
+      <label>Points<select id="shPoints"><option value="2">2</option><option value="3">3</option></select></label>
+      <label>Result<select id="shMade" onchange="hoopsSyncShotFields()"><option value="true">Made</option><option value="false">Missed</option></select></label>
+      <label class="shot-field-made">Assist (optional)<select id="shAssist"><option value="">None</option></select></label>
+      <label class="shot-field-missed">Blocked by (optional)<select id="shBlocker"><option value="">None</option></select></label>
+      <label class="shot-field-made">And-One (fouled on the make)<select id="shAndOne"><option value="false">No</option><option value="true">Yes</option></select></label>
+    </div>
+    <div class="button-row"><button class="success" onclick="hoopsRecordShot()">Record Shot</button></div>
+    <div id="hoopsShotStatus" class="status"></div>
+  </details>
+
+  <details class="program-visual-activity">
+    <summary><strong>Free Throw</strong><small>Record one free-throw attempt at a time.</small></summary>
+    <div class="setup-grid">
+      <label>Team<select id="ftTeam" onchange="hoopsPopulateOnFloorSelects()"><option value="home">Home</option><option value="visitor">Visitor</option></select></label>
+      <label>Shooter<select id="ftShooter"></select></label>
+      <label>Result<select id="ftMade"><option value="true">Made</option><option value="false">Missed</option></select></label>
+    </div>
+    <div class="button-row"><button class="success" onclick="hoopsRecordFreeThrow()">Record Free Throw</button></div>
+    <div id="hoopsFreeThrowStatus" class="status"></div>
+  </details>
+
+  <details class="program-visual-activity">
+    <summary><strong>Rebound</strong><small>Record which team/player pulled it down.</small></summary>
+    <div class="setup-grid">
+      <label>Team<select id="rbTeam" onchange="hoopsPopulateOnFloorSelects()"><option value="home">Home</option><option value="visitor">Visitor</option></select></label>
+      <label>Player (optional)<select id="rbPlayer"><option value="">(unspecified)</option></select></label>
+      <label>Kind<select id="rbKind"><option value="defensive">Defensive</option><option value="offensive">Offensive</option><option value="team">Team</option></select></label>
+    </div>
+    <div class="button-row"><button onclick="hoopsRecordRebound()">Record Rebound</button></div>
+    <div id="hoopsReboundStatus" class="status"></div>
+  </details>
+
+  <details class="program-visual-activity">
+    <summary><strong>Foul</strong><small>Team fouls, bonus, and foul-outs are computed automatically from the type recorded here -- a proposed free-throw count is shown, never applied automatically.</small></summary>
+    <div class="setup-grid">
+      <label>Team (fouling)<select id="flTeam" onchange="hoopsPopulateOnFloorSelects()"><option value="home">Home</option><option value="visitor">Visitor</option></select></label>
+      <label>Player<select id="flPlayer"></select></label>
+      <label>Type<select id="flType" onchange="hoopsSyncFoulFields()">
+        <option value="personal">Personal</option>
+        <option value="shooting">Shooting</option>
+        <option value="offensive">Offensive</option>
+        <option value="loose_ball">Loose Ball</option>
+        <option value="technical">Technical</option>
+        <option value="flagrant_1">Flagrant 1</option>
+        <option value="flagrant_2">Flagrant 2</option>
+        <option value="intentional">Intentional</option>
+      </select></label>
+      <label class="foul-field-shooting">Shooting foul on a<select id="flShotPoints"><option value="2">2-point attempt</option><option value="3">3-point attempt</option></select></label>
+      <label class="foul-field-shooting">And-One (basket also counted)<select id="flAndOne"><option value="false">No</option><option value="true">Yes</option></select></label>
+    </div>
+    <div class="button-row"><button class="warning" onclick="hoopsRecordFoul()">Record Foul</button></div>
+    <div id="hoopsFoulStatus" class="status"></div>
+  </details>
+
+  <details class="program-visual-activity">
+    <summary><strong>Substitution</strong><small>Free and unlimited (Sec.6) -- gated only by "the incoming player isn't already on the floor" and "a disqualified player can never re-enter."</small></summary>
+    <div class="setup-grid">
+      <label>Side<select id="suSide" onchange="hoopsPopulateSubstituteSelects()"><option value="home">Home</option><option value="visitor">Visitor</option></select></label>
+      <label>Player Out<select id="suOut"></select></label>
+      <label>Player In<select id="suIn"></select></label>
+    </div>
+    <div class="button-row"><button onclick="hoopsSubstitute()">Substitute</button></div>
+    <div id="hoopsSubstituteStatus" class="status"></div>
+  </details>
+
+  <details class="program-visual-activity">
+    <summary><strong>Turnover / Held Ball</strong><small>A turnover flips possession to the other team; a held ball flips the alternating-possession arrow and assigns possession to it.</small></summary>
+    <div class="setup-grid">
+      <label>Turnover -- Team<select id="toTeam" onchange="hoopsPopulateOnFloorSelects()"><option value="home">Home</option><option value="visitor">Visitor</option></select></label>
+      <label>Player (optional)<select id="toPlayer"><option value="">(unspecified)</option></select></label>
+      <label>Stolen by (optional)<select id="toStealer"><option value="">(none)</option></select></label>
+    </div>
+    <div class="button-row">
+      <button onclick="hoopsRecordTurnover()">Record Turnover</button>
+      <button onclick="hoopsRecordHeldBall()">Held Ball (flip arrow)</button>
+    </div>
+    <div id="hoopsTurnoverStatus" class="status"></div>
+  </details>
+
+  <details class="program-visual-activity">
+    <summary><strong>Violation</strong><small>Traveling, 3-seconds, backcourt, shot-clock, and similar -- recorded exactly as called; the engine never guesses the possession consequence.</small></summary>
+    <div class="setup-grid">
+      <label>Team (charged)<select id="vlTeam"><option value="home">Home</option><option value="visitor">Visitor</option></select></label>
+      <label>Type<select id="vlType">
+        <option value="traveling">Traveling</option>
+        <option value="carry">Carrying/Palming</option>
+        <option value="double_dribble">Double Dribble</option>
+        <option value="three_second">3-Second (offensive)</option>
+        <option value="five_second">5-Second</option>
+        <option value="ten_second_backcourt">10-Second Backcourt</option>
+        <option value="out_of_bounds">Out of Bounds</option>
+        <option value="goaltending">Goaltending</option>
+        <option value="basket_interference">Basket Interference</option>
+        <option value="kicked_ball">Kicked Ball</option>
+      </select></label>
+      <label>Possession To<select id="vlPossessionTo"><option value="">(no change)</option><option value="home">Home</option><option value="visitor">Visitor</option></select></label>
+    </div>
+    <p class="section-note">Goaltending/basket-interference points are not applied here -- record the basket separately via Shot, above, if the ruling awards one.</p>
+    <div class="button-row"><button onclick="hoopsRecordViolation()">Record Violation</button></div>
+    <div id="hoopsViolationStatus" class="status"></div>
+  </details>
+
+  <div class="button-row utility-row">
+    <button onclick="hoopsTimeout('home')">Home Timeout</button>
+    <button onclick="hoopsTimeout('visitor')">Visitor Timeout</button>
+  </div>
+  <div id="hoopsTimeoutStatus" class="status"></div>
+
+  <details class="program-visual-activity">
+    <summary><strong>Ruling</strong><small>A general correction for score, possession, and/or the clock -- applied exactly as entered, recorded as its own auditable event, no engine judgment of the deserved outcome.</small></summary>
+    <div class="setup-grid">
+      <label>Adjust Score -- Team<select id="rlScoreTeam"><option value="">(no change)</option><option value="home">Home</option><option value="visitor">Visitor</option></select></label>
+      <label>Points<input id="rlScorePoints" type="number" value="0"></label>
+      <label>Possession To<select id="rlPossessionTo"><option value="">(no change)</option><option value="home">Home</option><option value="visitor">Visitor</option></select></label>
+      <label>Clock Adjustment (seconds, +/-)<input id="rlClockAdjustment" type="number" value="0"></label>
+    </div>
+    <div class="button-row"><button onclick="hoopsRecordRuling()">Apply Ruling</button></div>
+    <div id="hoopsRulingStatus" class="status"></div>
+  </details>
+
+  <details class="program-visual-activity">
+    <summary><strong>Manual Set-Value</strong><small>Directly correct a single field -- recorded as its own auditable event, same as every other action here (never a silent overwrite).</small></summary>
+    <div class="setup-grid">
+      <label>Field<select id="svField">
+        <option value="period">Period</option>
+        <option value="clock_seconds">Game Clock (seconds)</option>
+        <option value="home_score">Home Score</option>
+        <option value="visitor_score">Visitor Score</option>
+        <option value="home_team_fouls">Home Team Fouls</option>
+        <option value="visitor_team_fouls">Visitor Team Fouls</option>
+        <option value="home_timeouts">Home Timeouts Remaining</option>
+        <option value="visitor_timeouts">Visitor Timeouts Remaining</option>
+        <option value="shot_clock_seconds">Shot Clock (seconds, blank to disable)</option>
+      </select></label>
+      <label>Value<input id="svValue"></label>
+    </div>
+    <div class="button-row"><button class="warning" onclick="hoopsSetValue()">Set Value</button></div>
+    <div id="hoopsSetValueStatus" class="status"></div>
+  </details>
+
+  <div class="button-row utility-row">
+    <button onclick="hoopsUndo()">Undo</button>
+    <button onclick="hoopsRedo()">Redo</button>
+    <button class="danger" onclick="hoopsConfirmGameEnd()">Confirm Official Game End</button>
+    <button onclick="openHoopsBoxScore()">Box Score</button>
+  </div>
+  <div id="hoopsActionStatus" class="status"></div>
+</section>
+
+<div id="hoopsBoxScoreModal" class="hidden modal-overlay" onclick="if(event.target===this)closeHoopsBoxScore()">
+  <div class="modal-panel">
+    <div class="section-heading compact"><h3>Box Score</h3><button onclick="closeHoopsBoxScore()">Close</button></div>
+    <div id="hoopsBoxScoreContent"></div>
+  </div>
+</div>

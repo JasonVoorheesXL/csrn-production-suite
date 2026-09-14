@@ -553,7 +553,11 @@ async function syncCreateBroadcastRulesetOptions() {
   const sportField = document.getElementById('sport');
   if (!select || !sportField) return;
   const sport = sportField.value.toLowerCase();
-  if (!['baseball', 'softball'].includes(sport)) return; // football keeps its existing static option
+  // basketball (P5) reuses this same generic re-scoping -- it's not
+  // baseball/softball-specific despite the file it lives in (this
+  // function predates hoops_controls.js and there was no reason to
+  // duplicate it there).
+  if (!['baseball', 'softball', 'basketball'].includes(sport)) return; // football keeps its existing static option
   try {
     const rows = (await api('/api/rulesets'))?.rulesets;
     if (!Array.isArray(rows)) return;
