@@ -6,6 +6,8 @@ from typing import Any, Callable, Mapping
 
 import engine_router
 import ruleset_service
+from hoops_period_service import HoopsPeriodService
+from hoops_rules_service import HoopsRulesService
 
 
 @dataclass(frozen=True)
@@ -228,6 +230,33 @@ class BroadcastLifecycleService:
             "effective_profile_version": version,
         }
 
+    def _default_hoops_fields(
+        self, sport: str, country: str, region: str, association: str
+    ) -> dict[str, Any]:
+        """Fresh period/clock/hoops sub-state for a newly-loaded basketball
+        broadcast -- same "state is correct the moment it exists" standard
+        as _state_from_record()'s diamond stamp above, but basketball's own
+        initial values (period length, shot clock, timeouts) are
+        ruleset-derived, unlike baseball's default_diamond_state() (which
+        needs no ruleset at all). Resolves the ruleset once, here, via a
+        throwaway probe dict passed to hoops_period_service.start_game()
+        (the same call hoops_game_operations_service.initialize_hoops()
+        makes), then returns just the fields it set -- period/clock_seconds/
+        clock_running/clock_started_at (shared) plus hoops (namespaced) --
+        for the caller to splat into the real state dict being built."""
+        probe: dict[str, Any] = {
+            "sport": sport, "country": country, "region": region, "association": association,
+        }
+        ruleset = HoopsRulesService.active_ruleset(probe)
+        HoopsPeriodService.start_game(probe, ruleset)
+        return {
+            "period": probe["period"],
+            "clock_seconds": probe["clock_seconds"],
+            "clock_running": probe["clock_running"],
+            "clock_started_at": probe["clock_started_at"],
+            "hoops": probe["hoops"],
+        }
+
     def _state_from_record(self, item: Mapping[str, Any]) -> dict[str, Any]:
         status = str(item.get("status", "planned"))
         sport = str(item.get("sport", "Football"))
@@ -302,6 +331,18 @@ class BroadcastLifecycleService:
             **(
                 {"diamond": engine_router.default_diamond_state()}
                 if engine_router.is_diamond_sport(sport)
+                else {}
+            ),
+            # P5: a freshly-loaded basketball broadcast gets a clean period/
+            # clock/hoops sub-state immediately (period 1, a full game
+            # clock, zeroed fouls/timeouts from the ruleset) rather than
+            # waiting on lazy creation at the first hoops route call. Same
+            # fresh-record-only caveat as the diamond stamp above -- a
+            # resumed live-state snapshot already carries whatever
+            # basketball state that game had.
+            **(
+                self._default_hoops_fields(sport, country, region, association)
+                if engine_router.is_hoops_sport(sport)
                 else {}
             ),
         }

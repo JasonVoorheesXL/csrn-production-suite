@@ -47,32 +47,37 @@ def test_base_family_collapses_canadian_football_onto_football() -> None:
     assert sf.base_family("hockey") == "hockey"
 
 
-def test_engine_ready_is_football_baseball_and_softball() -> None:
-    # Football (+ canadian_football, same module) plus baseball and softball
-    # (P5: docs/BASEBALL_SOFTBALL_ENGINE_SCOPING_PLAN.md) have a broadcast
-    # engine today. The other families are real/licensable but not ready.
+def test_engine_ready_is_football_baseball_softball_and_basketball() -> None:
+    # Football (+ canadian_football, same module), baseball and softball
+    # (docs/BASEBALL_SOFTBALL_ENGINE_SCOPING_PLAN.md), and now basketball
+    # (docs/BASKETBALL_ENGINE_SCOPING_PLAN.md P5) have a broadcast engine
+    # today. The other families are real/licensable but not ready.
     assert sf.is_engine_ready("football") is True
     assert sf.is_engine_ready("canadian_football") is True
     assert sf.is_engine_ready("baseball") is True
     assert sf.is_engine_ready("softball") is True
-    assert sf.is_engine_ready("basketball") is False
+    assert sf.is_engine_ready("basketball") is True
     assert sf.is_engine_ready("soccer") is False
     assert sf.is_engine_ready("hockey") is False
 
 
 def test_family_sport_options_separates_licensed_not_ready_from_unlicensed() -> None:
-    opts = {o["family"]: o for o in sf.family_sport_options(["football", "basketball"])}
+    # basketball now has an engine (P5) -- soccer is the still-engineless
+    # family this test uses as its "licensed but not ready" example instead
+    # (same swap baseball's own P5 made when baseball stopped being that
+    # example).
+    opts = {o["family"]: o for o in sf.family_sport_options(["football", "soccer"])}
     # football: licensed + engine -> available
     assert opts["football"] == {
         "family": "football", "label": "Football",
         "licensed": True, "engine_ready": True, "available": True,
     }
-    # basketball: licensed, but no engine -> NOT available, and the reason is
+    # soccer: licensed, but no engine -> NOT available, and the reason is
     # "engine not ready", not "unlicensed"
-    assert opts["basketball"]["licensed"] is True
-    assert opts["basketball"]["engine_ready"] is False
-    assert opts["basketball"]["available"] is False
-    # baseball: not licensed and no engine
+    assert opts["soccer"]["licensed"] is True
+    assert opts["soccer"]["engine_ready"] is False
+    assert opts["soccer"]["available"] is False
+    # baseball: not licensed (but does have an engine)
     assert opts["baseball"]["licensed"] is False
     assert opts["baseball"]["available"] is False
 

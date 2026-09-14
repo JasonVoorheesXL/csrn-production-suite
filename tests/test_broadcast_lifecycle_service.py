@@ -298,6 +298,50 @@ def test_load_never_overwrites_a_resumed_diamond_snapshot() -> None:
     assert state["diamond"] == {"inning": 5, "inning_half": "BOTTOM", "outs": 2}
 
 
+def test_load_stamps_a_fresh_hoops_substate_for_basketball() -> None:
+    # P5: a freshly-loaded basketball broadcast gets a clean period/clock/
+    # hoops sub-state the moment it's loaded, same standard as the diamond
+    # stamp above -- but ruleset-derived (period length, shot clock,
+    # timeouts) via hoops_period_service.start_game(), not a bare
+    # structural default, since basketball's own initial values depend on
+    # the active ruleset.
+    bb_row = record()
+    bb_row.update({"sport": "Basketball", "country": "US", "association": "NFHS"})
+    bb_state = build_service(records=[bb_row])["service"].load("FB-2026-01").data["state"]
+    assert bb_state["period"] == "1"
+    assert bb_state["clock_seconds"] == 480
+    assert bb_state["clock_running"] is False
+    assert bb_state["hoops"]["home_timeouts"] == 5
+    assert bb_state["hoops"]["home_bonus"] == "NONE"
+
+    # Football is untouched -- no "hoops" key appears at all, and its own
+    # "period" field (a plain quarter counter, not basketball's clock/hoops
+    # apparatus) is whatever football's own default already was.
+    fb_state = build_service()["service"].load("FB-2026-01").data["state"]
+    assert "hoops" not in fb_state
+
+
+def test_load_never_overwrites_a_resumed_hoops_snapshot() -> None:
+    # Same principle as the diamond snapshot test above: a resumed
+    # basketball snapshot's in-progress game (fouls recorded, a real
+    # clock reading) must survive unchanged -- the fresh-hoops stamp only
+    # ever applies on the "build from record" branch.
+    row = record("live")
+    row.update({"sport": "Basketball", "country": "US", "association": "NFHS"})
+    row["live_state"] = {
+        "broadcast_created": True,
+        "broadcast_id": "FB-2026-01",
+        "period": "3",
+        "clock_seconds": 214,
+        "hoops": {"home_team_fouls": 4, "home_bonus": "DOUBLE"},
+    }
+    built = build_service(records=[row])
+    state = built["service"].load("FB-2026-01").data["state"]
+    assert state["period"] == "3"
+    assert state["clock_seconds"] == 214
+    assert state["hoops"] == {"home_team_fouls": 4, "home_bonus": "DOUBLE"}
+
+
 def test_load_completed_record_restores_final_score_and_review_mode() -> None:
     built = build_service(records=[record("completed")])
     result = built["service"].load("FB-2026-01")

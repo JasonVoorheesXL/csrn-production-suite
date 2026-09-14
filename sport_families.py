@@ -64,16 +64,18 @@ OTHER_CONTEXTS: tuple[str, ...] = (
 )
 
 # Contexts a broadcast engine actually loads for today. Football (and
-# canadian_football, which rides the same Round 26 module) plus baseball and
+# canadian_football, which rides the same Round 26 module), baseball and
 # softball (the P0-P5 diamond engine: docs/BASEBALL_SOFTBALL_ENGINE_
-# SCOPING_PLAN.md) are built. The remaining families are real, licensable
-# SPORT_FAMILIES with a login icon, but selecting one lands nowhere useful
-# yet -- so they get the same "coming soon" gate as the OTHER_CONTEXTS
-# placeholders. A family being licensed is tracked separately
-# (resolve_licensed_families / licensed_sport_families): licensed-but-not-
-# ready and not-licensed are different situations and the UI says so.
+# SCOPING_PLAN.md), and now basketball (the P0-P5 hoops engine:
+# docs/BASKETBALL_ENGINE_SCOPING_PLAN.md) are built. The remaining families
+# are real, licensable SPORT_FAMILIES with a login icon, but selecting one
+# lands nowhere useful yet -- so they get the same "coming soon" gate as
+# the OTHER_CONTEXTS placeholders. A family being licensed is tracked
+# separately (resolve_licensed_families / licensed_sport_families):
+# licensed-but-not-ready and not-licensed are different situations and the
+# UI says so.
 ENGINE_READY: frozenset[str] = frozenset(
-    {"football", "canadian_football", "baseball", "softball"}
+    {"football", "canadian_football", "baseball", "softball", "basketball"}
 )
 
 # Wildcard token a license may carry in its ``sports`` list ("every family").

@@ -24,7 +24,10 @@ def _require_auth(func):
 
 @pytest.fixture
 def client():
-    licensed = [["football", "basketball"]]
+    # basketball now has an engine too (P5) -- "soccer" is added here as
+    # the fixture's own still-licensed-but-engineless example (basketball
+    # graduated out of that role the same way baseball did before it).
+    licensed = [["football", "basketball", "soccer"]]
 
     app = Flask(__name__)
     app.config.update(TESTING=True, SECRET_KEY="access-model-test")
@@ -61,13 +64,14 @@ def test_session_context_reports_current_context_and_license(client) -> None:
 
     assert body["sport_context"] == "football"
     assert body["sport_scope"] == "football"
-    assert body["licensed_sports"] == ["football", "basketball"]
+    assert body["licensed_sports"] == ["football", "basketball", "soccer"]
     assert body["all_sports_licensed"] is False
     assert [o["context"] for o in body["other_sports"]][:1] == ["canadian_football"]
     fams = {f["family"]: f for f in body["family_sports"]}
     assert fams["football"]["available"] is True          # licensed + engine
-    assert fams["basketball"]["available"] is False        # licensed, no engine
-    assert fams["basketball"]["licensed"] is True
+    assert fams["basketball"]["available"] is True        # licensed + engine (P5)
+    assert fams["soccer"]["available"] is False            # licensed, no engine
+    assert fams["soccer"]["licensed"] is True
     assert fams["baseball"]["licensed"] is False
 
 
@@ -111,12 +115,14 @@ def test_sport_context_switch_rejects_an_unlicensed_engine_ready_family(client) 
 
 
 def test_sport_context_switch_licensed_but_engineless_family_is_not_ready(client) -> None:
-    # basketball IS licensed on this stub install, but there is no engine
-    # for it yet -- a distinct reason from "unlicensed".
+    # soccer IS licensed on this stub install (fixture default), but there
+    # is no engine for it yet -- a distinct reason from "unlicensed".
+    # basketball graduated out of this example's role in P5 (it now has an
+    # engine), same as baseball/softball did before it.
     test_client, _ = client
     _authenticate(test_client)
 
-    response = test_client.post("/api/sport-context", json={"sport": "basketball"})
+    response = test_client.post("/api/sport-context", json={"sport": "soccer"})
 
     assert response.status_code == 400
     assert response.get_json()["error"] == "SPORT_ENGINE_NOT_READY"
@@ -126,11 +132,15 @@ def test_sport_context_switch_licensed_but_engineless_family_is_not_ready(client
 
 def test_sport_context_switch_unlicensed_engineless_family_is_coming_soon(client) -> None:
     # "baseball" used to be this scenario's example (unlicensed AND no
-    # engine); P5 gave baseball/softball a real engine
-    # (sport_families.ENGINE_READY), so a sport genuinely still lacking
-    # both is needed -- "soccer" is unlicensed in this fixture (licensed =
-    # ["football", "basketball"]) and still has no broadcast engine.
-    test_client, _ = client
+    # engine); P5 gave baseball/softball -- and now basketball -- a real
+    # engine (sport_families.ENGINE_READY), so a sport genuinely still
+    # lacking both is needed. The fixture's default license list now
+    # includes "soccer" (test_sport_context_switch_licensed_but_engineless_
+    # family_is_not_ready's own example), so this test overrides the
+    # license list to exclude it, restoring "soccer" as unlicensed AND
+    # still with no broadcast engine for this scenario specifically.
+    test_client, licensed = client
+    licensed[0] = ["football"]
     _authenticate(test_client)
 
     response = test_client.post("/api/sport-context", json={"sport": "soccer"})
