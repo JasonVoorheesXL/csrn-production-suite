@@ -634,9 +634,19 @@ class LineupService:
         merely because the CR enters.' CR-01: lineup occupant unchanged;
         CR appearance created. CR-02: an ineligible CR is a warning, never
         an automatic block (Sec.10: 'do not auto-remove a runner from a
-        live game')."""
-        if for_role_at_time not in {"PITCHER", "CATCHER"}:
-            raise ValueError("for_role_at_time must be PITCHER or CATCHER")
+        live game').
+
+        P2 followup (2026-09-14, owner decision): universal operator
+        option, not gated by association-specific adoption rules (e.g.
+        MHSAA's postseason-only window, pitcher/catcher-only eligibility).
+        `for_role_at_time` used to be restricted to PITCHER/CATCHER --
+        that restriction is gone; any operator can enter a courtesy
+        runner for any player, any game, any association, at any time.
+        `for_role_at_time` is still recorded (whatever position the
+        player actually held, e.g. "PITCHER", "CATCHER", "SHORTSTOP") for
+        the eligibility snapshot below, purely as an audit fact -- it no
+        longer gates anything. The special-role modeling itself
+        (role-at-time snapshot, not ordinary substitution) is unchanged."""
         side_state = cls._side(state, side)
         appearance = {
             "runner_player_id": runner_player_id,

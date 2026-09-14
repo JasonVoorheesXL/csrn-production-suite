@@ -75,6 +75,7 @@ class BroadcastService:
         "visitor_pregame_record",
         "visitor_pregame_region_record",
         "record_tracking",
+        "regulation_innings_override",
     )
     _STATE_SYNC_KEYS = _EDITABLE_KEYS + (
         "home_school_id",
@@ -347,6 +348,15 @@ class BroadcastService:
             "week": week,
             "level": data.get("level", "Varsity"),
             "division": data.get("division", "Boys"),
+            # P2 followup (2026-09-14, owner decision): a narrow per-
+            # broadcast override for baseball/softball's regulation-length
+            # game-end evaluation (game_end_evaluator._scheduled_innings())
+            # -- the ruleset's own scheduledInnings stays the default when
+            # this is absent. Not sport-gated at creation time (harmless,
+            # unread, for a football broadcast).
+            "regulation_innings_override": self._regulation_innings_override(
+                data.get("regulation_innings_override")
+            ),
             "date": data.get("date", ""),
             "scheduled_start": data.get("scheduled_start", "07:00 PM"),
             "home_school_id": home_school_id,
@@ -711,6 +721,22 @@ class BroadcastService:
     @staticmethod
     def _snapshot_value(incoming: Any, school: School | None, key: str) -> str:
         return str(incoming or (school or {}).get(key, "") or "").strip()
+
+    @staticmethod
+    def _regulation_innings_override(value: Any) -> int | None:
+        """None (absent/blank) means "no override -- use the ruleset's own
+        scheduledInnings," matching every other optional numeric field's
+        own convention here. A non-numeric value is treated the same as
+        absent rather than raising -- this is an operator convenience
+        field, not validated input the engine depends on for correctness
+        (the ruleset default always still applies if this is wrong/blank)."""
+        if value in (None, ""):
+            return None
+        try:
+            innings = int(value)
+        except (TypeError, ValueError):
+            return None
+        return innings if innings > 0 else None
 
     @staticmethod
     def _primary_side(primary_school_id: str, home_id: str, visitor_id: str) -> str:

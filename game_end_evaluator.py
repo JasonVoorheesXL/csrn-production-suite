@@ -40,6 +40,22 @@ class GameEndEvaluator:
         return ruleset_service.active_ruleset(state, sport=cls._sport(state))
 
     @classmethod
+    def _scheduled_innings(cls, state: Mapping[str, Any]) -> int:
+        """P2 followup (2026-09-14, owner decision): regulation length
+        ships on the NFHS-generic default but is operator-editable per
+        broadcast. `state["regulation_innings_override"]`, when set, wins
+        over the resolved ruleset's own `regulation.scheduledInnings` --
+        a narrow, per-broadcast field, not the full P5b self-service
+        RulesProfile editor (which stays deferred; P0 already landed the
+        general baseline->state->competition->game override *schema*, but
+        the operator-facing editing workflow for it is P5b's own, larger
+        scope -- this is a standalone field for just this one value)."""
+        override = state.get("regulation_innings_override")
+        if override is not None:
+            return int(override)
+        return int(cls._ruleset(state).get("regulation", {}).get("scheduledInnings", 7))
+
+    @classmethod
     def evaluate(cls, state: Mapping[str, Any]) -> dict[str, Any] | None:
         """Sec.11.1 evaluation order (walk-off first, then run-rule, then
         regulation). Call after every finalized play and every half-inning
@@ -65,7 +81,7 @@ class GameEndEvaluator:
         if not half.startswith("B"):
             return None
         inning = int(state.get("inning", 1))
-        scheduled = int(cls._ruleset(state).get("regulation", {}).get("scheduledInnings", 7))
+        scheduled = cls._scheduled_innings(state)
         if inning < scheduled:
             return None
         home = int(state.get("home_score", 0))
@@ -126,7 +142,7 @@ class GameEndEvaluator:
             return None  # extras -- never a regulation candidate while tied
         inning = int(state.get("inning", 1))
         half = str(state.get("inning_half", "TOP")).upper()
-        scheduled = int(cls._ruleset(state).get("regulation", {}).get("scheduledInnings", 7))
+        scheduled = cls._scheduled_innings(state)
         trailing = "visitor" if home > visitor else "home"
         if trailing == "visitor":
             turn_complete = inning > scheduled or (inning == scheduled and half.startswith("B"))
@@ -138,7 +154,7 @@ class GameEndEvaluator:
 
     @classmethod
     def seed_tiebreaker_runner(
-        cls, state: dict[str, Any], player_id: str
+        cls, state: dict[str, Any], player_id: str, starting_inning: int
     ) -> GameEndResult:
         """Sec.11.3: only when the active profile's tieBreaker.mode is
         RUNNER_ON_SECOND, the score is tied, and play has moved past
@@ -146,13 +162,23 @@ class GameEndEvaluator:
         (TIEBREAKER_RUNNER_PLACED), never a silent base mutation --
         seededRunnerSelection (which player) is the caller's decision
         (PREVIOUS_BATTER / PROFILE_DEFINED / MANUAL per the profile); this
-        evaluator only enforces the structural eligibility."""
+        evaluator only enforces the structural eligibility.
+
+        P2 followup (2026-09-14, owner decision): `starting_inning` is a
+        REQUIRED operator input, not derived from the ruleset's
+        tieBreaker.startsAtInning -- the owner wants this chosen at the
+        moment a tiebreaker situation actually arises, not fixed by a
+        handbook number. The ruleset value, if present, is only ever a
+        UI-layer pre-filled suggestion (see csrn-diamond-controls.js);
+        this method records whatever the operator actually confirmed,
+        every time, in the TIEBREAKER_RUNNER_PLACED payload itself. The
+        RUNNER_ON_SECOND mode gate below is unchanged -- only the inning
+        number changed from ruleset-derived to operator-supplied."""
         ruleset = cls._ruleset(state)
         tie_breaker = ruleset.get("tieBreaker") or {}
         if str(tie_breaker.get("mode", "NONE")).upper() != "RUNNER_ON_SECOND":
             return GameEndResult("TIEBREAKER_NOT_ACTIVE", state, {})
-        scheduled = int(ruleset.get("regulation", {}).get("scheduledInnings", 7))
-        starts_at = int(tie_breaker.get("startsAtInning") or (scheduled + 1))
+        starts_at = int(starting_inning)
         inning = int(state.get("inning", 1))
         if inning < starts_at:
             return GameEndResult("NOT_YET_ELIGIBLE", state, {})
@@ -161,7 +187,7 @@ class GameEndEvaluator:
         base = "second"
         if (state.get("base_runners") or {}).get(base):
             return GameEndResult("BASE_OCCUPIED", state, {})
-        payload = {"base": base, "playerId": player_id}
+        payload = {"base": base, "playerId": player_id, "startingInning": starts_at}
         DiamondStateFoundation.apply_tiebreaker_runner_placed(state, payload)
         event = DiamondStateFoundation.append_event(state, "TIEBREAKER_RUNNER_PLACED", payload)
         return GameEndResult("OK", state, {"event": event})

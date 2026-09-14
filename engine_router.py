@@ -103,6 +103,10 @@ _SHARED_VIEW_KEYS: tuple[str, ...] = (
     "sport", "country", "region", "association", "status",
     "effective_profile_id", "effective_profile_version",
     "home_team", "visitor_team", "broadcast_id",
+    # P2 followup (2026-09-14): narrow per-broadcast regulation-length
+    # override, read (never written) by game_end_evaluator -- same
+    # read-only-passthrough treatment as effective_profile_id/version.
+    "regulation_innings_override",
 )
 
 

@@ -359,6 +359,32 @@ class DiamondStateFoundation:
         state["pending_ruling"] = None
         state["ball_status"] = str(payload.get("ballStatus", "LIVE"))
 
+    @classmethod
+    def apply_game_end_confirmed(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> None:
+        """GAME_END_CONFIRMED (P2 followup, 2026-09-14): the operator's
+        explicit "end this game now" call -- Sec.11.2 "the scorer/umpire
+        can confirm official termination when the local procedure requires
+        it." `reason` is free text (RUN_RULE / WALK_OFF / REGULATION / any
+        other officiating judgment call CSRN never auto-computes -- this
+        interpreter applies it exactly as given, no engine judgment).
+
+        Sets `status` directly rather than through the CANONICAL_FIELDS
+        per-field reset every other field here gets: `status` is NOT a
+        CANONICAL_FIELDS entry, deliberately -- game_suspension_service.py
+        also mutates `status` ("suspended" / restored-on-resume) entirely
+        outside this ledger, so folding `status` into the blanket reset
+        would incorrectly force every unrelated undo/void/correct during a
+        *suspended* game back to "live". `official_game_end_reason` IS a
+        CANONICAL_FIELDS entry, so it already resets to None correctly on
+        rebuild; `rebuild()` derives `status` back to "live" itself,
+        narrowly, when no non-voided GAME_END_CONFIRMED event survives a
+        replay -- see the comment there. Net effect: voiding this event
+        (DiamondEventService.void_event(), or plain undo() when this was
+        the most recent event) is the entire "reopen a game ended by
+        mistake" mechanism -- no separate reopen method needed."""
+        state["status"] = "completed"
+        state["official_game_end_reason"] = str(payload.get("reason", ""))
+
     # --- event ledger -----------------------------------------------------
 
     @classmethod
@@ -404,6 +430,7 @@ class DiamondStateFoundation:
         "HALF_INNING_END": "apply_half_inning_transition",
         "TIEBREAKER_RUNNER_PLACED": "apply_tiebreaker_runner_placed",
         "RULING": "apply_ruling",
+        "GAME_END_CONFIRMED": "apply_game_end_confirmed",
     }
 
     @classmethod
@@ -449,4 +476,20 @@ class DiamondStateFoundation:
         rebuilt["last_applied_sequence"] = (
             max(int(e.get("sequence", 0) or 0) for e in contributing) if contributing else 0
         )
+
+        # `status` isn't in CANONICAL_FIELDS (see apply_game_end_confirmed's
+        # own docstring for why -- game_suspension_service.py also owns
+        # `status` transitions outside this ledger, so a blanket reset
+        # would clobber a suspended game on every unrelated undo). Derive
+        # it narrowly instead: if nothing left this replay "completed" via
+        # a surviving GAME_END_CONFIRMED event, `status` can't correctly
+        # still read "completed" -- that only happens when the event that
+        # set it was just voided (an undo/void reopening the game). Any
+        # other value ("live", "suspended", ...) is untouched, since it
+        # came from something outside this reducer's ownership.
+        game_end_survives = any(
+            e.get("event_type") == "GAME_END_CONFIRMED" and not e.get("voided") for e in applied
+        )
+        if not game_end_survives and rebuilt.get("status") == "completed":
+            rebuilt["status"] = "live"
         return rebuilt

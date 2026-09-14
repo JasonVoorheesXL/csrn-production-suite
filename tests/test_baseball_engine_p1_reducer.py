@@ -194,16 +194,20 @@ def test_END_04_tie_after_scheduled_innings_seeds_the_tiebreaker_runner() -> Non
     original = ruleset_service.active_ruleset
     ruleset_service.active_ruleset = fake_ruleset
     try:
-        result = GameEndEvaluator.seed_tiebreaker_runner(state, "player-99")
+        # P2 followup (2026-09-14): starting_inning is now a required
+        # operator input, not read from the ruleset's own startsAtInning
+        # (still present above only as a UI pre-fill suggestion the
+        # operator confirmed -- 8, matching this game's actual inning).
+        result = GameEndEvaluator.seed_tiebreaker_runner(state, "player-99", 8)
         assert result.ok
         assert state["base_runners"]["second"]["player_id"] == "player-99"
         assert state["base_runners"]["second"]["reason"] == "TIEBREAKER_RUNNER_PLACED"
         events = [e for e in state["diamond_events"] if e["event_type"] == "TIEBREAKER_RUNNER_PLACED"]
         assert len(events) == 1
-        assert events[0]["payload"] == {"base": "second", "playerId": "player-99"}
+        assert events[0]["payload"] == {"base": "second", "playerId": "player-99", "startingInning": 8}
 
         # not eligible a second time -- base already occupied
-        again = GameEndEvaluator.seed_tiebreaker_runner(state, "player-100")
+        again = GameEndEvaluator.seed_tiebreaker_runner(state, "player-100", 8)
         assert again.code == "BASE_OCCUPIED"
     finally:
         ruleset_service.active_ruleset = original

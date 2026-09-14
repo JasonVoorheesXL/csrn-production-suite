@@ -277,6 +277,13 @@ class BroadcastLifecycleService:
             "region": region,
             "association": association,
             **self._effective_profile_fields(sport, country, region, association),
+            # P2 followup (2026-09-14, owner decision): narrow per-
+            # broadcast override for baseball/softball's regulation length
+            # -- game_end_evaluator._scheduled_innings() checks this before
+            # falling back to the resolved ruleset's scheduledInnings.
+            # None (absent) is the common case; harmless on a non-diamond
+            # broadcast, since nothing else reads it.
+            "regulation_innings_override": item.get("regulation_innings_override"),
             "season": item.get("season", ""),
             "week": item.get("week", "1"),
             "classification": item.get("classification", ""),

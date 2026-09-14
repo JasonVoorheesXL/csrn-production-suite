@@ -38,6 +38,7 @@ from typing import Any, Callable, Mapping
 import engine_router
 from at_bat_rules_service import AtBatRulesService
 from diamond_event_service import DiamondEventService
+from game_end_evaluator import GameEndEvaluator
 from game_suspension_service import GameSuspensionService
 from lineup_service import LineupService
 from live_command_service import (
@@ -69,6 +70,10 @@ ACTIONS: dict[str, Callable[..., Any]] = {
     "record_plate_appearance": AtBatRulesService.record_plate_appearance,
     "record_ruling": AtBatRulesService.record_ruling,
     "confirm_game_end": AtBatRulesService.confirm_game_end,
+    # game_end_evaluator (P2 followup, 2026-09-14 -- previously unreachable
+    # by any operator; starting_inning is now an operator-supplied value,
+    # not read from the ruleset)
+    "seed_tiebreaker_runner": GameEndEvaluator.seed_tiebreaker_runner,
     # diamond_event_service (P2 -- undo/redo/correction boundary)
     "undo": DiamondEventService.undo,
     "redo": DiamondEventService.redo,

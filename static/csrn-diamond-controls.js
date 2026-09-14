@@ -94,6 +94,7 @@ function renderDiamondControlPanel() {
   diamondRenderWizardFields();
   diamondPopulatePaSelects();
   diamondPopulateRulingSelects();
+  diamondPopulateTiebreakerSelect();
   diamondRenderBattingOrderAlerts();
 }
 
@@ -495,6 +496,41 @@ async function diamondResume() { await diamondAction('resume', {}, 'diamondActio
 async function diamondConfirmGameEnd() {
   if (!confirm('Confirm the official end of this game per the umpire/scorer\'s determination?')) return;
   await diamondAction('confirm_game_end', { reason: prompt('Reason (e.g. regulation, run rule, walk-off):', '') || '' }, 'diamondActionStatus');
+}
+
+// --- international tiebreaker (P2 followup, 2026-09-14) --------------------
+//
+// seed_tiebreaker_runner() was previously unreachable by any operator --
+// this is the first UI for it. Starting inning is a required operator
+// input every time (game_end_evaluator.seed_tiebreaker_runner() no longer
+// falls back to the ruleset's own tieBreaker.startsAtInning) -- the number
+// pre-filled in tbStartingInning below is just a sensible static default,
+// not read from the live ruleset; the value actually recorded is whatever
+// the operator confirms in the field at the moment they submit.
+
+function diamondPopulateTiebreakerSelect() {
+  if (!diamondIsActive()) return;
+  const battingSide = document.getElementById('paBattingTeam')?.value || 'visitor';
+  const select = document.getElementById('tbPlayerId');
+  if (select) select.innerHTML = diamondPlayerOptionsHtml(battingSide);
+}
+
+async function diamondSeedTiebreakerRunner() {
+  const playerId = document.getElementById('tbPlayerId')?.value || '';
+  const startingInning = Number(document.getElementById('tbStartingInning')?.value || 0);
+  if (!playerId) {
+    diamondSetStatus('diamondTiebreakerStatus', 'Select a runner before placing them.', true);
+    return;
+  }
+  if (!startingInning || startingInning < 1) {
+    diamondSetStatus('diamondTiebreakerStatus', 'Enter a valid starting inning before placing the runner.', true);
+    return;
+  }
+  await diamondAction(
+    'seed_tiebreaker_runner',
+    { player_id: playerId, starting_inning: startingInning },
+    'diamondTiebreakerStatus',
+  );
 }
 
 // --- box score modal --------------------------------------------------------

@@ -185,6 +185,9 @@
             <option>Coed</option>
           </select>
         </label>
+        <label>Regulation Innings Override (optional, baseball/softball)
+          <input id="regulationInningsOverride" type="number" min="1" placeholder="Ruleset default">
+        </label>
         <label>Home Team
           <select id="homeSchoolSelect" onchange="teamSelectionChanged('home')"></select>
           <input id="homeTeam" class="hidden" placeholder="Enter home team manually"><div id="homeManualSave" class="manual-save hidden"><label class="check-row"><input id="homeSaveSchool" type="checkbox"> Save this team to School Database</label></div>
@@ -551,6 +554,17 @@
           </div>
           <div class="button-row"><button onclick="diamondRecordRuling()">Record Ruling</button></div>
           <div id="diamondRulingStatus" class="status"></div>
+        </details>
+
+        <details class="program-visual-activity">
+          <summary><strong>International Tiebreaker</strong><small>Sec.11.3 -- place a runner on 2nd to start an extra inning under RUNNER_ON_SECOND tiebreaker rules. Starting inning is your call, confirmed here every time -- not fixed by the ruleset.</small></summary>
+          <p class="section-note">Only usable when the ruleset's tiebreaker mode is RUNNER_ON_SECOND, the score is tied, and the game has reached the inning you confirm below.</p>
+          <div class="setup-grid">
+            <label>Runner<select id="tbPlayerId"></select></label>
+            <label>Starting Inning<input id="tbStartingInning" type="number" min="1" value="8"></label>
+          </div>
+          <div class="button-row"><button onclick="diamondSeedTiebreakerRunner()">Place Tiebreaker Runner</button></div>
+          <div id="diamondTiebreakerStatus" class="status"></div>
         </details>
 
         <div class="button-row utility-row">
@@ -3326,6 +3340,7 @@ async function createBroadcast() {
       week: document.getElementById('week').value,
     level: document.getElementById('level').value,
     division: document.getElementById('division').value,
+    regulation_innings_override: document.getElementById('regulationInningsOverride').value,
     home_team: document.getElementById('homeTeam').value,
     visitor_team: visitor,
     home_school_id: document.getElementById('homeSchoolSelect').value === '__manual__' ? '' : document.getElementById('homeSchoolSelect').value,
@@ -7668,7 +7683,7 @@ function renderGameManager(){
 }
 async function editGame(id){
   const r=gameManagerRecords.find(x=>x.broadcast_id===id); if(!r) return; editingBroadcastId=id; moveSetupPanelToGameManager(); const p=document.getElementById('setupPanel'); p.classList.remove('hidden');
-  for(const [k,v] of Object.entries({sport:r.sport||'Football',season:r.season||String(new Date().getFullYear()),classification:r.classification||'5A',week:r.week||'1',level:r.level||'Varsity',division:r.division||'Boys',date:r.date||'',venue:r.venue||'',visualMode:r.visual_mode||'graphic',homeTeam:r.home_team||'',visitorTeam:r.visitor_team||''})){const e=document.getElementById(k);if(e)e.value=v;}
+  for(const [k,v] of Object.entries({sport:r.sport||'Football',season:r.season||String(new Date().getFullYear()),classification:r.classification||'5A',week:r.week||'1',level:r.level||'Varsity',division:r.division||'Boys',date:r.date||'',venue:r.venue||'',visualMode:r.visual_mode||'graphic',homeTeam:r.home_team||'',visitorTeam:r.visitor_team||'',regulationInningsOverride:r.regulation_innings_override??''})){const e=document.getElementById(k);if(e)e.value=v;}
   selectRulesetJurisdiction(r.country||'US', r.region||'', r.association||'');
   document.getElementById('homeSchoolSelect').value=r.home_school_id||'__manual__'; document.getElementById('visitorSchoolSelect').value=r.visitor_school_id||'__manual__'; const m=(r.scheduled_start||'7:00 PM').match(/(\d+):(\d+)\s*(AM|PM)/i); if(m){startHour.value=String(Number(m[1]));startMinute.value=m[2];startAmPm.value=m[3].toUpperCase();}
   populateBroadcastPlanning(r);

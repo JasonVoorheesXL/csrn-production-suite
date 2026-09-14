@@ -460,6 +460,99 @@ differ).
 - **P4 — DONE.** `engine_router.py` (`state["sport"]` dispatch; the `diamond_view()`/`commit_diamond_view()` adapter that lets `state["diamond"]` stay a namespaced sub-key while every P0-P3 service keeps working against the flat dict shape it was built and tested against). `diamond_game_operations_service.py` (the "`game_operations_service` baseball extensions" deferred from P2 — a separate module, not an edit to `game_operations_service.py`, reusing the same `load_state`/`save_state`/`transaction_lock` plumbing; a single generic `dispatch()` covers all ~28 P1/P2 mutators rather than one hand-written wrapper per action). `routes/diamond_game_routes.py` (new `/api/diamond/...` URLs, zero edits to football's own routes). `app.py` + `phase5_architecture.py` wiring (blueprint registered, allowlisted, one public overlay-state endpoint allowlisted). **Pitch-count eligibility engine descoped** (owner decision — see §12's "Pitch count" row): pitch count stays an informational post-game stat only, nothing enforced or flagged live. Gate passed: `tests/test_baseball_engine_p4_engine_router.py`, `tests/test_baseball_engine_p4_diamond_game_operations_service.py`, `tests/test_diamond_game_routes_blueprint.py`; full suite at the known baseline (zero regressions); `test_phase_5_architecture.py`/`test_theme_architecture.py`/`test_deployment_architecture.py` pass with the new blueprint allowlisted.
 - **P5 — DONE.** `sport_families.ENGINE_READY += {"baseball","softball"}` (the flag that makes the already-built diamond engine reachable through the operator UI's existing sport-context switcher and family/other-sport tiles — both already sport-count-agnostic, so no route/template change was needed for the tiles themselves). `broadcast_lifecycle_service.py::_state_from_record()` stamps a fresh `state["diamond"]` onto a newly-loaded baseball/softball broadcast (same standard as every other field it sets fresh at load time). `templates/index.html`'s Sport dropdown offers real Baseball/Softball options (no longer "(future)"); a new `diamondControlPanel` section (`static/csrn-diamond-controls.js`) covers every deliverable this row originally scoped: starting-lineup builder (roster-driven, DH-mode-aware), plate-appearance entry, a guided lineup-change wizard (substitution / re-entry / position-change / DH / DP-FLEX / courtesy-runner / team-level actions — all 15 `lineup_service` transitions reachable), a batting-order-check panel (P2's `record_batter`/`apply_appeal_ruling`/`dismiss_alert_no_appeal`, not originally called out in this row but exposed since P2 built it), an umpire-ruling form matching `apply_ruling()`'s real `baseAwards`/`outsAwarded`/`ballStatus` payload shape, undo/redo/suspend/resume/confirm-game-end, and a box-score modal. `render()` branches on `state["sport"]` and returns before any football-specific rendering runs for a diamond broadcast — football's own code path is provably unchanged (a test asserts `/api/score`/`/api/set` never touched). Gate passed: `tests/test_baseball_engine_p5_operator_ui.py` (11 tests, including a cross-file consistency check pinning every UI action name against `diamond_game_operations_service.ACTIONS` so a typo can never silently 404) plus a full manual browser smoke test (PIN setup, sport-tile licensing, broadcast creation with live ruleset re-scoping, starting lineup, a scripted home run correctly updating the rendered scoreboard and box score, undo reverting it, suspend/resume toggling the phase badge). Void/correct-event (arbitrary ledger corrections beyond undo/redo) were deliberately left out of this round's UI scope — undo/redo already covers "operator runs a full game," and targeted event correction is a power-user feature for a later pass.
 | **P5** | Operator UI: `templates/_diamond_controls.html` partial — PA outcome entry, between-PA events, ruling workflow, substitution **wizard** (shows slot / starter-sub / prior exits / special role / pitcher-catcher status; picks substitution vs re-entry vs position-change vs DH/DP-FLEX vs courtesy runner vs correction), lineup editor, manual set-value. `sport_families.ENGINE_READY += {"baseball","softball"}`. | End-to-end: operator runs a full game from the UI; all five themes render it live. |
+
+- **P2 followup — DONE (2026-09-14).** Four owner-directed changes to
+  already-merged P1/P2 code, each preceded by an investigation reported
+  back and independently re-verified by the owner against the live
+  source before any code was touched.
+  1. **Mercy-rule/game-end ledger fix (a real bug, not a feature gap).**
+     `at_bat_rules_service.confirm_game_end()` used to set
+     `state["status"]`/`state["official_game_end_reason"]` directly,
+     completely outside the event ledger -- undo/void_event had nothing
+     to act on, and any unrelated rebuild (voiding an earlier, unrelated
+     play) silently wiped `official_game_end_reason` back to `None`
+     (a CANONICAL_FIELDS entry, reset every rebuild) while `status`
+     stayed stuck at `"completed"` (not a CANONICAL_FIELDS entry,
+     untouched by rebuild) -- an inconsistent, strand-able state.
+     Fixed by making `GAME_END_CONFIRMED` a real, voidable ledger event:
+     `diamond_state_service.apply_game_end_confirmed()` is the new
+     structural interpreter (sets both fields together, live-apply and
+     replay share the same code, per this module's own discipline).
+     `status` deliberately did **not** join `CANONICAL_FIELDS` outright --
+     `game_suspension_service.py` also owns `status` transitions
+     ("suspended" / restored) entirely outside this ledger, and a blanket
+     per-rebuild reset would have clobbered a suspended game on every
+     unrelated undo. Instead, `rebuild()` derives `status` back to
+     `"live"` narrowly, only when no non-voided `GAME_END_CONFIRMED`
+     event survives a replay -- correct for the game-end case, inert for
+     every other status value. Net effect: "reopen a game ended by
+     mistake" is just `DiamondEventService.void_event()`/`undo()` on
+     that event -- no separate reopen method. Walk-off and regulation
+     confirms are unchanged (same `confirm_game_end()` call, any
+     `reason` string, always was and remains un-gated) -- verified with a
+     dedicated test plus a live browser confirm-then-undo round trip.
+  2. **Courtesy runner: universal, not association-gated.**
+     `lineup_service.enter_courtesy_runner()`'s hardcoded
+     `if for_role_at_time not in {"PITCHER", "CATCHER"}: raise
+     ValueError(...)` is gone -- any operator can enter a courtesy
+     runner for any player, any game, any association, any time. The
+     ruleset's own `courtesyRunnerPolicy.enabled`/`roles` fields were
+     never actually read by any code path (confirmed before touching
+     anything) -- they're left in the ruleset JSON, `false`/informational
+     only, with `_source_notes` rewritten to say so explicitly rather
+     than describing a jurisdiction-gated policy that no longer exists
+     in the engine. Special-role modeling (role-at-time snapshot, not
+     ordinary substitution) is unchanged -- confirmed live for a
+     `SHORTSTOP` courtesy runner, a role the old code would have
+     rejected outright.
+  3. **International tiebreaker: wired up, operator-chosen inning.**
+     `game_end_evaluator.seed_tiebreaker_runner()` was previously
+     **absent from `diamond_game_operations_service.ACTIONS` entirely** --
+     unreachable by any operator, not just ruleset-gated on its inning
+     number. Both gaps closed together: the action is now dispatchable,
+     a new "International Tiebreaker" panel exists in the operator UI
+     (`tbPlayerId` / `tbStartingInning`), and `starting_inning` is now a
+     **required** parameter -- the method no longer falls back to the
+     ruleset's own `tieBreaker.startsAtInning` internally. The UI's
+     pre-filled `8` is a static, sensible default, not read from the live
+     ruleset (kept simple, per the owner's own "if convenient" framing);
+     whatever the operator confirms is what gets recorded in the
+     `TIEBREAKER_RUNNER_PLACED` event's `startingInning` field, every
+     time. The `RUNNER_ON_SECOND` mode gate itself is unchanged. No
+     shipped ruleset has this mode active yet (only an MHSAA overlay
+     would, and that's P6, not built) -- confirmed live that the wiring
+     itself returns a real `TIEBREAKER_NOT_ACTIVE` domain response, not
+     an unknown-action error.
+  4. **Regulation length: narrow per-broadcast override.** A new
+     `regulation_innings_override` field -- set at broadcast creation or
+     edit (`broadcast_service.py`, a plain optional number field on the
+     Create/Edit Broadcast form), stamped onto live state
+     (`broadcast_lifecycle_service.py`), threaded through
+     `engine_router.diamond_view()`'s existing shared-field passthrough
+     (same treatment as `effective_profile_id`) -- that
+     `game_end_evaluator._scheduled_innings()` checks before falling back
+     to the resolved ruleset's own `regulation.scheduledInnings`. Not the
+     full P5b self-service `RulesProfile` editor (P0 already landed the
+     general baseline→state→competition→game override *schema*; the
+     operator-facing editing *workflow* for it is P5b's own larger scope,
+     confirmed still not built when investigated) -- this is a standalone
+     field for just this one value, exactly as scoped. Verified live: a
+     broadcast created with the override correctly drove both the
+     walk-off and regulation game-end candidates off the overridden
+     inning, not the ruleset's.
+  - Gate passed: `tests/test_baseball_engine_p2_followup.py` (23 tests
+    covering all four items, including the ledger-event/rebuild replay
+    and void invariants for item 1 specifically) plus updates to
+    `tests/test_baseball_engine_p1_reducer.py` (the tiebreaker signature
+    change). A real manual browser smoke test drove all four through
+    the actual dispatched actions against a real broadcast: confirm →
+    undo reopened the game (status `"live"`, reason `null`, the original
+    event still in the ledger marked voided) with `regulation_innings_
+    override` visible on live state throughout; a `SHORTSTOP` courtesy
+    runner and a `seed_tiebreaker_runner` dispatch both round-tripped
+    correctly through the real API.
+  - Full suite: 2965 passed (2942 + 23 new), 2 known-environmental
+    failures, zero regressions.
 | **P5b** | **Self-service `RulesProfile` editor** — see §13. | An operator creates a working profile for a *new* state/league from a form + clones the pre-loaded MHSAA template, with no CSRN-side profile build. |
 | **P6** | `baseball/us-ms-mhsaa.json` + `softball/us-ms-mhsaa.json` shipped as **pre-loaded clonable seed templates** (MS pitch bands, run rule, courtesy runner, softball double-first-base + international tiebreaker; timezone; classification) once the §8.1 / spec §17 values are rulebook-confirmed by the owner. Handbook revision/effective date stored on the profile. | MHSAA values owner-confirmed; `_source_notes` updated/cleared; seed templates load in the P5b editor. |
 | **Later (not this engine)** | Pitch-by-pitch entry; double-switch batting-slot automation; defensive putout/assist auto-attribution; automated earned-run determination; any **auto-forfeit / administrative penalty** inference (permanently out — always human-declared). | — |
@@ -569,8 +662,8 @@ game-operation controls.
 
 ---
 
-*Scoping only. No engine code, ruleset JSON, or UI written this round.
+*P0 through P5, plus this P2-followup round, done and merged to trunk.
 Governing design reference:
-`docs/CSRN_NFHS_Baseball_Softball_Rules_Engine_Spec_2026.docx`. Branch holds
-at scoping until R26 + R27 + Phase C merge to trunk; first build action is
-the P0 rebase.*
+`docs/CSRN_NFHS_Baseball_Softball_Rules_Engine_Spec_2026.docx`. P5b
+(self-service RulesProfile editor, §13) and P6 (MHSAA seed templates,
+owner handbook confirmation) remain not started.*

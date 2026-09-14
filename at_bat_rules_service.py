@@ -75,7 +75,16 @@ class AtBatRulesService:
     def confirm_game_end(cls, state: dict[str, Any], reason: str) -> AtBatResult:
         """Sec.11.2: 'The scorer/umpire can confirm official termination
         when the local procedure requires it.' A GAME_END_CANDIDATE never
-        finalizes a game on its own -- this explicit call does."""
-        state["official_game_end_reason"] = reason
-        state["status"] = "completed"
-        return AtBatResult("OK", state, {"official_game_end_reason": reason})
+        finalizes a game on its own -- this explicit call does.
+
+        P2 followup (2026-09-14): recorded as a real, voidable
+        GAME_END_CONFIRMED ledger event (DiamondStateFoundation.
+        apply_game_end_confirmed()) rather than a direct status mutation --
+        the owner's own "operator ends the game manually, with the ability
+        to reopen if ended by mistake" decision. Reopening is just
+        DiamondEventService.void_event()/undo() on this event now; no
+        separate reopen method exists or is needed."""
+        payload = {"reason": reason}
+        DiamondStateFoundation.apply_game_end_confirmed(state, payload)
+        event = DiamondStateFoundation.append_event(state, "GAME_END_CONFIRMED", payload)
+        return AtBatResult("OK", state, {"event": event, "official_game_end_reason": reason})
