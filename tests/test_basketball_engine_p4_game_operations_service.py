@@ -144,6 +144,31 @@ def test_dispatch_foul_five_times_then_correct_foul_keeps_bonus_right() -> None:
     assert store.state["hoops"]["player_fouls"]["v4"] == 1
 
 
+def test_dispatch_violation_ruling_timeout_and_set_value() -> None:
+    # P5 addendum: these four actions were added after P4's own dispatch
+    # wiring landed -- confirms they're reachable through the same
+    # generic ACTIONS table, not just callable directly on the service.
+    store = _initialized_store()
+    service = _service(store)
+
+    violation = service.dispatch("violation", {"team": "home", "violationType": "traveling", "possessionTo": "visitor"})
+    assert violation.ok
+    assert store.state["possession"] == "visitor"
+
+    ruling = service.dispatch("ruling", {"scoreAdjustment": {"team": "home", "points": 2}})
+    assert ruling.ok
+    assert store.state["home_score"] == 2
+
+    timeout = service.dispatch("timeout", {"team": "home"})
+    assert timeout.ok
+    assert store.state["hoops"]["home_timeouts"] == 4
+
+    set_value = service.dispatch("set_value", {"field": "visitor_team_fouls", "value": 5})
+    assert set_value.ok
+    assert store.state["hoops"]["visitor_team_fouls"] == 5
+    assert store.state["hoops"]["home_bonus"] == "DOUBLE"
+
+
 def test_dispatch_confirm_game_end_sets_shared_status() -> None:
     store = _initialized_store()
     service = _service(store)

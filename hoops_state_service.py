@@ -104,6 +104,19 @@ _SHARED_CANONICAL_FIELDS: tuple[str, ...] = (
     "visitor_score",
 )
 
+# P5 addition: docs/BASKETBALL_ENGINE_SCOPING_PLAN.md Sec.2's
+# game_operations_service.ALLOWED_SET_FIELDS-equivalent for basketball
+# ("period, home_score, visitor_score, home_fouls, visitor_fouls,
+# shot_clock"), split by which namespace each field actually lives in --
+# see apply_set_value()'s own docstring for why this stays basketball's
+# own mechanism rather than an edit to the shared game_operations_service.py.
+_SETTABLE_SHARED_FIELDS: frozenset[str] = frozenset(
+    {"period", "clock_seconds", "home_score", "visitor_score"}
+)
+_SETTABLE_HOOPS_FIELDS: frozenset[str] = frozenset(
+    {"home_team_fouls", "visitor_team_fouls", "home_timeouts", "visitor_timeouts", "shot_clock_seconds"}
+)
+
 
 def default_shared_state() -> dict[str, Any]:
     """Defaults for the SHARED outer-state fields this module's
@@ -445,6 +458,81 @@ class HoopsStateFoundation:
             cls.set_possession(state, cls.opposite(team))
 
     @classmethod
+    def apply_violation(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
+        """payload: {team (charged with the violation), violationType,
+        playerId?, possessionTo}. P5 addition (Sec.5.1's "Violation | type
+        + team (traveling, 3-sec, backcourt, shot-clock, lane, etc.)").
+        violationType is recorded exactly as reported -- this interpreter
+        never derives a possession consequence from a hardcoded per-type
+        table (several types, e.g. goaltending/basket interference, award
+        points rather than simply turning the ball over, which is NOT
+        modeled here -- record that via a separate shot()/score event if
+        the ruling awards one); it applies only the possessionTo the
+        caller supplies, same "record the ruling" split as every other
+        event type."""
+        possession_to = str(payload.get("possessionTo", ""))
+        if possession_to in TEAMS:
+            cls.set_possession(state, possession_to)
+
+    @classmethod
+    def apply_ruling(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
+        """payload: {scoreAdjustment: {team, points}?, possessionTo?,
+        clockSecondsAdjustment?}. P5 addition: a general correction
+        mechanism for basketball, applied exactly as recorded -- no engine
+        judgment of the deserved outcome, same discipline as diamond_
+        state_service.apply_ruling(). Unlike baseball's own ruling (which
+        has a detailed base-award spec to mirror), basketball's engine has
+        no equivalent detailed ruling contract to draw from -- this is a
+        deliberately general {score, possession, clock} adjustment, not a
+        transcription of an existing spec section, and is documented as
+        such rather than presented as spec-derived."""
+        adjustment = payload.get("scoreAdjustment")
+        if isinstance(adjustment, Mapping) and adjustment.get("team") in TEAMS:
+            cls.score_points(state, str(adjustment["team"]), int(adjustment.get("points", 0)))
+        possession_to = payload.get("possessionTo")
+        if possession_to in TEAMS:
+            cls.set_possession(state, possession_to)
+        clock_adjustment = payload.get("clockSecondsAdjustment")
+        if clock_adjustment is not None:
+            state["clock_seconds"] = max(0, int(state.get("clock_seconds", 0)) + int(clock_adjustment))
+
+    @classmethod
+    def apply_timeout(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
+        """payload: {team}. P5 addition -- records that a timeout was
+        used. Calls the same use_timeout() primitive a live call would,
+        exactly once per event, so replay decrements the count exactly
+        once per TIMEOUT event, never twice."""
+        team = str(payload.get("team", ""))
+        if team in TEAMS:
+            cls.use_timeout(hoops, team)
+
+    @classmethod
+    def apply_set_value(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
+        """payload: {field, value, bonusRule?}. P5 addition: a manual,
+        auditable correction -- the basketball equivalent of football's
+        GameOperationsService.ALLOWED_SET_FIELDS, delivered as basketball's
+        own action rather than extending that shared, football-owned file
+        (whose set-mechanism assumes flat fields; several of basketball's
+        own settable fields are namespaced under state["hoops"], which the
+        shared file has no reason to know about -- same reasoning P4 used
+        to keep game_operations_service.py untouched). Recomputes the
+        OPPOSING team's bonus when a team-foul count is set directly,
+        using the bonusRule the caller (hoops_rules_service.set_value(),
+        which alone knows the active ruleset) already resolved -- same
+        split as apply_foul()."""
+        field = str(payload.get("field", ""))
+        value = payload.get("value")
+        if field in _SETTABLE_SHARED_FIELDS:
+            state[field] = value
+        elif field in _SETTABLE_HOOPS_FIELDS:
+            hoops[field] = value
+            if field in ("home_team_fouls", "visitor_team_fouls"):
+                bonus_rule = payload.get("bonusRule") or {}
+                if bonus_rule:
+                    team = "home" if field == "home_team_fouls" else "visitor"
+                    cls.set_bonus(hoops, cls.opposite(team), cls.bonus_for_fouls(int(value), bonus_rule))
+
+    @classmethod
     def apply_lineup_set(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
         """payload: {team, playerIds: [5 ids]}. hoops_lineup_service has
         already validated the count and disqualification-freedom before
@@ -534,6 +622,10 @@ class HoopsStateFoundation:
         "FOUL": "apply_foul",
         "HELD_BALL": "apply_held_ball",
         "TURNOVER": "apply_turnover",
+        "VIOLATION": "apply_violation",
+        "RULING": "apply_ruling",
+        "TIMEOUT": "apply_timeout",
+        "SET_VALUE": "apply_set_value",
         "LINEUP_SET": "apply_lineup_set",
         "SUBSTITUTION": "apply_substitution",
         "PERIOD_TRANSITION": "apply_period_transition",

@@ -80,6 +80,10 @@ ACTIONS: dict[str, Callable[..., Any]] = {
     "foul": HoopsRulesService.foul,
     "held_ball": HoopsRulesService.held_ball,
     "turnover": HoopsRulesService.turnover,
+    "violation": HoopsRulesService.violation,
+    "ruling": HoopsRulesService.ruling,
+    "timeout": HoopsRulesService.timeout,
+    "set_value": HoopsRulesService.set_value,
     "correct_foul": HoopsRulesService.correct_event_for_foul,
     "confirm_game_end": HoopsRulesService.confirm_game_end,
     # hoops_event_service (P2 -- undo/redo/correction boundary)

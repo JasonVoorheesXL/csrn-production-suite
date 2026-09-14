@@ -48,6 +48,32 @@ _FOUL_TYPES: tuple[str, ...] = (
 )
 _COUNTS_TOWARD_TEAM_FOULS: frozenset[str] = frozenset(_FOUL_TYPES) - {"technical"}
 
+# Sec.5.1's violation vocabulary. Recorded exactly as reported -- see
+# hoops_state_service.apply_violation()'s own docstring for why this
+# module never derives a possession consequence from the TYPE alone.
+VIOLATION_TYPES: tuple[str, ...] = (
+    "traveling", "carry", "double_dribble", "three_second",
+    "five_second", "ten_second_backcourt", "out_of_bounds",
+    "goaltending", "basket_interference", "kicked_ball",
+)
+
+# P5's set_value() -- see hoops_state_service._SETTABLE_SHARED_FIELDS/
+# _SETTABLE_HOOPS_FIELDS for the namespace split this mirrors. The caster
+# is applied here (the orchestration layer) rather than in the pure
+# interpreter, matching how foul()/shot() coerce their own payload types
+# before handing off to hoops_state_service.
+_SETTABLE_FIELDS: dict[str, type] = {
+    "period": str,
+    "clock_seconds": int,
+    "home_score": int,
+    "visitor_score": int,
+    "home_team_fouls": int,
+    "visitor_team_fouls": int,
+    "home_timeouts": int,
+    "visitor_timeouts": int,
+    "shot_clock_seconds": int,
+}
+
 
 @dataclass(frozen=True)
 class HoopsResult:
@@ -230,6 +256,76 @@ class HoopsRulesService:
         hoops = state.setdefault("hoops", {})
         HoopsStateFoundation.apply_turnover(state, hoops, payload)
         event = HoopsStateFoundation.append_event(hoops, "TURNOVER", payload)
+        return HoopsResult("OK", state, {"event": event})
+
+    @classmethod
+    def violation(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> HoopsResult:
+        """P5 addition (Sec.5.1 'Violation | type + team'). payload:
+        {team, violationType, playerId?, possessionTo}. violationType is
+        recorded exactly as reported; the possession consequence is
+        whatever the caller supplies in possessionTo -- see
+        hoops_state_service.apply_violation()'s own docstring for why a
+        scoring consequence (goaltending/basket interference) is
+        deliberately NOT derived here."""
+        violation_type = str(payload.get("violationType", ""))
+        if violation_type not in VIOLATION_TYPES:
+            raise ValueError(f"unknown violationType: {violation_type!r}")
+        hoops = state.setdefault("hoops", {})
+        HoopsStateFoundation.apply_violation(state, hoops, payload)
+        event = HoopsStateFoundation.append_event(hoops, "VIOLATION", payload)
+        return HoopsResult("OK", state, {"event": event})
+
+    @classmethod
+    def ruling(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> HoopsResult:
+        """P5 addition -- a general correction mechanism (see
+        hoops_state_service.apply_ruling()'s own docstring on why this is
+        deliberately general rather than a transcription of an existing
+        spec section). payload: {scoreAdjustment: {team, points}?,
+        possessionTo?, clockSecondsAdjustment?}."""
+        hoops = state.setdefault("hoops", {})
+        HoopsStateFoundation.apply_ruling(state, hoops, payload)
+        event = HoopsStateFoundation.append_event(hoops, "RULING", payload)
+        return HoopsResult("OK", state, {"event": event})
+
+    @classmethod
+    def timeout(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> HoopsResult:
+        """P5 addition (Sec.5.1 'Timeout | team, full/short'). payload:
+        {team}. This engine models timeouts as a single combined
+        remaining-count per team (see hoops_period_service.start_game()'s
+        own note on why full-vs-short isn't tracked separately) -- a
+        full/short distinction in the payload, if the caller sends one, is
+        for the operator's own record-keeping only and does not change
+        which counter is decremented."""
+        team = str(payload.get("team", ""))
+        hoops = state.setdefault("hoops", {})
+        messages = cls.validate_timeout(hoops, team) if team in ("home", "visitor") else []
+        if cls.has_hard_error(messages):
+            return HoopsResult("HARD_ERROR", state, {"messages": messages})
+        HoopsStateFoundation.apply_timeout(state, hoops, payload)
+        event = HoopsStateFoundation.append_event(hoops, "TIMEOUT", payload)
+        return HoopsResult("OK", state, {"event": event, "messages": messages})
+
+    @classmethod
+    def set_value(cls, state: dict[str, Any], field: str, value: Any) -> HoopsResult:
+        """P5 addition -- docs/BASKETBALL_ENGINE_SCOPING_PLAN.md Sec.2's
+        game_operations_service.ALLOWED_SET_FIELDS-equivalent, delivered
+        as basketball's own action (see hoops_state_service.
+        apply_set_value()'s own docstring for why this doesn't touch the
+        shared, football-owned game_operations_service.py). A manual,
+        auditable correction -- appended as its own SET_VALUE ledger
+        event, not a silent direct write, so it's visible in the same
+        undo/redo/replay history as everything else."""
+        if field not in _SETTABLE_FIELDS:
+            raise ValueError(f"field is not settable: {field!r}")
+        caster = _SETTABLE_FIELDS[field]
+        cast_value = None if value is None else caster(value)
+        hoops = state.setdefault("hoops", {})
+        payload: dict[str, Any] = {"field": field, "value": cast_value}
+        if field in ("home_team_fouls", "visitor_team_fouls"):
+            ruleset = cls.active_ruleset(state)
+            payload["bonusRule"] = dict(ruleset.get("fouls", {}).get("bonus_rule", {}))
+        HoopsStateFoundation.apply_set_value(state, hoops, payload)
+        event = HoopsStateFoundation.append_event(hoops, "SET_VALUE", payload)
         return HoopsResult("OK", state, {"event": event})
 
     @classmethod
