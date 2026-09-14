@@ -662,8 +662,11 @@ game-operation controls.
 
 ---
 
-*P0 through P5, plus this P2-followup round, done and merged to trunk.
-Governing design reference:
+*P0 through P5 done and merged to trunk. This P2-followup round
+(mercy-rule ledger fix, courtesy-runner de-gating, tiebreaker wiring,
+regulation-length override) is gated and committed on
+`baseball-engine-p2-followup-20260914`, pending merge -- not claimed
+"merged to trunk" here until it actually is. Governing design reference:
 `docs/CSRN_NFHS_Baseball_Softball_Rules_Engine_Spec_2026.docx`. P5b
 (self-service RulesProfile editor, §13) and P6 (MHSAA seed templates,
 owner handbook confirmation) remain not started.*
