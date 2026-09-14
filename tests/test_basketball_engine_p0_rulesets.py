@@ -6,8 +6,14 @@ ruleset_service machinery with zero code changes to the resolver itself
 Unlike baseball P0 (which shipped NFHS-generic only and deferred any MHSAA
 document to P6), this scoping doc's own P0 row calls for an MHSAA overlay
 to exist already -- its 3 flagged values (shot clock, bonus rule,
-timeouts) ship as unconfirmed placeholders carried via _source_notes, not
-omitted. See docs/BASKETBALL_ENGINE_SCOPING_PLAN.md Sec.4.2/8.1.
+timeouts) shipped as unconfirmed placeholders carried via _source_notes,
+not omitted. P6 (2026-09-13) resolved all three: shot_clock.enabled=false
+is now a permanent product decision (CSRN never runs a shot clock,
+regardless of MHSAA's actual rule), and bonus_rule/timeouts are settled as
+"use the NFHS-generic default, not independently confirmed for MHSAA" --
+see this document's own _source_notes for the exact reasoning on each.
+See docs/BASKETBALL_ENGINE_SCOPING_PLAN.md Sec.4.2/8.1 and the P6 phase-
+status entry.
 
 Football's own rulesets/catalog/behaviour are covered by test_ruleset_golden
 and must stay byte-identical; baseball's own documents are covered by
@@ -57,16 +63,18 @@ def test_basketball_us_nfhs_subvarsity_shortens_the_period_only() -> None:
         ) != "basketball/us-nfhs-subvarsity"
 
 
-def test_basketball_us_ms_mhsaa_extends_nfhs_with_unconfirmed_placeholders() -> None:
+def test_basketball_us_ms_mhsaa_extends_nfhs_with_settled_p6_values() -> None:
     resolved = ruleset_service.resolve(
         country="US", region="MS", association="MHSAA", sport="basketball"
     )
     assert resolved["id"] == "basketball/us-ms-mhsaa"
     assert "extends" not in resolved  # fully resolved
     assert resolved["jurisdiction"] == {"country": "US", "region": "MS", "association": "MHSAA"}
-    # Currently repeats the NFHS-generic values verbatim -- see the module
-    # docstring and this document's own _source_notes for why these are
-    # placeholders, not confirmed MHSAA facts.
+    # Repeats the NFHS-generic values verbatim -- as of P6 this is settled,
+    # not a placeholder: shot_clock.enabled=false is a permanent product
+    # decision, and bonus_rule/timeouts are deliberately NOT independently
+    # confirmed against MHSAA's own handbook (not worth chasing for a
+    # broadcast-only product). See this document's own _source_notes.
     assert resolved["shot_clock"]["enabled"] is False
     assert resolved["fouls"]["bonus_rule"]["type"] == "TWO_SHOT_ON_FIFTH_FOUL"
     assert resolved["timeouts"]["full"] == 3

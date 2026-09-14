@@ -343,16 +343,22 @@ builds sequence.
 | **P3** | Overlay-state serializer emitting the §7 keys (all already consumed by Phase C). | Payload drives a live basketball scorebug across all five themes with no theme change; bonus enum → badge mapping verified. |
 | **P4** | `routes/hoops_game_routes.py` blueprint (mirror `live_game_routes.py`). `engine_router` dispatch. `app.py` + `phase5_architecture.py` wiring. | Football + baseball + hockey routes untouched; architecture audit passes. |
 | **P5** | Operator UI: `templates/_hoops_controls.html` partial — shot / foul / FT / rebound / turnover / violation / sub / timeout entry, ruling workflow, manual set-value. `sport_families.ENGINE_READY += {"basketball"}`. | End-to-end: operator runs a full game from the UI; all five themes render it live (they already can). |
-| **P6** | MHSAA overlay values finalised once the owner confirms shot-clock stance / bonus rule / timeouts / classification against the current handbook; `_source_notes` cleared; handbook revision date stored. | Owner-confirmed; sub-varsity profile added if needed. |
+| **P6** | MHSAA overlay values finalised: no shot clock (permanent product decision, not a handbook lookup) + bonus rule/timeouts shipped on the NFHS-generic default (deliberately not independently confirmed for MHSAA); `_source_notes` updated to reflect both as settled, not open. | Owner-confirmed; no further handbook confirmation pending. |
 | **Later (not this engine)** | Play-by-play win-probability; shot-location / heat-map analytics; automated +/- attribution; lineup-plus-minus; possession-count / pace metrics. | — |
 
 ---
 
 ## 11. Open questions for review
 
-1. **Shot clock, bonus rule, timeouts** (§4.2) — owner to confirm MHSAA's
+1. ~~**Shot clock, bonus rule, timeouts** (§4.2) — owner to confirm MHSAA's
    current stance on all three against the handbook. P1 ships with the
-   NFHS baseline behind `_source_notes`; P6 finalises.
+   NFHS baseline behind `_source_notes`; P6 finalises.~~ **Resolved in P6
+   (2026-09-13), not by handbook lookup but by owner decision:** no shot
+   clock, ever (permanent product decision, independent of MHSAA's actual
+   rule); bonus rule and timeouts ship on the NFHS-generic default,
+   explicitly not independently confirmed for MHSAA and not worth chasing
+   for a broadcast-only product. See the P6 phase-status entry and this
+   ruleset's own `_source_notes`.
 2. **Sub-varsity scope** — is a middle-school / JV MHSAA basketball
    profile needed day one, or varsity-only first (baseball did varsity
    first, JV noted)?
@@ -796,9 +802,60 @@ builds sequence.
   - Full suite: 2942 passed (2927 + 15 new), 2 known-environmental
     failures, zero regressions.
 
+- **P6 — DONE (2026-09-13).** `rulesets/basketball/us-ms-mhsaa.json`
+  `_source_notes` only -- no ruleset *values* changed, since the P0
+  placeholders already happened to match what the owner decided to ship
+  (confirmed by direct comparison against `basketball/us-nfhs.json`
+  before touching anything: `shot_clock.enabled: false`,
+  `fouls.bonus_rule` (5th-foul/two-shot/quarter-scope), and `timeouts`
+  (3 full + 2 short, 1 carryover OT) were already byte-identical between
+  the two documents).
+  - **Two owner decisions closed out this phase, neither resolved by an
+    actual MHSAA handbook lookup:**
+    1. **No shot clock, ever** -- a permanent product decision, not
+       conditioned on MHSAA's actual on-court rule: running one
+       accurately live is operationally impractical for a broadcast
+       crew, and CSRN doesn't officiate the game. `_source_notes.
+       shot_clock.enabled` rewritten to say this plainly (`PERMANENT
+       PRODUCT DECISION`), replacing the old "P0 placeholder, needs
+       owner confirmation" language, so nobody revisits this later
+       thinking it's still open. The shot-clock state fields and the
+       overlay serializer's blank-when-off behavior (P3,
+       `test_shot_clock_is_blank_not_stale_zero_when_the_profile_has_
+       it_disabled`) are deliberately left in place, untouched, exactly
+       as instructed -- confirmed still passing, not ripped out just
+       because MHSAA will never turn it on.
+    2. **Bonus rule and timeouts ship on the NFHS-generic default,
+       not independently confirmed for MHSAA** -- the owner's call:
+       chasing the exact current MHSAA handbook wording isn't worth it
+       for a broadcast-only product that doesn't officiate. Both
+       `_source_notes` entries rewritten from "needs owner confirmation
+       against the current MHSAA handbook" to an explicit "using
+       NFHS-generic default, not independently confirmed for MHSAA --
+       revisit only if this ever turns out to matter for broadcast
+       accuracy," per the owner's own wording.
+  - `tests/test_basketball_engine_p0_rulesets.py`: module docstring and
+    `test_basketball_us_ms_mhsaa_extends_nfhs_with_unconfirmed_
+    placeholders` (renamed to `..._with_settled_p6_values`) updated to
+    stop describing these three values as open/unconfirmed -- the
+    assertions themselves were already correct (they check the
+    resolved numeric/structural values and `_source_notes` key
+    presence, never the note text), so only the framing needed fixing,
+    not the test logic.
+  - Section 11 (open questions) item 1 struck through with a resolution
+    note; the P6 phase-table row (Sec.10) updated to describe what was
+    actually decided instead of "pending owner confirmation against the
+    handbook."
+  - Full suite: 2942 passed, 2 known-environmental failures, zero
+    regressions (no behavioral code changed -- ruleset values were
+    already correct, only `_source_notes`/doc/test-comment text moved).
+
 ---
 
-*P0 through P5 done. P6 (MHSAA-specific numbers -- shot clock, bonus
-rule, timeouts -- finalized against the current handbook, replacing the
-`_source_notes` placeholders shipped since P0) is next, pending owner
-confirmation.*
+*P0 through P6 done, matching this phase's own original scope exactly
+(MHSAA shot-clock/bonus-rule/timeouts settled, `_source_notes` no longer
+describes them as pending). Next up, per the owner's own priority
+stated alongside P6: a UX friction investigation of the P5 operator UI
+(stat-entry speed -- taps/clicks per action, sensible defaults, on-floor-
+only player lists) to inform a redesign, not yet built pending that
+investigation's findings.*
