@@ -726,12 +726,15 @@ DEFAULT_STATE: dict[str, Any] = {
     "game_data_authority": "broadcaster",
     "statistician_enabled": False,
     "ticker_visible": True,
-    # "fast" == 189 px/s in csrn-production-theme-runtime.js tickerSpeed().
-    # "slow" (36 px/s) read as a crawl on broadcast; operators can still pick
-    # any preset from the Scroll Speed control. Existing broadcasts keep
-    # whatever value their saved state already has -- flip the control to
-    # change a game in progress.
-    "ticker_speed": "fast",
+    # "normal" == 76 px/s in csrn-production-theme-runtime.js tickerSpeed()
+    # (presets: very_slow 22 / slow 32 / normal 76 / fast 170). New broadcasts
+    # start on "normal"; operators can still pick any preset from the Scroll
+    # Speed control. Existing broadcasts keep whatever value their saved state
+    # already has (defaults are merged UNDER saved state) -- flip the control
+    # to change a game in progress. History: "slow" read as a crawl and was
+    # replaced by "fast" (2e825df); "fast" is now judged too quick, so the
+    # default is "normal".
+    "ticker_speed": "normal",
     "ticker_pause": 2,
     "production_type": "game",
     "lower_third": {
