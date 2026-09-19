@@ -934,3 +934,50 @@ def test_second_half_direction_controls_exist_in_both_consoles() -> None:
     assert "second_half_drive_direction" in _js_function(html, "periodAction") or "second_half_drive_direction" in html[
         html.index("async function periodAction(") : html.index("async function changeProgramVisual")
     ]
+
+
+# --- Item 9a: live play log shows the game clock -----------------------------
+#
+# The eventLog row showed only the wall-clock time the play was logged. It now
+# also shows the running game clock (M:SS from clock_seconds), gated on
+# clock_visible -- the operator's Show/Hide Clock switch. The gate reads the
+# value recorded WITH the event: in the real incident game the first plays were
+# logged with the clock hidden and frozen at 720, which must not render as 12:00.
+
+
+def test_events_carry_the_game_clock_and_its_visibility_the_log_reads() -> None:
+    g = _live_game(clock_visible=True, clock_seconds=512)
+    g.run("home", "LEFT 20", "LEFT 25")
+    after = g.store["events"][-1]["after"]
+    assert after["clock_seconds"] == 512 and after["clock_visible"] is True
+
+    g = _live_game(clock_visible=False, clock_seconds=720)
+    g.run("home", "LEFT 20", "LEFT 25")
+    after = g.store["events"][-1]["after"]
+    assert after["clock_seconds"] == 720 and after["clock_visible"] is False
+
+
+def test_recorded_clock_visibility_survives_an_edit_rebuild() -> None:
+    """bug 4b's recorded-field preservation is what keeps 'clock was hidden when
+    this play was logged' true after any later edit."""
+    g = _live_game(clock_visible=False, clock_seconds=720)
+    g.run("home", "LEFT 20", "LEFT 25")
+    g.store.update(clock_visible=True, clock_seconds=400)
+    g.run("home", "LEFT 25", "LEFT 29")
+    g.edit(0, yards=6)
+    flags = [(e["after"]["clock_visible"], e["after"]["clock_seconds"]) for e in g.store["events"]]
+    assert flags == [(False, 720), (True, 400)]
+
+
+def test_event_log_row_shows_the_gated_game_clock() -> None:
+    html = _index_html()
+    helper = _js_function(html, "eventClockText")
+    # gated on clock_visible: the event's recorded value, live flag only as a fallback
+    assert "a.clock_visible" in helper and "currentState?.clock_visible" in helper
+    assert "clock_seconds" in helper and "padStart(2,'0')" in helper
+    start = html.index("const eventLog=document.getElementById('eventLog')")
+    block = html[start : html.index("const confirmation=document.getElementById('eventConfirmation')", start)]
+    assert "eventClockText(ev)" in block
+    assert "<time>${period}" in block
+    # quarter is unchanged and still first
+    assert "const period=[quarter,eventClockText(ev)]" in block
