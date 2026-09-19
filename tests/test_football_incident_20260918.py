@@ -981,3 +981,48 @@ def test_event_log_row_shows_the_gated_game_clock() -> None:
     assert "<time>${period}" in block
     # quarter is unchanged and still first
     assert "const period=[quarter,eventClockText(ev)]" in block
+
+
+# --- Item 9b: live play log shows down & distance ----------------------------
+#
+# Down & distance after each play. There is NO per-broadcast "down & distance
+# enabled" setting in the codebase (only ball_spot_visible and the Layout
+# Builder's overlay-only game_fields visibility), so the only gate is the
+# engine's own convention -- a real down and a real distance; "Off"/empty is
+# not shown. eventDownDistanceEnabled() is the single place to repoint if a
+# real setting is added.
+
+
+def test_events_and_plays_carry_the_down_and_distance_the_log_reads() -> None:
+    g = _live_game()
+    g.run("home", "LEFT 20", "LEFT 25")  # 1st & 10, +5 -> 2nd & 5
+    event = g.store["events"][-1]
+    assert (event["after"]["down"], event["after"]["distance"]) == ("2nd", "5")
+    # Live plays carry no resulting_* fields -- event.after is the reliable
+    # source. Replayed plays (after an edit) do get them, so the row's fallback
+    # to the play's resulting_down/resulting_distance still covers those.
+    assert "resulting_down" not in g.store["plays"][-1]
+    g.edit(0, yards=6)
+    assert g.store["plays"][-1]["resulting_down"] == "2nd"
+    assert g.store["plays"][-1]["resulting_distance"] == "4"
+
+
+def test_kickoff_and_try_phases_record_off_which_the_log_hides() -> None:
+    state = _state()
+    C.enter_kickoff(state, "home")
+    assert (state["down"], state["distance"]) == ("Off", "Off")
+
+
+def test_event_log_row_shows_down_and_distance_after_the_play() -> None:
+    html = _index_html()
+    helper = _js_function(html, "eventDownDistanceText")
+    assert "a.down??play.resulting_down" in helper and "a.distance??play.resulting_distance" in helper
+    # a real down and a real distance only: "Off"/empty is hidden
+    assert "toLowerCase()==='off'" in helper
+    assert "eventDownDistanceEnabled()" in helper
+    assert "function eventDownDistanceEnabled(){return true}" in html  # no such setting exists yet
+    start = html.index("const eventLog=document.getElementById('eventLog')")
+    block = html[start : html.index("const confirmation=document.getElementById('eventConfirmation')", start)]
+    assert "eventDownDistanceText(ev)" in block and 'class="event-situation"' in block
+    # the clock (9a) and quarter are untouched
+    assert "const period=[quarter,eventClockText(ev)]" in block
