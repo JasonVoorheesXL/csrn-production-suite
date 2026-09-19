@@ -1194,7 +1194,16 @@ function productionDownDistance(runtime) {
   const distanceOff = !rawDistance || rawDistance.toLowerCase() === "off";
 
   const downDigits = rawDown.match(/\d+/)?.[0] || rawDown;
-  const distanceDigits = rawDistance.match(/\d+/)?.[0] || rawDistance;
+  let distanceDigits = rawDistance.match(/\d+/)?.[0] || rawDistance;
+
+  // Goal to go: the server serves distance "Goal" (state_service.runtime_view).
+  // The text stays "1st & Goal", but numeric LED cells cannot render it (the
+  // Stadium glyph set has no "A"), so they show the yards to the goal line.
+  const goalToGo = rawDistance.toLowerCase() === "goal";
+  if (goalToGo) {
+    const toGoal = Number(runtime.canonical_field_state?.yards_to_goal);
+    distanceDigits = Number.isFinite(toGoal) && toGoal > 0 ? String(toGoal) : "G";
+  }
 
   return {
     down: downOff ? "-" : downDigits,
@@ -1321,6 +1330,9 @@ function productionFieldState(source, gameSource = {}, canonicalField = {}) {
   const ball = parseFieldSpot(ballRaw, lengthYards);
   const drive = parseFieldSpot(driveRaw, lengthYards);
   const downDistance = productionDownDistance(source);
+  // downDistance.distance is already the yards to the goal line when it is
+  // goal to go (see productionDownDistance), so the first-down line lands on
+  // the goal line rather than collapsing onto the ball.
   const distance = Number(downDistance.distance);
   // distance is a yardage; convert to % of field width before offsetting.
   const distancePct = Number.isFinite(distance) ? (distance / lengthYards) * 100 : NaN;

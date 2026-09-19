@@ -125,9 +125,37 @@ class CanonicalStateFoundation:
         return max(0, min(length, int(to_goal)))
 
     @classmethod
+    def goal_to_go(cls, state: Mapping[str, Any]) -> bool:
+        """True when the line to gain is the goal line: the offense is no
+        farther from the goal than the distance it needs.
+
+        The boundary is inclusive -- 1st & 10 from the opponent's 10 is
+        "1st & Goal" -- and it matches the operator panel's own goal-to-go
+        readout. The stored ``distance`` stays numeric and authoritative
+        (first-down / down-advance math depends on it); this is derived
+        from ball_spot, direction and possession on every read so it can
+        never go stale after a manual spot correction or a change of ends.
+        """
+        if str(state.get("special_game_phase", "") or "").strip():
+            return False
+        down = str(state.get("down", "") or "").strip().lower()
+        if down in {"", "off"}:
+            return False
+        raw = str(state.get("distance", "") or "").strip()
+        to_goal = cls.yards_to_goal(state)
+        if raw.lower() == "goal":
+            return to_goal > 0
+        try:
+            distance = int(raw)
+        except ValueError:
+            return False
+        return 0 < to_goal <= distance
+
+    @classmethod
     def field_state(cls, state: Mapping[str, Any]) -> dict[str, Any]:
         roles = cls.team_roles(state)
         to_goal = cls.yards_to_goal(state)
+        goal_to_go = cls.goal_to_go(state)
         return {
             "ball_spot": str(state.get("ball_spot", "") or ""),
             "possession": roles.possessing_team,
@@ -135,6 +163,10 @@ class CanonicalStateFoundation:
             "defense": roles.defense,
             "down": str(state.get("down", "1st") or "1st"),
             "distance": str(state.get("distance", "10") or "10"),
+            "goal_to_go": goal_to_go,
+            "distance_display": (
+                "Goal" if goal_to_go else str(state.get("distance", "10") or "10")
+            ),
             "yards_to_goal": to_goal,
             "red_zone": 0 < to_goal <= cls._field_geometry(state).get("red_zone_yards", 20),
             "length_yards": cls._field_geometry(state).get("length_yards", 100),

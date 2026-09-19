@@ -463,6 +463,13 @@ class StateService:
 
         runtime["team_roles"] = CanonicalStateFoundation.team_roles(runtime).as_dict()
         runtime["canonical_field_state"] = CanonicalStateFoundation.field_state(runtime)
+        # On-air overlays render `distance` verbatim ("1st & 10"), so hand them
+        # the broadcast-correct "Goal" when the line to gain is the goal line.
+        # This view is overlay-only (the operator UI reads the public state),
+        # and the numeric value stays available as distance_yards.
+        if runtime["canonical_field_state"].get("goal_to_go"):
+            runtime["distance_yards"] = runtime.get("distance")
+            runtime["distance"] = "Goal"
         runtime["ticker_items"] = TickerPolicyService.build(source)
         runtime["runtime_view_schema"] = "csrn-runtime-state-v1"
         runtime["state_revision"] = current_revision(source)
