@@ -484,8 +484,24 @@ class RulesService:
                     "sacker",
                     "kicker",
                     "returner",
+                    "recoverer",
                 )
             }
+            # Own-team fumble recovery: the carrier fumbles and a *teammate*
+            # recovers (no turnover). Possession and the ball never change
+            # hands, but credit for the yardage from the recovery spot on -- and
+            # any touchdown -- belongs to the recoverer, not the original
+            # carrier. Only meaningful on a live run/pass that ended in a
+            # normal result; a lost fumble already has its own returner fields.
+            handler_number = numbers["receiver"] if kind == "pass" else numbers["player"]
+            own_recovery = bool(
+                kind in {"run", "pass"}
+                and bool(incoming.get("fumble"))
+                and not bool(incoming.get("fumble_lost"))
+                and outcome not in {"incomplete", "spike", "interception"}
+                and numbers["recoverer"]
+                and numbers["recoverer"] != handler_number
+            )
             refs = {
                 "player": self._resolve(state, team, numbers["player"]),
                 "passer": self._resolve(state, team, numbers["passer"]),
@@ -501,6 +517,7 @@ class RulesService:
                     self.opposite(team),
                     numbers["returner"],
                 ),
+                "recoverer": self._resolve(state, team, numbers["recoverer"]),
             }
             # Server-side player/team validation is authoritative. A jersey sent
             # for an offensive/defensive role must resolve on the canonical team
@@ -515,6 +532,8 @@ class RulesService:
                     required_roles.append("receiver")
                 if outcome == "sack" and numbers["sacker"]:
                     required_roles.append("sacker")
+            if own_recovery:
+                required_roles.append("recoverer")
             for role in required_roles:
                 permitted_team = roles.defense if role == "sacker" else roles.offense
                 ref = refs[role]
@@ -730,6 +749,19 @@ class RulesService:
                         detail=f"{return_yards}-yard {kind} return",
                     )
 
+            recovery_yards = 0
+            recovery_spot_text = ""
+            if own_recovery and not turnover:
+                recovery_value = incoming.get("recovery_spot")
+                recovery_coord = self.spot_to_coord(
+                    recovery_value if recovery_value not in (None, "") else end, state)
+                # Yards gained from where the teammate recovered it to the end
+                # of the play; the carrier keeps (yards - recovery_yards).
+                recovery_yards = (end - recovery_coord) * direction
+                recovery_spot_text = self.coord_to_spot(recovery_coord, state)
+            else:
+                own_recovery = False
+
             if kind in {"run", "pass"}:
                 if turnover:
                     state["possession"] = turnover_team
@@ -782,6 +814,8 @@ class RulesService:
                     self._stop_clock(state)
                     is_pass_reception = kind == "pass" and outcome == "complete"
                     td_role = "receiver" if is_pass_reception else "player"
+                    if own_recovery:
+                        td_role = "recoverer"
                     td_number = numbers[td_role]
                     td_name = names[td_role]
                     self._show_player_spotlight(
@@ -792,7 +826,9 @@ class RulesService:
                         player_ref=refs[td_role],
                         position="",
                         detail=(
-                            f"{yards}-yard touchdown "
+                            f"{recovery_yards}-yard touchdown after fumble recovery"
+                            if own_recovery
+                            else f"{yards}-yard touchdown "
                             + ("reception" if kind == "pass" else "run")
                         ),
                         # Only a pass-reception touchdown has a separate QB to
@@ -800,7 +836,9 @@ class RulesService:
                         # turnover-return branches (their own
                         # _show_player_spotlight() calls above) have no
                         # passer role at all.
-                        passer_name=names["passer"] if is_pass_reception else "",
+                        passer_name=(
+                            names["passer"] if is_pass_reception and not own_recovery else ""
+                        ),
                     )
                 elif safety:
                     other = self.opposite(team)
@@ -880,6 +918,11 @@ class RulesService:
                 description += ", fumble" + (
                     " lost" if bool(incoming.get("fumble_lost")) else " recovered"
                 )
+                if own_recovery:
+                    description += (
+                        f" by {self._display(numbers['recoverer'], names['recoverer'])}"
+                        f" at {recovery_spot_text}"
+                    )
                 if bool(incoming.get("fumble_lost")):
                     recoverer = self._display(numbers["returner"], names["returner"]) if numbers["returner"] or names["returner"] else self._team_fallback(state, self.opposite(team))
                     description += f", recovered by {recoverer} at {self.coord_to_spot(turnover_spot, state)}"
@@ -910,6 +953,8 @@ class RulesService:
                 if turnover_touchdown
                 else numbers["returner"]
                 if touchdown and kind in {"kickoff", "punt"}
+                else numbers["recoverer"]
+                if touchdown and own_recovery
                 else numbers["receiver"]
                 if kind == "pass" and outcome == "complete"
                 else numbers["player"]
@@ -919,6 +964,8 @@ class RulesService:
                 if turnover_touchdown
                 else names["returner"]
                 if touchdown and kind in {"kickoff", "punt"}
+                else names["recoverer"]
+                if touchdown and own_recovery
                 else names["receiver"]
                 if kind == "pass" and outcome == "complete"
                 else names["player"]
@@ -970,6 +1017,10 @@ class RulesService:
                         else names["returner"] if turnover else ""
                     ),
                     "muffed_punt": muffed_punt,
+                    "recoverer_number": numbers["recoverer"] if own_recovery else "",
+                    "recoverer_name": names["recoverer"] if own_recovery else "",
+                    "recovery_spot": recovery_spot_text,
+                    "recovery_yards": recovery_yards if own_recovery else 0,
                     "touchdown": touchdown,
                     "safety": safety,
                     "player_name": (
@@ -1044,6 +1095,10 @@ class RulesService:
                 ),
                 "safety": safety,
                 "muffed_punt": muffed_punt,
+                "recoverer_number": numbers["recoverer"] if own_recovery else "",
+                "recoverer_name": names["recoverer"] if own_recovery else "",
+                "recovery_spot": recovery_spot_text,
+                "recovery_yards": recovery_yards if own_recovery else 0,
                 "notes": str(incoming.get("notes", "")),
                 "created_by": "statistician",
                 "created_at": created_at,

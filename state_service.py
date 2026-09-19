@@ -609,6 +609,7 @@ class StateService:
             ("kicker", offense),
             ("returner", defense),
             ("sacker", defense),
+            ("recoverer", offense),
         )
         if self._resolve_player is not None:
             for role, team_key in role_specs:
@@ -629,6 +630,11 @@ class StateService:
                 f"#{play['player_number']} {play['player_name']} "
                 f"{suffix} for {yards} yards"
             )
+            if play.get("recoverer_number") and play.get("fumble") and not play.get("fumble_lost"):
+                play["result"] += (
+                    f", fumble recovered by #{play['recoverer_number']}"
+                    + (f" {play['recoverer_name']}" if play.get("recoverer_name") else "")
+                )
             if play.get("touchdown"):
                 play["result"] += ", touchdown"
             elif play.get("first_down"):

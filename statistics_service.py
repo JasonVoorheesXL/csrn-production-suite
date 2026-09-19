@@ -190,6 +190,7 @@ class StatisticsService:
             "interceptions": 0,
             "defensive_interceptions": 0,
             "fumble_recoveries": 0,
+            "own_fumble_recoveries": 0,
             "muff_recoveries": 0,
             "turnover_return_yards": 0,
             "sacks": 0,
@@ -397,14 +398,38 @@ class StatisticsService:
                 passer = player_row(offense, play.get("passer_name", ""), play.get("passer_number", ""))
                 receiver = None
 
+                # Own-team fumble recovery: a teammate recovers the carrier's
+                # fumble (no turnover). The play stays one play for team
+                # totals, but yardage from the recovery spot on -- and any
+                # touchdown -- is credited to the recoverer; the carrier keeps
+                # the yards up to the fumble. recovery_yards is stored on the
+                # play; the carrier's share is derived so a later yardage edit
+                # keeps every player row reconciled with the team total.
+                recoverer = None
+                recovery_yards = 0
+                if (
+                    play.get("fumble")
+                    and not play.get("fumble_lost")
+                    and (play.get("recoverer_number") or play.get("recoverer_name"))
+                ):
+                    recoverer = player_row(offense, play.get("recoverer_name", ""), play.get("recoverer_number", ""))
+                    if recoverer is not None:
+                        recovery_yards = self._safe_int(play.get("recovery_yards", 0))
+                        recoverer["own_fumble_recoveries"] += 1
+                carrier_yards = yards - recovery_yards
+
                 if kind == "run":
                     teams[offense]["rushing_attempts"] += 1
                     teams[offense]["rushing_yards"] += yards
                     if ball_carrier is not None:
                         ball_carrier["rushing_attempts"] += 1
-                        ball_carrier["rushing_yards"] += yards
-                        if play_touchdown:
+                        ball_carrier["rushing_yards"] += carrier_yards
+                        if play_touchdown and recoverer is None:
                             ball_carrier["rushing_touchdowns"] += 1
+                    if recoverer is not None:
+                        recoverer["rushing_yards"] += recovery_yards
+                        if play_touchdown:
+                            recoverer["rushing_touchdowns"] += 1
                 else:
                     outcome = str(play.get("pass_outcome") or linked_automation.get("pass_outcome") or "complete").lower()
                     if outcome == "complete":
@@ -438,10 +463,15 @@ class StatisticsService:
                             passer["passing_yards"] += yards
                         if receiver is not None:
                             receiver["receptions"] += 1
-                            receiver["receiving_yards"] += yards
-                            if play_touchdown:
+                            receiver["receiving_yards"] += carrier_yards
+                            if play_touchdown and recoverer is None:
                                 receiver["receiving_touchdowns"] += 1
-                        if play_touchdown and passer is not None:
+                        if recoverer is not None:
+                            recoverer["receiving_yards"] += recovery_yards
+                            if play_touchdown:
+                                recoverer["receiving_touchdowns"] += 1
+                        # No touchdown pass when a teammate recovered the fumble and scored.
+                        if play_touchdown and passer is not None and recoverer is None:
                             passer["passing_touchdowns"] += 1
                     elif outcome == "interception":
                         teams[offense]["interceptions"] += 1
@@ -461,7 +491,9 @@ class StatisticsService:
                 play_id = str(play.get("play_id", "") or "")
                 if play_touchdown and play_id not in touchdown_play_ids:
                     teams[offense]["touchdowns"] += 1
-                    td_player = receiver if kind == "pass" else ball_carrier
+                    td_player = recoverer if recoverer is not None else (
+                        receiver if kind == "pass" else ball_carrier
+                    )
                     if td_player is not None:
                         td_player["touchdowns"] += 1
 

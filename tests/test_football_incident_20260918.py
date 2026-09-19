@@ -293,7 +293,7 @@ def test_overlay_js_renders_goal_text_and_led_yards() -> None:
 # field. Period transitions append no event, so rebuild() had nothing to replay.
 
 
-def _live_game(**patch):
+def _live_game(resolve=None, **patch):
     import copy
     import itertools
     import threading
@@ -332,7 +332,7 @@ def _live_game(**patch):
     rules = RulesService(
         load_state=load, save_state=save, push_history=lambda s: None,
         source_allowed=lambda s, src: True, locked_payload=lambda s: s,
-        resolve_player=lambda s, t, n: {}, show_player_graphic=lambda *a, **k: None,
+        resolve_player=resolve or (lambda s, t, n: {}), show_player_graphic=lambda *a, **k: None,
         transaction_lock=threading.Lock(), now=lambda: next(tick),
     )
     events = EventService(
@@ -506,3 +506,225 @@ def test_play_direction_prefers_the_event_snapshot_and_falls_back_to_live() -> N
     assert "ev?.before?.[team+'_direction']" in helper
     # legacy events without a recorded direction still resolve (live direction)
     assert "currentState?.[team+'_direction']" in helper
+
+
+# --- Bug 6: fumble recovered by a teammate -----------------------------------
+#
+# Caleb Lang (#7) fumbled, teammate Medcalf (#22) recovered and ran it in. Not
+# a turnover -- Caledonia kept the ball -- but the play form had no way to
+# credit anyone except the single ball carrier. `recoverer_number` /
+# `recovery_spot` are the new optional fields; yardage from the recovery spot
+# on, and any touchdown, belong to the recoverer.
+
+ROSTERS = {("home", "7"): "Caleb Lang", ("home", "22"): "Medcalf", ("home", "11"): "Wide Out",
+           ("home", "12"): "Passer", ("visitor", "22"): "Visitor Twenty-Two"}
+
+
+def _resolver(state, team, number):
+    name = ROSTERS.get((team, str(number)))
+    if not name:
+        return {"resolved": False, "number": str(number)}
+    return {"resolved": True, "number": str(number), "name": name, "player_id": f"{team}-{number}"}
+
+
+def _lang_medcalf(**extra):
+    """Home ball at LEFT 30. Lang (#7) runs to LEFT 40 and fumbles; Medcalf (#22)
+    recovers there and returns it to the right goal line for a touchdown."""
+    g = _live_game(resolve=_resolver, ball_spot="LEFT 30")
+    payload = {
+        "team": "home", "play_type": "run", "start_spot": "LEFT 30", "end_spot": "RIGHT GOAL",
+        "player_number": "7", "fumble": True, "fumble_lost": False,
+        "recoverer_number": "22", "recovery_spot": "LEFT 40",
+    }
+    payload.update(extra)
+    result = g.rules.play(payload)
+    assert result.ok, result.code
+    return g, result.data["play"]
+
+
+def test_own_recovery_touchdown_is_credited_to_the_recoverer_without_a_turnover() -> None:
+    g, play = _lang_medcalf()
+    s = g.store
+    assert play["turnover"] is False and play["turnover_type"] == ""
+    assert s["possession"] == "home" and s["home_score"] == 6
+    assert s["special_game_phase"] == "pending_try"
+    assert (play["recoverer_number"], play["recoverer_name"]) == ("22", "Medcalf")
+    assert play["recovery_spot"] == "LEFT 40"
+    assert play["yards"] == 70 and play["recovery_yards"] == 60
+    # the ball carrier field is untouched -- it is still Lang's play
+    assert (play["player_number"], play["player_name"]) == ("7", "Caleb Lang")
+    assert "fumble recovered by #22 Medcalf at LEFT 40" in play["result"]
+    assert play["result"].endswith("touchdown")
+
+
+def test_own_recovery_touchdown_scorer_on_the_event_is_the_recoverer() -> None:
+    g, _play = _lang_medcalf()
+    automation = g.store["events"][-1]["automation"]
+    assert (automation["player_number"], automation["player_name"]) == ("22", "Medcalf")
+    assert (automation["recoverer_number"], automation["recovery_yards"]) == ("22", 60)
+    assert automation["touchdown"] is True
+
+
+def _report(game):
+    from statistics_service import StatisticsService
+
+    state = dict(game.store)
+    return StatisticsService().report(state).data["statistics"]
+
+
+def _player(report, number):
+    return next(p for p in report["players"] if p["number"] == number)
+
+
+def test_statistics_split_the_yardage_and_credit_the_touchdown_to_the_recoverer() -> None:
+    g, _play = _lang_medcalf()
+    report = _report(g)
+    lang, medcalf = _player(report, "7"), _player(report, "22")
+
+    assert (lang["rushing_attempts"], lang["rushing_yards"]) == (1, 10)
+    assert lang["fumbles"] == 1 and lang["fumbles_lost"] == 0
+    assert lang["touchdowns"] == 0 and lang["rushing_touchdowns"] == 0
+
+    assert (medcalf["rushing_attempts"], medcalf["rushing_yards"]) == (0, 60)
+    assert medcalf["rushing_touchdowns"] == 1 and medcalf["touchdowns"] == 1
+    assert medcalf["points"] == 6
+    assert medcalf["own_fumble_recoveries"] == 1
+
+    home = report["teams"]["home"]
+    assert home["rushing_yards"] == 70 and home["rushing_attempts"] == 1
+    assert home["touchdowns"] == 1  # counted once, not once per player
+    assert home["turnovers_gained"] == 0 and report["teams"]["visitor"]["turnovers_gained"] == 0
+    assert report["reconciliation"]["all_reconciled"] is True
+
+
+def test_recovery_without_a_spot_credits_the_touchdown_but_no_yardage() -> None:
+    g, play = _lang_medcalf(recovery_spot="")
+    assert play["recovery_yards"] == 0 and play["recovery_spot"] == "RIGHT GOAL"
+    report = _report(g)
+    lang, medcalf = _player(report, "7"), _player(report, "22")
+    assert lang["rushing_yards"] == 70 and medcalf["rushing_yards"] == 0
+    assert medcalf["touchdowns"] == 1 and lang["touchdowns"] == 0
+
+
+def test_a_recovery_that_gains_nothing_after_a_real_fumble_keeps_totals_reconciled() -> None:
+    g = _live_game(resolve=_resolver, ball_spot="LEFT 30")
+    result = g.rules.play({
+        "team": "home", "play_type": "run", "start_spot": "LEFT 30", "end_spot": "LEFT 38",
+        "player_number": "7", "fumble": True, "recoverer_number": "22", "recovery_spot": "LEFT 36",
+    })
+    assert result.ok
+    report = _report(g)
+    assert (_player(report, "7")["rushing_yards"], _player(report, "22")["rushing_yards"]) == (6, 2)
+    assert report["teams"]["home"]["rushing_yards"] == 8
+    assert report["reconciliation"]["rushing_reconciled"] is True
+    assert (g.store["down"], g.store["distance"], g.store["ball_spot"]) == ("2nd", "2", "LEFT 38")
+
+
+def test_a_plain_fumble_with_no_recoverer_still_credits_the_carrier() -> None:
+    g = _live_game(resolve=_resolver, ball_spot="LEFT 30")
+    result = g.rules.play({
+        "team": "home", "play_type": "run", "start_spot": "LEFT 30", "end_spot": "RIGHT GOAL",
+        "player_number": "7", "fumble": True,
+    })
+    play = result.data["play"]
+    assert play["recoverer_number"] == "" and play["recovery_yards"] == 0
+    report = _report(g)
+    assert _player(report, "7")["rushing_touchdowns"] == 1
+    assert "recovered by #" not in play["result"]
+
+
+def test_recoverer_equal_to_the_carrier_is_ignored() -> None:
+    g, play = _lang_medcalf(recoverer_number="7")
+    assert play["recoverer_number"] == "" and play["recovery_yards"] == 0
+    assert _player(_report(g), "7")["rushing_touchdowns"] == 1
+
+
+def test_a_lost_fumble_ignores_the_recoverer_field() -> None:
+    g = _live_game(resolve=_resolver, ball_spot="LEFT 30")
+    result = g.rules.play({
+        "team": "home", "play_type": "run", "start_spot": "LEFT 30", "end_spot": "LEFT 34",
+        "player_number": "7", "fumble": True, "fumble_lost": True,
+        "recoverer_number": "22", "turnover_spot": "LEFT 34", "returner_number": "22",
+    })
+    assert result.ok
+    play = result.data["play"]
+    assert play["turnover"] is True and play["turnover_team"] == "visitor"
+    assert play["recoverer_number"] == "" and play["recovery_yards"] == 0
+    assert g.store["possession"] == "visitor"
+
+
+def test_recoverer_must_be_on_the_offense() -> None:
+    """#22 exists on both rosters here; a number that only resolves on the
+    defence (visitor #22 under a home play, with no home #22) is rejected the
+    same way the other offensive roles are."""
+    only_visitor = {("home", "7"): "Caleb Lang", ("visitor", "22"): "Visitor Twenty-Two"}
+
+    def resolver(state, team, number):
+        name = only_visitor.get((team, str(number)))
+        return {"resolved": bool(name), "number": str(number), "name": name or "", "player_id": ""}
+
+    g = _live_game(resolve=resolver, ball_spot="LEFT 30")
+    result = g.rules.play({
+        "team": "home", "play_type": "run", "start_spot": "LEFT 30", "end_spot": "LEFT 40",
+        "player_number": "7", "fumble": True, "recoverer_number": "22", "recovery_spot": "LEFT 35",
+    })
+    assert result.code == "PLAYER_TEAM_MISMATCH"
+    assert result.data["role"] == "recoverer"
+    assert g.store["events"] == []  # nothing recorded
+
+
+def test_pass_fumble_recovered_by_a_teammate_splits_receiving_yards_and_the_td() -> None:
+    g = _live_game(resolve=_resolver, ball_spot="LEFT 30")
+    result = g.rules.play({
+        "team": "home", "play_type": "pass", "pass_outcome": "complete",
+        "start_spot": "LEFT 30", "end_spot": "RIGHT GOAL",
+        "passer_number": "12", "receiver_number": "11", "fumble": True,
+        "recoverer_number": "22", "recovery_spot": "50",
+    })
+    assert result.ok, result.code
+    play = result.data["play"]
+    assert (play["yards"], play["recovery_yards"]) == (70, 50)
+    report = _report(g)
+    passer, receiver, medcalf = _player(report, "12"), _player(report, "11"), _player(report, "22")
+    assert passer["passing_yards"] == 70 and passer["completions"] == 1
+    assert passer["passing_touchdowns"] == 0  # not a touchdown pass
+    assert (receiver["receptions"], receiver["receiving_yards"]) == (1, 20)
+    assert (medcalf["receiving_yards"], medcalf["receiving_touchdowns"], medcalf["touchdowns"]) == (50, 1, 1)
+    assert report["teams"]["home"]["receiving_yards"] == 70
+    assert report["reconciliation"]["all_reconciled"] is True
+
+
+def test_a_yardage_edit_keeps_the_recoverers_share_and_reconciles() -> None:
+    g, _play = _lang_medcalf()
+    g.store["special_game_phase"] = ""  # the edit path replays plays; keep the scenario simple
+    report_before = _report(g)
+    assert report_before["reconciliation"]["rushing_reconciled"] is True
+    g.store["plays"][0]["yards"] = 72  # what edit() writes
+    report = _report(g)
+    assert (_player(report, "7")["rushing_yards"], _player(report, "22")["rushing_yards"]) == (12, 60)
+    assert report["reconciliation"]["rushing_reconciled"] is True
+
+
+def test_enriched_play_text_keeps_the_recovery_visible() -> None:
+    from state_service import StateService
+
+    g, _play = _lang_medcalf()
+    service = StateService(load_raw=lambda: dict(g.store), replace_raw=lambda s: dict(s),
+                           default_state=lambda: {}, resolve_player=_resolver)
+    public = service.public(dict(g.store)).data["state"]
+    text = public["plays"][-1]["result"]
+    assert "fumble recovered by #22 Medcalf" in text and text.endswith("touchdown")
+
+
+def test_play_form_exposes_the_recovered_by_field() -> None:
+    html = _index_html()
+    assert 'id="playRecoverer"' in html and 'id="playRecovererWrap"' in html
+    submit = _js_function(html, "submitPlayEntry") if "function submitPlayEntry(" in html else html[
+        html.index("async function submitPlayEntry") :
+    ]
+    assert "recoverer_number:ownFumbleRecovery()" in submit
+    assert "recovery_spot:ownFumbleRecovery()" in submit
+    helper = _js_function(html, "ownFumbleRecovery")
+    # shown for Fumble checked and Fumble lost NOT checked, on run/pass only
+    assert "playFumble').checked&&!document.getElementById('playFumbleLost').checked" in helper
+    assert "kind!=='run'&&kind!=='pass'" in helper
