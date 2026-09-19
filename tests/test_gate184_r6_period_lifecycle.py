@@ -37,11 +37,15 @@ def base_state(**patch):
     return state
 
 
-def test_q1_to_q2_preserves_series_and_physical_spot_but_reverses_direction():
+def test_q1_to_q2_preserves_series_and_relative_spot_but_reverses_direction():
+    # Teams change ends, so the screen-fixed LEFT/RIGHT spot mirrors (LEFT 34
+    # -> RIGHT 34): same yard line relative to the teams, same series.
+    # (Incident FB-2026-5A-W04-001: this used to stay LEFT 34 and operators
+    # fixed it by hand at every quarter break.)
     r = PeriodService.transition(base_state(), "end_quarter")
     assert r.ok
     s = r.state
-    assert (s["quarter"], s["down"], s["distance"], s["ball_spot"], s["possession"]) == ("2", "2nd", "6", "LEFT 34", "home")
+    assert (s["quarter"], s["down"], s["distance"], s["ball_spot"], s["possession"]) == ("2", "2nd", "6", "RIGHT 34", "home")
     assert (s["home_direction"], s["visitor_direction"]) == ("left", "right")
     assert s["clock_seconds"] == 720 and not s["clock_running"]
 
@@ -51,7 +55,7 @@ def test_q3_to_q4_has_same_period_reset_contract():
     s = r.state
     assert s["quarter"] == "4" and s["clock_seconds"] == 720
     assert (s["home_direction"], s["visitor_direction"]) == ("right", "left")
-    assert s["ball_spot"] == "LEFT 34" and s["down"] == "2nd"
+    assert s["ball_spot"] == "RIGHT 34" and s["down"] == "2nd"
 
 
 def test_q2_end_enters_halftime_without_carrying_directly_into_q3():

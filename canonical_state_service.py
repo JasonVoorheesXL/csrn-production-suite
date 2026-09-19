@@ -224,6 +224,30 @@ class CanonicalStateFoundation:
             return str(mid)
         return f"LEFT {value}" if value < mid else f"RIGHT {length - value}"
 
+    @classmethod
+    def mirror_spot(cls, spot: Any, state: Mapping[str, Any] | None = None) -> Any:
+        """Reflect a ball spot across midfield (coord -> length - coord).
+
+        ball_spot is a screen-fixed LEFT/RIGHT label. When the teams change
+        ends the ball keeps its position *relative to the teams* (same yard
+        line, same series), which in that fixed frame is the mirror image:
+        "LEFT 40" becomes "RIGHT 40", LEFT GOAL <-> RIGHT GOAL, midfield
+        stays put. That also keeps yards_to_goal() unchanged across the swap.
+
+        An empty or unrecognisable spot is returned untouched rather than
+        silently replaced with midfield.
+        """
+        text = str(spot or "").strip()
+        if not text:
+            return spot
+        length = cls._field_length(state)
+        mid = length // 2
+        coord = cls._spot_to_coord(text, state)
+        if coord == mid and text.upper() not in {str(mid), "MIDFIELD"}:
+            # _spot_to_coord falls back to midfield for text it cannot parse.
+            return spot
+        return cls._coord_to_spot(length - coord, state)
+
 
     # Down cycle / field spots / geometry / point values are all resolved
     # from the active football ruleset (ruleset_service.active_ruleset), and

@@ -67,6 +67,14 @@ class PeriodService:
         visitor = str(state.get("visitor_direction", "left") or "left").lower()
         state["home_direction"] = "left" if home == "right" else "right"
         state["visitor_direction"] = "left" if visitor == "right" else "right"
+        # Teams change ends but the ball keeps its position relative to them
+        # (same yard line, same series), so the screen-fixed LEFT/RIGHT spot
+        # must mirror with the directions or every quarter break leaves it on
+        # the wrong side of the field for the operator to fix by hand.
+        if state.get("ball_spot"):
+            state["ball_spot"] = CanonicalStateFoundation.mirror_spot(
+                state["ball_spot"], state
+            )
 
     @classmethod
     def _stop_clock(cls, state: dict[str, Any], *, reset: bool = False) -> None:
