@@ -651,7 +651,8 @@
 
       <section class="panel compact utility-row live-operator-controls">
         <button id="scorebugToggle" class="success" onclick="toggleScorebug()">Show Scorebug</button>
-        <button id="halftimeToggle" class="warning" onclick="toggleHalftime()">Start Halftime</button>
+        <button id="halftimeToggle" class="warning" onclick="toggleHalftime('broadcaster')">Start Halftime</button>
+        <label class="second-half-direction" title="Applied when the second half starts. The second-half receiving team's drive direction is a fresh choice, like the coin toss.">2nd-half kickoff direction <select id="broadcasterSecondHalfDirection"><option value="">Mirror first half (default)</option><option value="right">Receiver drives → RIGHT</option><option value="left">Receiver drives ← LEFT</option></select></label>
         <button class="danger" onclick="endGame()">End Game</button>
       </section>
 
@@ -1757,7 +1758,7 @@
         <section class="rules-control-grid">
           <article class="rules-card"><h2>Drive Direction</h2><p class="section-note">Select the direction the team with possession is driving.</p><div class="button-row drive-direction-buttons"><button id="driveDirLeft" onclick="setDriveDirection('left')">←</button><button id="driveDirRight" onclick="setDriveDirection('right')">→</button></div></article>
           <article class="rules-card"><h2>Game Context</h2><div id="rulesContext" class="rules-context">Set possession, down, distance and ball spot.</div></article>
-          <article class="rules-card" id="periodAdministrationCard"><h2>Period Administration</h2><div class="button-row"><button id="statHalftimeToggle" class="warning" onclick="toggleHalftime()">Start Halftime</button></div><div id="periodStatus" class="rules-context">Quarter lifecycle ready.</div><div class="setup-grid"><label>Second-half receiving team<select id="secondHalfReceiver"><option value="">Auto / Select</option><option value="home">Home</option><option value="visitor">Visitor</option></select></label><label>Overtime possession<select id="overtimePossession"><option value="">Select</option><option value="home">Home</option><option value="visitor">Visitor</option></select></label><label class="span-2">Overtime starting spot<input id="overtimeSpot" placeholder="Association-approved spot, e.g. Visitor 10"></label></div><h3>Correct Quarter</h3><div id="periodQuarterButtons" class="button-row statistician-state-buttons"><button data-value="1" onclick="setStateFrom('quarter','1','statistician')">1</button><button data-value="2" onclick="setStateFrom('quarter','2','statistician')">2</button><button data-value="3" onclick="setStateFrom('quarter','3','statistician')">3</button><button data-value="4" onclick="setStateFrom('quarter','4','statistician')">4</button><button data-value="OT" onclick="setStateFrom('quarter','OT','statistician')">OT</button></div><div class="button-row"><button class="warning" onclick="periodAction('end_quarter')">End Quarter</button><button onclick="periodAction('start_second_half')">Start Second Half</button><button onclick="periodAction('clear_untimed_down')">Untimed Down Complete</button><button onclick="periodAction('start_overtime')">Start Overtime</button><button class="danger" onclick="periodAction('final_game')">Confirm Final</button></div></article>
+          <article class="rules-card" id="periodAdministrationCard"><h2>Period Administration</h2><div class="button-row"><button id="statHalftimeToggle" class="warning" onclick="toggleHalftime('statistician')">Start Halftime</button></div><div id="periodStatus" class="rules-context">Quarter lifecycle ready.</div><div class="setup-grid"><label>Second-half receiving team<select id="secondHalfReceiver"><option value="">Auto / Select</option><option value="home">Home</option><option value="visitor">Visitor</option></select></label><label>Second-half receiving team drives<select id="secondHalfDirection"><option value="">Mirror first half (default)</option><option value="right">Receiver drives → RIGHT</option><option value="left">Receiver drives ← LEFT</option></select></label><label>Overtime possession<select id="overtimePossession"><option value="">Select</option><option value="home">Home</option><option value="visitor">Visitor</option></select></label><label class="span-2">Overtime starting spot<input id="overtimeSpot" placeholder="Association-approved spot, e.g. Visitor 10"></label></div><h3>Correct Quarter</h3><div id="periodQuarterButtons" class="button-row statistician-state-buttons"><button data-value="1" onclick="setStateFrom('quarter','1','statistician')">1</button><button data-value="2" onclick="setStateFrom('quarter','2','statistician')">2</button><button data-value="3" onclick="setStateFrom('quarter','3','statistician')">3</button><button data-value="4" onclick="setStateFrom('quarter','4','statistician')">4</button><button data-value="OT" onclick="setStateFrom('quarter','OT','statistician')">OT</button></div><div class="button-row"><button class="warning" onclick="periodAction('end_quarter')">End Quarter</button><button onclick="periodAction('start_second_half')">Start Second Half</button><button onclick="periodAction('clear_untimed_down')">Untimed Down Complete</button><button onclick="periodAction('start_overtime')">Start Overtime</button><button class="danger" onclick="periodAction('final_game')">Confirm Final</button></div></article>
         </section>
         <section class="statistician-register"><div class="section-heading-row"><div><h2>Play Register</h2><p class="section-note">Alpha.3 rules-driven canonical gamebook. Select a play to inspect its structured record; use Edit to correct the linked event.</p></div><button onclick="refreshPlayRegister('manual-refresh',true)">Refresh</button></div><div class="play-register-layout"><div id="statisticianEventRegister" class="event-log play-register-list"></div><aside id="playDetailPanel" class="play-detail-panel"><div class="section-note">Select a play to view details.</div></aside></div></section>
         <section class="connection-panel"><div class="section-heading-row"><div><h2>Mobile / USB Connection</h2><p class="section-note">Addresses are detected from active laptop network adapters.</p></div><button onclick="loadConnectionInfo()">Refresh Addresses</button></div><div id="connectionInfo" class="status">Refresh after enabling hotspot or USB tethering.</div><div id="connectionAddresses" class="connection-addresses"></div></section>
@@ -2284,7 +2285,7 @@ class LiveCommandClient{
     if(group==='undo')return ['button[onclick="undo()"]'];
     if(group==='restore')return ['button[onclick="restoreLastUndone()"]','.restore-undone-btn'];
     if(group==='toggle-scorebug')return ['#scorebugButton','button[onclick="toggleScorebug()"]'];
-    if(group==='toggle-halftime')return ['button[onclick="toggleHalftime()"]'];
+    if(group==='toggle-halftime')return ['button[onclick^="toggleHalftime("]'];
     return [];
   }
   setGroupPending(group,pending){
@@ -3937,14 +3938,25 @@ async function toggleScorebug() {
   }
 }
 
-async function toggleHalftime() {
-  await GameStateManager.mutate('/api/toggle-halftime', {});
+async function toggleHalftime(source) {
+  // Ending halftime starts the second half. Which end each team attacks is a
+  // fresh choice (like the coin toss), not a forced mirror: send the operator's
+  // pick; an empty pick keeps the historical mirror.
+  const payload = {};
+  if (currentState?.broadcast_phase === 'halftime') {
+    const dirId = source === 'statistician' ? 'secondHalfDirection' : 'broadcasterSecondHalfDirection';
+    const direction = document.getElementById(dirId)?.value || '';
+    if (direction) payload.second_half_drive_direction = direction;
+    const receiver = source === 'statistician' ? (document.getElementById('secondHalfReceiver')?.value || '') : '';
+    if (receiver) payload.second_half_receiving_team = receiver;
+  }
+  await GameStateManager.mutate('/api/toggle-halftime', payload);
 }
 
 async function periodAction(action) {
   if(gameDataLockedFor('statistician')){alert('Statistician authority must be active for period administration.');return}
   const payload={source:'statistician',period_action:action};
-  if(action==='start_second_half')payload.second_half_receiving_team=document.getElementById('secondHalfReceiver')?.value||'';
+  if(action==='start_second_half'){payload.second_half_receiving_team=document.getElementById('secondHalfReceiver')?.value||'';payload.second_half_drive_direction=document.getElementById('secondHalfDirection')?.value||''}
   if(action==='start_overtime'){
     payload.overtime_possession=document.getElementById('overtimePossession')?.value||'';
     payload.overtime_spot=document.getElementById('overtimeSpot')?.value||'';

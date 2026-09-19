@@ -239,10 +239,12 @@ class GameOperationsService:
                     second_half_receiving_team=incoming.get("second_half_receiving_team", ""),
                     overtime_possession=incoming.get("overtime_possession", ""),
                     overtime_spot=incoming.get("overtime_spot", ""),
+                    second_half_drive_direction=incoming.get("second_half_drive_direction", ""),
                 )
                 if transition.code in {
                     "INVALID_PERIOD_ACTION",
                     "SECOND_HALF_RECEIVER_REQUIRED",
+                    "SECOND_HALF_DIRECTION_INVALID",
                     "OVERTIME_SETUP_REQUIRED",
                 }:
                     response_state = copy.deepcopy(state)
@@ -349,7 +351,12 @@ class GameOperationsService:
                 return GameOperationsResult("OK", duplicate)
             self._push_history(state)
             if state.get("broadcast_phase") == "halftime":
-                transition = PeriodService.transition(state, "start_second_half")
+                transition = PeriodService.transition(
+                    state,
+                    "start_second_half",
+                    second_half_receiving_team=incoming.get("second_half_receiving_team", ""),
+                    second_half_drive_direction=incoming.get("second_half_drive_direction", ""),
+                )
                 if transition.code == "SECOND_HALF_RECEIVER_REQUIRED":
                     state["quarter"] = "3"
                     state["broadcast_phase"] = "live"

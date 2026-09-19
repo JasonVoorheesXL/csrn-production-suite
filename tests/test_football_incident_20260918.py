@@ -728,3 +728,209 @@ def test_play_form_exposes_the_recovered_by_field() -> None:
     # shown for Fumble checked and Fumble lost NOT checked, on run/pass only
     assert "playFumble').checked&&!document.getElementById('playFumbleLost').checked" in helper
     assert "kind!=='run'&&kind!=='pass'" in helper
+
+
+# --- Item 7: second-half kickoff direction is an operator choice ------------
+#
+# Which end each team attacks is a fresh decision at the second-half kickoff
+# (same shape as the opening coin toss, whose direction is "the direction the
+# receiving team's offense will drive"), not the mechanical mirror used for the
+# in-half Q1->Q2 / Q3->Q4 breaks. `second_half_drive_direction` follows the coin
+# toss's `opening_drive_direction`; empty keeps the historical mirror.
+
+
+def _halftime(**patch):
+    return _state(
+        quarter="2",
+        broadcast_phase="halftime",
+        period_state="halftime",
+        ball_spot="LEFT 40",
+        # first half: home drove right, visitor left; home kicked off, so HOME
+        # receives the second-half kickoff (the opening kicker receives)
+        plays=[{"play_type": "kickoff", "offense": "home", "undone": False}],
+        **patch,
+    )
+
+
+def _second_half(direction="", **patch):
+    result = PeriodService.transition(_halftime(**patch), "start_second_half", second_half_drive_direction=direction)
+    assert result.ok, result.code
+    return result.state
+
+
+def test_default_second_half_direction_is_still_the_mirror() -> None:
+    s = _second_half("")
+    assert (s["home_direction"], s["visitor_direction"]) == ("left", "right")
+    s = _second_half("mirror")
+    assert (s["home_direction"], s["visitor_direction"]) == ("left", "right")
+
+
+@pytest.mark.parametrize("direction", ["right", "left"])
+def test_explicit_direction_is_the_receiving_teams_drive_direction(direction) -> None:
+    s = _second_half(direction)
+    assert s["receiving_team"] == "home"
+    assert s["home_direction"] == direction
+    assert s["visitor_direction"] == ("left" if direction == "right" else "right")
+
+
+def test_operator_can_keep_the_first_half_ends() -> None:
+    """Home receives and keeps driving RIGHT: nobody changes ends."""
+    s = _second_half("right")
+    assert (s["home_direction"], s["visitor_direction"]) == ("right", "left")
+    # the kickoff still lands on the kicking team's own 40 in the (unchanged)
+    # orientation: visitor drives left, so its own 40 is RIGHT 40
+    assert s["kicking_team"] == "visitor"
+    assert s["ball_spot"] == C._team_own_yard_spot(s, "visitor", 40) == "RIGHT 40"
+
+
+def test_operator_can_change_ends_for_the_second_half() -> None:
+    s = _second_half("left")
+    assert (s["home_direction"], s["visitor_direction"]) == ("left", "right")
+    # visitor now drives right, so its own 40 is LEFT 40
+    assert s["ball_spot"] == C._team_own_yard_spot(s, "visitor", 40) == "LEFT 40"
+
+
+@pytest.mark.parametrize("direction", ["", "left", "right"])
+@pytest.mark.parametrize("receiver", ["home", "visitor"])
+def test_kickoff_spot_is_right_for_every_direction_choice_and_receiver(direction, receiver) -> None:
+    """Whatever the choice, the kickoff is on the kicking team's own 40 for the
+    directions that are actually in force afterwards."""
+    result = PeriodService.transition(
+        _halftime(), "start_second_half",
+        second_half_receiving_team=receiver, second_half_drive_direction=direction,
+    )
+    assert result.ok
+    s = result.state
+    kicker = "visitor" if receiver == "home" else "home"
+    assert s["special_game_phase"] == "kickoff" and s["kicking_team"] == kicker
+    assert s["ball_spot"] == C._team_own_yard_spot(s, kicker, 40)
+    if direction:
+        assert s[f"{receiver}_direction"] == direction
+    assert {s["home_direction"], s["visitor_direction"]} == {"left", "right"}
+
+
+def test_ball_spot_mirrors_exactly_when_the_ends_change() -> None:
+    """_set_directions is the shared machinery: mirror iff the ends changed,
+    regardless of *why* -- and never when the chosen directions match the old
+    ones. (The kickoff overwrites the spot afterwards, so this pins the helper.)"""
+    changed = _state(ball_spot="LEFT 40")
+    PeriodService._set_directions(changed, "left", "right")
+    assert changed["ball_spot"] == "RIGHT 40"
+
+    unchanged = _state(ball_spot="LEFT 40")
+    PeriodService._set_directions(unchanged, "right", "left")
+    assert unchanged["ball_spot"] == "LEFT 40"
+
+    # a swap and an explicit choice that yields the same directions agree
+    swapped = _state(ball_spot="LEFT 40")
+    PeriodService._swap_directions(swapped)
+    explicit = _state(ball_spot="LEFT 40")
+    PeriodService._set_directions(explicit, "left", "right")
+    assert swapped["ball_spot"] == explicit["ball_spot"] == "RIGHT 40"
+
+
+def test_invalid_direction_is_rejected_without_changing_anything() -> None:
+    result = PeriodService.transition(_halftime(), "start_second_half", second_half_drive_direction="up")
+    assert result.code == "SECOND_HALF_DIRECTION_INVALID"
+    assert result.state["quarter"] == "2" and result.state["broadcast_phase"] == "halftime"
+    assert (result.state["home_direction"], result.state["visitor_direction"]) == ("right", "left")
+
+
+def test_direction_choice_does_not_affect_the_in_half_breaks() -> None:
+    q1 = PeriodService.transition(_state(), "end_quarter", second_half_drive_direction="left").state
+    assert (q1["home_direction"], q1["visitor_direction"]) == ("left", "right")
+    q3 = PeriodService.transition(
+        _state(quarter="3", home_direction="left", visitor_direction="right"), "end_quarter",
+        second_half_drive_direction="left",
+    ).state
+    assert (q3["home_direction"], q3["visitor_direction"]) == ("right", "left")
+
+
+def _ops(state):
+    from contextlib import nullcontext
+
+    from game_operations_service import GameOperationsService
+
+    store = {"state": state}
+    service = GameOperationsService(
+        load_state=lambda: store["state"], save_state=lambda v: store.update(state=dict(v)),
+        default_state=lambda: _halftime(), push_history=lambda s: None,
+        source_allowed=lambda s, source: True, locked_payload=lambda s: {"message": "locked"},
+        update_linked_status=lambda *a: None, load_config=lambda: {},
+        command_scorebug_visibility=lambda visible: None, transaction_lock=nullcontext(),
+    )
+    return service, store
+
+
+def test_set_values_start_second_half_passes_the_direction_through() -> None:
+    service, store = _ops(_halftime(game_data_authority="statistician"))
+    result = service.set_values({
+        "source": "statistician", "period_action": "start_second_half",
+        "second_half_receiving_team": "visitor", "second_half_drive_direction": "left",
+    })
+    assert result.ok and store["state"]["quarter"] == "3"
+    assert (store["state"]["home_direction"], store["state"]["visitor_direction"]) == ("right", "left")
+
+
+def test_set_values_reports_an_invalid_direction_and_stays_at_halftime() -> None:
+    service, store = _ops(_halftime(game_data_authority="statistician"))
+    result = service.set_values({
+        "source": "statistician", "period_action": "start_second_half",
+        "second_half_receiving_team": "visitor", "second_half_drive_direction": "sideways",
+    })
+    assert result.ok  # the route returns the state with the error attached
+    assert result.data["state"]["period_action_code"] == "SECOND_HALF_DIRECTION_INVALID"
+    assert store["state"]["broadcast_phase"] == "halftime"
+
+
+def test_halftime_toggle_passes_the_direction_through() -> None:
+    service, store = _ops(_halftime())
+    # home (the receiver) keeps driving right: a choice that differs from the mirror
+    result = service.toggle_halftime({"second_half_drive_direction": "right"})
+    assert result.ok
+    s = store["state"]
+    assert s["quarter"] == "3" and s["broadcast_phase"] == "live"
+    assert (s["home_direction"], s["visitor_direction"]) == ("right", "left")
+
+
+def test_halftime_toggle_without_a_choice_keeps_the_mirror() -> None:
+    service, store = _ops(_halftime())
+    assert service.toggle_halftime({}).ok
+    s = store["state"]
+    assert (s["home_direction"], s["visitor_direction"]) == ("left", "right")
+
+
+def test_a_non_mirrored_second_half_survives_a_later_edit_of_a_first_half_play() -> None:
+    """The recorded per-play direction (bug 4b) means a Q3 played in the SAME
+    direction as Q2 must not be mirrored by a rebuild."""
+    g = _live_game()
+    g.run("home", "LEFT 20", "LEFT 25")
+    g.period("end_quarter")                                  # Q2: home drives left
+    g.store["clock_seconds"] = 500
+    g.run("home", "RIGHT 25", "RIGHT 30")                    # 75 -> 70
+    g.period("end_quarter")                                  # halftime
+    g.store["plays"] = [{"play_type": "kickoff", "offense": "home", "undone": False}] + g.store["plays"]
+    g.period("start_second_half", second_half_receiving_team="home", second_half_drive_direction="left")
+    assert (g.store["home_direction"], g.store["quarter"]) == ("left", "3")   # ends NOT changed
+    g.store.update(special_game_phase="", kicking_team="", receiving_team="", possession="home",
+                   down="1st", distance="10", ball_spot="RIGHT 30", clock_seconds=610)
+    g.run("home", "RIGHT 30", "RIGHT 36")                    # 70 -> 64, still driving left
+
+    g.edit(0, yards=6)                                       # first-half play +5 -> +6
+
+    s = g.store
+    assert (s["quarter"], s["clock_seconds"], s["home_direction"]) == ("3", 610, "left")
+    # Q1 +6 -> 26 (right); Q2 mirror -> 74 then -5 -> 69; Q3 unchanged ends: -6 -> 63
+    assert s["ball_spot"] == "RIGHT 37"
+
+
+def test_second_half_direction_controls_exist_in_both_consoles() -> None:
+    html = _index_html()
+    assert 'id="secondHalfDirection"' in html and 'id="broadcasterSecondHalfDirection"' in html
+    toggle = html[html.index("async function toggleHalftime(") :]
+    toggle = toggle[: toggle.index("\n}\n")]
+    assert "second_half_drive_direction" in toggle
+    assert "toggleHalftime('broadcaster')" in html and "toggleHalftime('statistician')" in html
+    assert "second_half_drive_direction" in _js_function(html, "periodAction") or "second_half_drive_direction" in html[
+        html.index("async function periodAction(") : html.index("async function changeProgramVisual")
+    ]

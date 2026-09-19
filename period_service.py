@@ -61,20 +61,33 @@ class PeriodService:
         valid = cls._period()["quarters"]
         return text if text in valid else valid[0]
 
-    @staticmethod
-    def _swap_directions(state: dict[str, Any]) -> None:
-        home = str(state.get("home_direction", "right") or "right").lower()
-        visitor = str(state.get("visitor_direction", "left") or "left").lower()
-        state["home_direction"] = "left" if home == "right" else "right"
-        state["visitor_direction"] = "left" if visitor == "right" else "right"
-        # Teams change ends but the ball keeps its position relative to them
-        # (same yard line, same series), so the screen-fixed LEFT/RIGHT spot
-        # must mirror with the directions or every quarter break leaves it on
-        # the wrong side of the field for the operator to fix by hand.
-        if state.get("ball_spot"):
+    @classmethod
+    def _set_directions(cls, state: dict[str, Any], home: str, visitor: str) -> None:
+        """Set each team's drive direction. Teams change ends but the ball
+        keeps its position relative to them (same yard line, same series), so
+        when the ends actually change the screen-fixed LEFT/RIGHT spot mirrors
+        with them -- otherwise every change of ends leaves the ball on the
+        wrong side of the field for the operator to fix by hand. When the
+        chosen directions leave the ends as they were, the ball does not move.
+        """
+        old_home = str(state.get("home_direction", "right") or "right").lower()
+        old_visitor = str(state.get("visitor_direction", "left") or "left").lower()
+        state["home_direction"] = home
+        state["visitor_direction"] = visitor
+        if (home, visitor) != (old_home, old_visitor) and state.get("ball_spot"):
             state["ball_spot"] = CanonicalStateFoundation.mirror_spot(
                 state["ball_spot"], state
             )
+
+    @classmethod
+    def _swap_directions(cls, state: dict[str, Any]) -> None:
+        home = str(state.get("home_direction", "right") or "right").lower()
+        visitor = str(state.get("visitor_direction", "left") or "left").lower()
+        cls._set_directions(
+            state,
+            "left" if home == "right" else "right",
+            "left" if visitor == "right" else "right",
+        )
 
     @classmethod
     def _stop_clock(cls, state: dict[str, Any], *, reset: bool = False) -> None:
@@ -128,6 +141,7 @@ class PeriodService:
         second_half_receiving_team: Any = "",
         overtime_possession: Any = "",
         overtime_spot: Any = "",
+        second_half_drive_direction: Any = "",
     ) -> PeriodResult:
         current = copy.deepcopy(dict(state))
         command = str(action or "").strip().lower()
@@ -192,8 +206,31 @@ class PeriodService:
                     current,
                     {"message": "Select the team receiving the second-half kickoff."},
                 )
+            # Which end each team attacks is a fresh choice at the second-half
+            # kickoff (same shape as the opening coin toss), not a forced
+            # mirror: teams often stay put, e.g. to keep the scoreboard in
+            # view. Expressed like the coin toss: the direction the RECEIVING
+            # team's offense will drive. Empty keeps the historical mirror.
+            direction = str(second_half_drive_direction or "").strip().lower()
+            if direction in {"mirror", "auto"}:
+                direction = ""
+            if direction not in {"", "left", "right"}:
+                return PeriodResult(
+                    "SECOND_HALF_DIRECTION_INVALID",
+                    current,
+                    {"message": "Select the second-half receiving team's direction (left or right)."},
+                )
             kicker = CanonicalStateFoundation.opposite(receiver)
-            cls._swap_directions(current)
+            if direction:
+                receiver_direction = direction
+                kicker_direction = "left" if direction == "right" else "right"
+                cls._set_directions(
+                    current,
+                    receiver_direction if receiver == "home" else kicker_direction,
+                    receiver_direction if receiver == "visitor" else kicker_direction,
+                )
+            else:
+                cls._swap_directions(current)
             current["quarter"] = "3"
             current["broadcast_phase"] = "live"
             current["period_state"] = "quarter"
