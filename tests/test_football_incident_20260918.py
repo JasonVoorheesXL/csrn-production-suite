@@ -1250,3 +1250,145 @@ def test_event_log_gate_reads_the_setting_live_and_defaults_to_on() -> None:
     # the row builder still goes through the gate
     text_fn = _js_function(html, "eventDownDistanceText")
     assert "if(!eventDownDistanceEnabled())return ''" in text_fn
+
+
+# --- Item 13: toggle_halftime's "receiver unknown" fallback swaps the ends ---
+#
+# start_second_half returns SECOND_HALF_RECEIVER_REQUIRED only when there is no
+# explicit receiver AND the opening kickoff was never recorded (stats started
+# mid-game, etc.). toggle_halftime() then falls back to starting Q3 directly --
+# and used to skip direction entirely, leaving home_direction / visitor_direction
+# / ball_spot exactly as they were at the end of Q2. It now swaps the ends the
+# same way every other quarter break does (mirroring the ball with them). A
+# second_half_drive_direction is defined relative to the RECEIVING team, which is
+# precisely what is unknown here, so it is ignored -- and the operator is told.
+# The fallback still does no kickoff setup (that needs a known kicking team).
+
+
+def _unknown_receiver_halftime(**patch):
+    """Halftime with no receiver: no plays (so no opening kickoff to infer it
+    from), no opening_kicking_team, no second_half_receiving_team."""
+    fields = dict(
+        quarter="2", broadcast_phase="halftime", period_state="halftime",
+        ball_spot="LEFT 40", possession="home", down="2nd", distance="6",
+    )
+    fields.update(patch)
+    return _state(**fields)
+
+
+def test_the_precondition_receiver_really_is_unknown() -> None:
+    state = _unknown_receiver_halftime()
+    result = PeriodService.transition(state, "start_second_half")
+    assert result.code == "SECOND_HALF_RECEIVER_REQUIRED"
+    assert PeriodService._opening_kicking_team(state) == ""
+
+
+def test_fallback_swaps_the_ends_and_mirrors_the_ball_like_the_other_quarter_breaks() -> None:
+    service, store = _ops(_unknown_receiver_halftime())
+
+    result = service.toggle_halftime({})
+
+    assert result.ok
+    s = store["state"]
+    # the fallback still fired: Q3, live, with the fallback's own resets
+    assert (s["quarter"], s["broadcast_phase"], s["period_state"]) == ("3", "live", "quarter")
+    assert (s["down"], s["distance"], s["clock_seconds"], s["clock_running"]) == ("1st", "10", 720, False)
+    assert s["scorebug_visible"] is True
+    # ...and now the ends changed, with the ball mirrored -- exactly like Q1->Q2 / Q3->Q4
+    assert (s["home_direction"], s["visitor_direction"]) == ("left", "right")
+    assert s["ball_spot"] == "RIGHT 40"
+
+
+def test_fallback_matches_what_an_in_half_quarter_break_does() -> None:
+    """Same result as the mechanical swap used at Q1->Q2 and Q3->Q4."""
+    for spot in ("LEFT 40", "RIGHT 12", "LEFT GOAL", "50", "RIGHT 3"):
+        service, store = _ops(_unknown_receiver_halftime(ball_spot=spot))
+        reference = _unknown_receiver_halftime(ball_spot=spot)
+        PeriodService._swap_directions(reference)
+
+        assert service.toggle_halftime({}).ok
+        s = store["state"]
+        assert (s["home_direction"], s["visitor_direction"], s["ball_spot"]) == (
+            reference["home_direction"], reference["visitor_direction"], reference["ball_spot"],
+        ), spot
+
+
+def test_fallback_preserves_yards_to_goal_and_possession() -> None:
+    for possession in ("home", "visitor"):
+        before = _unknown_receiver_halftime(ball_spot="RIGHT 20", possession=possession)
+        service, store = _ops(before)
+        assert service.toggle_halftime({}).ok
+        after = store["state"]
+        assert C.yards_to_goal(after) == C.yards_to_goal(before), possession
+        assert after["possession"] == possession
+
+
+def test_fallback_still_does_no_kickoff_setup() -> None:
+    """Out of scope by design: a kickoff needs a known kicking team."""
+    service, store = _ops(_unknown_receiver_halftime())
+    assert service.toggle_halftime({}).ok
+    s = store["state"]
+    assert s["special_game_phase"] == ""
+    assert s["kicking_team"] == "" and s["receiving_team"] == ""
+    assert s["possession"] == "home"
+
+
+def test_an_explicit_direction_is_ignored_when_the_receiver_is_unknown_and_the_operator_is_told() -> None:
+    for direction in ("right", "left"):
+        service, store = _ops(_unknown_receiver_halftime())
+
+        result = service.toggle_halftime({"second_half_drive_direction": direction})
+
+        assert result.ok
+        s = store["state"]
+        # ignored: identical to the historical mirror whichever way was chosen
+        assert (s["home_direction"], s["visitor_direction"], s["ball_spot"]) == ("left", "right", "RIGHT 40"), direction
+        # surfaced, not silent: in the response the route returns...
+        notice = result.data["state"]["period_action_notice"]
+        assert direction.upper() in notice and "receiving team isn't known" in notice
+        assert result.data["message"] == notice
+        # ...but never persisted into the game state
+        assert "period_action_notice" not in s
+
+
+def test_no_notice_when_no_direction_was_chosen_or_the_mirror_was() -> None:
+    for payload in ({}, {"second_half_drive_direction": ""}, {"second_half_drive_direction": "mirror"}):
+        service, store = _ops(_unknown_receiver_halftime())
+        result = service.toggle_halftime(payload)
+        assert result.ok
+        assert "period_action_notice" not in result.data["state"], payload
+        assert "message" not in result.data, payload
+
+
+def test_a_known_receiver_still_takes_the_item_7_path_not_the_fallback() -> None:
+    """The fix is confined to the unknown-receiver branch."""
+    service, store = _ops(_unknown_receiver_halftime())
+    result = service.toggle_halftime({"second_half_receiving_team": "home", "second_half_drive_direction": "right"})
+    assert result.ok
+    s = store["state"]
+    assert s["special_game_phase"] == "kickoff" and s["receiving_team"] == "home"
+    assert (s["home_direction"], s["visitor_direction"]) == ("right", "left")  # the choice was honored
+    assert "period_action_notice" not in result.data["state"]
+
+
+def test_a_retried_command_does_not_swap_the_ends_twice() -> None:
+    """A retry (same command_id) hits the idempotency ledger. It must not swap
+    again. The ledger keeps the top-level `message` but, by design, strips
+    `state` and rebuilds it from the current state, so the transient
+    period_action_notice is not repeated in a retry's state."""
+    service, store = _ops(_unknown_receiver_halftime())
+    first = service.toggle_halftime({"command_id": "cmd-1", "second_half_drive_direction": "right"})
+    second = service.toggle_halftime({"command_id": "cmd-1", "second_half_drive_direction": "right"})
+    assert first.ok and second.ok
+    assert second.data["message"] == first.data["message"]
+    s = store["state"]
+    assert (s["home_direction"], s["visitor_direction"], s["ball_spot"]) == ("left", "right", "RIGHT 40")
+    assert s["quarter"] == "3"
+
+
+def test_halftime_button_shows_the_notice() -> None:
+    html = _index_html()
+    toggle = html[html.index("async function toggleHalftime(") :]
+    toggle = toggle[: toggle.index("\n}\n")]
+    assert "const data = await GameStateManager.mutate('/api/toggle-halftime', payload)" in toggle
+    assert "period_action_notice" in toggle and "showOperatorNotice(notice" in toggle

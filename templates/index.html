@@ -3952,7 +3952,10 @@ async function toggleHalftime(source) {
     const receiver = source === 'statistician' ? (document.getElementById('secondHalfReceiver')?.value || '') : '';
     if (receiver) payload.second_half_receiving_team = receiver;
   }
-  await GameStateManager.mutate('/api/toggle-halftime', payload);
+  const data = await GameStateManager.mutate('/api/toggle-halftime', payload);
+  // Set when the operator picked a direction that could not be applied (the second-half receiver was unknown).
+  const notice = data?.period_action_notice || data?.state?.period_action_notice || currentState?.period_action_notice || '';
+  if (notice) showOperatorNotice(notice, 'warning', 12000);
 }
 
 async function periodAction(action) {

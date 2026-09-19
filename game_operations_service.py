@@ -352,6 +352,7 @@ class GameOperationsService:
             if duplicate is not None:
                 return GameOperationsResult("OK", duplicate)
             self._push_history(state)
+            notice = ""
             if state.get("broadcast_phase") == "halftime":
                 transition = PeriodService.transition(
                     state,
@@ -360,6 +361,25 @@ class GameOperationsService:
                     second_half_drive_direction=incoming.get("second_half_drive_direction", ""),
                 )
                 if transition.code == "SECOND_HALF_RECEIVER_REQUIRED":
+                    # Nobody is known to receive the second-half kickoff (the
+                    # opening kickoff was never recorded and no receiver was
+                    # given), so a full kickoff setup is impossible here. The
+                    # ends must still change like every other quarter break:
+                    # swap directions and mirror the ball with them.
+                    PeriodService._swap_directions(state)
+                    # A second_half_drive_direction is defined relative to the
+                    # RECEIVING team, which is exactly what is unknown, so it
+                    # cannot be applied without risking the wrong team.
+                    # Historical mirror is the only safe default -- but say so
+                    # rather than silently ignoring the operator's choice.
+                    ignored = str(incoming.get("second_half_drive_direction", "") or "").strip().lower()
+                    if ignored in {"left", "right"}:
+                        notice = (
+                            "Second half started, but the second-half receiving team isn't known "
+                            "(no opening kickoff was recorded), so your "
+                            f"{ignored.upper()} direction choice could not be applied. The ends were "
+                            "swapped the usual way. Correct the direction with the Drive buttons if needed."
+                        )
                     state["quarter"] = "3"
                     state["broadcast_phase"] = "live"
                     state["period_state"] = "quarter"
@@ -391,7 +411,15 @@ class GameOperationsService:
                 action="toggle_halftime",
                 state_revision=revision,
             )
-            result_data = attach_metadata({"state": copy.deepcopy(state)}, metadata)
+            # The notice rides in the RESPONSE state only (like set_values'
+            # period_action_error): the route returns just result.data["state"],
+            # and it must not be persisted.
+            response_state = copy.deepcopy(state)
+            response = {"state": response_state}
+            if notice:
+                response_state["period_action_notice"] = notice
+                response["message"] = notice
+            result_data = attach_metadata(response, metadata)
             remember_command(state, command_id, metadata=metadata, result=result_data)
             self._save_state(state)
             return GameOperationsResult("OK", result_data)
