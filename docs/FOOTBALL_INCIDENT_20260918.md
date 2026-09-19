@@ -5,8 +5,8 @@ bug so each can be re-verified independently. **Not merged.** Merge is gated on
 Jason confirming there is no collision with in-flight football/basketball/
 baseball work (see "Collision check").
 
-Tests: `tests/test_football_incident_20260918.py` (128 tests, one section per
-item). Full suite in the worktree: see the bottom of this file.
+Tests: `tests/test_football_incident_20260918.py` (one section per item) and
+`tests/test_ticker_speed_default.py` (item 12). Full suite in the worktree: see the bottom of this file.
 
 | # | Commit | Report's root cause | Verdict |
 |---|--------|---------------------|---------|
@@ -21,6 +21,9 @@ item). Full suite in the worktree: see the bottom of this file.
 | 9a | `af3e15b` | live play log shows no game clock | Done, gated on `clock_visible` |
 | 9b | `66990c3` | live play log shows no down & distance | Done; **no setting exists to gate on** |
 | 10 | `a51e558` | pin goal-to-go through a penalty | Test only |
+| 11 | `0f44d3e` | down & distance log gate is a stub | Real per-broadcast toggle `down_distance_visible` |
+| 12 | `2b8aed7` | ticker default is "fast" | Now "normal" |
+| 13 | `f60ee39` | halftime fallback skips the ends | Swaps ends + ball; notice when a direction can't be honored |
 
 ## Bugs 1 & 2 - ball spot follows the change of ends
 
@@ -175,9 +178,8 @@ in-half breaks are unchanged. The kickoff spot is recomputed by `enter_kickoff`
 afterwards, so it is correct for every choice (tested for both receivers). A
 non-mirrored Q3 also survives a later edit of a first-half play (bug 4b).
 
-Known gap: `toggle_halftime`'s "receiver unknown" fallback still starts Q3
-without touching directions (the choice is relative to the receiver, which that
-path does not have).
+Former known gap, fixed in item 13: `toggle_halftime`'s "receiver unknown"
+fallback used to start Q3 without touching directions.
 
 ## Item 8 - goal-to-go is automatic (no code)
 
@@ -210,9 +212,9 @@ misleading `12:00` on every early row. `after.clock_seconds` is the live countdo
 
 **9b - down & distance (`66990c3`).** Shown as a small line under the
 description from `ev.after.down/distance` (fallback to the play's
-`resulting_*`, which only replayed plays have). **No "down & distance enabled"
-setting exists anywhere**: not in state defaults, `GameOperationsService`'s
-settable fields, the rulesets, or `index.html`. Nearest siblings are
+`resulting_*`, which only replayed plays have). **At the time, no "down & distance enabled"
+setting existed anywhere** (superseded by item 11): not in state defaults,
+`GameOperationsService`'s settable fields, the rulesets, or `index.html`. Nearest siblings are
 `ball_spot_visible` and the Layout Builder's overlay-only `game_fields`
 visibility, both different things. So it is gated only on the engine's own
 convention - a real down and a real distance; `Off`/empty (kickoffs, coin toss,
@@ -231,12 +233,90 @@ value, the full `EventService.trigger` path, a lockstep invariant across penalty
 sizes and distances, a negative control, and three orientations. Mutation-checked:
 breaking either half of the lockstep fails 15 tests.
 
+## Item 11 - `down_distance_visible` (`0f44d3e`)
+
+Jason confirmed down/distance in the play log should be a real per-broadcast
+setting, so the item-9b stub became one, mirroring `clock_visible` /
+`ball_spot_visible` end to end: `app.py` default **True**; a
+`GameOperationsService.ALLOWED_SET_FIELDS` entry (not in `GAME_DATA_FIELDS`: it
+is a display flag, so the statistician authority lock does not apply and it never
+touches the game); Hide/Show buttons under the Clock Display ones, labelled
+"Play Log: Down & Distance". `eventDownDistanceEnabled()` now returns
+`currentState.down_distance_visible !== false`.
+
+Default-on is load-bearing: saved states from before the setting have no such key
+and load as ON (defaults are merged *under* saved state in both
+`StateRepository.load` and `StateService.normalize`; both tested), and
+`reset_data` returns it to ON.
+
+**Scope:** it gates the operator **play log only**. It does not change the
+on-air overlay, whose "1st & Goal" / down text is unaffected. The name follows the
+`*_visible` convention, which for the clock *does* drive the overlay, so the UI
+label and tooltip say "Play Log" explicitly. Open question for Jason: should it
+also hide down & distance on air?
+
+**Recorded vs live - deliberately different from the clock.** Item 9a gates the
+clock on each event's recorded `clock_visible`, because the clock could be hidden
+*and frozen at 720* while a play was logged, so a live gate would retroactively
+show a false time. Down & distance has no such failure mode: the engine
+maintains it from every play whether or not the switch is on, so every row's
+value is true regardless. A display switch should then hide or reveal the whole
+log consistently (turning it back on brings earlier rows back), and reading it
+live keeps the flag out of `CANONICAL_FIELDS` and every event snapshot. If Jason
+would rather have the clock-style behaviour, it is adding the field to
+`CANONICAL_FIELDS`/`LIVE_PERIOD_FIELDS` and reading `ev.after`.
+
+One item-9b assertion pinned the literal `return true` stub and was updated; the
+other two 9b tests pass unchanged. Gate executed in the browser pane (missing
+key, on, off, back on).
+
+## Item 12 - ticker default (`2b8aed7`)
+
+`DEFAULT_STATE["ticker_speed"]` `"fast"` -> `"normal"` (76 px/s) in `app.py`,
+used by every sport. Presets (22/32/76/170) and the Scroll Speed control's list
+are untouched, and the stale comment beside the default was corrected.
+
+The brief said a test already pinned "a saved `ticker_speed` is unaffected".
+**None did**; only `test_ticker_speed_default.py`'s docstring claimed it. It is
+now tested through both real load paths (`StateRepository.load`,
+`StateService.normalize`) for every preset, plus a saved `"fast"` staying
+`"fast"`. `reset_data()` does not preserve `ticker_speed`, so a reset/new game
+starts on the default (pinned). The renamed default test and rewritten docstring
+now label the old "slow reads as a crawl -> fast" reasoning as history. Reverting
+the default fails 5 of 8 tests.
+
+Not changed: the `|| "slow"` (index.html) and `|| 32` (theme runtime) fallbacks
+apply only to a state with no `ticker_speed` key, which the defaults merge never
+produces.
+
+## Item 13 - unknown-receiver halftime fallback (`f60ee39`)
+
+`toggle_halftime()`'s `SECOND_HALF_RECEIVER_REQUIRED` fallback now calls
+`PeriodService._swap_directions(state)`, so the ends change and the ball mirrors
+exactly like Q1->Q2 / Q3->Q4. A supplied `second_half_drive_direction` is ignored
+(it is relative to the receiving team, which is what is unknown) and the
+operator is told: the response carries `period_action_notice` (plus a top-level
+`message`) and the halftime button shows it as a 12 s warning.
+
+Why the notice rides inside the state: `/api/toggle-halftime` returns only
+`result.data["state"]`, so a top-level message alone would have been dropped. It
+mirrors `set_values`' `period_action_error` and is never persisted. A **retried**
+`command_id` goes through the idempotency ledger, which strips `state` by design:
+the retry does not swap again and keeps `message`, but the notice is not repeated
+in the retry's state.
+
+Unchanged by design: no kickoff setup. Noticed, not touched: the fallback sets
+`halftime_pending`, which nothing reads, so `halftime_pending_second_half` stays
+stale after it. Mutation-checked: removing the swap fails 4 tests. `toggleHalftime`
+was executed in the browser pane against stubs (payload and notice display).
+
 ## Collision check (for Jason's merge gate)
 
 Files changed: `canonical_state_service.py`, `event_service.py`,
 `period_service.py`, `rules_service.py`, `state_service.py`,
 `statistics_service.py`, `static/csrn-production-theme-runtime.js`,
-`templates/index.html`, `game_operations_service.py` (item 7), plus tests.
+`templates/index.html`, `game_operations_service.py` (items 7, 11, 13), `app.py`
+(items 11, 12), plus tests.
 
 Nearly every recent round is already merged into trunk `4bde8e9`. The only
 branches with unmerged work are `basketball-p5-ui-followup-20260914`
@@ -251,10 +331,18 @@ check if either branch lands first. The production folder's uncommitted WIP
 ## Verification summary
 
 Full suite in the worktree (with `CSRN_GAME_DAY_LOCAL_STATE=1` and an isolated
-`CSRN_STATE_AUTHORITY_FILE`): **3094 passed, 1 skipped**. Trunk was still
-`4bde8e9` when re-checked; still no file overlap with the only two branches that
-have unmerged work (`basketball-p5-ui-followup-20260914`,
-`hockey-engine-scoping-20260907`).
+`CSRN_STATE_AUTHORITY_FILE`): **3116 passed, 1 failed**. The one failure,
+`tests/test_command_center_server.py::test_shell_run_real_server_clean_shutdown_on_window_close`,
+is **pre-existing and unrelated**: its `_FakeWebview` has no `settings`, which
+`csrn_desktop.py` has needed since `9095cf6`; both files are identical to trunk.
+It is normally masked by its own `skipif` (":5050 already in use") whenever the
+live app is running, and ran this time because nothing was on 5050. Earlier runs
+in this round showed "1 skipped" for that reason. It will fail on trunk too
+whenever :5050 is free.
+
+Trunk was still `4bde8e9` and there was still no file overlap with the only two
+branches that have unmerged work (`basketball-p5-ui-followup-20260914`,
+`hockey-engine-scoping-20260907`; same heads as before).
 
 ## Theme rendering verification (bug 3)
 
@@ -290,7 +378,9 @@ Observations, none caused by this change:
   swapped in, so it is pre-existing and unrelated (the package is hidden from the
   picker). Neon's goal-to-go rendering therefore could not be verified.
 
-Still not covered by any test: the two second-half direction selects and the new
-event-log row layout in a real operator session (items 7 and 9), and whether the
-five packages' *other* boards (pregame/halftime scenes) are unaffected (they do
-not read `distance`).
+Still not covered by any test: the second-half direction selects, the Play Log
+Down & Distance buttons, and the new event-log row layout in a real operator
+session (items 7, 9, 11, 13; the JS helpers/handlers were executed in the browser
+pane against stubs, but not the operator page itself, which needs the PIN), and
+whether the five packages' other boards (pregame/halftime scenes) are unaffected
+(they do not read `distance`).
