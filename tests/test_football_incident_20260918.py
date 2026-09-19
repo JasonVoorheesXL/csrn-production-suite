@@ -283,3 +283,186 @@ def test_overlay_js_renders_goal_text_and_led_yards() -> None:
     assert 'rawDistance.toLowerCase() === "goal"' in body
     assert "canonical_field_state?.yards_to_goal" in body
     assert "combined: `${downOff ? \"-\" : rawDown} & ${distanceOff ? \"-\" : rawDistance}`" in body
+
+
+# --- Bug 4b: editing/undoing a past play must not reset period, clock, ends --
+#
+# Confirmed by execution against the pre-fix code: log plays, cross Q1->Q2,
+# edit play 1 -> quarter snapped back to Q1, clock to the baseline value,
+# direction to the first play's, and the ball landed on the wrong side of the
+# field. Period transitions append no event, so rebuild() had nothing to replay.
+
+
+def _live_game(**patch):
+    import copy
+    import itertools
+    import threading
+
+    from event_service import EventService
+    from rules_service import RulesService
+
+    store = {
+        "broadcast_id": "B1", "status": "live", "broadcast_phase": "live",
+        "game_data_authority": "broadcaster", "home_team": "Home", "visitor_team": "Visitor",
+        "home_score": 0, "visitor_score": 0, "possession": "home", "down": "1st", "distance": "10",
+        "ball_spot": "LEFT 20", "quarter": "1", "clock_seconds": 720, "clock_running": False,
+        "clock_visible": True, "clock_started_at": 0,
+        "home_direction": "right", "visitor_direction": "left", "special_game_phase": "",
+        "next_play_number": 1, "events": [], "plays": [], "history": [], "correction_log": [],
+        "last_event": {}, "player_graphic": {"visible": False}, "team_roles": {},
+    }
+    store.update(patch)
+
+    def load():
+        return copy.deepcopy(store)
+
+    def save(value):
+        store.clear()
+        store.update(copy.deepcopy(dict(value)))
+
+    tick = itertools.count(1000)
+
+    class _Lock:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    rules = RulesService(
+        load_state=load, save_state=save, push_history=lambda s: None,
+        source_allowed=lambda s, src: True, locked_payload=lambda s: s,
+        resolve_player=lambda s, t, n: {}, show_player_graphic=lambda *a, **k: None,
+        transaction_lock=threading.Lock(), now=lambda: next(tick),
+    )
+    events = EventService(
+        load_state=load, save_state=save, public_state=lambda v: copy.deepcopy(dict(v)),
+        push_history=lambda v: None, update_linked_status=lambda *a, **k: None,
+        automation_player=lambda a, b: (None, None), manual_player=lambda *a, **k: None,
+        player_display=lambda p: "", show_player_graphic=lambda *a, **k: None,
+        apply_penalty=lambda *a, **k: {}, spot_to_coord=RulesService.spot_to_coord,
+        coord_to_spot=RulesService.coord_to_spot, team_direction=RulesService.team_direction,
+        normalize_state=lambda v: copy.deepcopy(dict(v)),
+        default_player_graphic=lambda: {"visible": False}, transaction_lock=_Lock(),
+        now=lambda: next(tick),
+    )
+
+    class Game:
+        pass
+
+    g = Game()
+    g.store, g.rules, g.events = store, rules, events
+
+    def run(team, start, end):
+        result = rules.play({"team": team, "play_type": "run", "start_spot": start, "end_spot": end})
+        assert result.ok, result.code
+        return result
+
+    def period(action, **kw):
+        result = PeriodService.transition(store, action, **kw)
+        assert result.ok, result.code
+        save(result.state)
+
+    def edit(index, **fields):
+        result = events.edit(store["events"][index]["id"], {"source": "broadcaster", **fields})
+        assert result.ok, result.code
+
+    g.run, g.period, g.edit = run, period, edit
+    return g
+
+
+def _game_in_q2():
+    """Two Q1 plays (+5, +3 -> LEFT 28), the Q1->Q2 break (ball mirrors to
+    RIGHT 28, home now drives left), then a +5 Q2 play to RIGHT 33, with the
+    Q2 clock at 5:01."""
+    g = _live_game()
+    g.run("home", "LEFT 20", "LEFT 25")
+    g.run("home", "LEFT 25", "LEFT 28")
+    g.period("end_quarter")
+    assert g.store["ball_spot"] == "RIGHT 28"
+    g.store["clock_seconds"] = 455
+    g.run("home", "RIGHT 28", "RIGHT 33")
+    g.store["clock_seconds"] = 301
+    return g
+
+
+def test_editing_an_early_play_keeps_quarter_clock_and_direction() -> None:
+    g = _game_in_q2()
+    assert (g.store["quarter"], g.store["clock_seconds"], g.store["home_direction"]) == ("2", 301, "left")
+
+    g.edit(0, yards=6)  # play 1: +5 -> +6
+
+    s = g.store
+    assert s["quarter"] == "2"
+    assert s["clock_seconds"] == 301
+    assert (s["home_direction"], s["visitor_direction"]) == ("left", "right")
+
+
+def test_editing_an_early_play_ripples_the_ball_spot_through_the_quarter_break() -> None:
+    g = _game_in_q2()
+    g.edit(0, yards=6)
+    # +6, +3 in Q1 -> coord 29; change of ends mirrors it to 71; the Q2 play
+    # drives left for 5 -> 66 == RIGHT 34.
+    assert g.store["ball_spot"] == "RIGHT 34"
+    assert (g.store["down"], g.store["distance"]) == ("1st", "10")
+
+
+def test_editing_a_play_does_not_stop_a_running_clock() -> None:
+    g = _game_in_q2()
+    g.store.update(clock_running=True, clock_started_at=1234, clock_seconds=200)
+    g.edit(1, yards=4)
+    s = g.store
+    assert (s["clock_running"], s["clock_started_at"], s["clock_seconds"]) == (True, 1234, 200)
+
+
+def test_edit_keeps_each_events_recorded_direction_and_quarter() -> None:
+    """rebuild() used to overwrite every event's `before` with the replayed
+    state, so after any edit every play claimed Q1 and the first play's
+    direction -- destroying the only record of which way a play was going."""
+    g = _game_in_q2()
+    g.edit(0, yards=6)
+    recorded = [(e["before"]["quarter"], e["before"]["home_direction"]) for e in g.store["events"]]
+    assert recorded == [("1", "right"), ("1", "right"), ("2", "left")]
+    g.edit(2, yards=4)
+    recorded = [(e["before"]["quarter"], e["before"]["home_direction"]) for e in g.store["events"]]
+    assert recorded == [("1", "right"), ("1", "right"), ("2", "left")]
+
+
+def test_editing_a_play_in_the_current_quarter_after_a_break_uses_that_plays_direction() -> None:
+    g = _game_in_q2()
+    g.edit(2, yards=8)  # the Q2 play: home drives LEFT, so +8 moves 72 -> 64
+    assert g.store["ball_spot"] == "RIGHT 36"
+    assert g.store["quarter"] == "2"
+
+
+def test_undo_after_a_quarter_break_keeps_period_clock_and_ends() -> None:
+    g = _game_in_q2()
+    result = g.events.undo({})
+    assert result.ok
+    s = g.store
+    assert (s["quarter"], s["clock_seconds"], s["home_direction"]) == ("2", 301, "left")
+    assert s["ball_spot"] == "RIGHT 28"
+    assert (s["down"], s["distance"]) == ("3rd", "2")
+    assert len(s["events"]) == 2
+
+
+def test_restore_after_a_quarter_break_keeps_period_clock_and_ends() -> None:
+    g = _game_in_q2()
+    assert g.events.undo({}).ok
+    result = g.events.restore({})
+    assert result.ok
+    s = g.store
+    assert (s["quarter"], s["clock_seconds"], s["home_direction"]) == ("2", 301, "left")
+    assert s["ball_spot"] == "RIGHT 33"
+    assert len(s["events"]) == 3
+
+
+def test_rebuild_is_still_a_pure_baseline_reducer_by_default() -> None:
+    """preserve_live is opt-in: without it the baseline still wins, which is
+    what the canonical-state and undo-to-empty tests pin."""
+    baseline = _state(quarter="1", clock_seconds=720)
+    live = _state(quarter="3", clock_seconds=100, home_direction="left", visitor_direction="right")
+    rebuilt = C.rebuild(live, [], [], baseline=baseline)
+    assert (rebuilt["quarter"], rebuilt["clock_seconds"], rebuilt["home_direction"]) == ("1", 720, "right")
+    kept = C.rebuild(live, [], [], baseline=baseline, preserve_live=True)
+    assert (kept["quarter"], kept["clock_seconds"], kept["home_direction"]) == ("3", 100, "left")

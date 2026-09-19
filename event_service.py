@@ -981,11 +981,16 @@ class EventService:
             # the currently visible controls.
             base_revision = current_revision(state)
             baseline = (events[0].get("before") if events else {}) or {}
+            # preserve_live: editing a past play must not touch the period,
+            # clock or field direction. Period transitions never append an
+            # event, so without this the baseline (the game's first play)
+            # snapped a Q3 game back to Q1 with a full clock.
             state = CanonicalStateFoundation.rebuild(
                 state,
                 events,
                 list(state.get("plays") or []),
                 baseline=baseline,
+                preserve_live=True,
             )
             state["state_revision"] = base_revision
             revision = assign_next_revision(state)
@@ -1081,11 +1086,17 @@ class EventService:
                     ),
                 )
                 baseline = (remaining_events[0].get("before") if remaining_events else target.get("before")) or {}
+                # With history left, the game has moved on since the baseline
+                # (period transitions leave no event), so keep the live
+                # period/clock/direction -- same reason as edit(). When the
+                # last tracked event is being undone there is nothing to be
+                # period-aware of and the pre-event state is the answer.
                 state = CanonicalStateFoundation.rebuild(
                     state,
                     remaining_events,
                     remaining_plays,
                     baseline=baseline,
+                    preserve_live=bool(remaining_events),
                 )
                 state["state_revision"] = base_revision
                 if not remaining_events:
@@ -1175,7 +1186,9 @@ class EventService:
             )
             baseline = (events[0].get("before") if events else event.get("before")) or {}
             base_revision = current_revision(state)
-            state = CanonicalStateFoundation.rebuild(state, events, plays, baseline=baseline)
+            state = CanonicalStateFoundation.rebuild(
+                state, events, plays, baseline=baseline, preserve_live=True
+            )
             state["state_revision"] = base_revision
             revision = assign_next_revision(state)
             metadata = command_metadata(

@@ -28,6 +28,24 @@ CANONICAL_FIELDS = (
 )
 
 
+# The part of canonical state that describes *where the game is right now*
+# (period, clock, which end each team attacks) rather than anything the outcome
+# of a past play can change. Period transitions and the running clock mutate
+# these directly and never append a replayable event, so a rebuild that seeds
+# them from the game's first play would snap a Q3 game back to Q1 / full clock.
+# rebuild(preserve_live=True) keeps the live values instead.
+LIVE_PERIOD_FIELDS = (
+    "quarter",
+    "clock_seconds",
+    "clock_visible",
+    "clock_running",
+    "clock_started_at",
+    "broadcast_phase",
+    "home_direction",
+    "visitor_direction",
+)
+
+
 @dataclass(frozen=True)
 class TeamRoles:
     possessing_team: str
@@ -577,6 +595,36 @@ class CanonicalStateFoundation:
         play["resulting_distance"] = str(state.get("distance", ""))
 
     @classmethod
+    def _follow_recorded_ends(
+        cls, rebuilt: dict[str, Any], recorded_before: Mapping[str, Any]
+    ) -> None:
+        """Bring the replay's field direction in line with the direction that
+        was recorded on the event about to be replayed. If the teams changed
+        ends since the previous event, mirror the running ball spot exactly as
+        the live period transition did (PeriodService._swap_directions)."""
+        home = str(recorded_before.get("home_direction", "") or "").lower()
+        visitor = str(recorded_before.get("visitor_direction", "") or "").lower()
+        if home not in {"left", "right"} or visitor not in {"left", "right"}:
+            return
+        if (
+            str(rebuilt.get("home_direction", "") or "").lower() == home
+            and str(rebuilt.get("visitor_direction", "") or "").lower() == visitor
+        ):
+            return
+        if rebuilt.get("ball_spot"):
+            rebuilt["ball_spot"] = cls.mirror_spot(rebuilt["ball_spot"], rebuilt)
+        rebuilt["home_direction"] = home
+        rebuilt["visitor_direction"] = visitor
+
+    @staticmethod
+    def _keep_recorded_live_fields(
+        snapshot: dict[str, Any], recorded: Mapping[str, Any]
+    ) -> None:
+        for field in LIVE_PERIOD_FIELDS:
+            if field in recorded:
+                snapshot[field] = copy.deepcopy(recorded[field])
+
+    @classmethod
     def rebuild(
         cls,
         current_state: Mapping[str, Any],
@@ -584,13 +632,41 @@ class CanonicalStateFoundation:
         plays: list[dict[str, Any]],
         *,
         baseline: Mapping[str, Any] | None = None,
+        preserve_live: bool = False,
     ) -> dict[str, Any]:
         """Rebuild dependent canonical game state from ordered canonical history.
 
         Supported scrimmage PLAY records are reduced from their canonical fields;
         other event types retain their recorded after-state until their dedicated
         Gate 18.4 repair batches replace those higher-level workflows.
+
+        ``preserve_live`` is for rebuilds that re-derive the game *after a
+        history edit* (edit / undo / restore), where the game has moved on
+        since the baseline. Period, clock and field direction
+        (LIVE_PERIOD_FIELDS) are never re-derived from history -- period
+        transitions don't append events, so the baseline would silently snap
+        them back to the start of the game. Instead:
+
+        - each event is replayed under the direction that was *recorded* when
+          it happened, and the running ball spot is mirrored whenever the
+          ends changed between two events (exactly what the live period
+          transition did), so plays from later quarters chain correctly;
+        - the recorded before/after values of those fields are kept on every
+          event rather than overwritten with the replayed ones (the recorded
+          direction is what a later edit needs to interpret that play);
+        - the live values from ``current_state`` are restored at the end.
+
+        Left False, this is the pure baseline-plus-events reducer.
         """
+        live_values = (
+            {
+                field: copy.deepcopy(current_state[field])
+                for field in LIVE_PERIOD_FIELDS
+                if field in current_state
+            }
+            if preserve_live
+            else {}
+        )
         rebuilt = copy.deepcopy(dict(current_state))
         ordered_events = [row for row in events if isinstance(row, dict) and not row.get("undone")]
         ordered_events.sort(key=lambda row: (int(row.get("play_number", 0) or 0), int(row.get("created_at", 0) or 0)))
@@ -609,7 +685,13 @@ class CanonicalStateFoundation:
             if field in seed:
                 rebuilt[field] = copy.deepcopy(seed[field])
         for event in ordered_events:
+            original_before = event.get("before") if isinstance(event.get("before"), Mapping) else {}
+            original_after = event.get("after") if isinstance(event.get("after"), Mapping) else {}
+            if preserve_live:
+                cls._follow_recorded_ends(rebuilt, original_before)
             event["before"] = cls.snapshot(rebuilt)
+            if preserve_live:
+                cls._keep_recorded_live_fields(event["before"], original_before)
             play = play_by_event.get(str(event.get("id", ""))) or play_by_id.get(str(event.get("play_id", "")))
             if str(event.get("event", "")).upper() == "PLAY" and play and str(play.get("play_type", "")).lower() in {"run", "pass"}:
                 cls._apply_scrimmage_play(rebuilt, play)
@@ -623,6 +705,13 @@ class CanonicalStateFoundation:
                     if field in after and (field not in recorded_before or after.get(field) != recorded_before.get(field)):
                         rebuilt[field] = copy.deepcopy(after[field])
             event["after"] = cls.snapshot(rebuilt)
+            if preserve_live:
+                cls._keep_recorded_live_fields(event["after"], original_after)
+        if preserve_live:
+            # The last replayed event may predate a change of ends that has
+            # happened since; bring the ball into the live orientation.
+            cls._follow_recorded_ends(rebuilt, live_values)
+        rebuilt.update(live_values)
         rebuilt["events"] = ordered_events
         rebuilt["plays"] = [row for row in plays if isinstance(row, dict) and not row.get("undone")]
         rebuilt["player_eligibility"] = EligibilityService.derive(rebuilt)
