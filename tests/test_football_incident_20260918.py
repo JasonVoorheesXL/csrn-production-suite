@@ -293,7 +293,7 @@ def test_overlay_js_renders_goal_text_and_led_yards() -> None:
 # field. Period transitions append no event, so rebuild() had nothing to replay.
 
 
-def _live_game(resolve=None, **patch):
+def _live_game(resolve=None, apply_penalty=None, **patch):
     import copy
     import itertools
     import threading
@@ -340,7 +340,7 @@ def _live_game(resolve=None, **patch):
         push_history=lambda v: None, update_linked_status=lambda *a, **k: None,
         automation_player=lambda a, b: (None, None), manual_player=lambda *a, **k: None,
         player_display=lambda p: "", show_player_graphic=lambda *a, **k: None,
-        apply_penalty=lambda *a, **k: {}, spot_to_coord=RulesService.spot_to_coord,
+        apply_penalty=apply_penalty or (lambda *a, **k: {}), spot_to_coord=RulesService.spot_to_coord,
         coord_to_spot=RulesService.coord_to_spot, team_direction=RulesService.team_direction,
         normalize_state=lambda v: copy.deepcopy(dict(v)),
         default_player_graphic=lambda: {"visible": False}, transaction_lock=_Lock(),
@@ -1026,3 +1026,127 @@ def test_event_log_row_shows_down_and_distance_after_the_play() -> None:
     assert "eventDownDistanceText(ev)" in block and 'class="event-situation"' in block
     # the clock (9a) and quarter are untouched
     assert "const period=[quarter,eventClockText(ev)]" in block
+
+
+# --- Item 10: goal-to-go survives a penalty ---------------------------------
+#
+# Non-obvious, so pinned. Down/distance and goal-to-go are tracked
+# independently: at "2nd & Goal from the 8" the stored distance is 10 (it is
+# only *displayed* as Goal). A 10-yard holding penalty on the offense sets
+# distance = old_distance + enforced yards = 20 at the new spot (18 yards from
+# the goal), and because 18 <= 20 goal_to_go() still reads "2nd & Goal from the
+# 18". That only works while penalty_service adds the SAME enforced yardage to
+# distance that it moves the ball -- a future change to either file that breaks
+# the lockstep flips this, so the numbers are asserted explicitly.
+
+
+def _enforce(state, **kw):
+    """The same wiring as app.apply_penalty_enforcement, on the real PenaltyService."""
+    from penalty_service import PenaltyService
+    from rules_service import RulesService
+
+    defaults = dict(
+        selected_team="home", requested_unit="Offensive", name="Holding", yards=10, outcome="accepted",
+        spot_to_coord=lambda v: RulesService.spot_to_coord(v, state),
+        coord_to_spot=lambda c: RulesService.coord_to_spot(c, state),
+        team_direction=RulesService.team_direction,
+    )
+    defaults.update(kw)
+    return PenaltyService.enforce(state, **defaults)
+
+
+def _goal_line_state(spot="RIGHT 8", distance="10", down="2nd", **patch):
+    return _state(ball_spot=spot, distance=distance, down=down, special_game_phase="", **patch)
+
+
+def test_holding_at_2nd_and_goal_from_the_8_is_still_goal_to_go_from_the_18() -> None:
+    state = _goal_line_state("RIGHT 8", "10", "2nd")
+    assert (C.yards_to_goal(state), C.goal_to_go(state)) == (8, True)
+
+    result = _enforce(state, name="Holding", yards=10)
+
+    assert result["applied"] is True and result["enforced_yards"] == 10
+    assert state["ball_spot"] == "RIGHT 18"
+    assert (state["down"], state["distance"]) == ("2nd", "20")   # 10 stored + 10 enforced
+    assert C.yards_to_goal(state) == 18
+    assert C.goal_to_go(state) is True                             # 18 <= 20
+    fs = C.field_state(state)
+    assert fs["goal_to_go"] is True and fs["distance_display"] == "Goal"
+
+
+def test_goal_to_go_after_a_penalty_reaches_the_overlay_as_goal() -> None:
+    state = _goal_line_state("RIGHT 8", "10", "2nd", broadcast_id="B1")
+    _enforce(state, name="Holding", yards=10)
+    _service, runtime = _runtime(state)
+    assert runtime["distance"] == "Goal"
+    assert runtime["distance_yards"] == "20"
+    assert runtime["canonical_field_state"]["yards_to_goal"] == 18
+
+
+def test_full_trigger_path_penalty_keeps_goal_to_go() -> None:
+    """EventService.trigger -> (app's apply_penalty_enforcement wiring) ->
+    PenaltyService -> goal_to_go(), end to end, through the real event."""
+    holder = {}
+
+    def apply_penalty(state, category, name, yards, outcome):
+        options = dict(state.get("_pending_penalty_options") or {})
+        return _enforce(
+            state, selected_team=options.get("selected_team") or state["possession"],
+            requested_unit=options.get("requested_unit") or category,
+            name=name, yards=yards, outcome=outcome,
+        )
+
+    g = _live_game(apply_penalty=apply_penalty, ball_spot="RIGHT 8", down="2nd", distance="10")
+    holder["g"] = g
+    result = g.events.trigger({
+        "team": "home", "event": "PENALTY", "source": "broadcaster",
+        "penalty_category": "Offensive", "penalty_name": "Holding",
+        "penalty_yards": 10, "penalty_outcome": "accepted",
+    })
+    assert result.ok, result.code
+    s = g.store
+    assert (s["ball_spot"], s["down"], s["distance"]) == ("RIGHT 18", "2nd", "20")
+    assert C.goal_to_go(s) is True
+    assert s["events"][-1]["after"]["distance"] == "20"
+
+
+@pytest.mark.parametrize("yards", [5, 10, 15])
+@pytest.mark.parametrize("distance", ["10", "8", "3"])
+def test_offensive_penalty_moves_ball_and_distance_in_lockstep(yards, distance) -> None:
+    """The invariant behind the case above: both grow by exactly the enforced
+    yardage, so a goal-to-go situation stays goal-to-go and a non-goal-to-go
+    one stays that way."""
+    state = _goal_line_state("RIGHT 8", distance, "2nd")
+    was = C.goal_to_go(state)
+    to_goal_before, distance_before = C.yards_to_goal(state), int(state["distance"])
+
+    result = _enforce(state, name="Holding", yards=yards)
+
+    assert result["applied"] is True
+    assert C.yards_to_goal(state) - to_goal_before == int(state["distance"]) - distance_before == yards
+    assert C.goal_to_go(state) is was
+
+
+def test_a_penalty_that_pushes_the_offense_out_of_goal_to_go_range_is_not_goal_to_go() -> None:
+    # 2nd & 3 from the 25 is not goal to go; a 10-yard holding makes it 2nd & 13
+    # from the 35 -- still not.
+    state = _goal_line_state("RIGHT 25", "3", "2nd")
+    assert C.goal_to_go(state) is False
+    _enforce(state, name="Holding", yards=10)
+    assert (state["ball_spot"], state["distance"]) == ("RIGHT 35", "13")
+    assert C.goal_to_go(state) is False and C.field_state(state)["distance_display"] == "13"
+
+
+@pytest.mark.parametrize(
+    "possession,spot,extra",
+    [
+        ("home", "RIGHT 8", {}),                                                   # home drives right
+        ("visitor", "LEFT 8", {}),                                                  # visitor drives left
+        ("home", "LEFT 8", {"home_direction": "left", "visitor_direction": "right"}),  # after a change of ends
+    ],
+)
+def test_penalty_goal_to_go_holds_in_every_orientation(possession, spot, extra) -> None:
+    state = _goal_line_state(spot, "10", "2nd", possession=possession, **extra)
+    _enforce(state, selected_team=possession, name="Holding", yards=10)
+    assert state["distance"] == "20"
+    assert C.yards_to_goal(state) == 18 and C.goal_to_go(state) is True
