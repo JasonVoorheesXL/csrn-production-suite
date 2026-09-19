@@ -718,6 +718,10 @@ DEFAULT_STATE: dict[str, Any] = {
     "next_play_number": 1,
     "ball_spot": "",
     "ball_spot_visible": True,
+    # Operator play log: show each play's down & distance. On by default so an
+    # existing or new broadcast behaves exactly as before until the operator
+    # hides it. Display-only -- the down/distance engine runs regardless.
+    "down_distance_visible": True,
     "correction_log": [],
     "game_data_authority": "broadcaster",
     "statistician_enabled": False,

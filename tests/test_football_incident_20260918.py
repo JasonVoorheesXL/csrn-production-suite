@@ -985,12 +985,9 @@ def test_event_log_row_shows_the_gated_game_clock() -> None:
 
 # --- Item 9b: live play log shows down & distance ----------------------------
 #
-# Down & distance after each play. There is NO per-broadcast "down & distance
-# enabled" setting in the codebase (only ball_spot_visible and the Layout
-# Builder's overlay-only game_fields visibility), so the only gate is the
-# engine's own convention -- a real down and a real distance; "Off"/empty is
-# not shown. eventDownDistanceEnabled() is the single place to repoint if a
-# real setting is added.
+# Down & distance after each play. Two gates: the engine's own convention (a
+# real down and a real distance; "Off"/empty is not shown) and, since item 11,
+# the per-broadcast down_distance_visible setting via eventDownDistanceEnabled().
 
 
 def test_events_and_plays_carry_the_down_and_distance_the_log_reads() -> None:
@@ -1020,7 +1017,8 @@ def test_event_log_row_shows_down_and_distance_after_the_play() -> None:
     # a real down and a real distance only: "Off"/empty is hidden
     assert "toLowerCase()==='off'" in helper
     assert "eventDownDistanceEnabled()" in helper
-    assert "function eventDownDistanceEnabled(){return true}" in html  # no such setting exists yet
+    # (item 11: this was a `return true` stub until the real setting existed)
+    assert "function eventDownDistanceEnabled(){return currentState?.down_distance_visible!==false}" in html
     start = html.index("const eventLog=document.getElementById('eventLog')")
     block = html[start : html.index("const confirmation=document.getElementById('eventConfirmation')", start)]
     assert "eventDownDistanceText(ev)" in block and 'class="event-situation"' in block
@@ -1150,3 +1148,105 @@ def test_penalty_goal_to_go_holds_in_every_orientation(possession, spot, extra) 
     _enforce(state, selected_team=possession, name="Holding", yards=10)
     assert state["distance"] == "20"
     assert C.yards_to_goal(state) == 18 and C.goal_to_go(state) is True
+
+
+# --- Item 11: down & distance in the play log is a real per-broadcast toggle -
+#
+# `down_distance_visible`, modelled on clock_visible / ball_spot_visible:
+# an app.py default, a GameOperationsService settable field, and Hide/Show
+# buttons beside the Clock Display ones. ON by default -- nothing changes for
+# anyone who never touches the control. Read LIVE by the log (see the comment
+# on eventDownDistanceEnabled() for why that differs from the clock).
+
+
+def test_down_distance_visible_defaults_to_on_for_a_new_broadcast() -> None:
+    import app
+
+    assert app.DEFAULT_STATE["down_distance_visible"] is True
+
+
+def test_states_saved_before_the_setting_existed_load_with_it_on(tmp_path) -> None:
+    """The point of default-on: an existing broadcast's saved state has no such
+    key and must come back as ON -- not off, not missing."""
+    import json
+
+    import app
+    from core_repositories import StateRepository
+    from persistence_engine import JsonPersistenceEngine
+
+    legacy = {k: v for k, v in app.DEFAULT_STATE.items() if k != "down_distance_visible"}
+    legacy.update(broadcast_id="OLD-GAME", home_score=7)
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps(legacy), encoding="utf-8")
+    engine = JsonPersistenceEngine(tmp_path / "bk", tmp_path / "q")
+
+    loaded = StateRepository(engine, path, app.DEFAULT_STATE).load()
+
+    assert loaded["broadcast_id"] == "OLD-GAME" and loaded["home_score"] == 7
+    assert loaded["down_distance_visible"] is True
+
+
+def test_a_saved_off_setting_survives_a_reload(tmp_path) -> None:
+    import json
+
+    import app
+    from core_repositories import StateRepository
+    from persistence_engine import JsonPersistenceEngine
+
+    saved = {**app.DEFAULT_STATE, "broadcast_id": "G", "down_distance_visible": False}
+    path = tmp_path / "state.json"
+    path.write_text(json.dumps(saved), encoding="utf-8")
+    loaded = StateRepository(JsonPersistenceEngine(tmp_path / "bk", tmp_path / "q"), path, app.DEFAULT_STATE).load()
+    assert loaded["down_distance_visible"] is False
+
+
+def test_state_service_normalize_keeps_an_off_setting_and_defaults_a_missing_one_to_on() -> None:
+    import app
+    from state_service import StateService
+
+    service = StateService(load_raw=lambda: {}, replace_raw=lambda s: dict(s), default_state=lambda: dict(app.DEFAULT_STATE))
+    assert service.normalize({"broadcast_id": "G"})["down_distance_visible"] is True
+    assert service.normalize({"broadcast_id": "G", "down_distance_visible": False})["down_distance_visible"] is False
+    assert service.normalize({"broadcast_id": "G", "down_distance_visible": True})["down_distance_visible"] is True
+
+
+def test_down_distance_visible_is_settable_and_display_only() -> None:
+    """Settable through GameOperationsService like clock_visible, and -- being a
+    display flag, not game data -- not subject to the statistician authority lock
+    and never touching the game itself."""
+    from game_operations_service import GameOperationsService
+
+    assert "down_distance_visible" in GameOperationsService.ALLOWED_SET_FIELDS
+    assert "down_distance_visible" not in GameOperationsService.GAME_DATA_FIELDS
+
+    service, store = _ops(_state(game_data_authority="statistician", down_distance_visible=True))
+    before = {k: store["state"][k] for k in ("down", "distance", "ball_spot", "possession", "home_score")}
+
+    # a broadcaster-source change is accepted even though the statistician holds game-data authority
+    result = service.set_values({"source": "broadcaster", "down_distance_visible": False})
+    assert result.ok and result.data["changes"] == {"down_distance_visible": False}
+    assert store["state"]["down_distance_visible"] is False
+    assert {k: store["state"][k] for k in before} == before
+
+    assert service.set_values({"source": "broadcaster", "down_distance_visible": True}).ok
+    assert store["state"]["down_distance_visible"] is True
+
+
+def test_down_distance_toggle_control_sits_beside_the_clock_display_control() -> None:
+    html = _index_html()
+    assert 'id="downDistanceVisibilityButtons"' in html
+    assert "setState('down_distance_visible',false)" in html and "setState('down_distance_visible',true)" in html
+    # active state is highlighted the same way as the clock buttons, defaulting to ON when unset
+    assert "markActive('downDistanceVisibilityButtons', String(currentState.down_distance_visible !== false))" in html
+    # placed directly after the Clock Display control, before Quarter
+    assert html.index('id="clockVisibilityButtons"') < html.index('id="downDistanceVisibilityButtons"') < html.index("<h3>Quarter</h3>")
+    # it is labelled as a play-log control, not an on-air one
+    assert "Play Log: Down &amp; Distance" in html
+
+
+def test_event_log_gate_reads_the_setting_live_and_defaults_to_on() -> None:
+    html = _index_html()
+    assert "function eventDownDistanceEnabled(){return currentState?.down_distance_visible!==false}" in html
+    # the row builder still goes through the gate
+    text_fn = _js_function(html, "eventDownDistanceText")
+    assert "if(!eventDownDistanceEnabled())return ''" in text_fn

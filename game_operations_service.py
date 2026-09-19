@@ -44,6 +44,8 @@ class GameOperationsService:
         "ticker_speed",
         "ticker_pause",
         "ball_spot_visible",
+        # Operator play-log toggle for down & distance (display-only).
+        "down_distance_visible",
         # Video-mode support (CSRN_VIDEO_MODE_BUILD_PROMPT.md) -- live-
         # mutable like every other broadcast-level display toggle above
         # (scorebug_visible, ticker_visible, ...); a game could plausibly
