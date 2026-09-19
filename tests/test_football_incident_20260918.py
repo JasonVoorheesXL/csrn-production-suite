@@ -466,3 +466,43 @@ def test_rebuild_is_still_a_pure_baseline_reducer_by_default() -> None:
     assert (rebuilt["quarter"], rebuilt["clock_seconds"], rebuilt["home_direction"]) == ("1", 720, "right")
     kept = C.rebuild(live, [], [], baseline=baseline, preserve_live=True)
     assert (kept["quarter"], kept["clock_seconds"], kept["home_direction"]) == ("3", 100, "left")
+
+
+# --- Bug 4a: the edit modal reads the play's own direction -------------------
+#
+# updateEditCalculation() used the live currentState direction, so any edit made
+# after a change of ends computed yards with the wrong sign (correction
+# COR-1789779045467: LEFT 49 -> RIGHT 49 on a 2-yard edit). No JS runtime in the
+# test environment, so this pins the source; the recorded direction it relies
+# on is guaranteed by test_edit_keeps_each_events_recorded_direction_and_quarter.
+
+
+def _index_html() -> str:
+    from pathlib import Path
+
+    return (Path(__file__).resolve().parents[1] / "templates" / "index.html").read_text(encoding="utf-8")
+
+
+def _js_function(source: str, name: str) -> str:
+    start = source.index(f"function {name}(")
+    return source[start : source.index("\nfunction ", start + 1)]
+
+
+def test_edit_calculation_uses_the_recorded_play_direction() -> None:
+    html = _index_html()
+    calc = _js_function(html, "updateEditCalculation")
+    assert "playDirection(ev,team)" in calc
+    assert "currentState?.[team+'_direction']" not in calc
+
+
+def test_edit_drive_arrow_uses_the_recorded_play_direction() -> None:
+    opener = _js_function(_index_html(), "openEditEvent")
+    assert "playDirection(ev,team)" in opener
+    assert "currentState?.[team+'_direction']" not in opener
+
+
+def test_play_direction_prefers_the_event_snapshot_and_falls_back_to_live() -> None:
+    helper = _js_function(_index_html(), "playDirection")
+    assert "ev?.before?.[team+'_direction']" in helper
+    # legacy events without a recorded direction still resolve (live direction)
+    assert "currentState?.[team+'_direction']" in helper
