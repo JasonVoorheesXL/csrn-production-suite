@@ -62,11 +62,8 @@ state stays numeric (it posts `currentState.distance` back on a spot
 correction). `productionDownDistance()` keeps the text "1st & Goal" but shows
 yards-to-goal digits in LED cells (Stadium glyph set has no "A").
 
-**Not visually verified** on any of the eight themes: no Node/browser render
-was done. The eight-bit and stadium engines parse `downDistance` with a
-digits-only regex and fall back to demo values, but `applyBoardOverrides()` runs
-after each render and replaces those cells. Worth one look at a goal-to-go state
-on each theme before game day.
+**Rendered and verified per package** (see "Theme rendering verification" at the
+bottom). Note: there are five selectable packages, not eight.
 
 ## Bug 4b - edit/undo/restore reset period, clock, ends
 
@@ -259,6 +256,41 @@ Full suite in the worktree (with `CSRN_GAME_DAY_LOCAL_STATE=1` and an isolated
 have unmerged work (`basketball-p5-ui-followup-20260914`,
 `hockey-engine-scoping-20260907`).
 
-Not covered by any automated test: how "1st & Goal" and the LED-cell yards render
-on each of the eight themes (bug 3), and the two new second-half direction
-selects and the new log-row layout in a real operator session (items 7, 9).
+## Theme rendering verification (bug 3)
+
+Run against the real app (source-checkout mode, isolated state/template files,
+port 5071, no PIN or license bypass; the live install was not touched), with the
+overlay at 1920x1080 in the browser pane. State: Q3, clock 8:32, home ball at the
+opponent's 6, 1st & 10 stored. The selectable packages are `legacy` (classic
+overlay), `friday_night_stadium`, `eight_bit_gameday`, `heritage_press` and
+`collegiate_traditional`; `digital_neon` is hidden (see below).
+
+| Package | Goal-to-go (1st & 10 @ opp 6) | Control (3rd & 7 @ LEFT 40) |
+|---|---|---|
+| Classic overlay (`legacy`) | "1ST & GOAL" | "3RD & 7" |
+| Friday Night Stadium | DOWN 1, **TO GO 6**, BALL ON 6 | DOWN 3, TO GO 7, BALL ON 40 |
+| Eight-Bit Gameday | DOWN 1, **TO GO 6**, BALL ON 6 | DOWN 3, TO GO 7, BALL ON 40 |
+| Heritage Press | "1ST & GOAL" (header and Game State panel) | "3RD & 7" |
+| Collegiate Traditional | "1st & Goal"; first-down marker on the goal line (95%), line to gain "...GOAL" | "3rd & 7"; line to gain "Cavaliers 47", marker 7 yds ahead |
+
+Also checked: the exact boundary (2nd & 10 from the 10) reads "2nd & Goal" on
+Collegiate (marker still on the goal line) and puts a **two-digit** number in the
+Stadium LED cell, which fits. The LED cells show yards-to-goal, so a 10-yard
+distance at the 6 now reads 6, not 10.
+
+Observations, none caused by this change:
+- The Collegiate LINE TO GAIN cell visually clips a long school name
+  ("AMORY HIGH SCHOOL GO..."); the full text is "...GOAL". The old code clamped to
+  the same goal-line position, so this is unchanged.
+- The Eight-Bit board's POSSESSION cell shows a dash in this test state and
+  its score digits render very small; neither involves down/distance.
+- `digital_neon` fails to bind in this environment with "Theme scorebug render
+  contract failed" and falls back to the classic scorebug. It fails identically on
+  the **normal** down and with trunk's original `csrn-production-theme-runtime.js`
+  swapped in, so it is pre-existing and unrelated (the package is hidden from the
+  picker). Neon's goal-to-go rendering therefore could not be verified.
+
+Still not covered by any test: the two second-half direction selects and the new
+event-log row layout in a real operator session (items 7 and 9), and whether the
+five packages' *other* boards (pregame/halftime scenes) are unaffected (they do
+not read `distance`).
