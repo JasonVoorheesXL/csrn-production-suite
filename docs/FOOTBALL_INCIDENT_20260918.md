@@ -5,8 +5,8 @@ bug so each can be re-verified independently. **Not merged.** Merge is gated on
 Jason confirming there is no collision with in-flight football/basketball/
 baseball work (see "Collision check").
 
-Tests: `tests/test_football_incident_20260918.py` (86 tests, one section per
-bug). Full suite in the worktree: **3052 passed, 1 skipped**.
+Tests: `tests/test_football_incident_20260918.py` (128 tests, one section per
+item). Full suite in the worktree: see the bottom of this file.
 
 | # | Commit | Report's root cause | Verdict |
 |---|--------|---------------------|---------|
@@ -16,6 +16,11 @@ bug). Full suite in the worktree: **3052 passed, 1 skipped**.
 | 4a | `35bab5e` | edit modal uses live direction | Confirmed |
 | 5 | (no code) | notes have no permanent home | **Premise wrong** |
 | 6 | `4a5a4ae` | no own-team recovery attribution | Confirmed |
+| 7 | `b59172a` | second-half direction is a forced mirror | Confirmed; operator choice added |
+| 8 | (no code) | goal-to-go is automatic | Confirmed |
+| 9a | `af3e15b` | live play log shows no game clock | Done, gated on `clock_visible` |
+| 9b | `66990c3` | live play log shows no down & distance | Done; **no setting exists to gate on** |
+| 10 | `a51e558` | pin goal-to-go through a penalty | Test only |
 
 ## Bugs 1 & 2 - ball spot follows the change of ends
 
@@ -118,10 +123,10 @@ The "ball spot penalty" text is not in the archive: only one play has a note
 "Field position controller". It was most likely on a play that was later undone
 (undone events are dropped, redo stack keeps 20) or was never saved.
 
-Unrelated, noticed in passing: PENALTY event descriptions in the archive contain
-a mojibake em dash (`Penalty, New Albany, 5 yards ? False Start`).
-`StatisticsService._repair_text` repairs the known signature on the
-report path, but the stored text is still corrupt.
+Correction (round 2): an earlier draft of this doc claimed the archive's PENALTY
+descriptions contain a mojibake em dash. That was wrong - it came from an
+ASCII-replace in the inspection script. A byte-level read shows a proper U+2014
+and 0 of 138 archived events contain mojibake or replacement characters.
 
 ## Bug 6 - own-team fumble recovery
 
@@ -149,12 +154,92 @@ Audited for single-credited-player assumptions: `statistics_service`,
 `social_service` (reads event `automation.player_*`, which is the TD scorer).
 `box_score_service` and `recap_service` never read per-play credit.
 
+## Item 7 - second-half kickoff direction is an operator choice
+
+`start_second_half()` took the receiver as a choice but derived direction with
+the same mechanical `_swap_directions()` as the in-half Q1->Q2 / Q3->Q4 breaks.
+Correct there, wrong for a fresh decision that mirrors the opening coin toss.
+
+Follows the coin toss pattern (`opening_drive_direction`, "the direction the
+opening receiver's offense will drive", validated left/right):
+`second_half_drive_direction` = the direction the **second-half receiving
+team's** offense will drive. Empty or `"mirror"` keeps the historical mirror as
+the default; anything else returns `SECOND_HALF_DIRECTION_INVALID` and changes
+nothing. Wired through both entry points (`set_values` period action and
+`toggle_halftime`; the latter also now passes an explicit receiver), with a
+select in the statistician Period Administration card and beside the
+broadcaster's halftime button.
+
+The ball spot follows **whether the ends actually change**, not whether a choice
+was made: `_set_directions()` mirrors exactly when the resulting directions
+differ from the old ones, and never otherwise (choosing to keep the first-half
+ends must not move the ball). `_swap_directions()` now goes through it, so the
+in-half breaks are unchanged. The kickoff spot is recomputed by `enter_kickoff`
+afterwards, so it is correct for every choice (tested for both receivers). A
+non-mirrored Q3 also survives a later edit of a first-half play (bug 4b).
+
+Known gap: `toggle_halftime`'s "receiver unknown" fallback still starts Q3
+without touching directions (the choice is relative to the receiver, which that
+path does not have).
+
+## Item 8 - goal-to-go is automatic (no code)
+
+Confirmed. `CanonicalStateFoundation.goal_to_go()` is derived on every read from
+live ball spot, down, distance, possession and direction, so it applies at the
+start of any set of downs at the 10 or closer *and* as the ball moves within a
+series, not only at the start of a possession.
+
+One edge noticed while tracing item 10: a defensive penalty enforced without the
+half-distance flag can leave the ball exactly on the goal line (0 yards to go),
+where `goal_to_go()` is false by design (`0 < yards_to_goal`), so the overlay
+reads "1st & 10". That is the half-distance option's job, not a goal-to-go bug.
+
+## Item 9 - live play log: game clock and down & distance
+
+`templates/index.html`, the `eventLog` row builder (distinct from the post-game
+`play_register`). Both helpers were executed in the browser pane against edge
+cases, not just source-asserted.
+
+**9a - clock (`af3e15b`).** `eventClockText()` renders `M:SS` from
+`ev.after.clock_seconds` (512 -> `8:32`) in the `<time>` cell: `Q2 · 8:32 ·
+10:42:31 PM`. Gated on **`clock_visible`**: confirmed as the right field - it is
+what the "Clock Display: Hide/Show Clock" buttons set (`setState('clock_visible')`
+/ `toggleClockVisibility()`) and defaults to hidden. The gate reads the value
+recorded **with the event** (`ev.after.clock_visible`), live flag only as a
+fallback for older events. Reason, from the real incident game: its first plays
+were logged with the clock hidden and frozen at 720, which would otherwise show a
+misleading `12:00` on every early row. `after.clock_seconds` is the live countdown
+(`load_state` -> `StateService.load()` derives the running clock).
+
+**9b - down & distance (`66990c3`).** Shown as a small line under the
+description from `ev.after.down/distance` (fallback to the play's
+`resulting_*`, which only replayed plays have). **No "down & distance enabled"
+setting exists anywhere**: not in state defaults, `GameOperationsService`'s
+settable fields, the rulesets, or `index.html`. Nearest siblings are
+`ball_spot_visible` and the Layout Builder's overlay-only `game_fields`
+visibility, both different things. So it is gated only on the engine's own
+convention - a real down and a real distance; `Off`/empty (kickoffs, coin toss,
+tries) is hidden - through one function, `eventDownDistanceEnabled()`. Own
+commit so it can be dropped or re-gated independently. **Open question for
+Jason:** is down/distance tracking optional per broadcast? If so this needs a
+new setting rather than an existing one.
+
+## Item 10 - goal-to-go through a penalty (test only)
+
+At 2nd & Goal from the 8 (stored distance 10 - goal-to-go is display-only), a
+10-yard offensive holding gives distance 20 at the 18 (18 to goal); 18 <= 20 so
+it still reads Goal. Depends on `penalty_service` adding the same enforced yards
+to `distance` that it moves the ball. Pinned with the exact case, the overlay
+value, the full `EventService.trigger` path, a lockstep invariant across penalty
+sizes and distances, a negative control, and three orientations. Mutation-checked:
+breaking either half of the lockstep fails 15 tests.
+
 ## Collision check (for Jason's merge gate)
 
 Files changed: `canonical_state_service.py`, `event_service.py`,
 `period_service.py`, `rules_service.py`, `state_service.py`,
 `statistics_service.py`, `static/csrn-production-theme-runtime.js`,
-`templates/index.html`, plus tests.
+`templates/index.html`, `game_operations_service.py` (item 7), plus tests.
 
 Nearly every recent round is already merged into trunk `4bde8e9`. The only
 branches with unmerged work are `basketball-p5-ui-followup-20260914`
@@ -165,3 +250,15 @@ branches with unmerged work are `basketball-p5-ui-followup-20260914`
 `csrn-production-theme-runtime.js` are the two shared surfaces, so re-run this
 check if either branch lands first. The production folder's uncommitted WIP
 (`Data/Runtime/pregame_presentation.json`) does not overlap either.
+
+## Verification summary
+
+Full suite in the worktree (with `CSRN_GAME_DAY_LOCAL_STATE=1` and an isolated
+`CSRN_STATE_AUTHORITY_FILE`): **3094 passed, 1 skipped**. Trunk was still
+`4bde8e9` when re-checked; still no file overlap with the only two branches that
+have unmerged work (`basketball-p5-ui-followup-20260914`,
+`hockey-engine-scoping-20260907`).
+
+Not covered by any automated test: how "1st & Goal" and the LED-cell yards render
+on each of the eight themes (bug 3), and the two new second-half direction
+selects and the new log-row layout in a real operator session (items 7, 9).
