@@ -948,7 +948,12 @@ def build_pregame_presentation_blueprint() -> Blueprint:
         path = _overlay_template()
         if not path.exists():
             return Response("Pregame overlay template missing.", status=500, mimetype="text/plain")
-        return Response(path.read_text(encoding="utf-8"), mimetype="text/html")
+        html = path.read_text(encoding="utf-8")
+        if request.args.get("layout_preview") == "1":
+            # Layout Builder P2: only the builder's embedded preview asks for
+            # this; the real overlay's HTML (what OBS loads) is unchanged.
+            html = html.replace("<head>", '<head><script src="/static/csrn-layout-preview.js"></script>', 1)
+        return Response(html, mimetype="text/html")
 
     @bp.get("/api/pregame-presentation")
     def status():

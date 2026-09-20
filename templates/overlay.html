@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+{% if request.args.get('layout_preview') == '1' %}<script src="/static/csrn-layout-preview.js"></script>{% endif %}<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CSRN Football Scorebug</title>
 <style>
 :root{--ease:cubic-bezier(.2,.75,.2,1)}
