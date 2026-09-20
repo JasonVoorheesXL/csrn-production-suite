@@ -261,6 +261,12 @@ _EXISTING_INSTALL = STATE_FILE.exists() or CONFIG_FILE.exists()
 IDENTITY_PROFILE = load_identity_profile(
     IDENTITY_FILE, existing_install=_EXISTING_INSTALL
 )
+# The unresolved problem (if any) with the profile THE RUNNING APP IS USING,
+# captured whenever IDENTITY_PROFILE is (re)bound. It is deliberately not read
+# live from identity_service: other code re-reads the file (the launcher's
+# streaming-links call, Configuration Manager saves), and a fixed file must not
+# make diagnostics go green while the app is still showing the fallback values.
+IDENTITY_PROFILE_ISSUE = identity_service.load_issue(IDENTITY_FILE)
 
 
 def internal_tools_enabled() -> bool:
@@ -511,10 +517,11 @@ def _complete_onboarding(payload: Mapping[str, Any]) -> tuple[bool, str, str]:
     profile["onboarding_complete"] = True
     save_identity_profile(IDENTITY_FILE, profile, existing_install=_EXISTING_INSTALL)
 
-    global IDENTITY_PROFILE
+    global IDENTITY_PROFILE, IDENTITY_PROFILE_ISSUE
     IDENTITY_PROFILE = load_identity_profile(
         IDENTITY_FILE, existing_install=_EXISTING_INSTALL
     )
+    IDENTITY_PROFILE_ISSUE = identity_service.load_issue(IDENTITY_FILE)
     return True, "", ""
 
 
@@ -1254,7 +1261,7 @@ def save_layouts_document(document: Mapping[str, Any]) -> dict[str, Any]:
     pregame_presentation read on every request) and drop the runtime-state
     cache, so the change reaches the overlays on their next poll -- no restart.
     """
-    global IDENTITY_PROFILE
+    global IDENTITY_PROFILE, IDENTITY_PROFILE_ISSUE
     with _LAYOUTS_WRITE_LOCK:
         current = load_identity_profile(IDENTITY_FILE, existing_install=True)
         current["layouts"] = copy.deepcopy(dict(document))
@@ -1262,6 +1269,7 @@ def save_layouts_document(document: Mapping[str, Any]) -> dict[str, Any]:
         IDENTITY_PROFILE = load_identity_profile(
             IDENTITY_FILE, existing_install=_EXISTING_INSTALL
         )
+        IDENTITY_PROFILE_ISSUE = identity_service.load_issue(IDENTITY_FILE)
         saved = copy.deepcopy(IDENTITY_PROFILE.get("layouts") or {})
     from runtime_state_cache import invalidate_runtime_state_cache
 
@@ -1388,7 +1396,7 @@ def get_diagnostics_service() -> DiagnosticsService:
             load_obs_status=load_obs_status,
             authenticated=authenticated,
             migrate_venues=migrate_venue_names,
-            identity_status=lambda: identity_service.load_issue(IDENTITY_FILE),
+            identity_status=lambda: IDENTITY_PROFILE_ISSUE,
             identity_file=IDENTITY_FILE,
         )
     return DIAGNOSTICS_SERVICE

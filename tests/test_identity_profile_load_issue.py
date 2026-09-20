@@ -270,15 +270,48 @@ def test_the_real_app_reports_its_own_corrupt_profile_through_diagnostics(tmp_pa
 
     path = _write(tmp_path, '{"organization": ')
     monkeypatch.setattr(app_module, "IDENTITY_FILE", path)
-    _load(path)  # what a startup / save does
+    # what the app's startup does: load the profile and remember its problem
+    monkeypatch.setattr(app_module, "IDENTITY_PROFILE", _load(path))
+    monkeypatch.setattr(app_module, "IDENTITY_PROFILE_ISSUE", identity_service.load_issue(path))
     with app_module.app.test_request_context():  # diagnostics() reads the session
         diagnostics = app_module.diagnostic_status()
         assert diagnostics["identity_profile"]["ok"] is False
         assert diagnostics["identity_profile"]["issue"]["kind"] == "invalid_json"
         assert diagnostics["identity_profile"]["path"] != ""
-        path.write_text(json.dumps(GOOD), encoding="utf-8")
-        _load(path)
-        assert app_module.diagnostic_status()["identity_profile"]["ok"] is True
+
+
+def test_fixing_the_file_does_not_turn_diagnostics_green_while_the_app_is_still_on_the_fallback(
+    tmp_path, monkeypatch,
+) -> None:
+    """Other code re-reads identity_profile.json at runtime (the launcher's
+    streaming-links call, Configuration Manager saves). If that cleared the
+    warning, an operator who fixed the file but did not restart would see
+    green while the graphics still show the fallback values."""
+    import app as app_module
+
+    path = _write(tmp_path, '{"organization": ')
+    monkeypatch.setattr(app_module, "IDENTITY_FILE", path)
+    monkeypatch.setattr(app_module, "IDENTITY_PROFILE", _load(path))
+    monkeypatch.setattr(app_module, "IDENTITY_PROFILE_ISSUE", identity_service.load_issue(path))
+    path.write_text(json.dumps(GOOD), encoding="utf-8")
+    assert app_module.identity_streaming_links() is not None  # a runtime re-read of the fixed file...
+    assert identity_service.load_issue(path) is None            # ...clears the file-level issue
+    with app_module.app.test_request_context():
+        assert app_module.diagnostic_status()["identity_profile"]["ok"] is False  # but the running app still is on the fallback
+
+
+def test_a_save_that_rebinds_the_profile_reports_the_new_truth(tmp_path, monkeypatch) -> None:
+    import app as app_module
+
+    path = _write(tmp_path, '{"organization": ')
+    monkeypatch.setattr(app_module, "IDENTITY_FILE", path)
+    monkeypatch.setattr(app_module, "_EXISTING_INSTALL", True)
+    monkeypatch.setattr(app_module, "IDENTITY_PROFILE", _load(path))
+    monkeypatch.setattr(app_module, "IDENTITY_PROFILE_ISSUE", identity_service.load_issue(path))
+    app_module.save_layouts_document(identity_service.layout_builder_service.default_layouts_document())
+    assert app_module.IDENTITY_PROFILE_ISSUE is None  # the file is valid and is what the app now runs on
+    assert json.loads(path.read_text(encoding="utf-8"))["layouts"]
+    assert list(tmp_path.glob("identity_profile.json.corrupt-*"))  # and the original is still kept
 
 
 def test_command_center_shows_the_identity_row_in_the_diagnostics_panel() -> None:
