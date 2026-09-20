@@ -14,25 +14,48 @@ import app as app_module
 
 
 def test_build_command_center_server_returns_a_bound_stoppable_server(monkeypatch) -> None:
+    """The builder binds the production port and returns a live, stoppable server.
+
+    Runs on an OS-chosen loopback port so it passes whether or not a real CSRN
+    instance is holding :5050 (it used to fail whenever one was). The one thing
+    that genuinely is about 5050 -- that the builder asks for it, because OBS
+    overlay URLs depend on it -- is still asserted, on the port the builder
+    *requests*, rather than by needing that port to be free.
+    """
+    import waitress
+
     # Don't actually stand up the isolated media server on :5051 for a unit test.
     monkeypatch.setattr(app_module, "start_isolated_media_server", lambda *a, **k: 5051)
     monkeypatch.setattr(app_module, "ensure_data_architecture", lambda: None)
     monkeypatch.setattr(app_module, "load_config", lambda: {})
 
+    port = _free_port()
+    requested: dict = {}
+    real_create_server = waitress.create_server
+
+    def create_server_on_our_port(application, **kwargs):
+        requested.update(kwargs)  # what the builder asked for
+        kwargs.update(host="127.0.0.1", port=port)
+        return real_create_server(application, **kwargs)
+
+    monkeypatch.setattr(waitress, "create_server", create_server_on_our_port)
+
     server = app_module.build_command_center_server()
     try:
-        # create_server(_start=True) binds the socket immediately.
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(1.0)
-            assert s.connect_ex(("127.0.0.1", 5050)) == 0  # something is listening
+        assert requested["port"] == 5050  # the production port contract
+        # create_server(_start=True) binds the socket immediately -- and it is
+        # ours, so this cannot be satisfied by some other process on the port.
+        assert _listening(port)
 
         t = threading.Thread(target=server.run, daemon=True)
         t.start()
         # serve for a beat, then stop it from this (non-server) thread
         time.sleep(0.3)
+        assert _listening(port)
         server.close()
         t.join(timeout=5)
         assert not t.is_alive()  # server.run() returned after close()
+        assert not _listening(port)  # ...and the socket was released
     finally:
         try:
             server.close()
