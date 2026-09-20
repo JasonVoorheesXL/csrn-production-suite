@@ -43,6 +43,9 @@ const SPONSOR_ACTIVE_CLASS = "csrn-production-theme-sponsor-active";
 // Layout Builder P1: set while the active layout HIDES the element that owns
 // a video-board mode, so the legacy overlay node for that content stays
 // hidden instead of being released (see layoutMaskedRuntimeR1()).
+// Layout Builder P2: set while the active layout hides the ticker (see
+// syncLayoutSuppressionR1()); keeps the legacy stat bar from being exposed.
+const LAYOUT_HIDE_TICKER_CLASS_R2 = "csrn-production-layout-hide-ticker";
 const LAYOUT_HIDE_CLASSES_R1 = Object.freeze({
   player: "csrn-production-layout-hide-player",
   sponsor: "csrn-production-layout-hide-sponsor",
@@ -776,7 +779,8 @@ function deactivate(reason = "legacy") {
     PLAYER_PENDING_CLASS,
     HIGHLIGHT_ACTIVE_CLASS,
     SPONSOR_ACTIVE_CLASS,
-    ...Object.values(LAYOUT_HIDE_CLASSES_R1)
+    ...Object.values(LAYOUT_HIDE_CLASSES_R1),
+    LAYOUT_HIDE_TICKER_CLASS_R2
   );
   setHostState(scoreHost(), false, "legacy", "", reason);
   setHostState(playerHost(), false, "legacy", "", reason);
@@ -2263,6 +2267,19 @@ function syncLayoutSuppressionR1(runtime) {
       LAYOUT_HIDE_CLASSES_R1[mode], layoutHidesModeR1(runtime, mode)
     );
   }
+  // Same idea for the ticker (P2): the legacy overlay's stat bar (#statBar,
+  // shown while the scorebug is on and stats exist) sits under the themed
+  // ticker and is only ever hidden by being covered by it. A layout that hides
+  // the ticker would expose it, so it stays hidden while the ticker is hidden.
+  document.documentElement.classList.toggle(LAYOUT_HIDE_TICKER_CLASS_R2, layoutHidesTickerR2(runtime));
+}
+
+function layoutHidesTickerR2(runtime) {
+  if (!runtime || !runtime.layouts) return false;
+  const override = resolveLayoutOverrideR0(
+    runtime.layouts, productionSportFamily(runtime.sport), "ticker"
+  );
+  return Boolean(override) && override.visible === false;
 }
 
 function themeVideoModeFor(alias, runtime) {

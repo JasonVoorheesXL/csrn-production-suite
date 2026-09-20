@@ -732,3 +732,33 @@ def test_save_preserves_layouts_across_a_reload_from_disk(isolated_identity) -> 
     app_module.save_layouts_document(document)
     reloaded = identity_service.load_identity_profile(identity_file, existing_install=True)
     assert reloaded["layouts"] == document
+
+
+# --- P2: hiding the ticker must not expose the legacy stat bar -----------------------
+
+
+def test_hiding_the_ticker_keeps_the_legacy_stat_bar_hidden() -> None:
+    """Found by the P2 preview: with the scorebug on and stats present, the
+    legacy #statBar is normally covered by the themed ticker; a layout that hides
+    the ticker exposed it."""
+    js = _read(RUNTIME)
+    assert 'const LAYOUT_HIDE_TICKER_CLASS_R2 = "csrn-production-layout-hide-ticker";' in js
+    sync = _function(js, "syncLayoutSuppressionR1")
+    assert "classList.toggle(LAYOUT_HIDE_TICKER_CLASS_R2, layoutHidesTickerR2(runtime))" in sync
+    hides = _function(js, "layoutHidesTickerR2")
+    assert "if (!runtime || !runtime.layouts) return false;" in hides  # inert with no layout
+    assert 'productionSportFamily(runtime.sport), "ticker"' in hides and "override.visible === false" in hides
+    assert "LAYOUT_HIDE_TICKER_CLASS_R2" in _function(js, "deactivate")  # released with the other suppression classes
+    css = _read("static/csrn-production-theme-runtime.css")
+    rule = css[css.index("html.csrn-production-layout-hide-ticker #statBar"):].split("}")[0]
+    assert "display:none!important" in rule and "opacity:0!important" in rule
+    assert 'id="statBar"' in _read("templates/overlay.html")
+
+
+def test_the_original_layout_hide_classes_are_unchanged_by_the_ticker_addition() -> None:
+    js = _read(RUNTIME)
+    assert _js_mapping(js, "LAYOUT_HIDE_CLASSES_R1") == {
+        "player": "csrn-production-layout-hide-player",
+        "sponsor": "csrn-production-layout-hide-sponsor",
+        "highlight": "csrn-production-layout-hide-highlight",
+    }

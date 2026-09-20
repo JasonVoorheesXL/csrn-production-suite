@@ -131,6 +131,13 @@ html.csrn-production-theme-player-active #playerGraphic{
 /* Layout Builder P1: the active layout hides this element, so the legacy
    overlay node for the same content must stay hidden (see
    syncLayoutSuppressionR1() in csrn-production-theme-runtime.js). */
+/* Layout Builder P2: hiding the ticker must not expose the legacy stat bar that
+   the themed ticker normally covers. */
+html.csrn-production-layout-hide-ticker #statBar{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+}
 html.csrn-production-layout-hide-player #playerGraphic,
 html.csrn-production-layout-hide-sponsor #sponsorSpotlight,
 html.csrn-production-layout-hide-highlight #playerHighlight{
