@@ -167,14 +167,15 @@ def test_apply_hook_never_hides_a_video_board_mode_host():
     assert "removeAttribute" not in hook
 
 
-def test_ticker_is_the_only_element_using_the_px_zone_setter():
+def test_ticker_placement_goes_through_the_reversible_isolated_component_path():
     js = _read("static/csrn-production-theme-runtime.js")
     hook = js.split("function applyLayoutOverrides")[1].split("\nasync function renderSelected")[0]
-    # setNodeZonePxR0() writes position/left/top/width/height. That is exactly
-    # what P0 live-verified crushes the bonded scorebug board, so score_box
-    # must never go through it -- only the isolated ticker component does.
-    # (score_box placement is a uniform transform: see test_layout_builder_p1.py.)
-    assert hook.count("setNodeZonePxR0(") == 1
+    # P0's setNodeZonePxR0() wrote position/left/top/width/height with no undo
+    # (and stretched the bar to the zone's height); it is gone. Ticker placement
+    # still only ever targets the isolated top-level component -- never the
+    # broader host that also carries the LIVE badge (the P0 collapse).
+    assert "setNodeZonePxR0" not in js
+    assert "applyTickerPlacementR1(isolatedTicker, tickerOverride)" in hook
     assert "resolveIsolatedTickerComponentR0(root, alias)" in hook
 
 

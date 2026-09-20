@@ -275,7 +275,7 @@ def test_score_box_placement_reuses_the_p0_target_resolver_and_aligns_by_zone_na
 def test_apply_hook_wires_placement_after_visibility_and_always_offers_the_undo() -> None:
     hook = _function(_read(RUNTIME), "applyLayoutOverrides")
     block = hook.split('"score_box"')[1].split("ticker: visibility")[0]
-    assert "if (scorebugOverride) setNodeVisibilityR0(scorebugNode, scorebugOverride.visible !== false);" in block
+    assert "setNodeVisibilityR0(scorebugNode, scorebugOverride ? scorebugOverride.visible !== false : true);" in block
     # called for a null override too -> that is what clears a placement live
     assert "applyScoreBoxPlacementR1(scorebugNode, scorebugOverride);" in block
     assert block.index("setNodeVisibilityR0(") < block.index("applyScoreBoxPlacementR1(")
@@ -299,5 +299,58 @@ def test_smoke_harness_covers_score_box_placement_on_every_theme() -> None:
         "placed board survives a full rebuild into",
         "layout removed -> board back at native box",
         "idempotent",
+    ):
+        assert token in smoke, token
+
+
+# --- B0: ticker placement is reversible; "override removed" undoes visibility --
+
+
+def test_ticker_placement_remembers_and_restores_the_inline_box() -> None:
+    js = _read(RUNTIME)
+    assert 'const TICKER_PLACEMENT_PROPS_R1 = ["position", "left", "top", "width", "height"];' in js
+    apply = _function(js, "applyTickerPlacementR1")
+    assert "node.dataset.csrnLayoutTickerPrev === undefined" in apply  # saved once, before the first write
+    assert "const target = override ? layoutTargetPxR0(override) : null;" in apply
+    assert "clearTickerPlacementR1(node);" in apply.split("if (!target")[1].split("return;")[0]
+    clear = _function(js, "clearTickerPlacementR1")
+    assert "raw === undefined) return;" in clear  # a node the layout never touched stays byte-identical
+    assert "node.style[prop] = saved[prop] || \"\"" in clear
+    assert "delete node.dataset.csrnLayoutTickerPrev" in clear
+
+
+def test_ticker_placement_takes_the_zones_x_and_width_but_keeps_the_bars_own_height() -> None:
+    apply = _function(_read(RUNTIME), "applyTickerPlacementR1")
+    assert 'node.style.left = target.x + "px";' in apply
+    assert 'node.style.width = target.w + "px";' in apply
+    assert "Math.min(nativeHeight || target.h, target.h)" in apply  # never the zone's 245-280px height
+    assert 'node.style.height = height + "px";' in apply
+    assert "layoutZoneAlignmentR1(override)" in apply  # top-* / bottom-* edge alignment shared with score_box
+
+
+def test_hook_always_offers_visibility_and_placement_so_a_removed_override_is_undone() -> None:
+    hook = _function(_read(RUNTIME), "applyLayoutOverrides")
+    # visibility: a null override means "visible" -> setNodeVisibilityR0 restores what it hid
+    assert "setNodeVisibilityR0(tickerNode, tickerOverride ? tickerOverride.visible !== false : true);" in hook
+    assert "setNodeVisibilityR0(scorebugNode, scorebugOverride ? scorebugOverride.visible !== false : true);" in hook
+    # placement: called with the (possibly null) override, never gated on it
+    assert "if (isolatedTicker) applyTickerPlacementR1(isolatedTicker, tickerOverride);" in hook
+    assert "if (tickerOverride) {" not in hook
+
+
+def test_only_the_isolated_ticker_component_is_ever_placed() -> None:
+    js = _read(RUNTIME)
+    assert "setNodeZonePxR0" not in js  # P0's non-reversible, height-stretching setter is gone
+    isolated = _function(js, "resolveIsolatedTickerComponentR0")
+    assert "closest('[data-component=\"ticker\"]')" in isolated
+
+
+def test_smoke_harness_covers_ticker_placement() -> None:
+    smoke = _read("tools/layout_builder_smoke.js")
+    for token in (
+        "window.__tickerMatrix",
+        "csrnLayoutTickerPrev",
+        "override removed -> ticker back at its exact native inline box",
+        "no isolated ticker component on this theme",
     ):
         assert token in smoke, token

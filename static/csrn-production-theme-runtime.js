@@ -3344,31 +3344,50 @@ function setNodeVisibilityR0(node, visible) {
   }
 }
 
-// Repositions `node` to `targetPx` (1920x1080-basis px) using the browser's
-// own layout (getBoundingClientRect() / offsetParent) rather than assuming
-// any particular theme's DOM nesting or which ancestor is CSS-positioned --
-// this is what lets one function reposition both a direct canvas child
-// (the scorebug component) and a deeply-nested per-theme ticker node
-// correctly.
-function setNodeZonePxR0(node, canvasRoot, targetPx) {
-  if (!node || !canvasRoot || !targetPx) return;
-  const canvasRect = canvasRoot.getBoundingClientRect();
-  if (!canvasRect.width || !canvasRect.height) return;
-  const scaleX = canvasRect.width / 1920;
-  const scaleY = canvasRect.height / 1080;
-  const onScreen = {
-    left: canvasRect.left + targetPx.x * scaleX,
-    top: canvasRect.top + targetPx.y * scaleY,
-    width: targetPx.w * scaleX,
-    height: targetPx.h * scaleY
-  };
-  const parent = node.offsetParent || canvasRoot;
-  const parentRect = parent.getBoundingClientRect();
+// Ticker placement (P0 originally, reworked for live editing in P1). The
+// isolated ticker component is a bar whose HEIGHT is its own (FNS/8-Bit: 62px);
+// the engine zones are far taller (e.g. bottom-center is 245px), so the zone is
+// used for WHERE and how WIDE, never how tall: the bar takes the zone's x and
+// width, keeps its native height, and is aligned to the zone's top/bottom edge
+// by zone name (else centred). Everything the hook touches is remembered in
+// dataset.csrnLayoutTickerPrev and put back verbatim when the override goes
+// away -- P0 wrote the inline box with no undo, so a live preset change left
+// the ticker stranded where the previous preset had put it. The canvas is a
+// fixed 1920x1080 layout (#csrnProductionThemeLayout), so layout px are canvas
+// px and no on-screen scaling is involved.
+const TICKER_PLACEMENT_PROPS_R1 = ["position", "left", "top", "width", "height"];
+
+function clearTickerPlacementR1(node) {
+  const raw = node.dataset.csrnLayoutTickerPrev;
+  if (raw === undefined) return;
+  let saved = {};
+  try { saved = JSON.parse(raw) || {}; } catch (_) { saved = {}; }
+  for (const prop of TICKER_PLACEMENT_PROPS_R1) node.style[prop] = saved[prop] || "";
+  delete node.dataset.csrnLayoutTickerPrev;
+}
+
+// `override` is the resolved ticker override, or null to undo any placement.
+function applyTickerPlacementR1(node, override) {
+  if (!node) return;
+  const target = override ? layoutTargetPxR0(override) : null;
+  if (!target || !(target.w > 0) || !(target.h > 0)) {
+    clearTickerPlacementR1(node);
+    return;
+  }
+  if (node.dataset.csrnLayoutTickerPrev === undefined) {
+    const saved = {};
+    for (const prop of TICKER_PLACEMENT_PROPS_R1) saved[prop] = node.style[prop];
+    node.dataset.csrnLayoutTickerPrev = JSON.stringify(saved);
+  }
+  const nativeHeight = parseFloat(JSON.parse(node.dataset.csrnLayoutTickerPrev).height) || node.offsetHeight;
+  const height = Math.min(nativeHeight || target.h, target.h);
+  const align = layoutZoneAlignmentR1(override);
+  const top = align.y === "start" ? target.y : align.y === "end" ? target.y + target.h - height : target.y + (target.h - height) / 2;
   node.style.position = "absolute";
-  node.style.left = (onScreen.left - parentRect.left) + "px";
-  node.style.top = (onScreen.top - parentRect.top) + "px";
-  node.style.width = onScreen.width + "px";
-  node.style.height = onScreen.height + "px";
+  node.style.left = target.x + "px";
+  node.style.top = top + "px";
+  node.style.width = target.w + "px";
+  node.style.height = height + "px";
 }
 
 // tickerKind "replace-sibling" hides the tickerSelector node and mounts the
@@ -3506,28 +3525,22 @@ function applyLayoutOverrides(root, runtime) {
   const scorebugOverride = resolveLayoutOverrideR0(layouts, family, "score_box");
   const scorebugNode = root.querySelector('.bl-component[data-component="scorebug"]');
   if (scorebugNode) {
-    if (scorebugOverride) setNodeVisibilityR0(scorebugNode, scorebugOverride.visible !== false);
+    setNodeVisibilityR0(scorebugNode, scorebugOverride ? scorebugOverride.visible !== false : true);
     applyScoreBoxPlacementR1(scorebugNode, scorebugOverride);
   }
 
   // ticker: visibility uses the broader host (safe -- a display toggle
-  // doesn't disturb shared layout); repositioning uses ONLY the isolated
+  // doesn't disturb shared layout); placement uses ONLY the isolated
   // top-level ticker component, when the theme has one (see
-  // resolveIsolatedTickerComponentR0()'s module note -- forcing the
-  // broader host to position:absolute at a fixed size was live-verified
-  // to collapse shared sibling layout).
+  // resolveIsolatedTickerComponentR0()'s module note -- forcing the broader
+  // host to position:absolute at a fixed size was live-verified to collapse
+  // shared sibling layout). Both are always called, with a null override when
+  // none applies, because that is what undoes a previous preset's effect.
   const tickerOverride = resolveLayoutOverrideR0(layouts, family, "ticker");
-  if (tickerOverride) {
-    const tickerNode = resolveTickerHostR0(root, alias);
-    if (tickerNode) {
-      setNodeVisibilityR0(tickerNode, tickerOverride.visible !== false);
-    }
-    const px = layoutTargetPxR0(tickerOverride);
-    if (px) {
-      const isolatedTicker = resolveIsolatedTickerComponentR0(root, alias);
-      if (isolatedTicker) setNodeZonePxR0(isolatedTicker, canvas, px);
-    }
-  }
+  const tickerNode = resolveTickerHostR0(root, alias);
+  if (tickerNode) setNodeVisibilityR0(tickerNode, tickerOverride ? tickerOverride.visible !== false : true);
+  const isolatedTicker = resolveIsolatedTickerComponentR0(root, alias);
+  if (isolatedTicker) applyTickerPlacementR1(isolatedTicker, tickerOverride);
 
   // sponsor_slot / spotlight_zone / video_zone visibility is NOT applied here
   // and deliberately never by hiding a node. (P0's first pass did hide the

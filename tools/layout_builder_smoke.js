@@ -210,3 +210,64 @@ window.__placementMatrix = async () => {
   check('layout removed -> board back at native box, marker cleared', o.rect.join() === base.rect.join() && o.marker === null && o.tf === '', o);
   return rows.join('\n');
 };
+
+/*
+ * ticker PLACEMENT matrix (Layout Builder P1, B0). `await __tickerMatrix()`.
+ * Only Friday Night Stadium and Eight-Bit Gameday have an isolated ticker
+ * component; on Heritage Press / Collegiate the expected result is the two
+ * "no-op" PASS lines. A zone gives the bar its x + width; the height stays the
+ * bar's own; removing the override restores the exact native inline box.
+ */
+window.__tk = () => {
+  const n = document.querySelector('#csrnProductionThemeLayout .bl-component[data-component="ticker"]');
+  if (!n) return null;
+  const b = n.getBoundingClientRect();
+  const host = n.querySelector('.bl-fns-top-ticker, .bl-8bit-top-ticker');
+  return {
+    rect: [b.left, b.top, b.width, b.height].map(Math.round),
+    style: n.getAttribute('style'),
+    prev: n.dataset.csrnLayoutTickerPrev || null,
+    hostDisplay: host ? getComputedStyle(n.querySelector('.csrn-theme-ticker-viewport') || host).display : null
+  };
+};
+window.__tickerMatrix = async () => {
+  const Z = window.CSRNBroadcastLayoutEngine.zones;
+  const rows = [];
+  const W = 2000;
+  const set = async (t) => {
+    __smoke.layouts = t ? { active: 'default', presets: { default: { in_game: { football: { ticker: t } }, pregame: {}, halftime: {} } } } : null;
+    await __wait(W);
+    return __tk();
+  };
+  const check = (name, cond, o) => rows.push((cond ? 'PASS ' : 'FAIL ') + name + '  ' + JSON.stringify(o));
+  const px = (o, prop) => parseFloat(o.style.match(new RegExp(prop + ': ([\d.]+)px'))[1]);
+  const base = await set(null);
+  rows.push('baseline ' + JSON.stringify(base));
+  if (!base) {
+    rows.push('PASS no isolated ticker component on this theme -> placement is a no-op (nothing to move)');
+    const o = await set({ zone: 'top-right' });
+    check('zone override on a theme without an isolated ticker changes nothing and does not throw', o === null, o);
+    return rows.join('\n');
+  }
+  const nativeH = base.rect[3];
+  for (const zn of ['bottom-center', 'top-right', 'top-full', 'center']) {
+    const o = await set({ zone: zn });
+    const z = Z[zn];
+    check('zone ' + zn + ' -> x/width of the zone, native height, inside the zone',
+      o.rect[0] === z.x && o.rect[2] === z.w && o.rect[3] === nativeH && o.rect[1] >= z.y && o.rect[1] + o.rect[3] <= z.y + z.h, o);
+  }
+  let o = await set({ zone: 'bottom-center' });
+  check('bottom-* zone aligns the bar to the zone bottom', px(o, 'top') + px(o, 'height') === Z['bottom-center'].y + Z['bottom-center'].h, o);
+  o = await set({ zone: 'top-right' });
+  check('top-* zone aligns the bar to the zone top', o.rect[1] === Z['top-right'].y, o);
+  o = await set({ rect: { x: 10, y: 50, w: 50, h: 10 } });
+  check('explicit rect (% of canvas) is honoured', o.rect[0] === 192 && o.rect[2] === 960, o);
+  o = await set({ visible: false });
+  check('visible:false hides the ticker host', o.hostDisplay === 'none', o);
+  o = await set({ visible: true, zone: 'top-right' });
+  check('visible again + placement -> shown and placed', o.hostDisplay !== 'none' && o.rect[0] === Z['top-right'].x, o);
+  o = await set(null);
+  check('override removed -> ticker back at its exact native inline box, marker cleared',
+    o.style === base.style && o.rect.join() === base.rect.join() && o.prev === null && o.hostDisplay !== 'none', o);
+  return rows.join('\n');
+};
