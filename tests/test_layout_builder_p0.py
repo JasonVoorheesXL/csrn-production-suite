@@ -24,7 +24,11 @@ than degrading gracefully. Both were reverted (not shipped, not silently
 downgraded to "best effort") -- see csrn-production-theme-runtime.js's own
 module docstring above applyLayoutOverrides() for the full root-cause
 account. The tests below assert the NARROWER, live-verified-safe final
-scope, not the originally-planned one.
+scope, not the originally-planned one. (Update, Layout Builder P1 A1:
+sponsor_slot / spotlight_zone / video_zone visibility is now delivered
+upstream of this hook via layout-aware mode selection -- see
+tests/test_layout_builder_p1.py -- but this hook still never hides a mode
+host, which is what the tests here keep pinning.)
 """
 
 from __future__ import annotations
@@ -139,14 +143,16 @@ def test_apply_layout_overrides_no_ops_with_no_layouts_section():
     assert 'if (!layouts || typeof layouts !== "object") return; // no section -> untouched' in js
 
 
-def test_sponsor_spotlight_and_video_zone_are_schema_only_after_live_verification():
+def test_apply_hook_never_hides_a_video_board_mode_host():
     # 2026-09-14 manual smoke test caught a real bug: hiding
     # sponsor_slot/spotlight_zone/video_zone via nativeVideoBoardHost() left
     # a blank hole where the whole scoreboard should be (sponsor/player/
     # highlight modes REPLACE the board's visible content in at least one
     # theme's markup, rather than overlaying on top of an always-present
     # board). That code path was removed rather than shipped broken --
-    # confirm it stays removed, not silently reintroduced.
+    # confirm it stays removed, not silently reintroduced. (Layout Builder P1
+    # A1 delivers the visibility effect upstream instead, by making
+    # themeVideoModeFor() layout-aware; see tests/test_layout_builder_p1.py.)
     js = _read("static/csrn-production-theme-runtime.js")
     hook = js.split("function applyLayoutOverrides")[1].split("\nasync function renderSelected")[0]
     # These exact call/lookup patterns are what the removed code path used

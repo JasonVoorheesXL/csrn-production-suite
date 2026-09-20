@@ -128,6 +128,18 @@ html.csrn-production-theme-player-active #playerGraphic{
 }
 
 
+/* Layout Builder P1: the active layout hides this element, so the legacy
+   overlay node for the same content must stay hidden (see
+   syncLayoutSuppressionR1() in csrn-production-theme-runtime.js). */
+html.csrn-production-layout-hide-player #playerGraphic,
+html.csrn-production-layout-hide-sponsor #sponsorSpotlight,
+html.csrn-production-layout-hide-highlight #playerHighlight{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
 html.csrn-production-theme-player-pending #playerGraphic,
 html.csrn-production-theme-player-active #playerGraphic{
   display:none!important;

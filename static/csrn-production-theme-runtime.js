@@ -40,6 +40,14 @@ const PLAYER_ACTIVE_CLASS = "csrn-production-theme-player-active";
 const PLAYER_PENDING_CLASS = "csrn-production-theme-player-pending";
 const HIGHLIGHT_ACTIVE_CLASS = "csrn-production-theme-highlight-active";
 const SPONSOR_ACTIVE_CLASS = "csrn-production-theme-sponsor-active";
+// Layout Builder P1: set while the active layout HIDES the element that owns
+// a video-board mode, so the legacy overlay node for that content stays
+// hidden instead of being released (see layoutMaskedRuntimeR1()).
+const LAYOUT_HIDE_CLASSES_R1 = Object.freeze({
+  player: "csrn-production-layout-hide-player",
+  sponsor: "csrn-production-layout-hide-sponsor",
+  highlight: "csrn-production-layout-hide-highlight"
+});
 
 // --- Sponsor video warm cache ------------------------------------------------
 // The 5-15s gap between the operator clicking Run and a sponsor commercial
@@ -767,7 +775,8 @@ function deactivate(reason = "legacy") {
     PLAYER_ACTIVE_CLASS,
     PLAYER_PENDING_CLASS,
     HIGHLIGHT_ACTIVE_CLASS,
-    SPONSOR_ACTIVE_CLASS
+    SPONSOR_ACTIVE_CLASS,
+    ...Object.values(LAYOUT_HIDE_CLASSES_R1)
   );
   setHostState(scoreHost(), false, "legacy", "", reason);
   setHostState(playerHost(), false, "legacy", "", reason);
@@ -2187,7 +2196,79 @@ function themedVideoBoardSupported(alias) {
     alias === "collegiate_traditional";
 }
 
+// --- Layout Builder P1: layout-aware mode selection --------------------------
+//
+// The three video-board modes REPLACE the board's content in the theme's own
+// markup (they are not overlays on an always-present scoreboard), so a
+// layout that hides the element owning a mode cannot be honoured by hiding
+// the mode's host after the fact -- that leaves a blank hole where the board
+// should be (live-verified 2026-09-14). The mode must instead never be
+// SELECTED, so the theme renders its idle/neutral board. Each mode is owned
+// by one layout element (docs/LAYOUT_BUILDER_RECONCILIATION.md Sec.5.1):
+//   sponsor   <- sponsor_slot      (runtime.sponsor_spotlight)
+//   player    <- spotlight_zone    (runtime.player_graphic)
+//   highlight <- video_zone        (runtime.player_highlight; the engine's
+//                                   `highlightVideo` component)
+const LAYOUT_MODE_ELEMENT_R1 = Object.freeze({
+  highlight: "video_zone",
+  sponsor: "sponsor_slot",
+  player: "spotlight_zone"
+});
+const LAYOUT_MODE_TRIGGER_R1 = Object.freeze({
+  highlight: "player_highlight",
+  sponsor: "sponsor_spotlight",
+  player: "player_graphic"
+});
+
+// True when the active layout has an in-game override for the element that
+// owns `mode` with visible === false. No layouts / no override -> false.
+function layoutHidesModeR1(runtime, mode) {
+  const element = LAYOUT_MODE_ELEMENT_R1[mode];
+  if (!element || !runtime || !runtime.layouts) return false;
+  const override = resolveLayoutOverrideR0(
+    runtime.layouts, productionSportFamily(runtime.sport), element
+  );
+  return Boolean(override) && override.visible === false;
+}
+
+// The runtime with every layout-hidden trigger made inert (visible:false), so
+// EVERY downstream reader -- mode selection, the pending/fallback flags, the
+// render signature, media mounting -- agrees the hidden content is
+// unavailable. With no layout (or no override that hides anything) it returns
+// the SAME object, so the default preset is byte-for-byte the old behaviour.
+function layoutMaskedRuntimeR1(runtime) {
+  if (!runtime || !runtime.layouts) return runtime;
+  let masked = null;
+  for (const mode of Object.keys(LAYOUT_MODE_ELEMENT_R1)) {
+    if (!layoutHidesModeR1(runtime, mode)) continue;
+    const key = LAYOUT_MODE_TRIGGER_R1[mode];
+    const graphic = runtime[key];
+    if (!graphic || typeof graphic !== "object" || !graphic.visible) continue;
+    if (!masked) masked = Object.assign({}, runtime);
+    masked[key] = Object.assign({}, graphic, {visible: false});
+  }
+  return masked || runtime;
+}
+
+// Keeps the legacy overlay's own player/sponsor/highlight node hidden while
+// the layout hides that element. enforceLegacyMediaOwnership() only
+// suppresses a legacy node while the THEMED mode owns that content and
+// RELEASES it otherwise -- so without this, a layout-hidden trigger would
+// fall through to the idle board and the old overlay would pop the same
+// content up on top of it. Class-based (CSS !important), so it cannot be
+// undone by restoreLegacyPlayerNeutral()'s inline-style cleanup.
+function syncLayoutSuppressionR1(runtime) {
+  for (const mode of Object.keys(LAYOUT_HIDE_CLASSES_R1)) {
+    document.documentElement.classList.toggle(
+      LAYOUT_HIDE_CLASSES_R1[mode], layoutHidesModeR1(runtime, mode)
+    );
+  }
+}
+
 function themeVideoModeFor(alias, runtime) {
+  // Layout-hidden triggers are treated as absent: selection falls through to
+  // the next available mode, else the theme's idle mode below.
+  runtime = layoutMaskedRuntimeR1(runtime);
   if (!themedVideoBoardSupported(alias)) {
     return playerModeFor(alias, runtime);
   }
@@ -3192,16 +3273,13 @@ function patchVideoWindowGuide(root, runtime) {
 //     canvas-sized, not tightly fitted, so forcing it into a smaller
 //     target zone visually crushes the whole board illegible rather than
 //     resizing it. See the code comment at its call site below.
-//   - `sponsor_slot` / `spotlight_zone` / `video_zone` are SCHEMA-ONLY --
-//     no DOM effect at all, for both visibility and zone/rect. This is
-//     narrower than the kickoff prompt's stated gate ("hides the sponsor
-//     slot"), which the first pass of this hook DID implement -- and which
-//     the live smoke test caught as actually producing a blank hole where
-//     the whole scoreboard should be, not a graceful hide. See the code
-//     comment at its (now-removed) call site below for the full root
-//     cause and the real fix this needs (upstream of this hook, in
-//     themeVideoModeFor()) -- flagged for a P1/Phase-C-owner decision, not
-//     guessed at or shipped broken here.
+//   - `sponsor_slot` / `spotlight_zone` / `video_zone` VISIBILITY (P1): applied
+//     by making themeVideoModeFor() treat a layout-hidden element as
+//     unavailable (falls through to the next mode, else the theme's idle
+//     board) plus keeping the legacy overlay node hidden -- NOT by hiding a
+//     mode host, which P0 live-verified leaves a blank hole. See
+//     layoutMaskedRuntimeR1() / syncLayoutSuppressionR1(). Their zone/rect
+//     stays schema-only.
 //   - `clock_period` / `game_fields` / `logo` overrides are schema-only in
 //     P0: no independently addressable DOM node exists for them yet.
 //   - `video_zone`'s data-module="video.board" / [data-video-mode] markup
@@ -3383,36 +3461,18 @@ function applyLayoutOverrides(root, runtime) {
     }
   }
 
-  // sponsor_slot / spotlight_zone / video_zone: SCHEMA-ONLY in P0 -- no
-  // DOM effect. Round-trips correctly through identity_service (P0
-  // deliverables 1/2/6) but is deliberately not applied here.
-  //
-  // This was NOT the original plan -- P0 first shipped with a
-  // display:none toggle on nativeVideoBoardHost(root, alias, mode), and
-  // that is what the kickoff prompt's stated gate ("hides the sponsor
-  // slot") assumed would work. Live-verified (2026-09-14, friday_night_
-  // stadium, sponsor mode forced active): hiding it left a BLANK HOLE
-  // where the entire scoreboard should be, not a graceful fallback to the
-  // normal board. Root cause: these three modes (sponsor/player/highlight)
-  // REPLACE the video-board region's visible content in this theme's
-  // markup (class "bl-fns-video-replacement") rather than overlaying on
-  // top of an always-present scoreboard -- when sponsor mode is active,
-  // the normal board simply isn't concurrently rendered underneath, so
-  // display:none on the sponsor host reveals nothing.
-  //
-  // The real fix is upstream of this hook: themeVideoModeFor() (which
-  // picks "sponsor"/"player"/"highlight" purely from game state --
-  // runtime.player_highlight / runtime.sponsor_spotlight / playerVisible())
-  // would need to also treat a hidden layout element as unavailable, so
-  // mode selection falls through to the theme's own idle/neutral mode
-  // (which DOES show the normal board) instead of picking a mode this
-  // hook then has to blank out after the fact. themeVideoModeFor()'s
-  // return value feeds the render SIGNATURE array (`polledVideoMode`)
-  // that gates full-rebuild-vs-patch-only, so changing its selection
-  // logic is real, correctness-sensitive surgery on an already-tested,
-  // high-blast-radius function -- deliberately NOT attempted in this
-  // additive P0 hook. Flagged for a P1/Phase-C-owner decision, not
-  // guessed at here (docs/LAYOUT_BUILDER_RECONCILIATION.md Sec.8).
+  // sponsor_slot / spotlight_zone / video_zone visibility is NOT applied here
+  // and deliberately never by hiding a node. (P0's first pass did hide the
+  // mode host with display:none and, live-verified 2026-09-14, that left a
+  // blank hole where the board belongs, because these modes REPLACE the
+  // board's content in the markup.) It is applied upstream instead:
+  //   * themeVideoModeFor() / layoutMaskedRuntimeR1() never select a mode
+  //     whose owning element the layout hides, so the theme renders its own
+  //     idle/neutral board;
+  //   * syncLayoutSuppressionR1() keeps the matching legacy overlay node
+  //     hidden so the old overlay cannot pop the same content up on top.
+  // By the time this hook runs there is therefore no hidden-mode host in the
+  // DOM to blank. zone/rect for these three remain schema-only.
 }
 
 async function renderSelected() {
@@ -3433,10 +3493,14 @@ async function renderSelected() {
       document.documentElement.classList.add(PLAYER_PENDING_CLASS);
     }
 
-    const [runtime, captionState] = await Promise.all([
+    const [rawRuntime, captionState] = await Promise.all([
       fetchJson(RUNTIME_STATE_URL),
       fetchJson(CAPTION_STATE_URL).catch(() => ({visible:false, segments:[]}))
     ]);
+    // Layout Builder P1: from here on `runtime` is the layout-masked view
+    // (hidden triggers inert); the raw payload is not read again.
+    const runtime = layoutMaskedRuntimeR1(rawRuntime);
+    syncLayoutSuppressionR1(rawRuntime);
     const collegiateStatistics = await fetchCollegiateStatistics(runtime, alias);
     const captionSegment = activeCaptionSegment(captionState);
     runtimeClockRunning = runtime.clock_running === true;

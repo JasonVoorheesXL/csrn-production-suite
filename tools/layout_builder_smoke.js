@@ -1,0 +1,143 @@
+/*
+ * Layout Builder manual smoke harness (paste into the browser console on
+ * /overlay, or evaluate it through any browser-automation tool).
+ *
+ * WHY THIS EXISTS: csrn-production-theme-runtime.js has no JS test runner in
+ * this repo, and the 2026-09-14 Layout Builder P0 smoke test caught two bugs
+ * that no static test could. This file is that smoke test, made repeatable.
+ * Run it against every theme after ANY change that touches
+ * csrn-production-theme-runtime.js's layout hooks (applyLayoutOverrides,
+ * themeVideoModeFor, layoutMaskedRuntimeR1, syncLayoutSuppressionR1).
+ *
+ * HOW: it wraps window.fetch for /api/runtime-state so a test can inject a
+ * layouts document and force the sponsor / player / highlight triggers live,
+ * exercising the real render, transition and patch paths. No server state is
+ * touched. Do NOT use a real broadcast; run an isolated instance.
+ *
+ *   1. Select a theme (Data/production_template_state.json package_id).
+ *   2. Open /overlay at 1920x1080 and paste this whole file.
+ *   3. `__idle = __observe().mode; await __matrix(__idle)`
+ *      idle mode is `clash` (Friday Night Stadium, 8-Bit), `broadcast`
+ *      (Heritage Press) or `IDLE` (Collegiate: its idle board has no
+ *      data-video-mode node).
+ *   4. Every line must start with PASS. The matrix takes ~30s per theme.
+ *
+ * What a PASS means (see the layoutMaskedRuntimeR1 comment in the runtime):
+ *   - hiding sponsor_slot / spotlight_zone / video_zone makes that mode
+ *     UNAVAILABLE, so the theme falls through to the next mode or its idle
+ *     board -- never a blank hole where the board belongs;
+ *   - the legacy overlay node for the same content does not pop up over the
+ *     themed board (verified on screen 2026-09-19: without the suppression
+ *     class the legacy "PLAYER HIGHLIGHT" card leaks through);
+ *   - un-hiding brings the mode back.
+ */
+if (!window.__origFetch) {
+  window.__origFetch = window.fetch.bind(window);
+  window.__smoke = { layouts: null, force: {} };
+  window.fetch = async (u, o) => {
+    const r = await window.__origFetch(u, o);
+    if (String(u).includes('/api/runtime-state')) {
+      const j = await r.clone().json();
+      const s = window.__smoke;
+      if (s.layouts) j.layouts = s.layouts;
+      for (const [k, v] of Object.entries(s.force || {})) {
+        j[k] = Object.assign({}, j[k] || {}, v, { visible: true });
+      }
+      return new Response(JSON.stringify(j), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    return r;
+  };
+}
+
+window.__FORCE = {
+  sponsor:   { sponsor_spotlight: { sponsor_name: 'ACME Auto', lead_in: 'SPONSOR SPOTLIGHT', caption: 'Thanks for watching', media_type: 'image' } },
+  player:    { player_graphic: { full_name: 'Caleb Lang', display_name: 'Caleb Lang', number: '7', position: 'RB', graphic_type: 'touchdown', eyebrow: 'TOUCHDOWN', team_name: 'Caledonia', play_detail: '70-yard run' } },
+  highlight: { player_highlight: { full_name: 'Caleb Lang', display_name: 'Caleb Lang', number: '7', detail: '70-yard run', eyebrow: 'PLAYER HIGHLIGHT', media_type: 'video' } }
+};
+
+// A layouts document that hides the given in-game football elements.
+window.__hide = (...els) => ({
+  active: 'default',
+  presets: { default: { in_game: { football: Object.fromEntries(els.map(e => [e, { visible: false }])) }, pregame: {}, halftime: {} } }
+});
+
+window.__wait = ms => new Promise(r => setTimeout(r, ms));
+
+window.__legacy = id => {
+  const n = document.getElementById(id);
+  if (!n) return 'absent';
+  const c = getComputedStyle(n);
+  return { hiddenClass: n.classList.contains('hidden'), display: c.display, visibility: c.visibility, opacity: c.opacity };
+};
+
+window.__observe = () => {
+  const h = document.documentElement.classList;
+  const root = document.querySelector('#csrnProductionThemeLayout');
+  const node = root && root.querySelector('[data-video-mode]');
+  const st = window.CSRNProductionThemeBindingState;
+  const measure = root && (root.querySelector('.bl-college-stage') || node);
+  const b = measure && measure.getBoundingClientRect();
+  return {
+    mode: (st && st.active) ? (node ? node.dataset.videoMode : 'IDLE') : 'NONE',
+    binding: st ? (st.error || 'ok') : 'unset',
+    layoutHide: [...h].filter(c => c.startsWith('csrn-production-layout-hide')).map(c => c.replace('csrn-production-layout-hide-', '')),
+    legacy: { player: __legacy('playerGraphic'), sponsor: __legacy('sponsorSpotlight'), highlight: __legacy('playerHighlight') },
+    boardBox: b ? [Math.round(b.width), Math.round(b.height)] : null
+  };
+};
+
+window.__shown = n => {
+  if (!n) return false;
+  const c = getComputedStyle(n);
+  return !n.classList.contains('hidden') && c.display !== 'none' && c.visibility !== 'hidden' && Number(c.opacity) > 0.01;
+};
+window.__legacyShown = () => ({
+  player: __shown(document.getElementById('playerGraphic')),
+  sponsor: __shown(document.getElementById('sponsorSpotlight')),
+  highlight: __shown(document.getElementById('playerHighlight'))
+});
+
+window.__matrix = async (idle) => {
+  const EL = { sponsor: 'sponsor_slot', player: 'spotlight_zone', highlight: 'video_zone' };
+  const rows = [];
+  const W = 2000; // > the runtime's slowest poll (900ms) + a render
+  const set = async (layout, forceKeys) => {
+    __smoke.layouts = layout;
+    __smoke.force = Object.assign({}, ...forceKeys.map(k => __FORCE[k]));
+    await __wait(W);
+    const o = __observe();
+    o.legacyShown = __legacyShown();
+    return o;
+  };
+  const anyLegacy = o => Object.values(o.legacyShown).some(Boolean);
+  const check = (name, cond, o) => rows.push(
+    (cond ? 'PASS ' : 'FAIL ') + name + '  [mode=' + o.mode + ' box=' + (o.boardBox || []).join('x') +
+    ' legacyShown=' + Object.entries(o.legacyShown).filter(e => e[1]).map(e => e[0]).join(',') +
+    ' hideCls=' + o.layoutHide.join(',') + ']'
+  );
+
+  const base = await set(null, []);
+  rows.push('baseline mode=' + base.mode + ' box=' + base.boardBox.join('x'));
+  const baseBox = base.boardBox;
+
+  for (const m of ['sponsor', 'player', 'highlight']) {
+    let o = await set(null, [m]);
+    check(m + ' forced, no layout -> ' + m, o.mode === m && !anyLegacy(o), o);
+    o = await set(__hide(EL[m]), [m]);
+    check(m + ' forced, ' + EL[m] + ' HIDDEN -> idle, no legacy leak, board intact',
+      o.mode === idle && !anyLegacy(o) && o.boardBox && o.boardBox[0] >= baseBox[0] * 0.9 && o.layoutHide.includes(m), o);
+    o = await set(null, [m]);
+    check(m + ' un-hidden -> ' + m + ' returns', o.mode === m, o);
+  }
+
+  let o = await set(__hide('video_zone'), ['highlight', 'sponsor']);
+  check('highlight+sponsor forced, video_zone hidden -> falls through to sponsor', o.mode === 'sponsor', o);
+  o = await set(__hide('sponsor_slot'), ['sponsor', 'player']);
+  check('sponsor+player forced, sponsor_slot hidden -> falls through to player', o.mode === 'player', o);
+  o = await set(__hide('sponsor_slot', 'spotlight_zone', 'video_zone'), ['sponsor', 'player', 'highlight']);
+  check('ALL three forced, ALL three hidden -> idle, nothing leaks',
+    o.mode === idle && !anyLegacy(o) && o.boardBox[0] >= baseBox[0] * 0.9, o);
+  o = await set(null, []);
+  check('everything cleared -> idle', o.mode === idle, o);
+  return rows.join('\n');
+};
