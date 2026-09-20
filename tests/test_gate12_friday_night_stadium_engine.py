@@ -20,7 +20,7 @@ def test_gate12_isolated_engine_exists_and_preserves_frozen_neon() -> None:
     assert CSS.is_file()
     # Re-pinned T1 (2026-09-12) -- see test_gate116.
     assert _digest("static/csrn-broadcast-layout-engine.css") == "8C36E5E5DAEFBDE3E040F81363CDC02211AA6FFDBE557340A8CCB9BDDD83548B"
-    assert _digest("static/csrn-broadcast-layout-engine.js") == "C99D631349B9EA60F86D9825A0F338B5580BFEAAC011842DCF52F26BB6BB7DB4"
+    assert _digest("static/csrn-broadcast-layout-engine.js") == "1C36E1A24845D0032A3AE73957FA9A0CEC5E9828EABB2D2A2DC021EBC352F4C5"
 
 
 def test_gate12_lab_loads_and_routes_the_approved_stadium_engine() -> None:

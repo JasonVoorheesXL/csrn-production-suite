@@ -50,10 +50,12 @@ def test_disabled_package_cannot_be_selected_and_reads_back_as_default(tmp_path,
     assert service.read_production_template_state()["package_id"] == service.DEFAULT_PACKAGE_ID
 
 
-def test_neon_engine_code_is_left_intact():
-    # This round is a hide, not a removal.
-    for engine in ("static/csrn-neon-r1-engine.js", "static/csrn-neon-r2-engine.js"):
-        assert (ROOT / engine).is_file()
+def test_neon_engine_code_is_archived_not_deleted():
+    # Neon was rebuilt (2026-09) as a Collegiate-Tech skin. The retired standalone
+    # engines are ARCHIVED under tests/retired/neon_v1/ (see its README), not deleted.
+    for engine in ("csrn-neon-r1-engine.js", "csrn-neon-r2-engine.js"):
+        assert (ROOT / "tests" / "retired" / "neon_v1" / "static" / engine).is_file()
+        assert not (ROOT / "static" / engine).exists()
     layout = (ROOT / "static" / "csrn-broadcast-layout-engine.js").read_text(encoding="utf-8")
     assert 'id:"digital_neon"' in layout
 

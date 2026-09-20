@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CSRN Broadcast Layout Lab</title>
 <link rel="stylesheet" href="csrn-broadcast-layout-engine.css?v=11">
-<link rel="stylesheet" href="csrn-neon-r2-engine.css?v=15.1-r40">
-<link rel="stylesheet" href="csrn-neon-softball-r42-driver.css?v=15.3-r42a">
-<link rel="stylesheet" href="csrn-neon-baseball-r43-driver.css?v=15.3-r43a">
 <link rel="stylesheet" href="csrn-heritage-press-engine.css?v=14.1">
 <link rel="stylesheet" href="csrn-friday-night-stadium-engine.css?v=12.6">
 <link rel="stylesheet" href="csrn-eight-bit-gameday-engine.css?v=13.7">
@@ -91,9 +88,6 @@ code{color:#ffe26d}
   <p>Runtime marker: <code id="marker">PENDING</code></p>
 </div>
 <script src="csrn-broadcast-layout-engine.js?v=11"></script>
-<script src="csrn-neon-r2-engine.js?v=15.1-r40"></script>
-<script src="csrn-neon-softball-r42-driver.js?v=15.3-r42a"></script>
-<script src="csrn-neon-baseball-r43-driver.js?v=15.3-r43a"></script>
 <script src="csrn-heritage-press-engine.js?v=14.1"></script>
 <script src="csrn-friday-night-stadium-engine.js?v=12.6"></script>
 <script src="csrn-eight-bit-gameday-engine.js?v=13.7"></script>
@@ -109,11 +103,9 @@ code{color:#ffe26d}
     const pixelEngine=window.CSRNEightBitGamedayEngine;
     if(!pixelEngine)throw new Error("8-Bit Gameday Engine failed to load.");
     const heritageEngine=window.CSRNHeritagePressEngine;
-    const neonR2Engine=window.CSRNNeonR2Engine;
     if(!heritageEngine)throw new Error("Heritage Press Engine failed to load.");
-    if(!neonR2Engine)throw new Error("Neon R2 Engine failed to load.");
-    const rendererFor=(packageId)=>packageId===neonR2Engine.packageId?neonR2Engine:packageId===heritageEngine.packageId?heritageEngine:packageId===pixelEngine.packageId?pixelEngine:packageId===stadiumEngine.packageId?stadiumEngine:engine;
-    const errors=[...engine.validateManifests(),...stadiumEngine.validateManifests(),...pixelEngine.validateManifests(),...heritageEngine.validateManifests(),...neonR2Engine.validateManifests()];
+    const rendererFor=(packageId)=>packageId===heritageEngine.packageId?heritageEngine:packageId===pixelEngine.packageId?pixelEngine:packageId===stadiumEngine.packageId?stadiumEngine:engine;
+    const errors=[...engine.validateManifests(),...stadiumEngine.validateManifests(),...pixelEngine.validateManifests(),...heritageEngine.validateManifests()];
     if(errors.length)throw new Error(errors.join(" | "));
 
     const packageSelect=document.getElementById("package");
@@ -121,7 +113,7 @@ code{color:#ffe26d}
     const scenarioSelect=document.getElementById("scenario");
     const videoModeSelect=document.getElementById("videoMode");
     Object.values(engine.manifests).forEach(item=>{
-      const approved=item.id===neonR2Engine.packageId?neonR2Engine.manifests[neonR2Engine.packageId]:item.id===heritageEngine.packageId?heritageEngine.manifests[heritageEngine.packageId]:item.id===pixelEngine.packageId?pixelEngine.manifests[pixelEngine.packageId]:item.id===stadiumEngine.packageId?stadiumEngine.manifests[stadiumEngine.packageId]:item;
+      const approved=item.id===heritageEngine.packageId?heritageEngine.manifests[heritageEngine.packageId]:item.id===pixelEngine.packageId?pixelEngine.manifests[pixelEngine.packageId]:item.id===stadiumEngine.packageId?stadiumEngine.manifests[stadiumEngine.packageId]:item;
       packageSelect.add(new Option(approved.name,approved.id));
     });
     Object.keys(engine.sports).forEach(item=>sportSelect.add(new Option(item,item)));

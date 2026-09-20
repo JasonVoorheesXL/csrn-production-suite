@@ -195,7 +195,7 @@ def test_runtime_fast_path_patches_the_new_structure_without_rerender():
     assert "function patchCollegiateBaseballLineScore(root, runtime)" in RUNTIME_JS
     diamond_fn = RUNTIME_JS[RUNTIME_JS.index("function applyDiamondBoardOverrides(root, alias, runtime) {"):
                              RUNTIME_JS.index("function applyFootballBoardOverrides(root, alias, runtime) {")]
-    branch = diamond_fn[diamond_fn.index('if (alias === "collegiate_traditional") {'):]
+    branch = diamond_fn[diamond_fn.index('if (isCollegiateFamily(alias)) {'):]
     assert "patchCollegiateBaseballDiamond(root, {half, inning, balls, strikes, outs, bases}, runtime);" in branch
     assert "patchCollegiateBaseballLineScore(root, runtime);" in branch
 
@@ -239,7 +239,7 @@ def test_rail_stats_and_on_deck_are_placeholders_not_fabricated_data():
 def test_football_rail_path_is_unchanged():
     assert 'function patchCollegiateRails(root, runtime, statistics) {' in RUNTIME_JS
     body = _fn(RUNTIME_JS, 'function patchCollegiateRails(root, runtime, statistics) {')
-    assert 'if (currentAlias !== "collegiate_traditional" || !root) return;' in body
+    assert 'if (!isCollegiateFamily(currentAlias) || !root) return;' in body
     assert 'if (sport === "baseball" || sport === "softball") {' in body
     assert 'if (!statistics) return;' in body
     # the original football per-side loop is untouched

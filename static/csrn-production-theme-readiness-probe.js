@@ -14,7 +14,7 @@ const EXPECTED = Object.freeze([
   }),
   Object.freeze({
     packageId: "digital_neon",
-    globalName: "CSRNNeonR2Engine",
+    globalName: "CSRNBroadcastLayoutEngine",
     renderCandidates: ["renderPackage", "render", "mount"]
   }),
   Object.freeze({

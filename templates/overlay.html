@@ -153,8 +153,9 @@ let csrnActiveScorebugLayout="";
 // Production packages whose themed video board renders the sponsor commercial itself.
 // When one of these is active, the legacy #sponsorSpotlight panel is fully redundant
 // and must not mount/play its own video (it would double-render and double-audio).
-// digital_neon and legacy have no sponsor video board, so legacy stays authoritative there.
-const CSRN_BOARD_SPONSOR_ALIASES=new Set(['friday_night_stadium','eight_bit_gameday','heritage_press','collegiate_traditional']);
+// Only legacy has no sponsor video board, so legacy stays authoritative there. (digital_neon
+// is Collegiate Tech's structure and does have one.)
+const CSRN_BOARD_SPONSOR_ALIASES=new Set(['friday_night_stadium','eight_bit_gameday','heritage_press','collegiate_traditional','digital_neon']);
 let csrnThemedSponsorBoardActive=false;
 function refreshCsrnThemeCss(revision){
   const link=document.getElementById('csrnThemeCss');

@@ -54,7 +54,7 @@ def test_gate167_theme_ticker_uses_frozen_visual_targets():
         ".bl-fns-ticker-led",
         ".bl-8bit-ticker-led",
         ".hp-wire-copy",
-        ".n2-ticker span",
+        ".bl-college-ticker-copy",
     ):
         assert selector in js
 

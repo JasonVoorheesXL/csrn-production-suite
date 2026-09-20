@@ -80,7 +80,7 @@ def test_collegiate_video_board_supports_player_highlight_and_sponsor_modes():
     # Registered into the shared runtime's video-board mode/host dispatch so
     # the overlay actually calls into the above instead of leaving Collegiate
     # on the legacy separate-zone player/highlight/sponsor components.
-    assert 'alias === "collegiate_traditional";' in runtime
+    assert 'isCollegiateFamily(alias);' in runtime  # Neon shares Collegiate's video board
     assert "collegiate_traditional: \".bl-college-stage\"" in runtime
     assert "eyebrow: textValue(graphic.eyebrow" in runtime
     assert "sponsorName: textValue(graphic.sponsor_name" in runtime
@@ -128,7 +128,7 @@ def test_collegiate_player_spotlight_is_sized_up_and_never_truncates():
 def test_collegiate_runtime_patches_live_field_state_without_rerender():
     runtime = read("static/csrn-production-theme-runtime.js")
     assert "function productionFieldState" in runtime
-    assert 'alias === "collegiate_traditional"' in runtime
+    assert 'isCollegiateFamily(alias)' in runtime
     assert 'tickerSelector: ".bl-college-ticker-copy"' in runtime
     assert '[data-bind="game.ballSpot"]' in runtime
     assert '[data-bind="game.possessionLogo"]' in runtime

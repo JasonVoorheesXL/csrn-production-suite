@@ -26,7 +26,7 @@ def test_gate167_r4_theme_ticker_actually_scrolls():
     assert ".bl-8bit-ticker-led" in js
     assert ".bl-fns-ticker-led" in js
     assert ".hp-wire-copy" in js
-    assert ".n2-ticker span" in js
+    assert ".bl-college-ticker-copy" in js
 
 def test_gate167_r4_player_graphic_maps_to_theme_player_state():
     js = read("static/csrn-production-theme-runtime.js")

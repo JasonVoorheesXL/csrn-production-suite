@@ -801,6 +801,71 @@
     </section>`;
   }
 
+  // ---- Neon team tint -------------------------------------------------------
+  // Each school's configured colours, electrified: hue kept, saturation pushed
+  // to full, lightness set per hue so blues and reds glow as brightly as
+  // yellows. Computed per game from the teams actually on the air, never a fixed
+  // palette. Achromatic school colours (black / white / grey) fall back to the
+  // secondary colour, then to ice-white, so every broadcast still reads as its
+  // team and never as a hardcoded accent.
+  function neonHexToHsl(hex) {
+    const color = normalizedTeamColor(hex);
+    if (!color) return null;
+    const r = parseInt(color.slice(1, 3), 16) / 255;
+    const g = parseInt(color.slice(3, 5), 16) / 255;
+    const b = parseInt(color.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    const d = max - min;
+    if (d === 0) return {h: 0, s: 0, l};
+    const s = d / (1 - Math.abs(2 * l - 1));
+    let h;
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h = (h * 60 + 360) % 360;
+    return {h, s, l};
+  }
+
+  function neonHslToHex(h, s, l) {
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = l - c / 2;
+    let r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; }
+    else if (h < 120) { r = x; g = c; }
+    else if (h < 180) { g = c; b = x; }
+    else if (h < 240) { g = x; b = c; }
+    else if (h < 300) { r = x; b = c; }
+    else { r = c; b = x; }
+    const part = (v) => Math.round((v + m) * 255).toString(16).padStart(2, "0");
+    return `#${part(r)}${part(g)}${part(b)}`.toUpperCase();
+  }
+
+  const NEON_ICE = "#EAF6FF";
+
+  function neonElectrify(primary, secondary) {
+    const usable = (c) => c && c.s >= 0.22 && c.l >= 0.08 && c.l <= 0.94;
+    const first = neonHexToHsl(primary);
+    const second = neonHexToHsl(secondary);
+    const source = usable(first) ? first : (usable(second) ? second : null);
+    if (!source) return NEON_ICE;
+    const h = source.h;
+    let l = 0.6;
+    if (h >= 215 && h < 275) l = 0.7;          // blues / violets read dark at equal lightness
+    else if (h < 15 || h >= 345) l = 0.62;     // reds
+    else if (h >= 45 && h < 70) l = 0.56;      // golds / yellows are already bright
+    else if (h >= 70 && h < 170) l = 0.55;     // greens
+    return neonHslToHex(h, 1, l);
+  }
+
+  function applyNeonTint(root, state) {
+    const visitor = state.visitor || {};
+    const home = state.home || {};
+    root.style.setProperty("--visitor-neon", neonElectrify(visitor.primary, visitor.secondary));
+    root.style.setProperty("--home-neon", neonElectrify(home.primary, home.secondary));
+  }
+
   function collegiateThemeVars(state) {
     const visitor = normalizedTeamColor(state.visitor && state.visitor.primary) || "#064624";
     const home = normalizedTeamColor(state.home && state.home.primary) || "#0A2342";
@@ -1633,6 +1698,42 @@
     return renderer(state, sport);
   }
 
+  // Per-sport component placement shared by Collegiate Traditional and Neon.
+  // Neon is a team-tinted SKIN of Collegiate Tech (same renderer, same markup,
+  // same data bindings, same zones); keeping the table in one place is what
+  // stops the two from drifting apart the way the retired standalone Neon build
+  // drifted from its own frozen tests.
+  const COLLEGIATE_SPORT_COMPONENTS = Object.freeze({
+        football:{components:{
+          scorebug:{zone:"full-safe",width:1840,height:1000,layer:100},ticker:{zone:"top-center",height:58,layer:110,allowOverlapWith:["scorebug"]},
+          playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80,allowOverlapWith:["scorebug"]},
+          highlightVideo:{zone:"top-right",layer:70,allowOverlapWith:["scorebug"]},sponsor:{zone:"top-left",layer:60,allowOverlapWith:["scorebug"]},
+          captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120,allowOverlapWith:["scorebug"]}
+        }},
+        basketball:{components:{
+          scorebug:{zone:"bottom-center",layer:100},ticker:{zone:"bottom-center",layer:110,allowOverlapWith:["scorebug"]},
+          playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80},
+          highlightVideo:{zone:"top-right",layer:70},sponsor:{zone:"top-left",layer:60},
+          captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120}
+        }},
+        // T1 (docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md): baseball/softball
+        // now render at football's structural prominence (same skeleton,
+        // same weight), not the old compact top-left board -- so they claim
+        // the same full-safe canvas zone as football, not a corner.
+        baseball:{components:{
+          scorebug:{zone:"full-safe",width:1840,height:1000,layer:100},ticker:{zone:"top-center",height:58,layer:110,allowOverlapWith:["scorebug"]},
+          playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80,allowOverlapWith:["scorebug"]},
+          highlightVideo:{zone:"top-right",layer:70,allowOverlapWith:["scorebug"]},sponsor:{zone:"top-left",layer:60,allowOverlapWith:["scorebug"]},
+          captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120,allowOverlapWith:["scorebug"]}
+        }},
+        softball:{components:{
+          scorebug:{zone:"full-safe",width:1840,height:1000,layer:100},ticker:{zone:"top-center",height:58,layer:110,allowOverlapWith:["scorebug"]},
+          playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80,allowOverlapWith:["scorebug"]},
+          highlightVideo:{zone:"top-right",layer:70,allowOverlapWith:["scorebug"]},sponsor:{zone:"top-left",layer:60,allowOverlapWith:["scorebug"]},
+          captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120,allowOverlapWith:["scorebug"]}
+        }}
+      });
+
   const PACKAGE_MANIFESTS = Object.freeze({
     modern_network: {
       id: "modern_network",
@@ -1788,78 +1889,22 @@
       }
     },
 
+    // Neon (2026-09 redesign). NOT the retired standalone Neon engine
+    // (csrn-neon-r2-engine.js and the "neon" renderer family further up are kept
+    // only as an unreferenced archive of that attempt). This is Collegiate Tech's
+    // structure with a bold, team-tinted neon skin: same renderer family, so it
+    // stamps data-component like every other shared-engine package and the
+    // Layout Builder controls apply to it the same way.
     digital_neon: {
-      id:"digital_neon", name:"Neon Sports Network", scorebugRenderer:"neon", styleClass:"package-neon-approved",
-      componentRendererFamily: "neon",
-      sports:{
-        football:{components:{
-          scorebug:{zone:"top-full",width:1840,height:250,layer:100},
-          ticker:{zone:"bottom-center",height:64,layer:110},
-          playerCard:{zone:"left-center",width:610,height:390,layer:80},
-          highlightVideo:{zone:"right-center",layer:70},
-          sponsor:{zone:"right-center",width:520,height:180,layer:60},
-          captions:{zone:"bottom-center",height:56,stackAboveHeight:64,layer:120}
-        }},
-        basketball:{components:{
-          scorebug:{zone:"top-full",width:1840,height:250,layer:100},
-          ticker:{zone:"bottom-center",height:64,layer:110},
-          playerCard:{zone:"left-center",width:610,height:390,layer:80},
-          highlightVideo:{zone:"right-center",layer:70},
-          sponsor:{zone:"right-center",width:520,height:180,layer:60},
-          captions:{zone:"bottom-center",height:56,stackAboveHeight:64,layer:120}
-        }},
-        baseball:{components:{
-          scorebug:{zone:"top-full",width:1840,height:250,layer:100},
-          ticker:{zone:"bottom-center",height:64,layer:110},
-          playerCard:{zone:"left-center",width:610,height:390,layer:80},
-          highlightVideo:{zone:"right-center",layer:70},
-          sponsor:{zone:"right-center",width:520,height:180,layer:60},
-          captions:{zone:"bottom-center",height:56,stackAboveHeight:64,layer:120}
-        }},
-        softball:{components:{
-          scorebug:{zone:"top-full",width:1840,height:250,layer:100},
-          ticker:{zone:"bottom-center",height:64,layer:110},
-          playerCard:{zone:"left-center",width:610,height:390,layer:80},
-          highlightVideo:{zone:"right-center",layer:70},
-          sponsor:{zone:"right-center",width:520,height:180,layer:60},
-          captions:{zone:"bottom-center",height:56,stackAboveHeight:64,layer:120}
-        }}
-      }
+      id:"digital_neon", name:"Neon", scorebugRenderer:"collegiate", styleClass:"package-collegiate package-collegiate-neon",
+      componentRendererFamily: "collegiate", neonTint: true,
+      sports: COLLEGIATE_SPORT_COMPONENTS
     },
 
     collegiate_traditional: {
       id:"collegiate_traditional", name:"Collegiate Traditional", scorebugRenderer:"collegiate", styleClass:"package-collegiate",
       componentRendererFamily: "collegiate",
-      sports:{
-        football:{components:{
-          scorebug:{zone:"full-safe",width:1840,height:1000,layer:100},ticker:{zone:"top-center",height:58,layer:110,allowOverlapWith:["scorebug"]},
-          playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80,allowOverlapWith:["scorebug"]},
-          highlightVideo:{zone:"top-right",layer:70,allowOverlapWith:["scorebug"]},sponsor:{zone:"top-left",layer:60,allowOverlapWith:["scorebug"]},
-          captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120,allowOverlapWith:["scorebug"]}
-        }},
-        basketball:{components:{
-          scorebug:{zone:"bottom-center",layer:100},ticker:{zone:"bottom-center",layer:110,allowOverlapWith:["scorebug"]},
-          playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80},
-          highlightVideo:{zone:"top-right",layer:70},sponsor:{zone:"top-left",layer:60},
-          captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120}
-        }},
-        // T1 (docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md): baseball/softball
-        // now render at football's structural prominence (same skeleton,
-        // same weight), not the old compact top-left board -- so they claim
-        // the same full-safe canvas zone as football, not a corner.
-        baseball:{components:{
-          scorebug:{zone:"full-safe",width:1840,height:1000,layer:100},ticker:{zone:"top-center",height:58,layer:110,allowOverlapWith:["scorebug"]},
-          playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80,allowOverlapWith:["scorebug"]},
-          highlightVideo:{zone:"top-right",layer:70,allowOverlapWith:["scorebug"]},sponsor:{zone:"top-left",layer:60,allowOverlapWith:["scorebug"]},
-          captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120,allowOverlapWith:["scorebug"]}
-        }},
-        softball:{components:{
-          scorebug:{zone:"full-safe",width:1840,height:1000,layer:100},ticker:{zone:"top-center",height:58,layer:110,allowOverlapWith:["scorebug"]},
-          playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80,allowOverlapWith:["scorebug"]},
-          highlightVideo:{zone:"top-right",layer:70,allowOverlapWith:["scorebug"]},sponsor:{zone:"top-left",layer:60,allowOverlapWith:["scorebug"]},
-          captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120,allowOverlapWith:["scorebug"]}
-        }}
-      }
+      sports: COLLEGIATE_SPORT_COMPONENTS
     },
 
     classic_broadcast: {
@@ -1963,6 +2008,7 @@
     root.dataset.sport = sport;
     root.dataset.engineVersion = VERSION;
     root.classList.toggle("diagnostics", Boolean(options.diagnostics));
+    if (manifest.neonTint) applyNeonTint(root, state);
 
     for (const component of activeComponents) {
       const placement = placements[component];
@@ -2101,6 +2147,7 @@
     splitPressWireStories,
     hydratePressWire,
     clearPressWire,
+    neonElectrify,
     renderPackage
   });
 })();

@@ -29,16 +29,10 @@ def test_gate163_r2_isolated_page_loads_engines_by_reference():
         "csrn-friday-night-stadium-engine.css?v=16.3-r2",
         "csrn-eight-bit-gameday-engine.css?v=16.3-r2",
         "csrn-heritage-press-engine.css?v=16.3-r2",
-        "csrn-neon-r2-engine.css?v=16.3-r2",
-        "csrn-neon-softball-r42-driver.css?v=16.3-r2",
-        "csrn-neon-baseball-r43-driver.css?v=16.3-r2",
         "csrn-broadcast-layout-engine.js?v=16.3-r2",
         "csrn-friday-night-stadium-engine.js?v=16.3-r2",
         "csrn-eight-bit-gameday-engine.js?v=16.3-r2",
         "csrn-heritage-press-engine.js?v=16.3-r2",
-        "csrn-neon-r2-engine.js?v=16.3-r2",
-        "csrn-neon-softball-r42-driver.js?v=16.3-r2",
-        "csrn-neon-baseball-r43-driver.js?v=16.3-r2",
         "csrn-production-theme-readiness-probe.js?v=16.3-r2",
     )
     for item in required:

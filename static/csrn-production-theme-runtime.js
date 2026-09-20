@@ -123,29 +123,36 @@ const PACKAGE_ALIASES = Object.freeze({
     js:  ["/static/csrn-broadcast-layout-engine.js?v=16.9-r8",
           "/static/csrn-heritage-press-engine.js?v=16.9-r8"]
   }),
+  // Neon (2026-09 redesign): Collegiate Tech's structure through the SAME shared
+  // engine (so it stamps data-component and honours the Layout Builder like every
+  // other package), plus a skin-only stylesheet. See isCollegiateFamily().
   digital_neon: Object.freeze({
-    globalName: "CSRNNeonR2Engine",
+    globalName: "CSRNBroadcastLayoutEngine",
     playerSupported: false,
-    tickerSelector: ".n2-ticker span",
+    tickerSelector: ".bl-college-ticker-copy",
     tickerKind: "inside",
-    css: ["/static/csrn-broadcast-layout-engine.css?v=16.9-r8",
-          "/static/csrn-neon-r2-engine.css?v=16.9-r8",
-          "/static/csrn-neon-softball-r42-driver.css?v=16.9-r8",
-          "/static/csrn-neon-baseball-r43-driver.css?v=16.9-r8"],
-    js:  ["/static/csrn-broadcast-layout-engine.js?v=16.9-r8",
-          "/static/csrn-neon-r2-engine.js?v=16.9-r8",
-          "/static/csrn-neon-softball-r42-driver.js?v=16.9-r8",
-          "/static/csrn-neon-baseball-r43-driver.js?v=16.9-r8"]
+    css: ["/static/csrn-broadcast-layout-engine.css?v=18.0-neon-r1",
+          "/static/csrn-collegiate-neon.css?v=18.0-neon-r1"],
+    js:  ["/static/csrn-broadcast-layout-engine.js?v=18.0-neon-r1"]
   }),
   collegiate_traditional: Object.freeze({
     globalName: "CSRNBroadcastLayoutEngine",
     playerSupported: false,
     tickerSelector: ".bl-college-ticker-copy",
     tickerKind: "inside",
-    css: ["/static/csrn-broadcast-layout-engine.css?v=17.1-passer-credit"],
-    js:  ["/static/csrn-broadcast-layout-engine.js?v=17.1-passer-credit"]
+    css: ["/static/csrn-broadcast-layout-engine.css?v=18.0-neon-r1"],
+    js:  ["/static/csrn-broadcast-layout-engine.js?v=18.0-neon-r1"]
   })
 });
+
+// Packages built on Collegiate Tech's structure (same renderer family, same DOM,
+// same data bindings). Every Collegiate-specific patch below keys on this, not
+// on the one alias, so a skin like Neon inherits rails / field / diamond /
+// statistics / video-board handling instead of forking it.
+const COLLEGIATE_FAMILY_ALIASES = Object.freeze(new Set(["collegiate_traditional", "digital_neon"]));
+function isCollegiateFamily(alias) {
+  return COLLEGIATE_FAMILY_ALIASES.has(alias);
+}
 
 const loadedCss = new Set();
 const loadedJs = new Map();
@@ -1511,7 +1518,7 @@ function applyBasketballBoardOverrides(root, alias, runtime) {
     if (periodValue && period) periodValue.textContent = period;
     return;
   }
-  if (alias === "collegiate_traditional") {
+  if (isCollegiateFamily(alias)) {
     root.querySelectorAll('[data-bind="game.clock"]').forEach(node => { node.textContent = clock; });
     if (period) root.querySelectorAll('[data-bind="game.period"]').forEach(node => { node.textContent = period; });
     if (shotClock) root.querySelectorAll('[data-bind="game.shotClock"]').forEach(node => { node.textContent = shotClock; });
@@ -1587,7 +1594,7 @@ function applyDiamondBoardOverrides(root, alias, runtime) {
     patchHeritageBoxscore(root, runtime);
     return;
   }
-  if (alias === "collegiate_traditional") {
+  if (isCollegiateFamily(alias)) {
     root.querySelectorAll('[data-bind="game.inning"]').forEach(node => { node.textContent = inning; });
     root.querySelectorAll('[data-bind="game.inningHalf"]').forEach(node => {
       node.textContent = `${half === "BOT" ? "▼" : "▲"} ${half === "BOT" ? "BOT" : "TOP"}`;
@@ -1776,7 +1783,7 @@ function applyFootballBoardOverrides(root, alias, runtime) {
     return;
   }
 
-  if (alias === "collegiate_traditional") {
+  if (isCollegiateFamily(alias)) {
     const field = productionFieldState(runtime, {}, runtime.canonical_field_state);
     const fieldRoot = root.querySelector(".bl-college-field");
     if (fieldRoot) {
@@ -1947,7 +1954,7 @@ function patchThemeScoresAndPossession(root, alias, runtime) {
     return;
   }
 
-  if (alias === "collegiate_traditional") {
+  if (isCollegiateFamily(alias)) {
     root.querySelectorAll('[data-bind="home.score"]').forEach(node => {
       node.textContent = String(homeScore);
     });
@@ -2197,7 +2204,7 @@ function themedVideoBoardSupported(alias) {
   return alias === "eight_bit_gameday" ||
     alias === "friday_night_stadium" ||
     alias === "heritage_press" ||
-    alias === "collegiate_traditional";
+    isCollegiateFamily(alias);
 }
 
 // --- Layout Builder P1: layout-aware mode selection --------------------------
@@ -2531,7 +2538,8 @@ function nativeVideoBoardHost(root, alias, mode) {
   const auditedNativeBoards = Object.freeze({
     eight_bit_gameday: ".bl-8bit-video-board",
     friday_night_stadium: ".bl-fns-video-board",
-    collegiate_traditional: ".bl-college-stage"
+    collegiate_traditional: ".bl-college-stage",
+    digital_neon: ".bl-college-stage"
   });
 
   if (Object.prototype.hasOwnProperty.call(auditedNativeBoards, alias)) {
@@ -2975,7 +2983,7 @@ async function fetchJson(url) {
 }
 
 async function fetchCollegiateStatistics(runtime, alias) {
-  if (alias !== "collegiate_traditional") return null;
+  if (!isCollegiateFamily(alias)) return null;
   const broadcastId = textValue(runtime?.broadcast_id, "");
   if (!broadcastId) return null;
   const now = Date.now();
@@ -3149,7 +3157,7 @@ function patchCollegiateBaseballRails(root, runtime, statistics) {
 }
 
 function patchCollegiateRails(root, runtime, statistics) {
-  if (currentAlias !== "collegiate_traditional" || !root) return;
+  if (!isCollegiateFamily(currentAlias) || !root) return;
   const sport = productionSportFamily(runtime && runtime.sport);
   if (sport === "baseball" || sport === "softball") {
     patchCollegiateBaseballRails(root, runtime, statistics);
@@ -3229,7 +3237,7 @@ function patchCollegiateRails(root, runtime, statistics) {
 // so the label stays current across the lightweight patch-only path too,
 // not just a full re-render.
 function patchVideoWindowGuide(root, runtime) {
-  if (currentAlias !== "collegiate_traditional" || !root) return;
+  if (!isCollegiateFamily(currentAlias) || !root) return;
   const label = root.querySelector(".bl-college-video-window-guide .bl-college-video-window-label");
   if (!label) return;
   const canvas = root.closest(".csrn-broadcast-layout") || root;
