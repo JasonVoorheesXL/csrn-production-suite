@@ -1388,6 +1388,8 @@ def get_diagnostics_service() -> DiagnosticsService:
             load_obs_status=load_obs_status,
             authenticated=authenticated,
             migrate_venues=migrate_venue_names,
+            identity_status=lambda: identity_service.load_issue(IDENTITY_FILE),
+            identity_file=IDENTITY_FILE,
         )
     return DIAGNOSTICS_SERVICE
 

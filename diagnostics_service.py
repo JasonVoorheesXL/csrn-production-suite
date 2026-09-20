@@ -13,6 +13,9 @@ LoadPayload = Callable[[], Payload]
 PublicState = Callable[[Payload], Payload]
 Authenticated = Callable[[], bool]
 MigrateVenues = Callable[[], None]
+# Returns identity_service.load_issue() for the live identity_profile.json:
+# None when the profile loaded cleanly, else the problem found on load.
+IdentityStatus = Callable[[], "Mapping[str, Any] | None"]
 
 
 @dataclass(frozen=True)
@@ -49,6 +52,8 @@ class DiagnosticsService:
         authenticated: Authenticated,
         migrate_venues: MigrateVenues,
         overlay_url: str = "http://127.0.0.1:5050/overlay",
+        identity_status: IdentityStatus | None = None,
+        identity_file: Path | None = None,
     ) -> None:
         self._base_dir = Path(base_dir)
         self._data_dir = Path(data_dir)
@@ -68,6 +73,19 @@ class DiagnosticsService:
         self._authenticated = authenticated
         self._migrate_venues = migrate_venues
         self._overlay_url = str(overlay_url)
+        self._identity_status = identity_status
+        self._identity_file = Path(identity_file) if identity_file else None
+
+    def _identity_issue(self) -> dict[str, Any] | None:
+        """The live identity profile's unresolved load problem, or None. Never
+        raises: a diagnostics probe must not be what breaks the diagnostics."""
+        if self._identity_status is None:
+            return None
+        try:
+            issue = self._identity_status()
+        except Exception:
+            return None
+        return copy.deepcopy(dict(issue)) if issue else None
 
     @staticmethod
     def _section(config: Mapping[str, Any], name: str) -> dict[str, Any]:
@@ -82,6 +100,7 @@ class DiagnosticsService:
         application = self._section(config, "application")
         logo_path = identity_service.branding_logo(organization)
 
+        identity_issue = self._identity_issue()
         required = {
             "Configuration": self._config_file,
             "Data folder": self._data_dir,
@@ -109,6 +128,13 @@ class DiagnosticsService:
             "authenticated": bool(self._authenticated()),
             "config_file": str(self._config_file),
             "data_folder": str(self._data_dir),
+            # identity_profile.json falls back to built-in values rather than
+            # crashing when it cannot be parsed; this is where that is visible.
+            "identity_profile": {
+                "ok": identity_issue is None,
+                "path": str(self._identity_file or ""),
+                "issue": identity_issue,
+            },
             "obs": copy.deepcopy(self._load_obs_status()),
             "engines": [
                 {
@@ -247,6 +273,23 @@ class DiagnosticsService:
             "Program Visual is configured.",
             "Configure the Program Visual scene in Settings.",
         )
+
+        identity_issue = self._identity_issue()
+        if identity_issue:
+            # Only present when there is a problem, so a healthy install's
+            # readiness payload is unchanged.
+            saved = identity_issue.get("backup")
+            add(
+                "identity_profile",
+                "Identity profile",
+                False,
+                "identity_profile.json could not be read; running on built-in defaults.",
+                "identity_profile.json is unusable ("
+                + str(identity_issue.get("error") or identity_issue.get("kind"))
+                + "), so the app is showing its built-in organization values. "
+                + (f"A copy of the bad file was kept at {saved}. " if saved else "")
+                + "Fix or restore identity_profile.json, then restart CSRN.",
+            )
 
         payload = {
             "ready": all(check["ok"] for check in checks),

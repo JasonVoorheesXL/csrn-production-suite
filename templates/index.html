@@ -6093,7 +6093,17 @@ async function loadDiagnostics() {
     `<div class="diagnostic-row ${check[1] ? 'diag-ok' : 'diag-fail'}">` +
     `<span>${check[1] ? '✓' : '✕'} ${check[0]}</span><small>${obs.error || ''}</small></div>`
   ).join('');
-  document.getElementById('diagnosticChecks').innerHTML = fileChecks + obsChecks;
+  const idp = d.identity_profile || {ok:true};
+  const idIssue = idp.issue || {};
+  const identityCheck =
+    `<div class="diagnostic-row ${idp.ok ? 'diag-ok' : 'diag-fail'}">` +
+    `<span>${idp.ok ? '✓' : '✕'} Identity profile</span><small>` +
+    (idp.ok ? escapeHtml(idp.path || '') :
+      escapeHtml(`Unreadable (${idIssue.error || idIssue.kind || 'unknown error'}` +
+        `${idIssue.line ? ` at line ${idIssue.line}, column ${idIssue.column}` : ''}) — running on built-in defaults. ` +
+        `${idIssue.backup ? `Copy of the bad file: ${idIssue.backup}. ` : ''}${idp.path || ''}`)) +
+    `</small></div>`;
+  document.getElementById('diagnosticChecks').innerHTML = identityCheck + fileChecks + obsChecks;
   document.getElementById('diagnosticEngines').innerHTML=(d.engines||[]).map(e=>`<div class="engine-status-card"><strong>${escapeHtml(e.name)}</strong><span>${escapeHtml(e.version)}</span><b>${escapeHtml(e.status)}</b></div>`).join('');
 }
 
