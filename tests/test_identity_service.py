@@ -5,8 +5,11 @@ with today's exact literals (zero behaviour change) and a fresh install blank.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import identity_service
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 # The historical literals, frozen here. If app.py's former DEFAULT_CONFIG
@@ -141,25 +144,151 @@ def test_existing_profile_file_is_loaded_and_normalized(tmp_path) -> None:
     assert "junk_section" not in profile
 
 
-def test_app_default_config_is_sourced_from_the_identity_profile() -> None:
-    import app
+# A profile the test writes itself. Every value differs from the historical
+# seed (asserted below, so the test cannot pass vacuously), every section key is
+# present so the loaded result is exactly this document, and `logo` is an extra
+# organization key like the ones a customised install carries.
+FIXTURE_PROFILE = {
+    "organization": {
+        "name": "Delta Valley Network",
+        "short_name": "DVN",
+        "logo_path": "static/dvn-logo.png",
+        "primary_color": "#123456",
+        "secondary_color": "#0A0B0C",
+        "accent_color": "#FEDCBA",
+        "logo": "branding/dvn-wide.png",
+    },
+    "broadcast_defaults": {
+        "venue": "Delta Field",
+        "sport": "Football",
+        "timezone": "America/Denver",
+        "theme": "DVN Light",
+        "home_school_id": "delta-valley",
+        "visual_mode": "camera",
+    },
+    "streaming": {
+        "facebook_live": "https://fb.example/dvn",
+        "youtube_live": "https://yt.example/dvn",
+        "broadcast_software_path": "D:\\obs\\obs64.exe",
+        "youtube_url": "https://yt.example/studio",
+        "facebook_url": "https://fb.example/producer",
+    },
+    "state_defaults": {"home_team": "Delta Valley", "venue": "Delta Field"},
+    "onboarding_complete": True,
+}
 
-    # This checkout is an existing install (config.json / state.json present),
-    # so DEFAULT_CONFIG must still carry exactly the former inline literals and
-    # load_config() must still resolve the Caledonia identity unchanged.
-    assert app.DEFAULT_CONFIG["organization"] == HISTORICAL_ORGANIZATION
-    assert app.DEFAULT_CONFIG["broadcast_defaults"] == HISTORICAL_BROADCAST_DEFAULTS
-    # Round 23: streaming is now in DEFAULT_CONFIG (Configuration Manager edits
-    # it); seeded from the profile, so on the existing install it is exactly
-    # the historical launcher URLs plus the blank quick-launch fields.
-    assert app.DEFAULT_CONFIG["streaming"] == HISTORICAL_STREAMING
-    assert "state_defaults" not in app.DEFAULT_CONFIG
-    resolved = app.load_config()
-    assert resolved["organization"]["name"] == "Caledonia Sports Radio Network"
-    assert resolved["broadcast_defaults"]["home_school_id"] == "caledonia"
-    # Round 13: DEFAULT_STATE placeholders now come from the profile, unchanged.
-    assert app.DEFAULT_STATE["home_team"] == "Caledonia"
-    assert app.DEFAULT_STATE["venue"] == "Caledonia High School"
+# What `import app` produces from the profile, printed by a fresh interpreter.
+_CHILD = """
+import json
+import app
+print("REPORT:" + json.dumps({
+    "identity_file": str(app.IDENTITY_FILE),
+    "organization": app.DEFAULT_CONFIG["organization"],
+    "broadcast_defaults": app.DEFAULT_CONFIG["broadcast_defaults"],
+    "streaming": app.DEFAULT_CONFIG["streaming"],
+    "state_defaults_in_config": "state_defaults" in app.DEFAULT_CONFIG,
+    "state_home_team": app.DEFAULT_STATE["home_team"],
+    "state_venue": app.DEFAULT_STATE["venue"],
+    "resolved": app.load_config(),
+}))
+"""
+
+
+def _import_app_against(tmp_path, profile_file: Path) -> dict:
+    """Import ``app`` in a fresh interpreter whose whole runtime root is under
+    ``tmp_path`` and whose identity profile is ``profile_file``.
+
+    app.py builds IDENTITY_PROFILE, DEFAULT_CONFIG and DEFAULT_STATE once, at
+    import time, from the profile file -- so the only honest way to test that
+    sourcing against a chosen profile is a new interpreter. Nothing here can
+    read or write the real identity profile, state, config or state-authority
+    file, whatever they contain.
+    """
+    import os
+    import subprocess
+    import sys
+
+    root = tmp_path / "runtime"
+    (root / "Data").mkdir(parents=True)
+    (root / "state.json").write_text("{}", encoding="utf-8")  # => an existing install
+    (root / "identity_profile.json").write_bytes(profile_file.read_bytes())
+    env = {
+        **os.environ,
+        "CSRN_RUNTIME_ROOT": str(root),
+        "CSRN_DATA_ROOT": str(root / "Data"),
+        "CSRN_GAME_DAY_LOCAL_STATE": "1",
+        "CSRN_STATE_AUTHORITY_FILE": str(root / "authority-state.json"),
+        "CSRN_PRODUCTION_TEMPLATE_STATE_PATH": str(root / "template.json"),
+        "LOCALAPPDATA": str(tmp_path / "localappdata"),
+        "PYTHONPATH": str(REPO_ROOT),
+    }
+    done = subprocess.run(
+        [sys.executable, "-c", _CHILD], cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=180
+    )
+    lines = [ln for ln in done.stdout.splitlines() if ln.startswith("REPORT:")]
+    assert done.returncode == 0 and lines, f"child failed ({done.returncode}):\n{done.stderr[-2000:]}"
+    report = json.loads(lines[-1][len("REPORT:"):])
+    # it read the scratch copy, never the real file
+    assert Path(report["identity_file"]) == (root / "identity_profile.json").resolve()
+    return report
+
+
+def test_app_default_config_is_sourced_from_the_identity_profile(tmp_path) -> None:
+    """DEFAULT_CONFIG / DEFAULT_STATE come from the identity profile *file*, not
+    from inline literals -- verified against a profile this test writes, so it
+    holds whatever is in the real, user-specific, gitignored identity_profile.json
+    (a customised install used to fail the version of this test that asserted the
+    stock Caledonia palette)."""
+    # The fixture must be unmistakably not the historical seed, or a regression to
+    # inline literals would still pass.
+    assert FIXTURE_PROFILE["organization"]["primary_color"] != HISTORICAL_ORGANIZATION["primary_color"]
+    assert FIXTURE_PROFILE["organization"]["name"] != HISTORICAL_ORGANIZATION["name"]
+    assert FIXTURE_PROFILE["broadcast_defaults"] != HISTORICAL_BROADCAST_DEFAULTS
+    assert FIXTURE_PROFILE["streaming"] != HISTORICAL_STREAMING
+    assert FIXTURE_PROFILE["state_defaults"] != HISTORICAL_STATE_DEFAULTS
+
+    profile_file = tmp_path / "fixture_identity_profile.json"
+    profile_file.write_text(json.dumps(FIXTURE_PROFILE, indent=2), encoding="utf-8")
+
+    report = _import_app_against(tmp_path, profile_file)
+
+    assert report["organization"] == FIXTURE_PROFILE["organization"]  # incl. the extra `logo` key
+    assert report["broadcast_defaults"] == FIXTURE_PROFILE["broadcast_defaults"]
+    # Round 23: streaming is in DEFAULT_CONFIG (Configuration Manager edits it);
+    # state_defaults feed DEFAULT_STATE and are deliberately not a config section.
+    assert report["streaming"] == FIXTURE_PROFILE["streaming"]
+    assert report["state_defaults_in_config"] is False
+    # Round 13: DEFAULT_STATE placeholders come from the profile.
+    assert report["state_home_team"] == FIXTURE_PROFILE["state_defaults"]["home_team"]
+    assert report["state_venue"] == FIXTURE_PROFILE["state_defaults"]["venue"]
+    # load_config() on a fresh install root (no saved config.json) resolves the
+    # profile's identity, not a built-in one.
+    resolved = report["resolved"]
+    assert resolved["organization"]["name"] == FIXTURE_PROFILE["organization"]["name"]
+    assert resolved["broadcast_defaults"]["home_school_id"] == FIXTURE_PROFILE["broadcast_defaults"]["home_school_id"]
+
+
+def test_app_default_config_follows_whatever_profile_is_installed(tmp_path) -> None:
+    """The same sourcing guarantee for the profile actually installed here --
+    stock, customised, or absent -- with expectations read from the file itself
+    rather than hard-coded. Works on a *copy*, so the live file is never touched;
+    if there is none (a fresh clone), the seed for an existing install is used."""
+    installed = REPO_ROOT / "identity_profile.json"
+    copy = tmp_path / "installed_identity_profile_copy.json"
+    if installed.exists():
+        copy.write_bytes(installed.read_bytes())
+    else:
+        identity_service.load_identity_profile(copy, existing_install=True)  # seeds the file
+
+    expected = identity_service.load_identity_profile(copy, existing_install=True)
+    report = _import_app_against(tmp_path, copy)
+
+    assert report["organization"] == expected["organization"]
+    assert report["broadcast_defaults"] == expected["broadcast_defaults"]
+    assert report["streaming"] == expected["streaming"]
+    assert report["state_defaults_in_config"] is False
+    assert report["state_home_team"] == expected["state_defaults"]["home_team"]
+    assert report["state_venue"] == expected["state_defaults"]["venue"]
 
 
 def test_launcher_streaming_links_endpoint_is_public_and_serves_the_profile() -> None:
