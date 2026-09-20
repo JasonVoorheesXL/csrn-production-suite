@@ -15,6 +15,10 @@ runtime is exercised here by static-source assertions, and the BEHAVIOUR was
 verified live in a real browser on all four board themes (see the commit
 message and docs/LAYOUT_BUILDER_P1.md). tools/layout_builder_smoke.js is that
 smoke test made repeatable; the last test below pins that it stays in sync.
+
+Part A2: score_box PLACEMENT. The bonded scorebug node is the theme's whole
+full-canvas board, so placement is a uniform scale-to-fit transform (see the
+A2 section below), live-verified on all four board themes.
 """
 
 from __future__ import annotations
@@ -220,3 +224,80 @@ def test_smoke_harness_exists_and_covers_every_mode_and_fallthrough() -> None:
         assert token in smoke, token
     # the harness reads the same class prefix the runtime sets
     assert "csrn-production-layout-hide" in smoke
+
+
+# --- A2: score_box placement (uniform scale-to-fit) -------------------------
+
+
+def test_score_box_placement_is_a_transform_never_a_box_resize() -> None:
+    body = _function(_read(RUNTIME), "applyScoreBoxPlacementR1")
+    # transform + origin 0 0, computed from the node's own layout box
+    assert "node.style.transformOrigin = \"0 0\";" in body
+    assert "translate(" in body and "scale(" in body
+    for forbidden in ("style.left", "style.top", "style.width", "style.height", "style.position"):
+        assert forbidden not in body  # the P0 crush: resizing the box leaves px-sized children behind
+    # offset* is untouched by a transform, so re-running every poll cannot drift;
+    # getBoundingClientRect() would read the already-scaled box and compound
+    assert "node.offsetLeft" in body and "node.offsetWidth" in body
+    assert "getBoundingClientRect" not in body
+
+
+def test_score_box_placement_never_upscales_and_refuses_an_illegible_scale() -> None:
+    js = _read(RUNTIME)
+    assert "const SCORE_BOX_MIN_SCALE_R1 = 0.5;" in js
+    body = _function(js, "applyScoreBoxPlacementR1")
+    assert "Math.min(target.w / base.w, target.h / base.h, 1)" in body  # fit, capped at native size
+    assert "if (scale < SCORE_BOX_MIN_SCALE_R1) {" in body
+    refused = body.split("if (scale < SCORE_BOX_MIN_SCALE_R1) {")[1].split("}")[0]
+    assert 'dataset.csrnLayoutScoreBox = "too-small"' in refused
+    assert "clearScoreBoxPlacementR1(node)" in refused  # the board stays where the theme put it
+
+
+def test_score_box_placement_is_undone_when_the_override_goes_away() -> None:
+    js = _read(RUNTIME)
+    body = _function(js, "applyScoreBoxPlacementR1")
+    assert "const target = override ? layoutTargetPxR0(override) : null;" in body
+    assert "clearScoreBoxPlacementR1(node);" in body.split("if (!target")[1].split("return;")[0]
+    clear = _function(js, "clearScoreBoxPlacementR1")
+    assert 'node.style.transform = "";' in clear and 'node.style.transformOrigin = "";' in clear
+    assert "delete node.dataset.csrnLayoutScoreBox" in clear
+    assert "=== undefined) return;" in clear  # a node the layout never touched is left byte-identical
+
+
+def test_score_box_placement_reuses_the_p0_target_resolver_and_aligns_by_zone_name() -> None:
+    js = _read(RUNTIME)
+    assert "layoutTargetPxR0(override)" in _function(js, "applyScoreBoxPlacementR1")  # rect wins over zone; zones from the engine
+    align = _function(js, "layoutZoneAlignmentR1")
+    for token in ('endsWith("-left")', 'endsWith("-right")', 'startsWith("top-")', 'startsWith("bottom-")', "layoutHasRectR1(override)"):
+        assert token in align
+
+
+def test_apply_hook_wires_placement_after_visibility_and_always_offers_the_undo() -> None:
+    hook = _function(_read(RUNTIME), "applyLayoutOverrides")
+    block = hook.split('"score_box"')[1].split("ticker: visibility")[0]
+    assert "if (scorebugOverride) setNodeVisibilityR0(scorebugNode, scorebugOverride.visible !== false);" in block
+    # called for a null override too -> that is what clears a placement live
+    assert "applyScoreBoxPlacementR1(scorebugNode, scorebugOverride);" in block
+    assert block.index("setNodeVisibilityR0(") < block.index("applyScoreBoxPlacementR1(")
+
+
+def test_placement_is_inert_by_default() -> None:
+    """No layouts section -> the hook returns before touching the board; a
+    layouts document with no score_box override reaches the placement call
+    with null, whose only effect is clearing what this hook itself set."""
+    js = _read(RUNTIME)
+    assert 'if (!layouts || typeof layouts !== "object") return; // no section -> untouched' in js
+    assert "node.dataset.csrnLayoutScoreBox === undefined) return;" in _function(js, "clearScoreBoxPlacementR1")
+
+
+def test_smoke_harness_covers_score_box_placement_on_every_theme() -> None:
+    smoke = _read("tools/layout_builder_smoke.js")
+    for token in (
+        "window.__placementMatrix",
+        "csrnLayoutScoreBox",
+        "REFUSED, board untouched",
+        "placed board survives a full rebuild into",
+        "layout removed -> board back at native box",
+        "idempotent",
+    ):
+        assert token in smoke, token

@@ -141,3 +141,72 @@ window.__matrix = async (idle) => {
   check('everything cleared -> idle', o.mode === idle, o);
   return rows.join('\n');
 };
+
+/*
+ * score_box PLACEMENT matrix (Layout Builder P1, A2). Same setup as above;
+ *   `await __placementMatrix()`   -- every line must start with PASS.
+ * The bonded scorebug node is the theme's whole board, so placement is a
+ * uniform scale-to-fit (applyScoreBoxPlacementR1); zones the board would have
+ * to shrink below SCORE_BOX_MIN_SCALE_R1 (0.5) are refused, not crushed.
+ */
+window.__place = (score_box) => ({
+  active: 'default',
+  presets: { default: { in_game: { football: { score_box } }, pregame: {}, halftime: {} } }
+});
+window.__sbNode = () => document.querySelector('#csrnProductionThemeLayout .bl-component[data-component="scorebug"]');
+window.__sbState = () => {
+  const n = __sbNode();
+  if (!n) return null;
+  const b = n.getBoundingClientRect();
+  return { rect: [b.left, b.top, b.width, b.height].map(Math.round), marker: n.dataset.csrnLayoutScoreBox || null, tf: n.style.transform || '' };
+};
+window.__placementMatrix = async () => {
+  const Z = window.CSRNBroadcastLayoutEngine.zones;
+  const rows = [];
+  const W = 2000;
+  const set = async (doc, force) => {
+    __smoke.layouts = doc;
+    __smoke.force = force ? Object.assign({}, ...force.map(k => __FORCE[k])) : {};
+    await __wait(W);
+    return __sbState();
+  };
+  const inside = (r, z, tol = 2) => r[0] >= z.x - tol && r[1] >= z.y - tol && r[0] + r[2] <= z.x + z.w + tol && r[1] + r[3] <= z.y + z.h + tol;
+  const check = (name, cond, o) => rows.push((cond ? 'PASS ' : 'FAIL ') + name + '  ' + JSON.stringify(o));
+
+  const base = await set(null);
+  rows.push('baseline ' + JSON.stringify(base));
+  const bw = base.rect[2], bh = base.rect[3];
+
+  let o = await set(__place({ zone: 'center' }));
+  check('zone center -> placed, scaled to fit, inside the zone, aspect kept',
+    o.marker === 'placed' && inside(o.rect, Z['center']) && o.rect[2] < bw && Math.abs(o.rect[2] / o.rect[3] - bw / bh) < 0.02, o);
+  const centred = o;
+
+  o = await set(__place({ zone: 'full-safe' }));
+  check('zone full-safe -> placed, inside the zone', o.marker === 'placed' && inside(o.rect, Z['full-safe']), o);
+
+  o = await set(__place({ rect: { x: 4, y: 40, w: 60, h: 56 } }));
+  const R = { x: 0.04 * 1920, y: 0.40 * 1080, w: 0.60 * 1920, h: 0.56 * 1080 };
+  check('rect (% of canvas) -> placed, inside the rect', o.marker === 'placed' && inside(o.rect, R), o);
+
+  o = await set(__place({ zone: 'top-left' }));
+  check('zone top-left (fit scale < 0.5) -> REFUSED, board untouched', o.marker === 'too-small' && o.tf === '' && o.rect.join() === base.rect.join(), o);
+  o = await set(__place({ zone: 'bottom-center' }));
+  check('zone bottom-center (fit scale < 0.5) -> REFUSED, board untouched', o.marker === 'too-small' && o.rect.join() === base.rect.join(), o);
+
+  o = await set(__place({ visible: false, zone: 'center' }));
+  check('visible:false still hides the board (placement does not resurrect it)', getComputedStyle(__sbNode()).display === 'none', o);
+
+  for (const m of ['sponsor', 'player', 'highlight']) {
+    o = await set(__place({ zone: 'center' }), [m]);
+    const mode = document.querySelector('#csrnProductionThemeLayout [data-video-mode]');
+    check('placed board survives a full rebuild into ' + m + ' mode',
+      o.marker === 'placed' && inside(o.rect, Z['center']) && (!mode || mode.dataset.videoMode === m), Object.assign({ mode: mode && mode.dataset.videoMode }, o));
+  }
+
+  o = await set(__place({ zone: 'center' }));
+  check('re-applying is idempotent (no drift across polls)', o.rect.join() === centred.rect.join(), o);
+  o = await set(null);
+  check('layout removed -> board back at native box, marker cleared', o.rect.join() === base.rect.join() && o.marker === null && o.tf === '', o);
+  return rows.join('\n');
+};

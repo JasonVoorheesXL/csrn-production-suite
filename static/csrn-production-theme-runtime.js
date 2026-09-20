@@ -3268,11 +3268,11 @@ function patchVideoWindowGuide(root, runtime) {
 //     scorebug component (no isolated node to reposition, so a zone/rect
 //     override is a no-op there); collegiate_traditional and digital_neon
 //     have no data-component="ticker" node either.
-//   - `zone`/`rect` on `score_box` is explicitly NOT applied (reverted
-//     after live-verification): the bonded scorebug component is nearly
-//     canvas-sized, not tightly fitted, so forcing it into a smaller
-//     target zone visually crushes the whole board illegible rather than
-//     resizing it. See the code comment at its call site below.
+//   - `zone`/`rect` on `score_box` (P1): applied as a uniform scale-to-fit of
+//     the whole bonded board (applyScoreBoxPlacementR1), NOT as a
+//     left/top/width/height override -- P0 live-verified that the bonded
+//     node is the theme's entire full-canvas board composition, so resizing
+//     its box crushes it. Refused below SCORE_BOX_MIN_SCALE_R1 (0.5).
 //   - `sponsor_slot` / `spotlight_zone` / `video_zone` VISIBILITY (P1): applied
 //     by making themeVideoModeFor() treat a layout-hidden element as
 //     unavailable (falls through to the next mode, else the theme's idle
@@ -3417,6 +3417,79 @@ function resolveIsolatedTickerComponentR0(root, alias) {
   return frozenTarget.closest('[data-component="ticker"]') || null;
 }
 
+// --- Layout Builder P1: score_box placement ------------------------------------
+//
+// Why a naive left/top/width/height override crushes the board (P0, live
+// 2026-09-14) and what works instead. In every board theme the bonded
+// `data-component="scorebug"` node is not a compact scorebug strip: it is the
+// theme's WHOLE board composition (scoreboard + video board + rails; Heritage
+// Press and Collegiate also carry the ticker), laid out in absolute px against
+// a 1920x1080 canvas -- measured live, FNS/8-Bit 1888x958, Heritage 1840x1032,
+// Collegiate 1840x1000. Resizing that box leaves its children at their fixed
+// px sizes, so the board is cropped/crushed. What CAN move it correctly is a
+// uniform scale of the node as a whole: `transform: translate() scale()` with
+// transform-origin 0 0, computed from the node's own layout box (offset*,
+// which a transform does not affect, so this is idempotent poll after poll and
+// needs no per-theme knowledge). The target zone/rect is a BOX TO FIT INTO:
+// the board is scaled down (never up) to the largest size that fits and is
+// aligned by the zone name (-left/-right/top-/bottom-, else centred).
+//
+// Legibility floor: the engine's compact zones (top-left 760x240 and the like)
+// are sized for a scorebug strip, so fitting a full board into them yields
+// scale ~0.25 (6px text at 1080p). Below SCORE_BOX_MIN_SCALE_R1 the placement
+// is REFUSED -- the board stays where the theme put it -- and the node is
+// marked data-csrn-layout-score-box="too-small" so it is observable rather
+// than silently ignored. Anything the layout previously did is undone when the
+// override goes away.
+const SCORE_BOX_MIN_SCALE_R1 = 0.5;
+
+function layoutHasRectR1(override) {
+  const rect = override && override.rect;
+  return Boolean(rect) && typeof rect === "object" &&
+    [rect.x, rect.y, rect.w, rect.h].every(value => Number.isFinite(Number(value)));
+}
+
+function layoutZoneAlignmentR1(override) {
+  const name = (!layoutHasRectR1(override) && typeof override.zone === "string") ? override.zone : "";
+  return {
+    x: name.endsWith("-left") ? "start" : name.endsWith("-right") ? "end" : "center",
+    y: name.startsWith("top-") ? "start" : name.startsWith("bottom-") ? "end" : "center"
+  };
+}
+
+function clearScoreBoxPlacementR1(node) {
+  if (node.dataset.csrnLayoutScoreBox === undefined) return;
+  node.style.transform = "";
+  node.style.transformOrigin = "";
+  delete node.dataset.csrnLayoutScoreBox;
+}
+
+// `override` is the resolved score_box override, or null to undo any placement.
+function applyScoreBoxPlacementR1(node, override) {
+  if (!node) return;
+  const target = override ? layoutTargetPxR0(override) : null;
+  if (!target || !(target.w > 0) || !(target.h > 0)) {
+    clearScoreBoxPlacementR1(node);
+    return;
+  }
+  const base = {x: node.offsetLeft, y: node.offsetTop, w: node.offsetWidth, h: node.offsetHeight};
+  if (!(base.w > 0) || !(base.h > 0)) return; // not laid out yet; a later poll retries
+  const scale = Math.min(target.w / base.w, target.h / base.h, 1);
+  if (scale < SCORE_BOX_MIN_SCALE_R1) {
+    clearScoreBoxPlacementR1(node);
+    node.dataset.csrnLayoutScoreBox = "too-small";
+    return;
+  }
+  const align = layoutZoneAlignmentR1(override);
+  const width = base.w * scale, height = base.h * scale;
+  const left = align.x === "start" ? target.x : align.x === "end" ? target.x + target.w - width : target.x + (target.w - width) / 2;
+  const top = align.y === "start" ? target.y : align.y === "end" ? target.y + target.h - height : target.y + (target.h - height) / 2;
+  const transform = `translate(${(left - base.x).toFixed(2)}px, ${(top - base.y).toFixed(2)}px) scale(${scale.toFixed(4)})`;
+  if (node.style.transform !== transform) node.style.transform = transform;
+  node.style.transformOrigin = "0 0";
+  node.dataset.csrnLayoutScoreBox = "placed";
+}
+
 function applyLayoutOverrides(root, runtime) {
   if (!root || !runtime) return;
   const layouts = runtime.layouts;
@@ -3425,21 +3498,16 @@ function applyLayoutOverrides(root, runtime) {
   const alias = currentAlias;
   const canvas = root.closest(".csrn-broadcast-layout") || root;
 
-  // score_box: visibility only (clock_period/game_fields are schema-only
-  // in P0 -- see module note above). Repositioning is deliberately NOT
-  // applied here: live-verified (2026-09-14), the bonded scorebug
-  // component is nearly canvas-sized (it's a loose hit-area wrapper, not
-  // a tightly-fitted box), so forcing it into a smaller target zone (e.g.
-  // "top-left") visually crushes the whole board into an illegible strip
-  // rather than resizing it sensibly. A real fix needs theme-aware
-  // internal scaling, not a naive left/top/width/height override -- P1/
-  // theme-runtime work, not guessed at here.
+  // score_box: visibility, plus (P1) zone/rect placement as a uniform
+  // scale-to-fit of the whole bonded board -- see the "score_box placement"
+  // note above applyScoreBoxPlacementR1() for why it must be a transform and
+  // not a left/top/width/height override. clock_period/game_fields remain
+  // schema-only (no independently addressable node inside the board).
   const scorebugOverride = resolveLayoutOverrideR0(layouts, family, "score_box");
-  if (scorebugOverride) {
-    const scorebugNode = root.querySelector('.bl-component[data-component="scorebug"]');
-    if (scorebugNode) {
-      setNodeVisibilityR0(scorebugNode, scorebugOverride.visible !== false);
-    }
+  const scorebugNode = root.querySelector('.bl-component[data-component="scorebug"]');
+  if (scorebugNode) {
+    if (scorebugOverride) setNodeVisibilityR0(scorebugNode, scorebugOverride.visible !== false);
+    applyScoreBoxPlacementR1(scorebugNode, scorebugOverride);
   }
 
   // ticker: visibility uses the broader host (safe -- a display toggle

@@ -167,22 +167,24 @@ def test_apply_hook_never_hides_a_video_board_mode_host():
     assert "removeAttribute" not in hook
 
 
-def test_ticker_is_the_only_zone_repositioned_element():
+def test_ticker_is_the_only_element_using_the_px_zone_setter():
     js = _read("static/csrn-production-theme-runtime.js")
     hook = js.split("function applyLayoutOverrides")[1].split("\nasync function renderSelected")[0]
-    # score_box repositioning was live-verified to crush the whole board
-    # into an illegible strip and was reverted -- only ticker (via the
-    # isolated top-level component) still repositions.
+    # setNodeZonePxR0() writes position/left/top/width/height. That is exactly
+    # what P0 live-verified crushes the bonded scorebug board, so score_box
+    # must never go through it -- only the isolated ticker component does.
+    # (score_box placement is a uniform transform: see test_layout_builder_p1.py.)
     assert hook.count("setNodeZonePxR0(") == 1
     assert "resolveIsolatedTickerComponentR0(root, alias)" in hook
 
 
-def test_score_box_visibility_still_works_but_reposition_does_not():
+def test_score_box_visibility_is_a_display_toggle_and_placement_never_resizes_the_box():
     js = _read("static/csrn-production-theme-runtime.js")
     hook = js.split("function applyLayoutOverrides")[1].split("\nasync function renderSelected")[0]
     scorebug_block = hook.split('"score_box"')[1].split("ticker: visibility")[0]
     assert "setNodeVisibilityR0(scorebugNode" in scorebug_block
     assert "setNodeZonePxR0(scorebugNode" not in scorebug_block
+    assert "applyScoreBoxPlacementR1(scorebugNode, scorebugOverride)" in scorebug_block
 
 
 # --- Pregame/Halftime read hook ---------------------------------------------
