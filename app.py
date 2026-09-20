@@ -211,6 +211,10 @@ from routes.theme_routes import (
     ThemeRoutesDependencies,
     create_theme_blueprint,
 )
+from routes.layout_routes import (
+    LayoutRoutesDependencies,
+    create_layout_blueprint,
+)
 from routes.social_routes import (
     SocialRoutesDependencies,
     create_social_blueprint,
@@ -1232,6 +1236,37 @@ def save_config(config: dict[str, Any]) -> None:
     ensure_data_architecture()
     CONFIG_REPOSITORY.save(config)
     _persist_identity_sections(config)
+
+
+_LAYOUTS_WRITE_LOCK = Lock()
+
+
+def get_layouts_document() -> dict[str, Any]:
+    """The Layout Builder document currently in force (what /api/runtime-state
+    and the pregame/halftime payload serve)."""
+    return copy.deepcopy(IDENTITY_PROFILE.get("layouts") or {})
+
+
+def save_layouts_document(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Layout Builder P1: the first writer of the identity profile's `layouts`
+    section. Read-modify-write of identity_profile.json so every other section
+    is preserved, then rebind IDENTITY_PROFILE (the object runtime_state() and
+    pregame_presentation read on every request) and drop the runtime-state
+    cache, so the change reaches the overlays on their next poll -- no restart.
+    """
+    global IDENTITY_PROFILE
+    with _LAYOUTS_WRITE_LOCK:
+        current = load_identity_profile(IDENTITY_FILE, existing_install=True)
+        current["layouts"] = copy.deepcopy(dict(document))
+        save_identity_profile(IDENTITY_FILE, current, existing_install=_EXISTING_INSTALL)
+        IDENTITY_PROFILE = load_identity_profile(
+            IDENTITY_FILE, existing_install=_EXISTING_INSTALL
+        )
+        saved = copy.deepcopy(IDENTITY_PROFILE.get("layouts") or {})
+    from runtime_state_cache import invalidate_runtime_state_cache
+
+    invalidate_runtime_state_cache()
+    return saved
 
 
 def update_config_values(
@@ -3752,6 +3787,15 @@ THEME_ROUTES_BLUEPRINT = create_theme_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(THEME_ROUTES_BLUEPRINT)
+
+LAYOUT_ROUTES_BLUEPRINT = create_layout_blueprint(
+    LayoutRoutesDependencies(
+        require_auth=require_auth,
+        get_layouts=lambda: get_layouts_document(),
+        save_layouts=lambda document: save_layouts_document(document),
+    )
+)
+APPLICATION_BLUEPRINTS.append(LAYOUT_ROUTES_BLUEPRINT)
 
 
 SOCIAL_SERVICE: SocialPublishingService | None = None

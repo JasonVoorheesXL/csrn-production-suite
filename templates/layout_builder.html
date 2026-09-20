@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Layout Builder</title>
+  <style>
+    :root{color-scheme:dark;font-family:Arial,Helvetica,sans-serif;--bg:#0c0f14;--panel:#141922;--line:#3a424e;--muted:#aeb7c2;--accent:#b5121b;--ok:#bce7c8;--warn:#f3d27a}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:#f4f6f8}
+    button,input,select{font:inherit} button{border:1px solid #657184;border-radius:8px;padding:9px 13px;background:#242c39;color:#fff;cursor:pointer;font-weight:800}
+    button.primary{background:var(--accent);border-color:#e03e46} button:disabled{opacity:.45;cursor:not-allowed}
+    button.quiet{background:transparent;font-weight:600}
+    header{padding:22px 30px;border-bottom:1px solid #343a44;background:#121720;display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    h1,h2,h3,p{margin-top:0} h1{margin-bottom:6px;font-size:28px} h2{font-size:19px;margin-bottom:12px} header p{margin-bottom:0;color:var(--muted);max-width:760px}
+    main{padding:22px 30px 40px;display:grid;gap:20px}
+    .pills{display:flex;flex-wrap:wrap;gap:10px}.pill{padding:8px 12px;border:1px solid #49515e;border-radius:999px;background:#171d27;color:#f4f6f8;text-decoration:none;font-size:14px}
+    .workspace{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:20px;align-items:start}
+    .panel{min-width:0;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);box-shadow:0 12px 24px rgba(0,0,0,.22)}
+    input,select{width:100%;padding:10px;border:1px solid #4c5665;border-radius:7px;background:#0d1118;color:#fff}
+    label{display:grid;gap:5px;color:#b8c1cd;font-size:13px}
+    .presets{display:grid;gap:9px;margin-bottom:16px}
+    .preset{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;text-align:left;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:#10151d;cursor:pointer;width:100%;font-weight:600}
+    .preset[aria-pressed="true"]{border-color:#ff5968;box-shadow:0 0 0 2px rgba(255,89,104,.2)}
+    .preset .name{font-weight:800}.preset .sub{display:block;color:#8792a1;font-size:12px;font-weight:400;margin-top:2px}
+    .badge{padding:3px 9px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;background:#102018;color:var(--ok);border:1px solid #385946}
+    .row-actions{display:flex;flex-wrap:wrap;gap:8px}
+    .newbox{display:grid;gap:9px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+    .tabs{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 14px}.tabs button[aria-selected="true"]{background:#fff;color:#111;border-color:#fff}
+    .scope{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:14px}.scope label{min-width:200px}
+    .tablewrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse}
+    th{padding:0 10px 8px;text-align:left;color:#8792a1;font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+    td{padding:11px 10px;border-top:1px solid #2b323d;vertical-align:middle}
+    td.el{font-weight:800;min-width:140px}
+    td select{min-width:150px}
+    .inherit{color:#8792a1;font-size:13px}
+    .hint{margin:6px 0 0;color:#8792a1;font-size:12px;line-height:1.4}
+    .note{margin:14px 0 0;padding:11px 13px;border:1px solid #4c4a2a;border-radius:9px;background:#1d1b10;color:var(--warn);font-size:13px;line-height:1.45}
+    .savebar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+    #message{min-height:24px;color:var(--ok)} #message.err{color:#ff8f98} #message ul{margin:6px 0 0 18px;padding:0}
+    .dirty{color:var(--warn);font-size:13px}
+    @media(max-width:980px){header,main{padding-left:16px;padding-right:16px}.workspace{grid-template-columns:minmax(0,1fr)}}
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Layout Builder</h1>
+    <p>Choose what shows on the production graphics and where. Pick a preset, adjust it per scene, then save &mdash; changes reach the live overlays within a second, no restart.</p>
+  </div>
+  <div class="pills">
+    <a class="pill" href="/">Return to Command Center</a>
+    <a class="pill" href="/themes">Graphics Themes</a>
+    <a class="pill" href="/overlay" target="_blank" rel="noopener">Open production overlay</a>
+    <a class="pill" href="/pregame-overlay" target="_blank" rel="noopener">Open pregame / halftime overlay</a>
+  </div>
+</header>
+<main>
+  <section class="workspace">
+    <aside class="panel" aria-labelledby="presetsHeading">
+      <h2 id="presetsHeading">Presets</h2>
+      <div id="presets" class="presets" role="group" aria-label="Layout presets"></div>
+      <div class="row-actions">
+        <button id="activatePreset" type="button">Use on air</button>
+        <button id="duplicatePreset" type="button" class="quiet">Duplicate</button>
+        <button id="renamePreset" type="button" class="quiet">Rename</button>
+        <button id="deletePreset" type="button" class="quiet">Delete</button>
+      </div>
+      <form id="newForm" class="newbox" autocomplete="off">
+        <h3 style="margin:0;font-size:15px">New preset</h3>
+        <label>Start from
+          <select id="newStarter"></select>
+        </label>
+        <p id="newStarterNote" class="hint" style="margin:0"></p>
+        <label>Name
+          <input id="newName" maxlength="40" placeholder="e.g. Friday night">
+        </label>
+        <button id="createPreset" type="submit">Create preset</button>
+      </form>
+    </aside>
+
+    <section class="panel" aria-labelledby="editorHeading">
+      <h2 id="editorHeading">Editing: <span id="editingName">&hellip;</span></h2>
+      <div class="tabs" id="sceneTabs" role="tablist" aria-label="Scene"></div>
+      <div class="scope">
+        <label>Applies to
+          <select id="familySelect"></select>
+        </label>
+        <p id="scopeNote" class="hint" style="margin:0 0 4px;max-width:420px"></p>
+      </div>
+      <div class="tablewrap"><table>
+        <thead><tr><th scope="col">Element</th><th scope="col">Display</th><th scope="col">Placement</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+      <p class="note" id="sceneNote"></p>
+      <div class="savebar">
+        <button id="save" class="primary" type="button" disabled>Save and apply live</button>
+        <button id="revert" type="button" disabled>Discard changes</button>
+        <span id="dirty" class="dirty" hidden>Unsaved changes</span>
+      </div>
+      <div id="message" role="status" aria-live="polite"></div>
+    </section>
+  </section>
+</main>
+
+<script src="/static/csrn-broadcast-layout-engine.js?v=11"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const DEFAULT_FAMILY = "default";
+  const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9 _.-]{0,39}$/;
+  const SCENE_NOTES = {
+    in_game: "Applies to the themed production overlay. Scoreboard placement scales the whole board to fit; the engine's compact corner zones would make it unreadably small, so only the sizes listed are offered. Ticker placement takes effect on Friday Night Stadium and 8-Bit Gameday; other themes keep their built-in ticker position.",
+    pregame: "Applies to the pregame overlay. Hiding the background lets a live video feed show through underneath.",
+    halftime: "Applies to the halftime overlay. Hiding the background lets a live video feed show through underneath."
+  };
+
+  let catalog = null, saved = null, work = null;
+  let selected = "default", scene = "in_game", family = DEFAULT_FAMILY;
+
+  const clone = (value) => JSON.parse(JSON.stringify(value));
+  const dirty = () => JSON.stringify(work) !== JSON.stringify(saved);
+
+  function say(text, errors) {
+    const box = $("message");
+    box.className = errors && errors.length ? "err" : "";
+    box.textContent = text || "";
+    if (errors && errors.length) {
+      const list = document.createElement("ul");
+      for (const message of errors) { const li = document.createElement("li"); li.textContent = message; list.appendChild(li); }
+      box.appendChild(list);
+    }
+  }
+
+  // ---- document helpers (mirror layout_builder_service.resolve_override) ----
+  function sceneDoc(preset, sceneId, create) {
+    const p = work.presets[preset];
+    if (!p[sceneId] && create) p[sceneId] = {};
+    return p[sceneId] || null;
+  }
+  function getOverride(preset, sceneId, fam, element) {
+    const s = sceneDoc(preset, sceneId, false);
+    const f = s && s[fam];
+    return f && Object.prototype.hasOwnProperty.call(f, element) ? f[element] : undefined;
+  }
+  function effective(preset, sceneId, fam, element) {
+    const own = getOverride(preset, sceneId, fam, element);
+    if (own !== undefined) return {source: fam, value: own};
+    const base = getOverride(preset, sceneId, DEFAULT_FAMILY, element);
+    return base !== undefined ? {source: DEFAULT_FAMILY, value: base} : {source: null, value: null};
+  }
+  function putOverride(preset, sceneId, fam, element, value) {
+    const s = sceneDoc(preset, sceneId, true);
+    if (value === null || (typeof value === "object" && !Object.keys(value).length && fam === DEFAULT_FAMILY)) {
+      if (s[fam]) { delete s[fam][element]; if (!Object.keys(s[fam]).length) delete s[fam]; }
+      return;
+    }
+    if (!s[fam]) s[fam] = {};
+    s[fam][element] = value;
+  }
+  const familyLabel = (id) => (catalog.families.find((f) => f.id === id) || {label: id}).label;
+
+  // ---- rendering ----
+  function renderPresets() {
+    const box = $("presets");
+    box.textContent = "";
+    for (const name of Object.keys(work.presets)) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "preset";
+      button.setAttribute("aria-pressed", String(name === selected));
+      const label = document.createElement("span");
+      const strong = document.createElement("span"); strong.className = "name"; strong.textContent = name;
+      const sub = document.createElement("span"); sub.className = "sub";
+      const count = countOverrides(work.presets[name]);
+      sub.textContent = count ? count + " customized setting" + (count === 1 ? "" : "s") : "Theme as designed";
+      label.append(strong, sub);
+      button.appendChild(label);
+      if (name === work.active) { const badge = document.createElement("span"); badge.className = "badge"; badge.textContent = "On air"; button.appendChild(badge); }
+      button.addEventListener("click", () => { selected = name; render(); });
+      box.appendChild(button);
+    }
+    $("activatePreset").disabled = selected === work.active;
+    $("deletePreset").disabled = selected === "default";
+    $("renamePreset").disabled = selected === "default";
+    $("editingName").textContent = selected;
+  }
+  function countOverrides(preset) {
+    let n = 0;
+    for (const s of Object.keys(preset || {})) for (const f of Object.keys(preset[s] || {})) n += Object.keys(preset[s][f] || {}).length;
+    return n;
+  }
+
+  function renderTabs() {
+    const tabs = $("sceneTabs");
+    tabs.textContent = "";
+    for (const s of catalog.scenes) {
+      const button = document.createElement("button");
+      button.type = "button"; button.setAttribute("role", "tab");
+      button.setAttribute("aria-selected", String(s.id === scene));
+      button.textContent = s.label;
+      button.addEventListener("click", () => { scene = s.id; render(); });
+      tabs.appendChild(button);
+    }
+    const select = $("familySelect");
+    select.textContent = "";
+    for (const f of catalog.families) { const o = document.createElement("option"); o.value = f.id; o.textContent = f.label; select.appendChild(o); }
+    select.value = family;
+    $("scopeNote").textContent = family === DEFAULT_FAMILY
+      ? "Settings here apply to every sport unless a sport has its own."
+      : familyLabel(family) + " settings replace the All sports setting for that element.";
+    $("sceneNote").textContent = SCENE_NOTES[scene] || "";
+  }
+
+  function zoneOptions(control) {
+    if (Array.isArray(control.zone_choices)) return control.zone_choices.map((c) => ({value: c.value, label: c.label}));
+    const engine = window.CSRNBroadcastLayoutEngine;
+    const zones = engine && engine.zones ? Object.keys(engine.zones) : [];
+    return [{value: null, label: "Theme default"}].concat(zones.map((z) => ({value: z, label: z.replace(/-/g, " ")})));
+  }
+
+  function commit(control, mutate) {
+    const current = getOverride(selected, scene, family, control.element);
+    const next = mutate(current ? clone(current) : {});
+    // An empty override means "no override" and is dropped on save. In a sport's
+    // own scope that would silently fall back to All sports, so the explicit
+    // "customized, shown, theme placement" state is stored as visible:true.
+    putOverride(selected, scene, family, control.element, next && Object.keys(next).length ? next : (family === DEFAULT_FAMILY ? null : {visible: true}));
+    render();
+  }
+
+  function renderRows() {
+    const body = $("rows");
+    body.textContent = "";
+    const scoped = family !== DEFAULT_FAMILY;
+    for (const control of catalog.controls[scene]) {
+      const tr = document.createElement("tr");
+      const th = document.createElement("td"); th.className = "el"; th.textContent = control.label; tr.appendChild(th);
+      const own = getOverride(selected, scene, family, control.element);
+      const eff = effective(selected, scene, family, control.element);
+      const editable = !scoped || own !== undefined;
+
+      const display = document.createElement("td");
+      if (scoped) {
+        const box = document.createElement("label"); box.style.gridAutoFlow = "column"; box.style.justifyContent = "start"; box.style.alignItems = "center"; box.style.gap = "8px";
+        const check = document.createElement("input"); check.type = "checkbox"; check.style.width = "auto"; check.checked = own !== undefined;
+        check.addEventListener("change", () => {
+          if (check.checked) putOverride(selected, scene, family, control.element, eff.value && Object.keys(eff.value).length ? clone(eff.value) : {visible: true});
+          else putOverride(selected, scene, family, control.element, null);
+          render();
+        });
+        box.append(check, document.createTextNode("Customize for " + familyLabel(family)));
+        display.appendChild(box);
+      }
+      if (control.capabilities.includes("visible")) {
+        const value = editable ? own : eff.value;
+        const select = document.createElement("select");
+        select.setAttribute("aria-label", control.label + " display, " + scene);
+        for (const [v, l] of [["show", "Show"], ["hide", "Hide"]]) { const o = document.createElement("option"); o.value = v; o.textContent = l; select.appendChild(o); }
+        select.value = value && value.visible === false ? "hide" : "show";
+        select.disabled = !editable;
+        select.addEventListener("change", () => commit(control, (ov) => { if (select.value === "hide") ov.visible = false; else if (scoped) ov.visible = true; else delete ov.visible; return ov; }));
+        display.appendChild(select);
+        if (scoped && !editable && eff.source) { const p = document.createElement("div"); p.className = "inherit"; p.textContent = "Inherited from " + familyLabel(eff.source); display.appendChild(p); }
+      }
+      tr.appendChild(display);
+
+      const placement = document.createElement("td");
+      if (control.capabilities.includes("zone")) {
+        const value = editable ? own : eff.value;
+        const select = document.createElement("select");
+        select.setAttribute("aria-label", control.label + " placement, " + scene);
+        const options = zoneOptions(control);
+        for (const opt of options) { const o = document.createElement("option"); o.value = opt.value === null ? "" : opt.value; o.textContent = opt.label; select.appendChild(o); }
+        const current = value && typeof value.zone === "string" ? value.zone : "";
+        if (current && !options.some((o) => o.value === current)) { const o = document.createElement("option"); o.value = current; o.textContent = current.replace(/-/g, " ") + " (custom)"; select.appendChild(o); }
+        select.value = current;
+        select.disabled = !editable;
+        select.addEventListener("change", () => commit(control, (ov) => { delete ov.rect; if (select.value) ov.zone = select.value; else delete ov.zone; return ov; }));
+        placement.appendChild(select);
+        if (value && value.rect) { const p = document.createElement("div"); p.className = "hint"; p.textContent = "A custom rectangle is set for this element; choosing a zone replaces it."; placement.appendChild(p); }
+      } else {
+        const p = document.createElement("span"); p.className = "inherit"; p.textContent = "Fixed by the theme"; placement.appendChild(p);
+      }
+      tr.appendChild(placement);
+      body.appendChild(tr);
+    }
+  }
+
+  function renderStarters() {
+    const select = $("newStarter");
+    if (select.options.length) return;
+    for (const s of catalog.starters) { const o = document.createElement("option"); o.value = s.id; o.textContent = s.label; select.appendChild(o); }
+    const note = () => { const s = catalog.starters.find((x) => x.id === select.value); $("newStarterNote").textContent = s ? s.description : ""; };
+    select.addEventListener("change", note); note();
+  }
+
+  function render() {
+    renderPresets(); renderTabs(); renderRows(); renderStarters();
+    const isDirty = dirty();
+    $("save").disabled = !isDirty; $("revert").disabled = !isDirty; $("dirty").hidden = !isDirty;
+  }
+
+  // ---- preset operations ----
+  function uniqueName(base) {
+    let name = base.slice(0, 40), n = 2;
+    while (work.presets[name]) { const suffix = " " + n++; name = base.slice(0, 40 - suffix.length) + suffix; }
+    return name;
+  }
+  function validName(name) {
+    if (!NAME_RE.test(name) || name !== name.trim()) { say("Preset names are 1-40 letters, numbers, spaces, - _ .", ["\"" + name + "\" is not a valid preset name."]); return false; }
+    if (work.presets[name]) { say("", ["A preset named \"" + name + "\" already exists."]); return false; }
+    if (Object.keys(work.presets).length >= catalog.max_presets) { say("", ["At most " + catalog.max_presets + " presets."]); return false; }
+    return true;
+  }
+  $("newForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const name = $("newName").value.trim();
+    if (!validName(name)) return;
+    const starter = catalog.starters.find((s) => s.id === $("newStarter").value);
+    work.presets[name] = clone(starter.preset);
+    selected = name; $("newName").value = ""; say(""); render();
+  });
+  $("duplicatePreset").addEventListener("click", () => {
+    if (Object.keys(work.presets).length >= catalog.max_presets) { say("", ["At most " + catalog.max_presets + " presets."]); return; }
+    const name = uniqueName(selected + " copy");
+    work.presets[name] = clone(work.presets[selected]); selected = name; say(""); render();
+  });
+  $("renamePreset").addEventListener("click", () => {
+    const name = (window.prompt("New name for \"" + selected + "\":", selected) || "").trim();
+    if (!name || name === selected || !validName(name)) return;
+    const rebuilt = {};
+    for (const key of Object.keys(work.presets)) rebuilt[key === selected ? name : key] = work.presets[key];
+    work.presets = rebuilt;
+    if (work.active === selected) work.active = name;
+    selected = name; say(""); render();
+  });
+  $("deletePreset").addEventListener("click", () => {
+    if (selected === "default" || !window.confirm("Delete the preset \"" + selected + "\"?")) return;
+    delete work.presets[selected];
+    if (work.active === selected) work.active = "default";
+    selected = "default"; say(""); render();
+  });
+  $("activatePreset").addEventListener("click", () => { work.active = selected; say(""); render(); });
+  $("familySelect").addEventListener("change", (event) => { family = event.target.value; render(); });
+
+  // ---- save / revert ----
+  $("save").addEventListener("click", async () => {
+    $("save").disabled = true; say("Saving…");
+    try {
+      const response = await fetch("/api/layouts", {method: "POST", headers: {"Content-Type": "application/json"}, credentials: "same-origin", body: JSON.stringify({layouts: work})});
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) { say(data.error === "AUTH_REQUIRED" ? "Your session has expired. Sign in on the Command Center and try again." : "The layout was not saved.", data.errors || []); render(); return; }
+      saved = clone(data.layouts); work = clone(data.layouts);
+      if (!work.presets[selected]) selected = work.active;
+      say("Saved. The overlays pick this up within a second — no restart needed.");
+      render();
+    } catch (error) { say("The layout was not saved.", [String(error && error.message || error)]); render(); }
+  });
+  $("revert").addEventListener("click", () => { work = clone(saved); if (!work.presets[selected]) selected = work.active; say(""); render(); });
+  window.addEventListener("beforeunload", (event) => { if (work && dirty()) { event.preventDefault(); event.returnValue = ""; } });
+
+  async function boot() {
+    try {
+      const response = await fetch("/api/layouts", {cache: "no-store", credentials: "same-origin"});
+      if (!response.ok) { say(response.status === 401 ? "Sign in on the Command Center first, then reopen this page." : "The layout could not be loaded.", []); return; }
+      const data = await response.json();
+      catalog = data.catalog; saved = clone(data.layouts); work = clone(data.layouts);
+      selected = work.active in work.presets ? work.active : Object.keys(work.presets)[0];
+      render();
+    } catch (error) { say("The layout could not be loaded.", [String(error && error.message || error)]); }
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

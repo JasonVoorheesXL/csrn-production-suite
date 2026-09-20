@@ -550,3 +550,17 @@ silently assumed — full reasoning in code comments at each site):**
   `video_zone`/`sponsor_slot`/`spotlight_zone` repositioning in the same
   pass, rather than two separate rounds re-deriving the same board
   structure.
+
+---
+
+## 9. Phase status: P1 — guided customization (2026-09-19/20)
+
+Built on `main` in `layout-builder-p1-20260919`. Fixes both P0 stubs
+(sponsor/spotlight/video visibility via layout-aware mode selection;
+score_box placement as a scale-to-fit transform with a legibility floor),
+makes ticker placement reversible, and adds the guided builder at `/layouts`
+with the first write path into the identity profile's `layouts` section
+(saves apply live — no restart). Full account, decisions and known gaps:
+`docs/LAYOUT_BUILDER_P1.md`. The §8.1 "schema-only" notes above are
+superseded by it for sponsor/spotlight/video visibility and score_box
+placement.

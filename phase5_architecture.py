@@ -31,6 +31,9 @@ EXPECTED_BLUEPRINTS = {
     # Basketball's own operator routes (P4) -- new URLs under
     # /api/hoops/..., never touching live_game_routes' football paths.
     "hoops_game_routes",
+    # Layout Builder P1: the guided-customization page + the first writer of
+    # the identity profile's `layouts` section (@require_auth).
+    "layout_routes",
     "live_game_routes",
     "logo_routes",
     "mhsaa_division_routes",

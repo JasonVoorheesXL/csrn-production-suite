@@ -354,3 +354,381 @@ def test_smoke_harness_covers_ticker_placement() -> None:
         "no isolated ticker component on this theme",
     ):
         assert token in smoke, token
+
+
+# --- B1: the builder catalog, strict write validation, routes, live apply -----
+
+import copy
+import json
+
+import pytest
+from flask import Flask, jsonify
+
+from routes.layout_routes import LayoutRoutesDependencies, create_layout_blueprint
+
+SVC = layout_builder_service
+
+
+def _doc(**presets):
+    return {"active": "default", "presets": {"default": SVC.default_preset(), **presets}}
+
+
+# LIVE_CONTROLS is what the builder offers; every entry must be something a real
+# consumer implements, or the page would show a control that does nothing.
+
+
+def test_every_live_control_is_a_real_element_that_applies_to_its_scene() -> None:
+    assert set(SVC.LIVE_CONTROLS) == set(SVC.SCENES)
+    for scene, controls in SVC.LIVE_CONTROLS.items():
+        for element, capabilities in controls.items():
+            assert element in SVC.ELEMENTS and SVC.element_applies_to_scene(element, scene)
+            assert set(capabilities) <= {"visible", "zone"} and "visible" in capabilities
+            assert element in SVC.ELEMENT_LABELS
+
+
+def test_schema_only_elements_are_not_offered_by_the_builder() -> None:
+    offered = {element for controls in SVC.LIVE_CONTROLS.values() for element in controls}
+    assert {"clock_period", "game_fields", "logo"}.isdisjoint(offered)
+
+
+def test_in_game_live_controls_match_what_the_theme_runtime_implements() -> None:
+    js = _read(RUNTIME)
+    hook = _function(js, "applyLayoutOverrides")
+    controls = SVC.LIVE_CONTROLS["in_game"]
+    # score_box: visibility + placement
+    assert controls["score_box"] == ("visible", "zone")
+    assert "setNodeVisibilityR0(scorebugNode" in hook and "applyScoreBoxPlacementR1(scorebugNode" in hook
+    # ticker: visibility + placement
+    assert controls["ticker"] == ("visible", "zone")
+    assert "setNodeVisibilityR0(tickerNode" in hook and "applyTickerPlacementR1(isolatedTicker" in hook
+    # sponsor / spotlight / video: visibility only, via the layout-aware mode selection
+    modes = _js_mapping(js, "LAYOUT_MODE_ELEMENT_R1")
+    for element in ("sponsor_slot", "spotlight_zone", "video_zone"):
+        assert controls[element] == ("visible",)
+        assert element in modes.values()
+    assert set(controls) == {"score_box", "ticker", "sponsor_slot", "spotlight_zone", "video_zone"}
+
+
+def test_pregame_and_halftime_live_controls_match_the_overlay_that_reads_them() -> None:
+    html = _read("templates/pregame_universal_overlay.html")
+    assert "elementHidden(layoutScene,'sponsor_slot')" in html  # both scenes
+    assert "elementHidden('halftime','spotlight_zone')" in html  # halftime ONLY
+    assert "elementHidden(scene,'background')" in html  # both scenes
+    assert SVC.LIVE_CONTROLS["pregame"] == {"sponsor_slot": ("visible",), "background": ("visible",)}
+    assert SVC.LIVE_CONTROLS["halftime"] == {
+        "sponsor_slot": ("visible",), "spotlight_zone": ("visible",), "background": ("visible",),
+    }
+
+
+def test_the_scoreboard_zone_choices_are_the_zones_the_runtime_will_not_refuse() -> None:
+    values = [value for value, _label in SVC.SCORE_BOX_ZONE_CHOICES]
+    assert values == [None, "full-safe", "center"]
+    # the engine's own zone sizes (mirrored here only to prove the choice list,
+    # not used by the service): board 1840x1000 (smallest measured) needs >= 0.5
+    engine = _read("static/csrn-broadcast-layout-engine.js")
+    for name in ("full-safe", "center"):
+        assert f'"{name}":' in engine
+    assert '"full-safe": {x: 40, y: 30, w: 1840, h: 1000}' in engine
+    assert '"center": {x: 450, y: 300, w: 1020, h: 520}' in engine
+
+
+def test_builder_catalog_is_complete_and_json_serialisable() -> None:
+    catalog = SVC.builder_catalog()
+    json.dumps(catalog)
+    assert [s["id"] for s in catalog["scenes"]] == list(SVC.SCENES)
+    assert [f["id"] for f in catalog["families"]] == list(SVC.FAMILY_KEYS)
+    for scene, rows in catalog["controls"].items():
+        assert [r["element"] for r in rows] == list(SVC.LIVE_CONTROLS[scene])
+    ticker = next(r for r in catalog["controls"]["in_game"] if r["element"] == "ticker")
+    assert ticker["zone_choices"] == "engine"  # filled from window.CSRNBroadcastLayoutEngine.zones
+    board = next(r for r in catalog["controls"]["in_game"] if r["element"] == "score_box")
+    assert board["zone_choices"][0] == {"value": None, "label": "Theme default"}
+    sponsor = next(r for r in catalog["controls"]["in_game"] if r["element"] == "sponsor_slot")
+    assert sponsor["zone_choices"] is None
+
+
+def test_family_keys_agree_with_the_runtime_and_sport_families() -> None:
+    import sport_families
+
+    assert set(SVC.FAMILY_KEYS) - {"default"} == {"football", "basketball", "baseball", "softball"}
+    for sport in ("football", "canadian_football", "basketball", "baseball", "softball"):
+        assert sport_families.base_family(sport) in SVC.FAMILY_KEYS
+
+
+# --- starters -----------------------------------------------------------------
+
+
+def test_starters_are_valid_unique_and_only_use_live_all_sports_controls() -> None:
+    ids = [s["id"] for s in SVC.STARTER_PRESETS]
+    assert len(ids) == len(set(ids)) and "theme-default" in ids
+    assert next(s for s in SVC.STARTER_PRESETS if s["id"] == "theme-default")["preset"] == SVC.default_preset()
+    for starter in SVC.STARTER_PRESETS:
+        assert starter["label"] and starter["description"]
+        document, errors = SVC.sanitize_layouts_document(_doc(**{"starter": starter["preset"]}))
+        assert errors == [], starter["id"]
+        for scene, families in starter["preset"].items():
+            assert set(families) <= {"default"}, starter["id"]  # All-sports key only
+            for element in families.get("default", {}):
+                assert element in SVC.LIVE_CONTROLS[scene], (starter["id"], scene, element)
+
+
+def test_starter_presets_cannot_be_mutated_through_the_catalog() -> None:
+    catalog = SVC.builder_catalog()
+    catalog["starters"][0]["preset"]["in_game"]["default"] = {"ticker": {"visible": False}}
+    assert SVC.STARTER_PRESETS[0]["preset"] == SVC.default_preset()
+
+
+# --- strict write validation --------------------------------------------------
+
+
+def test_a_valid_document_round_trips_canonically() -> None:
+    doc = _doc(**{"Friday night": {
+        "in_game": {"default": {"ticker": {"visible": False}, "score_box": {"zone": "center"}}, "football": {"sponsor_slot": {"visible": True}}},
+        "pregame": {"default": {"background": {"visible": False}}},
+        "halftime": {},
+    }})
+    doc["active"] = "Friday night"
+    clean, errors = SVC.sanitize_layouts_document(doc)
+    assert errors == [] and clean["active"] == "Friday night"
+    again, errors = SVC.sanitize_layouts_document(clean)
+    assert errors == [] and again == clean  # idempotent: what was saved re-validates to itself
+    assert clean["presets"]["Friday night"]["in_game"]["default"]["score_box"] == {"zone": "center"}
+    # and the normalizer the read path uses keeps it byte-for-byte
+    assert SVC.normalize_layouts(clean) == clean
+
+
+def test_empty_overrides_and_families_are_dropped_from_the_canonical_document() -> None:
+    doc = _doc(x={"in_game": {"default": {"ticker": {}}, "football": {}}, "pregame": {}, "halftime": {}})
+    clean, errors = SVC.sanitize_layouts_document(doc)
+    assert errors == [] and clean["presets"]["x"]["in_game"] == {}
+
+
+def test_an_explicit_visible_true_override_is_kept_so_a_sport_can_opt_out_of_all_sports() -> None:
+    clean, errors = SVC.sanitize_layouts_document(_doc(x={"in_game": {"football": {"ticker": {"visible": True}}}}))
+    assert errors == [] and clean["presets"]["x"]["in_game"] == {"football": {"ticker": {"visible": True}}}
+    # ...and the resolver honours it over the All-sports hide
+    doc = _doc(x={"in_game": {"default": {"ticker": {"visible": False}}, "football": {"ticker": {"visible": True}}}})
+    clean, _ = SVC.sanitize_layouts_document(doc)
+    clean["active"] = "x"
+    assert SVC.resolve_override(clean, scene="in_game", base_family="football", element="ticker") == {"visible": True}
+    assert SVC.resolve_override(clean, scene="in_game", base_family="basketball", element="ticker") == {"visible": False}
+
+
+BAD_DOCUMENTS = {
+    "not an object": "nope",
+    "no presets": {"active": "default", "presets": {}},
+    "presets not an object": {"active": "default", "presets": []},
+    "default removed": {"active": "x", "presets": {"x": {}}},
+    "active missing": {"presets": {"default": {}}},
+    "active unknown": {"active": "ghost", "presets": {"default": {}}},
+    "unknown scene": _doc(x={"warmup": {}}),
+    "scene not an object": _doc(x={"in_game": []}),
+    "unknown family": _doc(x={"in_game": {"rugby": {"ticker": {"visible": False}}}}),
+    "family not an object": _doc(x={"in_game": {"default": []}}),
+    "unknown element": _doc(x={"in_game": {"default": {"jumbotron": {"visible": False}}}}),
+    "background in game": _doc(x={"in_game": {"default": {"background": {"visible": False}}}}),
+    "override not an object": _doc(x={"in_game": {"default": {"ticker": True}}}),
+    "unknown field": _doc(x={"in_game": {"default": {"ticker": {"opacity": 0.5}}}}),
+    "visible not a bool": _doc(x={"in_game": {"default": {"ticker": {"visible": "no"}}}}),
+    "zone not a name": _doc(x={"in_game": {"default": {"ticker": {"zone": "Bottom Center"}}}}),
+    "zone not a string": _doc(x={"in_game": {"default": {"ticker": {"zone": 3}}}}),
+    "rect missing keys": _doc(x={"in_game": {"default": {"ticker": {"rect": {"x": 1, "y": 1}}}}}),
+    "rect outside canvas": _doc(x={"in_game": {"default": {"ticker": {"rect": {"x": 90, "y": 1, "w": 20, "h": 5}}}}}),
+    "rect zero size": _doc(x={"in_game": {"default": {"ticker": {"rect": {"x": 1, "y": 1, "w": 0, "h": 5}}}}}),
+    "rect boolean": _doc(x={"in_game": {"default": {"ticker": {"rect": {"x": True, "y": 1, "w": 5, "h": 5}}}}}),
+    "z out of range": _doc(x={"in_game": {"default": {"ticker": {"z": 5000}}}}),
+    "rotation out of range": _doc(x={"in_game": {"default": {"sponsor_slot": {"rotation_seconds": 0}}}}),
+    "name with slash": {"active": "default", "presets": {"default": {}, "a/b": {}}},
+    "name empty": {"active": "default", "presets": {"default": {}, "": {}}},
+    "name too long": {"active": "default", "presets": {"default": {}, "x" * 41: {}}},
+    "name leading space": {"active": "default", "presets": {"default": {}, " x": {}}},
+    "too many presets": {"active": "default", "presets": {"default": {}, **{f"p{i}": {} for i in range(SVC.MAX_PRESETS)}}},
+}
+
+
+@pytest.mark.parametrize("label", sorted(BAD_DOCUMENTS))
+def test_the_write_path_rejects_a_bad_document_whole(label: str) -> None:
+    clean, errors = SVC.sanitize_layouts_document(copy.deepcopy(BAD_DOCUMENTS[label]))
+    assert clean is None and errors, label  # nothing partially valid is ever returned to save
+
+
+def test_a_preset_named_default_is_required_but_others_are_free() -> None:
+    clean, errors = SVC.sanitize_layouts_document({"active": "default", "presets": {"default": {}, "Game 1.5-b_c": {}}})
+    assert errors == [] and set(clean["presets"]) == {"default", "Game 1.5-b_c"}
+
+
+def test_sanitize_never_mutates_its_input() -> None:
+    doc = _doc(x={"in_game": {"default": {"ticker": {"visible": False}}}})
+    before = copy.deepcopy(doc)
+    SVC.sanitize_layouts_document(doc)
+    assert doc == before
+
+
+# --- routes (real blueprint, fake deps) ----------------------------------------
+
+
+def _routes_app(*, authed: bool = True, save=None, current=None):
+    calls: dict = {"save": []}
+
+    def require_auth(func):
+        def wrapper(*args, **kwargs):
+            if not authed:
+                return jsonify({"error": "AUTH_REQUIRED"}), 401
+            return func(*args, **kwargs)
+        wrapper.__name__ = func.__name__
+        return wrapper
+
+    def default_save(document):
+        calls["save"].append(copy.deepcopy(document))
+        return document
+
+    app_ = Flask(__name__, template_folder=str(ROOT / "templates"))
+    app_.register_blueprint(create_layout_blueprint(LayoutRoutesDependencies(
+        require_auth=require_auth,
+        get_layouts=lambda: copy.deepcopy(current or SVC.default_layouts_document()),
+        save_layouts=save or default_save,
+    )))
+    return app_, calls
+
+
+def test_get_returns_the_document_and_catalog_uncached() -> None:
+    app_, _ = _routes_app()
+    response = app_.test_client().get("/api/layouts")
+    assert response.status_code == 200 and "no-store" in response.headers["Cache-Control"]
+    body = response.get_json()
+    assert body["layouts"] == SVC.default_layouts_document()
+    assert body["catalog"]["controls"]["in_game"][0]["element"] == "score_box"
+
+
+def test_post_saves_the_canonical_document_and_reports_live() -> None:
+    app_, calls = _routes_app()
+    doc = _doc(x={"in_game": {"default": {"ticker": {}, "sponsor_slot": {"visible": False}}}})
+    response = app_.test_client().post("/api/layouts", json={"layouts": doc})
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["applied"] == "live"
+    assert calls["save"] == [{"active": "default", "presets": {
+        "default": {"in_game": {}, "pregame": {}, "halftime": {}},
+        "x": {"in_game": {"default": {"sponsor_slot": {"visible": False}}}, "pregame": {}, "halftime": {}},
+    }}]  # the empty ticker override was dropped BEFORE saving
+
+
+@pytest.mark.parametrize("body", [None, {}, {"layouts": "x"}, {"layouts": {"active": "default", "presets": {}}}, [1]])
+def test_post_rejects_invalid_bodies_without_saving(body) -> None:
+    app_, calls = _routes_app()
+    response = app_.test_client().post("/api/layouts", json=body) if body is not None else app_.test_client().post("/api/layouts", data="not json")
+    assert response.status_code == 400
+    assert response.get_json()["error"] in {"LAYOUTS_REQUIRED", "LAYOUTS_INVALID"} and response.get_json()["errors"]
+    assert calls["save"] == []
+
+
+def test_post_reports_a_write_failure_as_500_not_a_crash() -> None:
+    def broken(_document):
+        raise OSError("disk full")
+
+    app_, _ = _routes_app(save=broken)
+    response = app_.test_client().post("/api/layouts", json={"layouts": SVC.default_layouts_document()})
+    assert response.status_code == 500 and response.get_json()["error"] == "LAYOUTS_SAVE_FAILED"
+
+
+def test_every_builder_route_is_behind_require_auth() -> None:
+    app_, calls = _routes_app(authed=False)
+    client = app_.test_client()
+    assert client.get("/layouts").status_code == 401
+    assert client.get("/api/layouts").status_code == 401
+    assert client.post("/api/layouts", json={"layouts": SVC.default_layouts_document()}).status_code == 401
+    assert calls["save"] == []
+
+
+def test_the_real_app_gates_the_builder_and_registers_it_as_an_authed_blueprint() -> None:
+    import app as app_module
+
+    client = app_module.app.test_client()
+    for method, path in (("get", "/layouts"), ("get", "/api/layouts"), ("post", "/api/layouts")):
+        assert getattr(client, method)(path).status_code in {401, 403}, path
+    rules = {r.rule: r for r in app_module.app.url_map.iter_rules() if r.endpoint.startswith("layout_routes.")}
+    assert set(rules) == {"/layouts", "/api/layouts"}
+    assert "layout_routes" in __import__("phase5_architecture").EXPECTED_BLUEPRINTS
+
+
+# --- live apply: the write path actually reaches the runtime ------------------
+
+
+@pytest.fixture()
+def isolated_identity(tmp_path, monkeypatch):
+    import app as app_module
+    import identity_service
+    import runtime_state_cache
+
+    identity_file = tmp_path / "identity_profile.json"
+    profile = identity_service.load_identity_profile(identity_file, existing_install=True)
+    identity_service.save_identity_profile(identity_file, profile, existing_install=True)
+    monkeypatch.setattr(app_module, "IDENTITY_FILE", identity_file)
+    monkeypatch.setattr(app_module, "IDENTITY_PROFILE", profile)
+    monkeypatch.setattr(app_module, "_EXISTING_INSTALL", True)
+    runtime_state_cache._cached = None
+    yield app_module, identity_file
+    runtime_state_cache._cached = None
+
+
+def test_save_writes_only_layouts_rebinds_the_profile_and_drops_the_runtime_cache(isolated_identity) -> None:
+    app_module, identity_file = isolated_identity
+    before = json.loads(identity_file.read_text(encoding="utf-8"))
+    client = app_module.app.test_client()
+
+    first = client.get("/api/runtime-state").get_json()
+    assert first["layouts"] == SVC.default_layouts_document()  # primes the 250 ms runtime-state cache
+
+    document, errors = SVC.sanitize_layouts_document(_doc(x={"in_game": {"default": {"ticker": {"visible": False}}}}))
+    assert errors == []
+    document["active"] = "x"
+    saved = app_module.save_layouts_document(document)
+
+    after = json.loads(identity_file.read_text(encoding="utf-8"))
+    assert after["layouts"] == saved == document
+    assert {k: v for k, v in after.items() if k != "layouts"} == {k: v for k, v in before.items() if k != "layouts"}
+    assert app_module.IDENTITY_PROFILE["layouts"] == document  # rebound: no restart
+
+    # served on the very next poll, even inside the 250 ms cache window
+    second = client.get("/api/runtime-state").get_json()
+    assert second["layouts"] == document
+    assert SVC.resolve_override(second["layouts"], scene="in_game", base_family="football", element="ticker") == {"visible": False}
+
+
+def test_save_is_seen_by_the_pregame_and_halftime_payload_without_a_restart(isolated_identity) -> None:
+    import pregame_presentation
+
+    app_module, _ = isolated_identity
+    assert pregame_presentation._layout_overrides("football", "pregame") == {}
+    document, _ = SVC.sanitize_layouts_document(_doc(x={
+        "pregame": {"default": {"sponsor_slot": {"visible": False}}},
+        "halftime": {"football": {"spotlight_zone": {"visible": False}}},
+    }))
+    document["active"] = "x"
+    app_module.save_layouts_document(document)
+    assert pregame_presentation._layout_overrides("football", "pregame") == {"sponsor_slot": {"visible": False}}
+    assert pregame_presentation._layout_overrides("football", "halftime") == {"spotlight_zone": {"visible": False}}
+    assert pregame_presentation._layout_overrides("basketball", "halftime") == {}  # football-only override
+
+
+def test_other_identity_writers_do_not_wipe_the_layouts_section(isolated_identity) -> None:
+    """Configuration Manager saves re-write identity_profile.json
+    (_persist_identity_sections); the builder's document must survive them."""
+    app_module, identity_file = isolated_identity
+    document, _ = SVC.sanitize_layouts_document(_doc(x={"in_game": {"default": {"ticker": {"visible": False}}}}))
+    document["active"] = "x"
+    app_module.save_layouts_document(document)
+    config = json.loads(identity_file.read_text(encoding="utf-8"))
+    app_module._persist_identity_sections({"organization": dict(config["organization"])})
+    assert json.loads(identity_file.read_text(encoding="utf-8"))["layouts"] == document
+
+
+def test_save_preserves_layouts_across_a_reload_from_disk(isolated_identity) -> None:
+    import identity_service
+
+    app_module, identity_file = isolated_identity
+    document, _ = SVC.sanitize_layouts_document(_doc(**{"Game night": {"in_game": {"default": {"score_box": {"zone": "full-safe"}}}}}))
+    document["active"] = "Game night"
+    app_module.save_layouts_document(document)
+    reloaded = identity_service.load_identity_profile(identity_file, existing_install=True)
+    assert reloaded["layouts"] == document
