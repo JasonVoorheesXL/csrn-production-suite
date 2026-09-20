@@ -564,3 +564,13 @@ with the first write path into the identity profile's `layouts` section
 `docs/LAYOUT_BUILDER_P1.md`. The §8.1 "schema-only" notes above are
 superseded by it for sponsor/spotlight/video visibility and score_box
 placement.
+
+---
+
+## 10. Phase status: P2 — live preview + honest fallback (2026-09-20)
+
+The builder previews the real overlay with unsaved edits (client-side only; the
+edit never reaches the server), and an unparseable `identity_profile.json` is now
+logged, kept aside and surfaced in diagnostics/readiness while still falling back
+rather than crashing. Neon and freeform placement remain open. See
+`docs/LAYOUT_BUILDER_P1.md` ("P2").

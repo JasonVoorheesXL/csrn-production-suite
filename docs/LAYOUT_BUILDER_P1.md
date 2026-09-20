@@ -135,10 +135,16 @@ applies.
   *visibility* works everywhere.
 - **Neon** (`digital_neon`) is hidden from selection and fails to bind even on
   trunk; it also never stamps `data-component`, so score_box overrides no-op.
-- An unparseable `identity_profile.json` silently falls back to the Caledonia
-  seed (pre-existing; noticed, not changed).
-- The builder shows no live preview; the header links open the real overlays.
-  A scaled preview would be a natural P2 companion to freeform placement.
+- ~~An unparseable `identity_profile.json` silently falls back to the Caledonia
+  seed.~~ **Closed in P2 (Part B, below):** still survivable, no longer silent.
+- ~~The builder shows no live preview.~~ **Closed in P2 (Part A, below):** the
+  builder previews the real overlay with your unsaved edits.
+- **Still open:** Neon (above). Freeform drag-and-drop placement (the real P2 of
+  the original plan) and a compact corner scorebug are untouched.
+- **Preview limits (P2):** it previews the *loaded game's* sport, so an edit under
+  another sport's scope is not visible until such a game is loaded (the page says
+  so); the in-game preview forces the scorebug on so the board is visible even
+  when the operator has not switched it on yet.
 
 ## Re-running the smoke test
 
@@ -147,3 +153,111 @@ Select a theme, open `/overlay` at 1920×1080 in an isolated instance, paste
 `await __placementMatrix()`, `await __tickerMatrix()` — every line must start
 `PASS`. Run it on all four themes after any change to `applyLayoutOverrides`,
 `themeVideoModeFor`, `layoutMaskedRuntimeR1` or `syncLayoutSuppressionR1`.
+
+---
+
+# P2 — live preview and an honest fallback
+
+Round `layout-builder-p2-20260920`, worktree `CSRN-Prod-layoutp2`, off `main`
+(`fbb7b2a`). Closes two of P1's three gaps; Neon is deliberately a separate
+effort.
+
+## Part A — a real rendered preview
+
+### The decision: real overlay in an iframe, not a schematic
+
+Investigated first. The high-fidelity option is workable *and* can be made
+strictly safer than the server-side "preview channel" the brief sketched, so it
+was built; the schematic (zone boxes over a placeholder) was not needed.
+
+The builder embeds `/overlay?layout_preview=1` (or `/pregame-overlay?...`,
+following the scene tab) in a same-origin iframe and `postMessage`s the working
+document into it. `static/csrn-layout-preview.js`, running inside that iframe,
+wraps `fetch()` so the overlay's own reads of `/api/runtime-state` and
+`/api/pregame-presentation` come back with the preview document merged in (and,
+optionally, forced sponsor / player card / highlight triggers, so a hide/show is
+visible without firing one live). **The edit never leaves the browser tab.** There
+is no server-side preview state at all, so there is nothing that could reach the
+saved `layouts` document, the runtime-state cache, or another operator's or OBS's
+overlay. That is stronger than a query-param honoured by the server, which would
+have needed per-request scoping to be safe.
+
+### Why it is inert to everything live (each is tested)
+
+1. The routes include the shim only when the request itself has
+   `?layout_preview=1`. The real `/overlay` and `/pregame-overlay` responses are
+   byte-identical to before (asserted), so OBS's page does not even reference it.
+2. The shim does nothing unless the page is embedded **and** asked for; it accepts
+   messages only from its own parent, same origin, and posts only to its own origin.
+3. **It blocks every non-GET request the embedded overlay makes.** This was found
+   by reading what the overlay does: `overlay.html` POSTs `/api/overlay-health`
+   (a process-wide singleton, unauthenticated, last writer wins). An unblocked
+   preview would have masqueraded as the OBS overlay in the operator's
+   overlay-health signal and could mask a real outage. Verified live: with only
+   the preview running, the server's overlay-health timestamp did not move and the
+   preview's own POST returned `{"preview": true, "blocked": ...}`.
+4. Everything the overlays load has no other write channel (no XHR / WebSocket /
+   EventSource / `sendBeacon`; asserted), and `sendBeacon` is a no-op anyway.
+
+Nothing in the preview path writes the saved document or invalidates the
+runtime-state cache; only **Save** does (unchanged from P1).
+
+### Behaviour
+
+- Preview panel above the scene tabs: **Show** toggle, forced-trigger toggles (in
+  game only), a status line naming the preset being previewed and the loaded game's
+  sport, and warnings when the preview cannot show an edit (classic theme has no
+  layout hook; editing a sport other than the loaded game's).
+- It previews the preset **being edited**, not just the one on air.
+- Pregame/halftime: the shim forces the scene being edited (`settings.mode`,
+  `broadcast_phase`) and serves the ~1.7 s payload from a short-lived copy of the
+  real response, re-applied on every poll, so an edit shows in ~1.8 s instead of ~4.
+- The transparent overlay backdrop shows as a checkerboard (needs `color-scheme:
+  light` on the iframe, otherwise the browser paints it opaque white).
+
+### A P1 defect the preview exposed (fixed, A0)
+
+With the scorebug on and stats present, the legacy `#statBar` is normally covered
+by the themed ticker; hiding the ticker exposed it. P1's live checks missed it
+because the isolated instance had the scorebug off. Fixed with the same pattern as
+A1's legacy suppression (`csrn-production-layout-hide-ticker` + CSS).
+
+### Live verification (real browser, isolated instance, FNS)
+
+Live overlay open in one tab, builder in another: edit board→centered and
+ticker→hidden ⇒ preview changes, live overlay and saved document do **not**; Save
+⇒ live overlay changes within a poll. Sponsor forced + sponsor hidden ⇒ idle
+board, no legacy leak; highlight forced ⇒ highlight. Pregame and halftime scenes
+reflect unsaved edits (background transparent; halftime view; forced-scene
+phase). Health-signal test above.
+
+## Part B — an unusable `identity_profile.json` is loud, not silent
+
+`load_identity_profile()` still never raises — this runs live broadcasts, and a
+startup crash on a corrupted file is worse than a fallback. What changed:
+
+- **Logged** at ERROR (`csrn.identity`) with the path, kind (unreadable / invalid
+  JSON with line and column / invalid UTF-8 / top level not an object), size, which
+  seed is now in use ("existing-install seed (Caledonia values)" or blank), and
+  where a copy was kept. Once per distinct problem, not once per load.
+- **The bad file is kept aside** as `identity_profile.json.corrupt-<hash>` (now
+  gitignored): a later Configuration Manager save would otherwise overwrite it
+  with the fallback.
+- **Surfaced where the operator already looks:** `/api/diagnostics` gains
+  `identity_profile {ok, path, issue}` (Command Center Diagnostics panel shows an
+  "Identity profile" row, red when unusable), and `/api/readiness` gains a failing
+  "Identity profile" check **only when there is a problem** (healthy payloads are
+  unchanged), which flows into the Release Readiness gate.
+- **Reports what the running app is using.** `app.IDENTITY_PROFILE_ISSUE` is
+  captured when `IDENTITY_PROFILE` is bound (startup, onboarding, the builder's
+  save), so fixing the file on disk does not turn diagnostics green until the app
+  is actually running on it (other code re-reads the file at runtime and would
+  otherwise clear a file-level flag; there is a test for that trap).
+- A UTF-8 BOM is now accepted (it used to trigger the silent fallback for a valid
+  file saved by a Windows editor).
+- Scope kept to `identity_profile.json`; a malformed `layouts` *section* inside a
+  valid profile keeps the P0 default-layouts behaviour.
+
+Live-verified: a profile with a trailing comma → startup ERROR line, diagnostics
+and readiness report it (line 3, column 30, backup path, fallback), and the
+Command Center panel shows the red row first.
