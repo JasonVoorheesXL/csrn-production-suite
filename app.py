@@ -62,6 +62,7 @@ from statistics_service import StatisticsService
 from game_operations_service import GameOperationsService
 from diamond_game_operations_service import DiamondGameOperationsService
 from hoops_game_operations_service import HoopsGameOperationsService
+from hoops_overlay_panel import HoopsOverlayPanelService
 from support_media_service import SupportMediaService
 from game_day_safety_service import GameDaySafetyService
 from recovery_service import RecoveryService
@@ -3333,11 +3334,26 @@ def get_hoops_game_operations_service() -> HoopsGameOperationsService:
     return HOOPS_GAME_OPERATIONS_SERVICE
 
 
+HOOPS_OVERLAY_PANEL_SERVICE: HoopsOverlayPanelService | None = None
+
+
+def get_hoops_overlay_panel_service() -> HoopsOverlayPanelService:
+    # Read-only feed for the Collegiate basketball board (docs/
+    # BASKETBALL_PANEL_PARITY.md): resolves ledger player ids to roster names.
+    global HOOPS_OVERLAY_PANEL_SERVICE
+    if HOOPS_OVERLAY_PANEL_SERVICE is None:
+        HOOPS_OVERLAY_PANEL_SERVICE = HoopsOverlayPanelService(
+            lambda: get_roster_service().list_rosters("")
+        )
+    return HOOPS_OVERLAY_PANEL_SERVICE
+
+
 HOOPS_GAME_ROUTES_BLUEPRINT = create_hoops_game_blueprint(
     HoopsGameRoutesDependencies(
         require_auth=require_auth,
         get_hoops_operations_service=lambda: get_hoops_game_operations_service(),
         load_state=lambda: load_state(),
+        get_panel_service=lambda: get_hoops_overlay_panel_service(),
     )
 )
 APPLICATION_BLUEPRINTS.append(HOOPS_GAME_ROUTES_BLUEPRINT)

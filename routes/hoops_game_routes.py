@@ -40,6 +40,9 @@ class HoopsGameRoutesDependencies:
     require_auth: RouteDecorator
     get_hoops_operations_service: Callable[[], Any]
     load_state: Callable[[], State]
+    # Basketball panel feed (hoops_overlay_panel.py): leaders, team totals, last
+    # basket, who is on the floor -- resolved against the roster server-side.
+    get_panel_service: Callable[[], Any] | None = None
 
 
 def create_hoops_game_blueprint(
@@ -94,6 +97,23 @@ def create_hoops_game_blueprint(
         if not engine_router.is_hoops_sport(state):
             return jsonify({"error": "NOT_A_HOOPS_SPORT"}), 409
         return jsonify(engine_router.hoops_overlay_payload(state))
+
+    @routes.get("/api/hoops/panel-state")
+    def hoops_panel_state():
+        # Read-only, unauthenticated, like /api/hoops/overlay-state: the OBS
+        # overlay's Collegiate basketball board (team snapshot rails, player
+        # leader cards, last-basket callout) has no login session and no
+        # roster access, so the names are resolved here.
+        state = dependencies.load_state()
+        if not engine_router.is_hoops_sport(state):
+            return jsonify({"error": "NOT_A_HOOPS_SPORT"}), 409
+        service = dependencies.get_panel_service() if dependencies.get_panel_service else None
+        if service is None:
+            return jsonify({"error": "PANEL_UNAVAILABLE"}), 503
+        try:
+            return jsonify(service.panel(state))
+        except Exception:  # a derived, cosmetic feed: never a 500 for the overlay
+            return jsonify({"leaders": {"home": None, "visitor": None}, "team_stats": {}, "last_basket": None, "on_floor": {"home": [], "visitor": []}})
 
     @routes.get("/api/hoops/box-score")
     @dependencies.require_auth

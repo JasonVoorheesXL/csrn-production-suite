@@ -632,7 +632,10 @@
   const COLLEGIATE_RAIL_STATS = Object.freeze({
     football: Object.freeze([["PASS", "passing_yards"], ["RUSH", "rushing_yards"], ["TO", "turnovers_gained"]]),
     baseball: Object.freeze([["AVG", "batting_avg"], ["H", "hits"], ["RBI", "rbi"]]),
-    softball: Object.freeze([["AVG", "batting_avg"], ["H", "hits"], ["RBI", "rbi"]])
+    softball: Object.freeze([["AVG", "batting_avg"], ["H", "hits"], ["RBI", "rbi"]]),
+    // Basketball's team totals come from the roster-resolved panel feed
+    // (hoops_overlay_panel.py), not the football statistics report.
+    basketball: Object.freeze([["FG", "fg"], ["3PT", "fg3"], ["REB", "reb"]])
   });
 
   function collegiateTeamPanel(team, side, sport = "football") {
@@ -985,6 +988,73 @@
   // each slot. Supersedes the R9 throwaway prototype (ensureCollegiate-
   // BaseballBottomBar / patchCollegiateLineScore, runtime-only, layout-only)
   // entirely; this is the real, engine-native structure.
+
+  // ---- Collegiate Tech basketball (docs/BASKETBALL_PANEL_PARITY.md) --------------------
+  // Basketball used to fall through collegiate() into a generic compact strip
+  // (team circle / name / score / period / clock, plus a shot-clock cell). It now
+  // has football's and baseball's structural weight: the same cabinet / live
+  // strip / score-clock row / main display (team snapshot rails + video board with
+  // a court-photo clash screen) and a bottom bank. Bank = a foul & timeout board
+  // (the field/diamond's counterpart) over a four-cell readout bar whose second
+  // cell, LAST BASKET, is the callout (the counterpart of Down & Distance /
+  // Count). There is deliberately NO shot clock (product decision 2026-09-14).
+  // Values are patched live by the unpinned runtime (patchCollegiateBasketballBoard).
+
+  const BASKETBALL_BONUS_TAG = Object.freeze({ONE_AND_ONE: "IN 1+1", DOUBLE: "IN BONUS"});
+
+  function basketballCount(value) {
+    const n = Number.parseInt(String(value ?? "").trim(), 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  function basketballPips(count, max) {
+    return Array.from({length: max}, (_, i) => `<i class="${i < count ? "on" : ""}"></i>`).join("");
+  }
+
+  function collegiateBasketballTeamRow(state, side) {
+    const g = state.game || {};
+    const team = state[side] || {};
+    const fouls = basketballCount(side === "home" ? g.homeFouls : g.visitorFouls);
+    const timeouts = basketballCount(side === "home" ? g.homeTimeouts : g.visitorTimeouts);
+    const bonus = String((side === "home" ? g.homeBonus : g.visitorBonus) || "NONE").toUpperCase();
+    return `<div class="bl-court-row bl-${side}" data-court-row="${side}" data-bonus="${esc(bonus)}">
+      <div class="bl-court-team"><em data-role="ball" aria-hidden="true"></em><b>${esc(collegiateTeamMascot(state, side))}</b></div>
+      <div class="bl-court-meter bl-court-fouls"><small>Fouls</small><span data-role="foul-pips">${basketballPips(fouls, 5)}</span><strong data-role="foul-count">${fouls}</strong></div>
+      <div class="bl-court-bonus"><span data-role="bonus">${esc(BASKETBALL_BONUS_TAG[bonus] || "")}</span></div>
+      <div class="bl-court-meter bl-court-timeouts"><small>Timeouts</small><span data-role="to-pips">${basketballPips(timeouts, 5)}</span><strong data-role="to-count">${timeouts}</strong></div>
+    </div>`;
+  }
+
+  function collegiateBasketballBank(state) {
+    const g = state.game || {};
+    const possession = String(g.possession || "").toLowerCase() === "visitor" ? "visitor" : (String(g.possession || "").toLowerCase() === "home" ? "home" : "");
+    const foulsText = `${collegiateTeamMascot(state, "visitor")} ${basketballCount(g.visitorFouls)} · ${collegiateTeamMascot(state, "home")} ${basketballCount(g.homeFouls)}`;
+    const timeoutsText = `${collegiateTeamMascot(state, "visitor")} ${basketballCount(g.visitorTimeouts)} · ${collegiateTeamMascot(state, "home")} ${basketballCount(g.homeTimeouts)}`;
+    return `<section class="bl-college-control-bank bl-college-basketball-bank" data-module="game.state">
+      <div class="bl-college-court" data-module="game.field" data-possession="${possession}">
+        <div class="bl-college-court-board">
+          ${collegiateBasketballTeamRow(state, "visitor")}
+          ${collegiateBasketballTeamRow(state, "home")}
+        </div>
+        <div class="bl-college-field-meta bl-college-court-meta">
+          <span><small>Possession</small><b data-bind="game.possessionText">${esc(possession ? collegiateTeamMascot(state, possession) : "-")}</b></span>
+          <span><small>Last Basket</small><b data-bind="game.lastBasket">-</b></span>
+          <span><small>Fouls</small><b data-bind="game.foulsText">${esc(foulsText)}</b></span>
+          <span><small>Timeouts</small><b data-bind="game.timeoutsText">${esc(timeoutsText)}</b></span>
+        </div>
+      </div>
+    </section>`;
+  }
+
+  function collegiateBasketballScorebug(state, sport, videoMode) {
+    return `<div class="bl-scorebug bl-collegiate bl-collegiate-tech bl-sport-${sport}" data-possession="${esc(state.game.possession || "home")}" ${collegiateThemeVars(state)}>
+      <div class="bl-college-cabinet" aria-hidden="true"></div>
+      <div class="bl-college-live-strip"><b>LIVE</b><span class="bl-college-ticker-copy">${esc(state.ticker.text || "CSRN LIVE")}</span><em>CSRN</em></div>
+      ${collegiateScoreClockRow(state)}
+      ${collegiateMainDisplay(state, "basketball", videoMode)}
+      ${collegiateBasketballBank(state)}
+    </div>`;
+  }
 
   function baseballInningPlan(state) {
     // Extra-innings line score is open-ended: render exactly as many columns
@@ -1482,9 +1552,12 @@
     collegiate(state, sport, videoMode) {
       if (sport === "baseball" || sport === "softball") return collegiateBaseballScorebug(state, sport, videoMode);
       if (sport === "football") return collegiateFootballScorebug(state, sport, videoMode);
+      if (sport === "basketball") return collegiateBasketballScorebug(state, sport, videoMode);
+      // Any other sport keeps the compact strip. Its shot-clock cell is never
+      // shown (sportState's includeAuxClock = false): no shot clock on Collegiate.
       return `<div class="bl-scorebug bl-collegiate bl-sport-${sport}">
         <section class="bl-college-team bl-home">${explicitTeam(state.home,"home",{order:["logo","copy"],record:true})}</section>
-        ${genericScore(state.home,"home")}${sportState(state,sport,"bl-college-state")}${genericScore(state.visitor,"visitor")}
+        ${genericScore(state.home,"home")}${sportState(state,sport,"bl-college-state",false)}${genericScore(state.visitor,"visitor")}
         <section class="bl-college-team bl-visitor">${explicitTeam(state.visitor,"visitor",{order:["copy","logo"],record:true})}</section>
       </div>`;
     },
@@ -1710,11 +1783,14 @@
           highlightVideo:{zone:"top-right",layer:70,allowOverlapWith:["scorebug"]},sponsor:{zone:"top-left",layer:60,allowOverlapWith:["scorebug"]},
           captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120,allowOverlapWith:["scorebug"]}
         }},
+        // Basketball panel parity (docs/BASKETBALL_PANEL_PARITY.md): the compact
+        // bottom-center strip is gone; basketball claims the same full-safe canvas
+        // as football, baseball and softball.
         basketball:{components:{
-          scorebug:{zone:"bottom-center",layer:100},ticker:{zone:"bottom-center",layer:110,allowOverlapWith:["scorebug"]},
-          playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80},
-          highlightVideo:{zone:"top-right",layer:70},sponsor:{zone:"top-left",layer:60},
-          captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120}
+          scorebug:{zone:"full-safe",width:1840,height:1000,layer:100},ticker:{zone:"top-center",height:58,layer:110,allowOverlapWith:["scorebug"]},
+          playerCard:{zone:"bottom-left",fallbackZones:["left-center"],layer:80,allowOverlapWith:["scorebug"]},
+          highlightVideo:{zone:"top-right",layer:70,allowOverlapWith:["scorebug"]},sponsor:{zone:"top-left",layer:60,allowOverlapWith:["scorebug"]},
+          captions:{zone:"top-center",fallbackZones:["top-right","top-left"],layer:120,allowOverlapWith:["scorebug"]}
         }},
         // T1 (docs/PHASE_C_THEME_SPORT_DISPATCH_PLAN.md): baseball/softball
         // now render at football's structural prominence (same skeleton,

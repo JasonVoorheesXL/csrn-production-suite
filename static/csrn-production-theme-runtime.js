@@ -29,6 +29,7 @@ const PUBLIC_STATE_URL = "/api/themes/public-state";
 const RUNTIME_STATE_URL = "/api/runtime-state";
 const CAPTION_STATE_URL = "/api/captions/overlay-state";
 const STATISTICS_URL = "/api/statistics/overlay-state";
+const HOOPS_PANEL_URL = "/api/hoops/panel-state";
 const CAPTION_STICKY_MS = 2800;
 const SCORE_HOST_ID = "csrnProductionThemeHost";
 const SCORE_LAYOUT_ID = "csrnProductionThemeLayout";
@@ -166,6 +167,8 @@ let tickerRenderSignature = "";
 let tickerBroadcastId = "";
 const tickerKnownTransientKeys = new Set();
 const collegiateStatisticsCache = {broadcastId:"", fetchedAt:0, data:null, promise:null};
+// Basketball's roster-resolved panel feed (leaders, team totals, last basket, who is on the floor).
+const collegiateHoopsPanelCache = {broadcastId:"", fetchedAt:0, data:null, promise:null};
 /* CSRN_THEME_SIGNATURE_DIFF_DIAGNOSTIC_R4
    Temporary diagnostic only. Logs exactly which destructive-render signature
    fields changed between polls. Does not alter render behavior.
@@ -1168,14 +1171,20 @@ function productionSportFamily(sport) {
 
 function productionBasketballState(source, gameSource) {
   const pick = (...k) => textValue(...k.flatMap(name => [source[name], gameSource[name]]));
+  // /api/runtime-state carries the basketball engine's own block (state["hoops"],
+  // raw names) but never published the flat wire fields of
+  // docs/HOOPS_OVERLAY_CONTRACT.md, so fouls / bonus / timeouts read blank live.
+  // The flat field still wins when present; the engine block is the fallback.
+  const hoops = objectValue(source.hoops, gameSource.hoops);
+  const nested = (...k) => textValue(...k.map(name => hoops[name]));
   return {
     shotClock: pick("shot_clock", "shotClock"),
-    homeFouls: pick("home_fouls", "homeFouls"),
-    visitorFouls: pick("visitor_fouls", "visitorFouls"),
-    homeBonus: pick("home_bonus", "homeBonus"),
-    visitorBonus: pick("visitor_bonus", "visitorBonus"),
-    homeTimeouts: pick("home_timeouts", "homeTimeouts"),
-    visitorTimeouts: pick("visitor_timeouts", "visitorTimeouts")
+    homeFouls: pick("home_fouls", "homeFouls") || nested("home_team_fouls"),
+    visitorFouls: pick("visitor_fouls", "visitorFouls") || nested("visitor_team_fouls"),
+    homeBonus: pick("home_bonus", "homeBonus") || nested("home_bonus"),
+    visitorBonus: pick("visitor_bonus", "visitorBonus") || nested("visitor_bonus"),
+    homeTimeouts: pick("home_timeouts", "homeTimeouts") || nested("home_timeouts"),
+    visitorTimeouts: pick("visitor_timeouts", "visitorTimeouts") || nested("visitor_timeouts")
   };
 }
 
@@ -1494,7 +1503,6 @@ function applyBasketballBoardOverrides(root, alias, runtime) {
   if (!root) return;
   const clock = productionClock(runtime);
   const period = textValue(runtime.period, runtime.quarter, "").trim();
-  const shotClock = textValue(runtime.shot_clock, runtime.shotClock, "").trim();
 
   if (alias === "eight_bit_gameday") {
     const cell = root.querySelector(".bl-8bit-basketball-control-bank .bl-8bit-clock-led")?.closest("span");
@@ -1526,7 +1534,8 @@ function applyBasketballBoardOverrides(root, alias, runtime) {
   if (isCollegiateFamily(alias)) {
     root.querySelectorAll('[data-bind="game.clock"]').forEach(node => { node.textContent = clock; });
     if (period) root.querySelectorAll('[data-bind="game.period"]').forEach(node => { node.textContent = period; });
-    if (shotClock) root.querySelectorAll('[data-bind="game.shotClock"]').forEach(node => { node.textContent = shotClock; });
+    // No shot clock on Collegiate (product decision 2026-09-14): nothing to patch.
+    patchCollegiateBasketballBoard(root, runtime, collegiateHoopsPanelCache.data);
   }
 }
 
@@ -3161,9 +3170,180 @@ function patchCollegiateBaseballRails(root, runtime, statistics) {
   });
 }
 
+// ---- Collegiate Tech basketball (docs/BASKETBALL_PANEL_PARITY.md) -----------------------
+// The board's markup is built by the engine (collegiateBasketballScorebug); everything that
+// moves is patched here on the same fast path football and baseball use, because the render
+// signature carries no game-state fields.
+
+const BASKETBALL_BONUS_TAG = Object.freeze({ONE_AND_ONE: "IN 1+1", DOUBLE: "IN BONUS"});
+
+async function fetchCollegiateHoopsPanel(runtime, alias) {
+  if (!isCollegiateFamily(alias) || productionSportFamily(runtime && runtime.sport) !== "basketball") return null;
+  const broadcastId = textValue(runtime?.broadcast_id, "");
+  if (!broadcastId) return null;
+  const cache = collegiateHoopsPanelCache;
+  if (cache.data && cache.broadcastId === broadcastId && Date.now() - cache.fetchedAt < 2500) return cache.data;
+  if (cache.promise) return cache.promise;
+  cache.promise = fetchJson(HOOPS_PANEL_URL)
+    .then(data => {
+      cache.broadcastId = broadcastId;
+      cache.fetchedAt = Date.now();
+      cache.data = data;
+      return data;
+    })
+    .catch(() => cache.data)
+    .finally(() => { cache.promise = null; });
+  return cache.promise;
+}
+
+function basketballCounter(value) {
+  const n = Number.parseInt(String(value ?? "").trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function setBasketballPips(container, count, max) {
+  if (!container) return;
+  const pips = Array.from(container.querySelectorAll("i"));
+  if (pips.length !== max) {
+    container.innerHTML = Array.from({length: max}, () => "<i></i>").join("");
+  }
+  container.querySelectorAll("i").forEach((pip, index) => pip.classList.toggle("on", index < count));
+}
+
+function basketballLastBasketText(runtime, panel) {
+  const last = panel && panel.last_basket;
+  if (!last) return "-";
+  const side = last.team === "visitor" ? "visitor" : "home";
+  const who = textValue(last.name, last.number ? `#${last.number}` : "", collegiateMascotForSide(runtime, side));
+  const points = Number(last.points) === 1 ? "FT" : `${Number(last.points) || 2} PT`;
+  return `${who} · ${points}`;
+}
+
+function patchCollegiateBasketballBoard(root, runtime, panel) {
+  if (!root) return;
+  const game = productionBasketballState(runtime || {}, objectValue(runtime && runtime.game));
+  const possession = textValue(runtime && runtime.possession).toLowerCase();
+  const side = possession === "visitor" ? "visitor" : (possession === "home" ? "home" : "");
+  const court = root.querySelector(".bl-college-court");
+  if (court) {
+    court.dataset.possession = side;
+    // LAST BASKET's callout colour follows the team that scored (Neon's pill); blank until a basket exists.
+    const lastTeam = panel && panel.last_basket ? (panel.last_basket.team === "visitor" ? "visitor" : "home") : "";
+    court.dataset.lastTeam = lastTeam;
+  }
+
+  const per = {
+    home: {fouls: basketballCounter(game.homeFouls), timeouts: basketballCounter(game.homeTimeouts), bonus: textValue(game.homeBonus, "NONE").toUpperCase()},
+    visitor: {fouls: basketballCounter(game.visitorFouls), timeouts: basketballCounter(game.visitorTimeouts), bonus: textValue(game.visitorBonus, "NONE").toUpperCase()}
+  };
+  ["visitor", "home"].forEach(key => {
+    const row = root.querySelector(`[data-court-row="${key}"]`);
+    if (!row) return;
+    const d = per[key];
+    row.dataset.bonus = d.bonus;
+    setBasketballPips(row.querySelector('[data-role="foul-pips"]'), d.fouls, 5);
+    setBasketballPips(row.querySelector('[data-role="to-pips"]'), d.timeouts, 5);
+    const foulCount = row.querySelector('[data-role="foul-count"]');
+    const toCount = row.querySelector('[data-role="to-count"]');
+    const bonus = row.querySelector('[data-role="bonus"]');
+    if (foulCount) foulCount.textContent = String(d.fouls);
+    if (toCount) toCount.textContent = String(d.timeouts);
+    if (bonus) bonus.textContent = BASKETBALL_BONUS_TAG[d.bonus] || "";
+  });
+
+  // The names come from the rendered board itself (the engine's identity blocks), so this
+  // fast path can never disagree with the markup it patches.
+  const mascot = key => textValue(
+    root.querySelector(`[data-bind="${key}.mascot"]`)?.textContent,
+    collegiateMascotForSide(runtime, key)
+  );
+  root.querySelectorAll('[data-bind="game.possessionText"]').forEach(node => { node.textContent = side ? mascot(side) : "-"; });
+  root.querySelectorAll('[data-bind="game.lastBasket"]').forEach(node => { node.textContent = basketballLastBasketText(runtime, panel); });
+  root.querySelectorAll('[data-bind="game.foulsText"]').forEach(node => {
+    node.textContent = `${mascot("visitor")} ${per.visitor.fouls} · ${mascot("home")} ${per.home.fouls}`;
+  });
+  root.querySelectorAll('[data-bind="game.timeoutsText"]').forEach(node => {
+    node.textContent = `${mascot("visitor")} ${per.visitor.timeouts} · ${mascot("home")} ${per.home.timeouts}`;
+  });
+}
+
+function basketballLeaderCandidates(panel, side) {
+  const candidates = [];
+  const leader = panel && panel.leaders && panel.leaders[side];
+  if (leader) {
+    candidates.push({
+      title: "Scoring Leader",
+      name: textValue(leader.name, leader.number ? `#${leader.number}` : "", "Scorer"),
+      line: leader.line || ""
+    });
+  }
+  const floor = (panel && panel.on_floor && panel.on_floor[side]) || [];
+  const numbers = floor.map(p => textValue(p.number)).filter(Boolean);
+  if (floor.length) {
+    candidates.push({
+      title: "On the Floor",
+      name: numbers.length ? numbers.map(n => `#${n}`).join(" ") : `${floor.length} players`,
+      line: floor.map(p => textValue(p.name).split(" ").slice(-1)[0]).filter(Boolean).join(" · ")
+    });
+  }
+  return candidates;
+}
+
+function patchCollegiateBasketballRails(root, runtime, panel) {
+  ["visitor", "home"].forEach((side, sideIndex) => {
+    const rail = root.querySelector(`[data-college-rail="${side}"]`);
+    if (!rail) return;
+    const totals = objectValue(panel && panel.team_stats && panel.team_stats[side]);
+    ["fg", "fg3", "reb"].forEach(key => {
+      const node = rail.querySelector(`[data-stat="${key}"]`);
+      if (node) node.textContent = textValue(totals[key], "-");
+    });
+
+    const leaderNode = rail.querySelector(".bl-player-leader");
+    if (!leaderNode) return;
+    const candidates = basketballLeaderCandidates(panel, side);
+    const pick = candidates.length
+      ? candidates[(Math.floor(Date.now() / COLLEGIATE_LEADER_ROTATION_MS) + sideIndex) % candidates.length]
+      : null;
+
+    const identity = objectValue(runtime?.[`${side}_identity`]);
+    const teamLogo = textValue(identity.logo, runtime?.[`${side}_logo`]);
+    const nextImage = pick ? teamLogo : "";
+    if (leaderNode.dataset.renderedImage !== nextImage) {
+      leaderNode.querySelectorAll("img").forEach(node => node.remove());
+      if (nextImage) {
+        const image = document.createElement("img");
+        image.src = nextImage;
+        image.alt = "";
+        leaderNode.prepend(image);
+      }
+      leaderNode.dataset.renderedImage = nextImage;
+    }
+    leaderNode.classList.toggle("is-empty", !pick);
+    leaderNode.classList.toggle("has-photo", Boolean(nextImage));
+    const title = leaderNode.querySelector("span");
+    const name = leaderNode.querySelector('[data-player="name"]');
+    const line = leaderNode.querySelector('[data-player="line"]');
+    if (!pick) {
+      if (title) title.textContent = "Player Leader";
+      if (name) name.textContent = "Awaiting Stats";
+      if (line) line.textContent = "Live leaders rotate here";
+      return;
+    }
+    if (title) title.textContent = pick.title;
+    if (name) name.textContent = pick.name;
+    if (line) line.textContent = pick.line;
+    fitPlayerLeaderName(name);
+  });
+}
+
 function patchCollegiateRails(root, runtime, statistics) {
   if (!isCollegiateFamily(currentAlias) || !root) return;
   const sport = productionSportFamily(runtime && runtime.sport);
+  if (sport === "basketball") {
+    patchCollegiateBasketballRails(root, runtime, collegiateHoopsPanelCache.data);
+    return;
+  }
   if (sport === "baseball" || sport === "softball") {
     patchCollegiateBaseballRails(root, runtime, statistics);
     return;
@@ -3613,6 +3793,7 @@ async function renderSelected() {
     const runtime = layoutMaskedRuntimeR1(rawRuntime);
     syncLayoutSuppressionR1(rawRuntime);
     const collegiateStatistics = await fetchCollegiateStatistics(runtime, alias);
+    await fetchCollegiateHoopsPanel(runtime, alias);
     const captionSegment = activeCaptionSegment(captionState);
     runtimeClockRunning = runtime.clock_running === true;
     lastRuntimeForClockPatch = runtime;

@@ -80,6 +80,9 @@ PUBLIC_ENDPOINTS = {
     # The basketball OBS overlay has no operator login session either,
     # same reasoning as diamond_game_routes.diamond_overlay_state above.
     "hoops_game_routes.hoops_overlay_state",
+    # The basketball board's player/leader/last-basket feed (read-only,
+    # roster-resolved) -- same OBS-has-no-login reasoning as the two above.
+    "hoops_game_routes.hoops_panel_state",
     # POST /api/licensing/install-file: the license gate screen is shown
     # before any operator PIN exists (fresh install) and for renewals; the
     # Ed25519 signature check is the real boundary. Round 22.
