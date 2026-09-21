@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CSRN Setup & Integrations</title>
+  <link rel="icon" type="image/png" href="/static/csrn-logo.png">
+  <style>
+    :root{color-scheme:dark;font-family:Arial,Helvetica,sans-serif;background:#0e1014;color:#f5f5f5}
+    *{box-sizing:border-box}body{margin:0;background:#0e1014}a{color:inherit}.shell{max-width:1240px;margin:auto;padding:22px}.topbar{display:flex;gap:14px;align-items:center;justify-content:space-between;padding:14px 0 22px}.brand{display:flex;gap:12px;align-items:center}.brand img{width:52px;height:52px;object-fit:contain}.eyebrow{font-size:.75rem;letter-spacing:.16em;color:#bfc5cc}.topbar h1{margin:3px 0 0;font-size:1.65rem}.actions{display:flex;gap:8px;flex-wrap:wrap}.button,button{border:1px solid #626a76;background:#252a32;color:#fff;border-radius:8px;padding:10px 13px;font-weight:700;text-decoration:none;cursor:pointer}.button.primary,button.primary{background:#b5121b;border-color:#e0444c}.button.secondary,button.secondary{background:#171a20}.hero{border:1px solid #3b414c;background:linear-gradient(135deg,#191d24,#242933);border-radius:16px;padding:20px;margin-bottom:18px}.progress{height:12px;background:#090b0f;border-radius:99px;overflow:hidden;border:1px solid #3e4653}.progress>div{height:100%;background:#b5121b;width:0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}.panel{border:1px solid #3b414c;background:#171a20;border-radius:14px;padding:17px}.panel h2{margin:0 0 6px}.panel p{color:#bfc5cc;line-height:1.45}.status{display:inline-flex;align-items:center;gap:7px;padding:5px 9px;border-radius:99px;background:#313741;font-size:.78rem;font-weight:700}.status.good{background:#173f2b}.status.warn{background:#523c14}.status.bad{background:#5c2024}.setup-list{display:grid;gap:9px;margin-top:14px}.check{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid #343a44}.check:first-child{border-top:0}.provider{display:grid;gap:10px}.provider-head{display:flex;justify-content:space-between;gap:10px}.provider-actions{display:flex;gap:8px;flex-wrap:wrap}.field{display:grid;gap:6px;margin-top:12px}.field label{color:#bec6d1;font-size:.85rem}.field select{width:100%;padding:10px;background:#0f1217;color:#fff;border:1px solid #4d5562;border-radius:8px}.module-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:11px;margin-top:12px}.module{display:block;border:1px solid #3f4652;border-radius:10px;padding:13px;text-decoration:none;background:#11141a}.module:hover{border-color:#b5121b}.module strong{display:block;margin-bottom:5px}.module span{color:#aeb7c2;font-size:.87rem;line-height:1.35}.message{min-height:24px;margin:12px 0;color:#f4cc79}.note{font-size:.87rem;color:#aeb7c2}.section-anchor{scroll-margin-top:20px}@media(max-width:640px){.topbar{align-items:flex-start;flex-direction:column}.actions{width:100%}.button,button{flex:1;text-align:center}.shell{padding:14px}}
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="topbar">
+    <div class="brand"><img src="/static/csrn-logo.png" alt="CSRN logo"><div><div class="eyebrow">CSRN PRODUCTION SUITE</div><h1>Setup & Integrations</h1></div></div>
+    <nav class="actions"><a class="button secondary" href="/">Back to Command Center</a><a class="button secondary" href="/?module=settings">Advanced Settings</a></nav>
+  </header>
+
+  <section class="hero">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div><h2 style="margin:0 0 6px">Launch readiness</h2><p style="margin:0;color:#bfc5cc">Complete normal setup here. Technical names and raw access tokens are kept out of the customer workflow.</p></div><strong id="progressText">Loading…</strong></div>
+    <div class="progress" style="margin-top:14px"><div id="progressBar"></div></div>
+    <div id="setupChecks" class="setup-list"></div>
+  </section>
+
+  <div class="grid">
+    <section class="panel section-anchor" id="appearance">
+      <h2>Graphics appearance</h2><p>Choose from the built-in visual presets. No internal template name needs to be typed.</p>
+      <div class="field"><label for="themeSelect">Theme preset</label><select id="themeSelect"></select></div>
+      <div class="provider-actions" style="margin-top:12px"><button class="primary" id="applyTheme">Apply selected theme</button><a class="button secondary" href="/themes">Open visual theme gallery</a></div>
+      <div id="themeStatus" class="note" style="margin-top:10px"></div>
+    </section>
+
+    <section class="panel section-anchor" id="social">
+      <h2>Social accounts</h2><p>Connect accounts through the provider sign-in flow. Customers do not copy access tokens into CSRN.</p>
+      <div id="providers" class="setup-list"></div>
+      <p class="note">X requires the PossumFrog X application client ID. Facebook requires the PossumFrog OAuth broker so Meta application secrets are never distributed with the desktop program.</p>
+      <a class="button secondary" href="/social">Open Social Publishing</a>
+    </section>
+  </div>
+
+  <section class="panel" style="margin-top:16px">
+    <h2>All product areas</h2><p>Every customer-facing feature is listed here. No one should need to know or type a hidden URL.</p>
+    <div id="moduleDirectory" class="module-grid"></div>
+  </section>
+
+  <div class="grid" style="margin-top:16px">
+    <section class="panel section-anchor" id="captions"><h2>Audio & captions</h2><p>Speaker names remain assignable by physical mixer channel. The guided commissioning flow will expose detected channels, personnel selectors, and test status rather than requiring internal labels.</p><a class="button secondary" href="/?module=settings">Open caption and audio settings</a></section>
+    <section class="panel section-anchor" id="weather"><h2>Venue weather</h2><p>Weather follows the selected game venue. Operators can verify the venue, preview alerts, and use manual lightning-delay controls without entering API details.</p><a class="button secondary" href="/weather-overlay?preview=1" target="_blank" rel="noopener">Preview weather overlay</a></section>
+    <section class="panel section-anchor" id="recovery"><h2>Recovery & backups</h2><p>Snapshots, restore readiness, and rollback status belong in a guided safety screen before a live broadcast.</p><a class="button secondary" href="/?module=diagnostics">Open diagnostics</a></section>
+    <section class="panel section-anchor" id="licensing"><h2>Licensing & updates</h2><p>Activation, entitlement, update, and support status will be shown here using plain customer-facing language.</p><a class="button secondary" href="/?module=settings">Open product settings</a></section>
+  </div>
+  <div id="message" class="message"></div>
+</main>
+<script>
+const requestJson=async(url,options={})=>{const response=await fetch(url,{cache:'no-store',headers:{'Content-Type':'application/json'},...options});const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);return payload};
+const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const showMessage=(text,error=false)=>{const node=document.getElementById('message');node.textContent=text||'';node.style.color=error?'#ff9b9b':'#f4cc79'};
+let statusData={};
+async function load(){
+  try{
+    const [status,options]=await Promise.all([requestJson('/api/setup/status'),requestJson('/api/setup/options')]);statusData=status;
+    const setup=status.setup||{};document.getElementById('progressText').textContent=`${setup.completed||0} of ${setup.required||0} required steps`;
+    document.getElementById('progressBar').style.width=`${setup.percent||0}%`;
+    document.getElementById('setupChecks').innerHTML=(setup.checks||[]).map(row=>`<div class="check"><span>${escapeHtml(row.label)}${row.optional?' <small>(optional)</small>':''}</span><span class="status ${row.complete?'good':'warn'}">${row.complete?'Ready':'Needs setup'}</span></div>`).join('');
+    const themeSelect=document.getElementById('themeSelect');themeSelect.innerHTML=(options.themes||[]).map(row=>`<option value="${escapeHtml(row.id)}">${escapeHtml(row.name)} — ${escapeHtml(row.description)}</option>`).join('');
+    const active=status.theme?.active; if(active?.id) themeSelect.value=active.id;document.getElementById('themeStatus').textContent=active?`Currently active: ${active.name}${status.theme.locked?' · season locked':''}`:'No active theme detected.';
+    document.getElementById('providers').innerHTML=(status.oauth?.providers||[]).map(provider=>renderProvider(provider)).join('');
+    bindProviders();
+    document.getElementById('moduleDirectory').innerHTML=(options.modules||[]).map(module=>`<a class="module" href="${escapeHtml(module.href)}"><strong>${escapeHtml(module.name)}</strong><span>${escapeHtml(module.description)}</span></a>`).join('');
+    const query=new URLSearchParams(location.search);if(query.get('connected'))showMessage(`${query.get('connected')} account connected.`);if(query.get('oauth_error'))showMessage(`Connection was not completed: ${query.get('oauth_error')}`,true);
+  }catch(error){showMessage(error.message,true)}
+}
+function renderProvider(provider){
+  const state=provider.connected?'Connected':provider.action_required?'Setup required':'Not connected';const klass=provider.connected?'good':provider.action_required?'bad':'warn';
+  return `<article class="provider" data-provider="${escapeHtml(provider.id)}"><div class="provider-head"><div><strong>${escapeHtml(provider.label)}</strong><div class="note">${escapeHtml(provider.display_name||provider.username||'No account connected')}</div></div><span class="status ${klass}">${state}</span></div><div class="provider-actions"><button class="primary" data-connect ${provider.connected||provider.action_required?'disabled':''}>Connect ${escapeHtml(provider.label)}</button><button data-test ${provider.connected?'':'disabled'}>Test connection</button><button class="secondary" data-disconnect ${provider.connected?'':'disabled'}>Disconnect</button></div>${provider.action_required?`<div class="note">${provider.vault_available?'Provider application registration is not configured yet.':'Protected Windows credential storage is unavailable.'}</div>`:''}</article>`;
+}
+function bindProviders(){document.querySelectorAll('[data-provider]').forEach(card=>{const provider=card.dataset.provider;card.querySelector('[data-connect]').onclick=async()=>{try{const result=await requestJson(`/api/setup/oauth/${provider}/start`,{method:'POST',body:'{}'});location.href=result.authorize_url}catch(error){showMessage(error.message,true)}};card.querySelector('[data-test]').onclick=async()=>{try{const result=await requestJson(`/api/setup/oauth/${provider}/test`,{method:'POST',body:'{}'});showMessage(result.ok?'Connection test passed.':'Connection test failed.',!result.ok);load()}catch(error){showMessage(error.message,true)}};card.querySelector('[data-disconnect]').onclick=async()=>{if(!confirm(`Disconnect the ${provider} account from CSRN?`))return;try{await requestJson(`/api/setup/oauth/${provider}/disconnect`,{method:'POST',body:JSON.stringify({confirmation:'DISCONNECT SOCIAL ACCOUNT'})});showMessage('Account disconnected.');load()}catch(error){showMessage(error.message,true)}}})}
+document.getElementById('applyTheme').onclick=async()=>{try{const id=document.getElementById('themeSelect').value;const locked=Boolean(statusData.theme?.locked);let confirmation='';if(locked){confirmation=prompt('This season theme is locked. Type CHANGE LOCKED SEASON THEME to continue:')||''}await requestJson('/api/setup/theme',{method:'POST',body:JSON.stringify({preset_id:id,confirmation})});showMessage('Theme applied.');load()}catch(error){showMessage(error.message,true)}};
+load();
+</script>
+</body>
+</html>
