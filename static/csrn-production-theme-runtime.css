@@ -138,6 +138,12 @@ html.csrn-production-layout-hide-ticker #statBar{
   visibility:hidden!important;
   opacity:0!important;
 }
+/* Neon: keep the legacy stats ribbon hidden (see NEON_ACTIVE_CLASS in the runtime). */
+html.csrn-production-theme-neon-active #statBar{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+}
 html.csrn-production-layout-hide-player #playerGraphic,
 html.csrn-production-layout-hide-sponsor #sponsorSpotlight,
 html.csrn-production-layout-hide-highlight #playerHighlight{

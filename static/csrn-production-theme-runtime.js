@@ -35,6 +35,10 @@ const SCORE_LAYOUT_ID = "csrnProductionThemeLayout";
 const PLAYER_HOST_ID = "csrnProductionThemePlayerHost";
 const PLAYER_LAYOUT_ID = "csrnProductionThemePlayerLayout";
 const SCORE_ACTIVE_CLASS = "csrn-production-theme-scorebug-active";
+// Neon (2026-09 redesign): set while the Neon package is rendering, so the legacy stats ribbon
+// (#statBar) stays hidden. Collegiate's opaque shell fill covers most of it by accident; Neon's
+// shell is deliberately transparent (the video window must be a true hole), so it would show.
+const NEON_ACTIVE_CLASS = "csrn-production-theme-neon-active";
 const TICKER_ACTIVE_CLASS = "csrn-production-theme-ticker-active";
 const PLAYER_ACTIVE_CLASS = "csrn-production-theme-player-active";
 const PLAYER_PENDING_CLASS = "csrn-production-theme-player-pending";
@@ -781,6 +785,7 @@ function deactivate(reason = "legacy") {
   enforceLegacyMediaOwnership("clash");
   document.documentElement.classList.remove(
     SCORE_ACTIVE_CLASS,
+    NEON_ACTIVE_CLASS,
     TICKER_ACTIVE_CLASS,
     PLAYER_ACTIVE_CLASS,
     PLAYER_PENDING_CLASS,
@@ -3722,6 +3727,7 @@ async function renderSelected() {
 
     setHostState(scoreHost(), true, alias, packageId, "rendered");
     document.documentElement.classList.add(SCORE_ACTIVE_CLASS);
+    document.documentElement.classList.toggle(NEON_ACTIVE_CLASS, alias === "digital_neon");
 
     // Capture the result: renderSelected() reports it as
     // CSRNProductionThemeBindingState.tickerActive below. Referencing an

@@ -1,8 +1,8 @@
 # Neon redesign — a team-tinted neon skin over Collegiate Tech
 
 **Round:** `neon-redesign-20260920`, worktree `CSRN-Prod-neon`, off `main` (`5c60393`).
-**Status:** checkpoint 2 (football) built and live-verified. Not yet done:
-checkpoint 3 (baseball / softball / basketball look), checkpoint 4 (final pass and
+**Status:** checkpoints 2 (football) and 3 (baseball, softball, basketball, and the neon
+field art) built and live-verified. Not yet done: checkpoint 4 (final pass and
 **re-enable in the pickers**). Neon is still hidden from the pickers.
 
 ## Why a redesign, not a fix
@@ -106,10 +106,50 @@ changing with no reload (pill and line of scrimmage switch team colour), on-air 
 above. Fresh suite: `tests/test_neon_collegiate_skin.py` (23 tests, including a Python
 port of the tint checked against the browser's own outputs).
 
+## Checkpoint 3: the other sports, and the field art
+
+**Baseball / softball** keep Collegiate's skeleton (line score left, diamond right). The line
+score's rows are each in their team's neon; the diamond and its runners take the **batting**
+team's neon (`--poss`, the same variable football uses for the team in possession), so it
+swaps to the home colour in the bottom half. **Count** is the callout: the same `999px` pill as
+football's Down & Distance, the second cell of the Batting / Count / Outs bar. Collegiate's 320px
+diamond column truncated "2–1" inside a pill, so Neon widens it to 430px.
+
+**Basketball** is Collegiate's older compact strip (no readout bar, no video board), so by decision
+it gets palette + glow only, no callout: dark glass, the gradient ring and team halo, each side
+in its own neon, glowing digits and clocks. That strip puts **home on the left** (football's
+board has the visitor there), so its ring and halo run home → visitor.
+
+**Field art (owner direction).**
+- *Field bar:* a neon **striped** field (bright/dim mowing stripes, glowing yard lines and
+  hashes, team-tinted end zones) and a redesigned **ball marker**: a football-shaped neon leaf in
+  the possession team's colour, its initials/logo kept upright.
+- *Clash screen:* the stadium photo is replaced by a **CSS-drawn neon field** on a receding
+  perspective plane: stripes, glowing yard lines, midfield line and circle, and end zones tinted by
+  each team's neon (easy, so included). Baseball/softball get the equivalent neon ballpark (foul
+  lines, infield and outfield arcs). No photos, no animation.
+
+## What full-resolution captures caught
+
+The 800×450 previews hid four real defects that 1920×1080 captures (headless Chrome against a
+scenario-driven scratch server, real polling) exposed:
+1. **The video window was blurred.** Collegiate's shell carries `backdrop-filter: blur(8px)`; Neon's
+   is `none`, so an on-air camera feed is sharp.
+2. **The legacy stats ribbon (`#statBar`) showed through** the now-transparent shell as a readable
+   strip across the top. Neon sets `csrn-production-theme-neon-active` while rendering and hides it
+   (Collegiate Traditional still has a sliver of it above its opaque shell; not changed here).
+3. **The readout pills were clipped** at the bottom: the bank is a fixed-height stack that
+   Collegiate's 1px borders just fit; Neon's 2px borders on those two containers cost 3px. They keep
+   1px (the glow carries the weight) with a few px of padding reclaimed.
+4. **Complementary team colours blended to grey** (gold + blue) for the shared centre colour. `--mn`
+   is now the blend pushed toward white (a neon tube's hot core), still tinted by both teams.
+
+Captures use two rig-only adjustments that do not affect the product: rail cards are pinned to
+their first card (headless virtual time freezes Collegiate's 24s CSS crossfade at its midpoint), and
+a backdrop page supplies a dark arena or a bright "camera feed" behind the transparent overlay.
+
 ## Not yet done
 
-- Checkpoint 3: baseball/softball (Count pill), basketball palette/glow, per-sport
-  stage art tint.
 - Checkpoint 4: theme catalog entry / Theme Manager preview for `digital_neon`, final
   `data-component` audit on all four sports, **re-enable** (`DISABLED_PACKAGE_IDS` and
   both JS `DISABLED` sets), final shared-engine hash re-pin, suite, docs.

@@ -22,7 +22,10 @@
 .package-collegiate-neon {
   --vn: var(--visitor-neon, color-mix(in srgb, var(--visitor-primary, #064624) 45%, #fff));
   --hn: var(--home-neon, color-mix(in srgb, var(--home-primary, #0A2342) 45%, #fff));
-  --mn: color-mix(in srgb, var(--vn) 50%, var(--hn));
+  /* The shared/centre colour: the two teams' neons blended, then pushed toward white. A plain
+     blend of complementary colours (gold + blue) is a dull grey; toward-white reads as the hot
+     core of a neon tube, still tinted by both teams. */
+  --mn: color-mix(in srgb, color-mix(in srgb, var(--vn) 50%, var(--hn)) 45%, #fff);
   --neon-ink: #02030a;
   --neon-panel: rgba(2, 4, 12, .88);
 }
@@ -35,6 +38,8 @@
      a full-cover dark fill here would sit behind it and dim the picture. Every panel below
      carries its own dark fill, so the glass look is unchanged where there is content. */
   background: transparent;
+  /* Collegiate blurs whatever is behind the shell. Nothing here may blur the video window. */
+  backdrop-filter: none;
   box-shadow:
     -14px 0 44px -8px var(--vn),
     14px 0 44px -8px var(--hn),
@@ -77,6 +82,11 @@
     0 0 48px color-mix(in srgb, var(--c, var(--mn)) 42%, transparent),
     inset 0 0 16px color-mix(in srgb, var(--c, var(--mn)) 34%, transparent);
 }
+/* The readout bank is a tight fixed-height stack (field 140 + bar 50 in a 236px bank). Collegiate's 1px
+   borders just fit it; 2px borders here clipped the bottom edge of the readout pills at 1920x1080, so
+   these two containers keep 1px (their glow carries the weight) and reclaim a few px of padding. */
+.package-collegiate-neon :is(.bl-college-control-bank, .bl-college-field) { border-width: 1px; }
+.package-collegiate-neon .bl-college-field { padding: 10px 10px 4px; gap: 6px; }
 .package-collegiate-neon .bl-college-score-chip.bl-visitor,
 .package-collegiate-neon .bl-collegiate-tech .bl-college-team.bl-visitor { --c: var(--vn); --team-primary: var(--vn); }
 .package-collegiate-neon .bl-college-score-chip.bl-home,
@@ -288,4 +298,259 @@
   background: var(--neon-panel);
   color: #fff;
   box-shadow: 0 0 4px var(--mn), 0 0 16px var(--mn), 0 0 36px color-mix(in srgb, var(--mn) 55%, transparent), inset 0 0 18px color-mix(in srgb, var(--mn) 28%, transparent);
+}
+
+/* ---- baseball / softball bank (checkpoint 3) ------------------------------------------------
+   Same skeleton as football: line score left, diamond right. Colour follows the same rule --
+   each row in its team's neon, the diamond in the BATTING team's neon (--poss, the same
+   variable football uses for the team in possession), and COUNT is the callout: the same
+   999px pill shape as football's Down & Distance, the second cell of the readout bar. */
+.package-collegiate-neon .bl-college-line-score {
+  --c: var(--mn);
+  border: 2px solid var(--c);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--mn) 14%, var(--neon-panel)), rgba(1, 2, 8, .94));
+  backdrop-filter: none;
+  box-shadow:
+    0 0 3px var(--c),
+    0 0 10px var(--c),
+    0 0 24px color-mix(in srgb, var(--c) 72%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--c) 30%, transparent);
+}
+.package-collegiate-neon .bl-cls-head { color: color-mix(in srgb, var(--mn) 55%, #fff); border-bottom-color: color-mix(in srgb, var(--mn) 45%, transparent); }
+.package-collegiate-neon .bl-cls-row.bl-visitor { --c: var(--vn); }
+.package-collegiate-neon .bl-cls-row.bl-home { --c: var(--hn); }
+.package-collegiate-neon .bl-cls-row {
+  border: 1px solid color-mix(in srgb, var(--c) 60%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 22%, var(--neon-panel)), rgba(1, 2, 8, .7));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--c) 45%, transparent), inset 0 0 12px color-mix(in srgb, var(--c) 22%, transparent);
+}
+.package-collegiate-neon .bl-cls-team { color: #fff; text-shadow: 0 0 8px color-mix(in srgb, var(--c) 80%, transparent); }
+.package-collegiate-neon .bl-cls-innings span { color: #fff; }
+.package-collegiate-neon .bl-cls-head .bl-cls-innings span { color: color-mix(in srgb, var(--mn) 55%, #fff); }
+.package-collegiate-neon .bl-cls-innings span.is-current {
+  background: color-mix(in srgb, var(--c) 30%, transparent);
+  box-shadow: inset 0 0 0 1px var(--c), 0 0 10px var(--c);
+  color: #fff;
+  text-shadow: 0 0 8px var(--c);
+}
+.package-collegiate-neon .bl-cls-rhe { border-left-color: color-mix(in srgb, var(--c) 50%, transparent); }
+.package-collegiate-neon .bl-cls-rhe span { color: #fff; text-shadow: 0 0 5px #fff, 0 0 12px var(--c); }
+.package-collegiate-neon .bl-cls-head .bl-cls-rhe span { color: color-mix(in srgb, var(--mn) 55%, #fff); text-shadow: none; }
+
+.package-collegiate-neon .bl-college-diamond {
+  --poss: var(--vn);
+  --cd-accent: var(--vn);
+  border: 2px solid var(--poss);
+  background: linear-gradient(180deg, rgba(2, 24, 16, .92), rgba(1, 10, 10, .94));
+  box-shadow:
+    0 0 3px var(--poss),
+    0 0 10px var(--poss),
+    0 0 24px color-mix(in srgb, var(--poss) 72%, transparent),
+    0 0 48px color-mix(in srgb, var(--poss) 42%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--poss) 34%, transparent);
+}
+.package-collegiate-neon .bl-college-diamond[data-inning-half="bottom"] { --poss: var(--hn); --cd-accent: var(--hn); }
+.package-collegiate-neon .bl-college-diamond-grid {
+  background:
+    radial-gradient(circle at 50% 78%, rgba(255, 255, 255, .05), transparent 30%),
+    linear-gradient(180deg, #02220f, #0a6a34 60%, #02220f);
+  box-shadow: inset 0 0 26px rgba(57, 255, 136, .16);
+}
+.package-collegiate-neon .bl-college-diamond-art .bl-cd-grass { fill: #03301a; }
+.package-collegiate-neon .bl-college-diamond-art .bl-cd-dirt { fill: #2c1c0a; opacity: .95; }
+.package-collegiate-neon .bl-college-diamond-art .bl-cd-infield { fill: #06522c; }
+.package-collegiate-neon .bl-college-diamond-art .bl-cd-foul { stroke: rgba(190, 255, 220, .95); filter: drop-shadow(0 0 3px rgba(120, 255, 190, .9)); }
+.package-collegiate-neon .bl-college-diamond-art .bl-cd-mound { fill: #3b2410; }
+.package-collegiate-neon .bl-college-diamond-art .bl-cd-base,
+.package-collegiate-neon .bl-college-diamond-art .bl-cd-home { fill: #fff; opacity: 1; filter: drop-shadow(0 0 4px var(--poss)); }
+.package-collegiate-neon .bl-college-diamond-art .bl-cd-runner { stroke: color-mix(in srgb, var(--poss) 60%, #fff); }
+.package-collegiate-neon .bl-college-diamond-art .bl-cd-runner.on {
+  fill: var(--cd-accent);
+  stroke: #fff;
+  filter: drop-shadow(0 0 4px #fff) drop-shadow(0 0 10px var(--cd-accent)) drop-shadow(0 0 18px var(--cd-accent));
+}
+.package-collegiate-neon .bl-cd-inning-arrow { color: var(--poss); text-shadow: 0 0 8px var(--poss); }
+.package-collegiate-neon .bl-college-diamond-meta span {
+  border: 1px solid color-mix(in srgb, var(--mn) 50%, transparent);
+  background: var(--neon-panel);
+}
+.package-collegiate-neon .bl-college-diamond-meta small { color: color-mix(in srgb, var(--mn) 55%, #fff); }
+.package-collegiate-neon .bl-college-diamond-meta b { color: #fff; text-shadow: 0 0 8px color-mix(in srgb, var(--mn) 70%, transparent); }
+/* COUNT: the callout, same pill shape as football's Down & Distance, in the batting team's neon */
+.package-collegiate-neon .bl-college-diamond-meta span:nth-child(2) {
+  border: 3px solid var(--poss);
+  border-radius: 999px;
+  padding: 5px 10px;
+  grid-template-columns: auto auto;
+  justify-content: center;
+  background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--poss) 30%, var(--neon-ink)), var(--neon-ink) 75%);
+  box-shadow:
+    0 0 4px var(--poss),
+    0 0 14px var(--poss),
+    0 0 30px color-mix(in srgb, var(--poss) 70%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--poss) 45%, transparent);
+}
+.package-collegiate-neon .bl-college-diamond-meta span:nth-child(2) small { color: var(--poss); text-shadow: 0 0 8px var(--poss); }
+.package-collegiate-neon .bl-college-diamond-meta span:nth-child(2) b {
+  font-size: 19px;
+  color: #fff;
+  text-shadow: 0 0 5px #fff, 0 0 14px var(--poss), 0 0 30px var(--poss);
+}
+
+/* Room for the Count pill: Collegiate's 320px diamond column truncates "2-1" inside a pill. */
+.package-collegiate-neon .bl-college-baseball-bank { grid-template-columns: minmax(0, 1fr) 430px; }
+.package-collegiate-neon .bl-college-diamond-meta { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr); }
+
+/* ---- neon field art (owner direction) ------------------------------------------------------------
+   1) the field bar at the bottom: a neon STRIPED field with glowing lines and a redesigned ball marker;
+   2) the clash screen's field graphic: a neon-stylised field drawn in CSS instead of the stadium photo.
+   Everything here is CSS-drawn (no photos), static, and the end zones / arcs pick up each team's neon. */
+
+/* -- 1. field bar ------------------------------------------------------------------------------------ */
+.package-collegiate-neon .bl-college-field-grid {
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 255, 150, .40) 0 5%, rgba(0, 255, 150, .05) 5% 10%),
+    linear-gradient(180deg, rgba(1, 12, 9, 1), rgba(2, 26, 18, 1) 55%, rgba(1, 12, 9, 1));
+  box-shadow: inset 0 0 0 2px rgba(120, 255, 190, .55), inset 0 0 30px rgba(57, 255, 136, .28);
+}
+.package-collegiate-neon .bl-college-field-grid::before {
+  background: linear-gradient(0deg, transparent 0 44%, rgba(190, 255, 225, .7) 44% 46%, transparent 46% 54%, rgba(190, 255, 225, .7) 54% 56%, transparent 56%);
+  opacity: 1;
+  filter: drop-shadow(0 0 3px rgba(120, 255, 190, .9));
+}
+.package-collegiate-neon .bl-college-field-grid::after { opacity: 1; filter: drop-shadow(0 0 3px rgba(190, 255, 225, .9)); }
+.package-collegiate-neon .bl-college-hashmarks { opacity: 1; filter: drop-shadow(0 0 2px rgba(190, 255, 225, .9)); }
+
+/* ball marker: a glowing neon football (a leaf shape with pointed ends) in the possession team's neon,
+   its initials/logo kept upright inside. Replaces the round medallion. */
+.package-collegiate-neon .bl-college-ball-marker {
+  width: 70px;
+  height: 70px;
+  border: 3px solid var(--poss);
+  border-radius: 0 100% 0 100%;
+  transform: translate(-50%, -50%) rotate(-45deg);
+  background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--poss) 34%, var(--neon-ink)), var(--neon-ink) 78%);
+  box-shadow:
+    0 0 4px #fff,
+    0 0 10px var(--poss),
+    0 0 24px var(--poss),
+    0 0 44px color-mix(in srgb, var(--poss) 60%, transparent),
+    inset 0 0 12px color-mix(in srgb, var(--poss) 55%, transparent);
+  overflow: visible;
+}
+.package-collegiate-neon .bl-college-ball-marker > * { transform: rotate(45deg); }
+.package-collegiate-neon .bl-college-ball-marker span { font-size: 15px; color: #fff; text-shadow: 0 0 6px #fff, 0 0 12px var(--poss); }
+/* laces */
+.package-collegiate-neon .bl-college-ball-marker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44%;
+  height: 2px;
+  transform: translate(-50%, -50%) rotate(45deg) translateY(15px);
+  background: #fff;
+  box-shadow: 0 0 5px #fff, 0 0 10px var(--poss);
+  opacity: .9;
+}
+
+/* -- 2. clash-screen field graphic: neon stylised field, drawn in CSS ----------------------------------- */
+.package-collegiate-neon .bl-college-stage-field,
+.package-collegiate-neon .bl-college-stage-field[data-sport="baseball"],
+.package-collegiate-neon .bl-college-stage-field[data-sport="softball"] {
+  background:
+    radial-gradient(ellipse at 50% 108%, color-mix(in srgb, var(--mn) 26%, transparent), transparent 64%),
+    linear-gradient(180deg, rgba(2, 3, 10, 1) 0%, rgba(3, 14, 22, 1) 52%, rgba(2, 24, 17, 1) 100%);
+  opacity: 1;
+  filter: none;
+  overflow: hidden;
+}
+/* the playing surface: a receding neon plane */
+.package-collegiate-neon .bl-college-stage-field::before {
+  content: "";
+  position: absolute;
+  left: -6%;
+  right: -6%;
+  top: -34%;
+  bottom: -12%;
+  transform-origin: 50% 100%;
+  transform: perspective(620px) rotateX(46deg);
+  border: 3px solid rgba(190, 255, 225, .95);
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, transparent calc(50% - 2px), rgba(255, 255, 255, .95) calc(50% - 2px) calc(50% + 2px), transparent calc(50% + 2px)),
+    radial-gradient(circle at 50% 50%, transparent 0 8.5%, rgba(255, 255, 255, .85) 8.5% 9.2%, transparent 9.2%),
+    linear-gradient(90deg, color-mix(in srgb, var(--vn) 62%, transparent) 0, transparent 11%, transparent 89%, color-mix(in srgb, var(--hn) 62%, transparent) 100%),
+    repeating-linear-gradient(90deg, rgba(190, 255, 225, .6) 0 2px, transparent 2px 8.333%),
+    repeating-linear-gradient(90deg, rgba(0, 255, 150, .24) 0 4.166%, rgba(0, 255, 150, .05) 4.166% 8.333%),
+    linear-gradient(180deg, rgba(2, 20, 14, 1), rgba(3, 38, 26, 1));
+  box-shadow: 0 0 14px rgba(120, 255, 190, .95), 0 0 46px rgba(57, 255, 136, .55), inset 0 0 44px rgba(57, 255, 136, .28);
+}
+/* baseball / softball: the same plane drawn as a neon ballpark (foul lines, infield + outfield arcs) */
+.package-collegiate-neon .bl-college-stage-field[data-sport="baseball"]::before,
+.package-collegiate-neon .bl-college-stage-field[data-sport="softball"]::before {
+  left: 4%;
+  right: 4%;
+  top: -30%;
+  border-radius: 6px 6px 0 0;
+  background:
+    conic-gradient(from -46deg at 50% 100%, rgba(255, 255, 255, .95) 0 1.4deg, transparent 1.4deg 90deg, rgba(255, 255, 255, .95) 90deg 91.4deg, transparent 91.4deg),
+    radial-gradient(circle at 50% 100%, transparent 0 21%, color-mix(in srgb, var(--vn) 80%, #fff) 21.4% 22.4%, transparent 22.8% 38%, color-mix(in srgb, var(--hn) 80%, #fff) 38.4% 39.4%, transparent 39.8% 58%, rgba(190, 255, 225, .8) 58.4% 59.4%, transparent 59.8%),
+    repeating-radial-gradient(circle at 50% 100%, rgba(0, 255, 150, .22) 0 6%, rgba(0, 255, 150, .05) 6% 12%),
+    linear-gradient(180deg, rgba(2, 20, 14, 1), rgba(3, 38, 26, 1));
+}
+
+/* ---- basketball: palette + glow only (owner decision: no callout) ----------------------------------------
+   Collegiate's basketball is the older compact strip (it has no readout bar and no video board), so it keeps
+   its structure and gets the same neon language: dark glass, the visitor->home gradient ring and team-coloured
+   halo, each side in its own team's neon, glowing digits and clocks. */
+.package-collegiate-neon .bl-collegiate:not(.bl-collegiate-tech) {
+  position: relative;
+  border: 3px solid transparent;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--neon-panel);
+  font-family: Inter, Roboto, Arial, sans-serif;
+  /* this strip has HOME on the left (football's board has the visitor there), so the gradient runs home -> visitor */
+  box-shadow: -12px 0 40px -8px var(--hn), 12px 0 40px -8px var(--vn), 0 0 28px color-mix(in srgb, var(--mn) 45%, transparent);
+}
+.package-collegiate-neon .bl-collegiate:not(.bl-collegiate-tech)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 3px;
+  background: linear-gradient(90deg, var(--hn), var(--mn) 50%, var(--vn));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+  z-index: 6;
+  filter: drop-shadow(0 0 5px var(--mn));
+}
+.package-collegiate-neon .bl-collegiate:not(.bl-collegiate-tech) .bl-college-team.bl-home,
+.package-collegiate-neon .bl-collegiate:not(.bl-collegiate-tech) [data-module="home.score"] { --c: var(--hn); }
+.package-collegiate-neon .bl-collegiate:not(.bl-collegiate-tech) .bl-college-team.bl-visitor,
+.package-collegiate-neon .bl-collegiate:not(.bl-collegiate-tech) [data-module="visitor.score"] { --c: var(--vn); }
+.package-collegiate-neon .bl-collegiate:not(.bl-collegiate-tech) .bl-college-team {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--c) 26%, var(--neon-panel)), rgba(1, 2, 8, .94));
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--c) 32%, transparent);
+}
+.package-collegiate-neon .bl-collegiate:not(.bl-collegiate-tech) .bl-team-name { color: #fff; text-shadow: 0 0 10px color-mix(in srgb, var(--c) 85%, transparent); }
+.package-collegiate-neon .bl-collegiate:not(.bl-collegiate-tech) .bl-score {
+  background: color-mix(in srgb, var(--c) 14%, var(--neon-ink));
+  color: #fff;
+  text-shadow: 0 0 4px #fff, 0 0 12px var(--c), 0 0 28px var(--c), 0 0 50px var(--c);
+}
+.package-collegiate-neon .bl-collegiate:not(.bl-collegiate-tech) .bl-college-state {
+  border-inline: 2px solid color-mix(in srgb, var(--mn) 75%, #fff);
+  background: color-mix(in srgb, var(--mn) 12%, var(--neon-ink));
+  color: #fff;
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--mn) 30%, transparent), 0 0 12px color-mix(in srgb, var(--mn) 55%, transparent);
+}
+.package-collegiate-neon .bl-collegiate:not(.bl-collegiate-tech) .bl-period,
+.package-collegiate-neon .bl-collegiate:not(.bl-collegiate-tech) .bl-clock,
+.package-collegiate-neon .bl-collegiate:not(.bl-collegiate-tech) .bl-shot-clock {
+  color: #fff;
+  text-shadow: 0 0 4px #fff, 0 0 12px var(--mn), 0 0 26px var(--mn);
 }

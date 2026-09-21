@@ -80,7 +80,8 @@ def test_the_skin_lives_in_its_own_file_and_collegiates_stylesheet_is_untouched(
 def test_the_uniform_recolour_pipeline_stays_retired() -> None:
     """Out of scope by decision: nothing new may resurrect the layers-v10 clash pipeline."""
     neon_css = read(NEON_CSS)
-    assert "clash" not in neon_css.lower() and "layers-v10" not in neon_css and "mask-image" not in neon_css
+    code = re.sub(r"/\*.*?\*/", "", neon_css, flags=re.S)  # comments may say "clash screen"; code may not resurrect the pipeline
+    assert "clash" not in code.lower() and "layers-v10" not in neon_css and "mask-image" not in neon_css
     assert "football-athletes" not in neon_css and "athletes-keyed" not in neon_css
 
 
@@ -302,8 +303,9 @@ def test_colour_is_team_derived_the_only_fixed_colours_are_semantic() -> None:
     fixed = set(h.lower() for h in re.findall(r"#[0-9a-fA-F]{3,8}\b", css))
     # white, black (the mask), ink, the LIVE badge red, the first-down-line yellow, the turf greens,
     # and Collegiate's own default team-primary FALLBACKS inside var(--x-primary, ...): none is a team accent
+    # (and the ballpark's dark turf / dirt in the diamond art, and the field greens)
     assert fixed <= {"#fff", "#000", "#02030a", "#ff3b6b", "#f6ff2a", "#f4fbff", "#02220f", "#0a6a34",
-                     "#064624", "#0a2342"}, fixed
+                     "#064624", "#0a2342", "#03301a", "#06522c", "#2c1c0a", "#3b2410"}, fixed
     for var in ("--vn", "--hn", "--mn", "--poss"):
         assert f"var({var}" in css
     assert "--visitor-neon" in css and "--home-neon" in css
@@ -376,3 +378,117 @@ def test_the_readme_names_what_was_archived_and_why() -> None:
     for token in ("gate116", "test_gate150_*", "csrn-neon-r2-engine", "layers-v10", "out of scope",
                   "test_gate78_heritage_press_design", "collect_ignore"):
         assert token.lower() in readme.lower(), token
+
+
+# --- checkpoint 3: baseball / softball / basketball, the field art, and what live screenshots caught -------
+
+
+def _rule(css: str, selector: str) -> str:
+    """Body of the LAST rule whose selector text contains `selector` (later rules win in the cascade)."""
+    start = css.rindex(selector)
+    return css[css.index("{", start) + 1 : css.index("}", start)]
+
+
+def test_baseball_and_softball_count_is_the_same_pill_as_football_down_and_distance() -> None:
+    css = read(NEON_CSS)
+    count = _rule(css, ".package-collegiate-neon .bl-college-diamond-meta span:nth-child(2) {")
+    assert "border-radius: 999px" in count and "var(--poss)" in count
+    # same shape as football's pill (rounded, poss-coloured border, glow), not a different treatment
+    football = _rule(css, ".package-collegiate-neon .bl-college-field-meta span:nth-child(2) {")
+    assert "border-radius: 999px" in football and "var(--poss)" in football
+    # the DOM it styles is Collegiate's: Count is the second of Batting | Count | Outs
+    engine = read(ENGINE)
+    meta = engine.split('<div class="bl-college-diamond-meta">')[1].split("</div>")[0]
+    assert meta.index("<small>Batting</small>") < meta.index("<small>Count</small>") < meta.index("<small>Outs</small>")
+
+
+def test_the_diamond_follows_the_batting_team_like_football_follows_possession() -> None:
+    css = read(NEON_CSS)
+    base = _rule(css, ".package-collegiate-neon .bl-college-diamond {")
+    assert "--poss: var(--vn)" in base and "--cd-accent: var(--vn)" in base  # top of the inning: visitor bats
+    bottom = _rule(css, '.package-collegiate-neon .bl-college-diamond[data-inning-half="bottom"] {')
+    assert "--poss: var(--hn)" in bottom and "--cd-accent: var(--hn)" in bottom
+    assert 'data-inning-half="${half === "BOTTOM" ? "bottom" : "top"}"' in read(ENGINE)  # the attribute the engine sets
+    assert "runner.on" in css.replace(".bl-cd-runner.on", "runner.on")  # occupied bases glow in the batting team's neon
+
+
+def test_the_line_score_rows_are_each_in_their_own_teams_neon() -> None:
+    css = read(NEON_CSS)
+    assert ".package-collegiate-neon .bl-cls-row.bl-visitor { --c: var(--vn); }" in css
+    assert ".package-collegiate-neon .bl-cls-row.bl-home { --c: var(--hn); }" in css
+    engine = read(ENGINE)
+    assert 'class="bl-cls-row bl-${side}"' in engine  # the classes those selectors rely on
+
+
+def test_the_count_pill_has_room_in_the_diamond_column() -> None:
+    """Live-found: Collegiate's 320px diamond column truncated "2-1" inside a pill."""
+    css = read(NEON_CSS)
+    assert ".package-collegiate-neon .bl-college-baseball-bank { grid-template-columns: minmax(0, 1fr) 430px; }" in css
+
+
+def test_basketball_gets_palette_and_glow_only_no_callout() -> None:
+    css = read(NEON_CSS)
+    block = css[css.index("/* ---- basketball"):]
+    assert ":not(.bl-collegiate-tech)" in block  # only Collegiate's compact strip
+    assert "999px" not in block and "nth-child" not in block  # no pill / callout (owner decision)
+    # this strip has HOME on the left, so its ring and halo run home -> visitor
+    ring = block.split(".bl-collegiate:not(.bl-collegiate-tech)::after {")[1].split("}")[0]
+    assert "linear-gradient(90deg, var(--hn), var(--mn) 50%, var(--vn))" in ring
+    assert "-12px 0 40px -8px var(--hn), 12px 0 40px -8px var(--vn)" in block
+    engine = read(ENGINE)
+    strip = engine.split('return `<div class="bl-scorebug bl-collegiate bl-sport-${sport}">')[1].split("</div>`;")[0]
+    assert strip.index("explicitTeam(state.home") < strip.index("explicitTeam(state.visitor")  # home first
+
+
+def test_the_clash_screen_field_is_a_css_drawn_neon_field_not_the_stadium_photo() -> None:
+    css = read(NEON_CSS)
+    art = css[css.index("/* -- 2. clash-screen field graphic"):]
+    assert "url(" not in art and "football-field-background" not in css and "ballpark-background" not in css
+    # all three sports the stage draws a field for, including the attribute selectors Collegiate uses per sport
+    assert '.bl-college-stage-field[data-sport="baseball"]' in art and '.bl-college-stage-field[data-sport="softball"]' in art
+    plane = _rule(art, ".package-collegiate-neon .bl-college-stage-field::before {")
+    assert "perspective(" in plane and "repeating-linear-gradient(90deg" in plane  # a receding, striped plane
+    assert "var(--vn)" in plane and "var(--hn)" in plane                          # team-tinted end zones
+    park = art.split('.bl-college-stage-field[data-sport="baseball"]::before,')[1]
+    assert "conic-gradient" in park and "repeating-radial-gradient" in park       # foul lines + arcs
+
+
+def test_the_field_bar_is_neon_striped_with_a_redesigned_ball_marker() -> None:
+    css = read(NEON_CSS)
+    grid = _rule(css, ".package-collegiate-neon .bl-college-field-grid {")
+    assert "repeating-linear-gradient(90deg, rgba(0, 255, 150" in grid  # the neon stripes
+    ball = _rule(css, ".package-collegiate-neon .bl-college-ball-marker {")
+    assert "border-radius: 0 100% 0 100%" in ball and "rotate(-45deg)" in ball  # a football-shaped leaf, not a circle
+    assert "var(--poss)" in ball
+    assert ".bl-college-ball-marker > * { transform: rotate(45deg); }" in css   # initials/logo stay upright
+    assert 'data-bind="game.possessionLogo"' in read(ENGINE)                      # the content the marker keeps
+
+
+# --- what full-resolution captures caught ------------------------------------------------------------------------
+
+
+def test_the_shell_never_blurs_or_darkens_what_is_behind_the_video_window() -> None:
+    shell = _rule(read(NEON_CSS), ".package-collegiate-neon .bl-collegiate-tech {")
+    assert "backdrop-filter: none;" in shell  # Collegiate's blur(8px) softened the camera feed (live-found)
+    assert "background: transparent;" in shell
+
+
+def test_the_readout_bank_keeps_1px_borders_so_the_pills_are_not_clipped() -> None:
+    """Live-found at 1920x1080: 2px borders on these two containers clipped the bottom of
+    the readout pills (the bank is a fixed-height stack that Collegiate's 1px borders just fit)."""
+    css = read(NEON_CSS)
+    assert ".package-collegiate-neon :is(.bl-college-control-bank, .bl-college-field) { border-width: 1px; }" in css
+    assert ".package-collegiate-neon .bl-college-field { padding: 10px 10px 4px; gap: 6px; }" in css
+    assert "grid-template-rows:minmax(140px,1fr) 50px" in read("static/csrn-broadcast-layout-engine.css")  # the geometry that forced it
+
+
+def test_the_legacy_stats_ribbon_is_hidden_only_while_neon_is_active() -> None:
+    js = read(RUNTIME)
+    assert 'const NEON_ACTIVE_CLASS = "csrn-production-theme-neon-active";' in js
+    assert 'document.documentElement.classList.toggle(NEON_ACTIVE_CLASS, alias === "digital_neon");' in js
+    deactivate = js.split("function deactivate(reason")[1].split("setHostState(scoreHost(), false")[0]
+    assert "NEON_ACTIVE_CLASS" in deactivate  # released with the other classes
+    css = read("static/csrn-production-theme-runtime.css")
+    rule = css[css.index("html.csrn-production-theme-neon-active #statBar"):].split("}")[0]
+    assert "display:none!important" in rule
+    assert "neon-active" not in css.split("html.csrn-production-layout-hide-player")[1]  # not applied to anything else
