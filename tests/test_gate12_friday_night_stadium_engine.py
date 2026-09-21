@@ -19,8 +19,9 @@ def test_gate12_isolated_engine_exists_and_preserves_frozen_neon() -> None:
     assert ENGINE.is_file()
     assert CSS.is_file()
     # Re-pinned T1 (2026-09-12) -- see test_gate116.
-    assert _digest("static/csrn-broadcast-layout-engine.css") == "8C36E5E5DAEFBDE3E040F81363CDC02211AA6FFDBE557340A8CCB9BDDD83548B"
-    assert _digest("static/csrn-broadcast-layout-engine.js") == "1C36E1A24845D0032A3AE73957FA9A0CEC5E9828EABB2D2A2DC021EBC352F4C5"
+    # Re-pinned again (2026-09-21): Collegiate Tech basketball panel parity, docs/BASKETBALL_PANEL_PARITY.md.
+    assert _digest("static/csrn-broadcast-layout-engine.css") == "FA61BF2F722A18E2730DB6CBC48A2832A2D06A9BCAA9A6E1732F36E8C9C86E7A"
+    assert _digest("static/csrn-broadcast-layout-engine.js") == "3AEA5365B6B948E1FED894417F95C080040FD0C5783231302B457DFD958F9FE1"
 
 
 def test_gate12_lab_loads_and_routes_the_approved_stadium_engine() -> None:

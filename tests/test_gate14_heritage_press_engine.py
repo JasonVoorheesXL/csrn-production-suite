@@ -20,8 +20,8 @@ def test_gate14_isolated_engine_preserves_all_frozen_renderers() -> None:
     assert ENGINE.is_file() and CSS.is_file()
     # Broadcast-layout-engine hashes re-pinned T1 (2026-09-12) -- see
     # test_gate116. 8-Bit engine hashes are unchanged.
-    assert _digest("static/csrn-broadcast-layout-engine.css") == "8C36E5E5DAEFBDE3E040F81363CDC02211AA6FFDBE557340A8CCB9BDDD83548B"
-    assert _digest("static/csrn-broadcast-layout-engine.js") == "1C36E1A24845D0032A3AE73957FA9A0CEC5E9828EABB2D2A2DC021EBC352F4C5"
+    assert _digest("static/csrn-broadcast-layout-engine.css") == "FA61BF2F722A18E2730DB6CBC48A2832A2D06A9BCAA9A6E1732F36E8C9C86E7A"
+    assert _digest("static/csrn-broadcast-layout-engine.js") == "3AEA5365B6B948E1FED894417F95C080040FD0C5783231302B457DFD958F9FE1"
     assert _digest("static/csrn-friday-night-stadium-engine.css") == "766686DAB90AABC40021919E65C01318FD426E86CB3E95A9B33CB72643E689AF"
     assert _digest("static/csrn-friday-night-stadium-engine.js") == "E2B3872D6D70A47FB733794CA02A46ADC4C3D9BAABBE192E6A17B96748926CBB"
     assert _digest("static/csrn-eight-bit-gameday-engine.css") == "6CFA49C22E2F9DE74E97E4BBA8FB9FE09E1F10F4AE64242066FBC9A728643BC4"

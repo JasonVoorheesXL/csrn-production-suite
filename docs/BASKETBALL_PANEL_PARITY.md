@@ -34,10 +34,10 @@ Three further findings from the audit, none of them in the brief:
 2. **Fouls, bonus and timeouts never reached the overlay live.** The renderer reads flat `home_fouls`,
    `home_bonus`, `home_timeouts` (`docs/HOOPS_OVERLAY_CONTRACT.md` §1), but `/api/runtime-state` only carries
    the engine's own `state["hoops"]` block (`home_team_fouls` …); the flat "wire" fields were specified in P0 and
-   never wired. On any theme they read blank in a real game. Fixed in this round (see §3).
+   never wired. On any theme they read blank in a real game. Fixed in this round (see §2, Runtime).
 3. **The overlay had no path to player names.** The hoops ledger records player *ids*; the roster is behind
    operator auth. So "who scored" and "who is playing" — the owner's stated basketball priority — could not
-   be shown at all without a new read-only feed (see §3).
+   be shown at all without a new read-only feed (see §2, Server).
 
 ## 2. What was built
 
