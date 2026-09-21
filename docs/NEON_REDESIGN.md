@@ -120,14 +120,22 @@ it gets palette + glow only, no callout: dark glass, the gradient ring and team 
 in its own neon, glowing digits and clocks. That strip puts **home on the left** (football's
 board has the visitor there), so its ring and halo run home → visitor.
 
-**Field art (owner direction).**
-- *Field bar:* a neon **striped** field (bright/dim mowing stripes, glowing yard lines and
-  hashes, team-tinted end zones) and a redesigned **ball marker**: a football-shaped neon leaf in
-  the possession team's colour, its initials/logo kept upright.
-- *Clash screen:* the stadium photo is replaced by a **CSS-drawn neon field** on a receding
-  perspective plane: stripes, glowing yard lines, midfield line and circle, and end zones tinted by
-  each team's neon (easy, so included). Baseball/softball get the equivalent neon ballpark (foul
-  lines, infield and outfield arcs). No photos, no animation.
+**Field art (owner direction, revised twice after live review).** Two drawn-CSS versions were
+rejected: mowed daylight turf with plain white lines clashed with the package, and a drawn
+receding plane "looked like a radar image". The owner's reference was neon/blacklight stadium art
+and "Cosmic Baseball": a picture of a real field under blacklight.
+- *Clash screen:* Collegiate's own photographs (football field, baseball and softball ballparks),
+  re-graded. The stage is multiplied into ultraviolet blue (turf near-black violet, dirt magenta),
+  each tower spills its team's neon down from the top corners, and the photo's own white lines and
+  stadium lights are re-lit in mint: `::before` is a contrast-isolated copy of the brights (crisp
+  core), `::after` the same copy blurred (bloom), both `screen`-blended. The softball sky is bright
+  enough to pass the isolation, so its glow layers are masked to the ground. No animation. The only
+  photos named are those three; the keyed player layers stay retired.
+- *Field bar and in-game diamond* (functional strips, not photographs): "blacklight turf", near-black
+  green with a faint mow, and every line (yard lines, hashes, numbers, foul lines, basepaths) drawn as a
+  thin bright core with a soft mint bloom (`--turf-core` / `--turf-bloom`, the same technique as the panel
+  borders and the Down / Count pills). Football's ball marker is a neon leaf in the possession
+  team's colour with its initials upright.
 
 ## What full-resolution captures caught
 

@@ -81,7 +81,11 @@ def test_the_uniform_recolour_pipeline_stays_retired() -> None:
     """Out of scope by decision: nothing new may resurrect the layers-v10 clash pipeline."""
     neon_css = read(NEON_CSS)
     code = re.sub(r"/\*.*?\*/", "", neon_css, flags=re.S)  # comments may say "clash screen"; code may not resurrect the pipeline
-    assert "clash" not in code.lower() and "layers-v10" not in neon_css and "mask-image" not in neon_css
+    # the only clash-folder files Neon may name are the three plain field photographs (the stage background), never
+    # the keyed player layers; the softball sky mask is the one place a mask is allowed
+    named = re.findall(r"clash/([\w.-]+)", code)
+    assert sorted(named) == ["baseball-ballpark-background.png", "football-field-background.png", "softball-ballpark-background.png"]
+    assert "layers-v10" not in neon_css and code.count("mask-image") == 2
     assert "football-athletes" not in neon_css and "athletes-keyed" not in neon_css
 
 
@@ -303,9 +307,9 @@ def test_colour_is_team_derived_the_only_fixed_colours_are_semantic() -> None:
     fixed = set(h.lower() for h in re.findall(r"#[0-9a-fA-F]{3,8}\b", css))
     # white, black (the mask), ink, the LIVE badge red, the first-down-line yellow, the turf greens,
     # and Collegiate's own default team-primary FALLBACKS inside var(--x-primary, ...): none is a team accent
-    # (and the ballpark's dark turf / dirt in the diamond art, and the field greens)
-    assert fixed <= {"#fff", "#000", "#02030a", "#ff3b6b", "#f6ff2a", "#f4fbff", "#02220f", "#0a6a34",
-                     "#064624", "#0a2342", "#03301a", "#06522c", "#2c1c0a", "#3b2410"}, fixed
+    # Turf is expressed in rgba()/custom properties, never as a fixed hex: the only hex left are the neutrals,
+    # the LIVE red, the first-down yellow, and Collegiate's own default team-primary fallbacks.
+    assert fixed <= {"#fff", "#000", "#02030a", "#ff3b6b", "#f6ff2a", "#f4fbff", "#064624", "#0a2342"}, fixed
     for var in ("--vn", "--hn", "--mn", "--poss"):
         assert f"var({var}" in css
     assert "--visitor-neon" in css and "--home-neon" in css
@@ -440,30 +444,6 @@ def test_basketball_gets_palette_and_glow_only_no_callout() -> None:
     assert strip.index("explicitTeam(state.home") < strip.index("explicitTeam(state.visitor")  # home first
 
 
-def test_the_clash_screen_field_is_a_css_drawn_neon_field_not_the_stadium_photo() -> None:
-    css = read(NEON_CSS)
-    art = css[css.index("/* -- 2. clash-screen field graphic"):]
-    assert "url(" not in art and "football-field-background" not in css and "ballpark-background" not in css
-    # all three sports the stage draws a field for, including the attribute selectors Collegiate uses per sport
-    assert '.bl-college-stage-field[data-sport="baseball"]' in art and '.bl-college-stage-field[data-sport="softball"]' in art
-    plane = _rule(art, ".package-collegiate-neon .bl-college-stage-field::before {")
-    assert "perspective(" in plane and "repeating-linear-gradient(90deg" in plane  # a receding, striped plane
-    assert "var(--vn)" in plane and "var(--hn)" in plane                          # team-tinted end zones
-    park = art.split('.bl-college-stage-field[data-sport="baseball"]::before,')[1]
-    assert "conic-gradient" in park and "repeating-radial-gradient" in park       # foul lines + arcs
-
-
-def test_the_field_bar_is_neon_striped_with_a_redesigned_ball_marker() -> None:
-    css = read(NEON_CSS)
-    grid = _rule(css, ".package-collegiate-neon .bl-college-field-grid {")
-    assert "repeating-linear-gradient(90deg, rgba(0, 255, 150" in grid  # the neon stripes
-    ball = _rule(css, ".package-collegiate-neon .bl-college-ball-marker {")
-    assert "border-radius: 0 100% 0 100%" in ball and "rotate(-45deg)" in ball  # a football-shaped leaf, not a circle
-    assert "var(--poss)" in ball
-    assert ".bl-college-ball-marker > * { transform: rotate(45deg); }" in css   # initials/logo stay upright
-    assert 'data-bind="game.possessionLogo"' in read(ENGINE)                      # the content the marker keeps
-
-
 # --- what full-resolution captures caught ------------------------------------------------------------------------
 
 
@@ -492,3 +472,109 @@ def test_the_legacy_stats_ribbon_is_hidden_only_while_neon_is_active() -> None:
     rule = css[css.index("html.csrn-production-theme-neon-active #statBar"):].split("}")[0]
     assert "display:none!important" in rule
     assert "neon-active" not in css.split("html.csrn-production-layout-hide-player")[1]  # not applied to anything else
+
+
+# --- blacklight turf (owner redirect after checkpoint 3) -------------------------------------------------------
+
+
+def _css_code() -> str:
+    return re.sub(r"/\*.*?\*/", "", read(NEON_CSS), flags=re.S)
+
+
+def test_turf_is_near_black_not_daylight_grass() -> None:
+    """Live review: mowed daylight grass with plain white lines clashed with the neon package. Every turf
+    surface must be near-black (channel values low), with only a faint mow pattern."""
+    css = _css_code()
+    turf_rules = (
+        ".package-collegiate-neon .bl-college-field-grid {",
+        ".package-collegiate-neon .bl-college-diamond-grid {",
+    )
+    for selector in turf_rules:
+        body = _rule(css, selector)
+        for r, g, b, a in re.findall(r"rgba\((\d+),\s*(\d+),\s*(\d+),\s*(\.?\d+)\)", body):
+            if float(a) >= 0.98:               # the solid base colours
+                assert int(r) <= 12 and int(g) <= 40 and int(b) <= 30, (selector, r, g, b)
+            elif int(g) > 100:                 # the mint mow stripes: faint only
+                assert float(a) <= 0.16, (selector, a)
+    for fill in re.findall(r"bl-cd-(?:grass|dirt|infield|mound) \{\s*fill: rgba\((\d+), (\d+), (\d+)", css):
+        assert max(int(c) for c in fill) <= 30, fill
+
+
+def test_every_field_line_has_a_bright_core_and_a_soft_bloom() -> None:
+    """The same technique as the panel borders and the Down / Count pills: a thin bright core (var(--turf-core))
+    with stacked drop-shadows in the bloom colour, never flat white."""
+    css = _css_code()
+    linework = (
+        ".package-collegiate-neon .bl-college-field-grid::before {",   # field bar: sideline bands
+        ".package-collegiate-neon .bl-college-field-grid::after {",    # field bar: yard lines
+        ".package-collegiate-neon .bl-college-five-yard-lines {",
+        ".package-collegiate-neon .bl-college-hashmarks {",
+        ".package-collegiate-neon .bl-college-diamond-art .bl-cd-infield {",
+        ".package-collegiate-neon .bl-college-diamond-art .bl-cd-foul {",
+        ".package-collegiate-neon .bl-college-diamond-art .bl-cd-mound {",
+        ".package-collegiate-neon .bl-college-diamond-art .bl-cd-dirt {",
+    )
+    for selector in linework:
+        body = _rule(css, selector)
+        assert "filter: drop-shadow(" in body and "var(--turf-bloom)" in body, selector
+    for selector in linework[:2] + linework[3:6]:
+        assert "var(--turf-core)" in _rule(css, selector), selector      # the bright core
+    numbers = _rule(css, ".package-collegiate-neon .bl-college-yard-numbers {")
+    assert numbers.count("var(--turf-bloom)") >= 2 and "var(--turf-core)" in numbers  # glowing text, layered
+
+
+def test_no_field_line_is_flat_white_any_more() -> None:
+    css = _css_code()
+    raw = read(NEON_CSS)
+    field = re.sub(r"/\*.*?\*/", "", raw[raw.index("/* -- football field bar */"):raw.index("/* -- clash screen")], flags=re.S)
+    assert "rgba(255, 255, 255" not in field and "#fff" not in field.replace("color-mix(in srgb, var(--vn) 85%, #fff)", "")
+    root = _rule(css, ".package-collegiate-neon {")
+    assert "--turf-core:" in root and "--turf-bloom:" in root
+
+
+def test_the_clash_screen_is_the_real_field_photo_under_a_blacklight_grade() -> None:
+    """Owner: "look like real fields ... a picture of a real field with blacklight effects" (a drawn plane read as a
+    radar image). The stage keeps Collegiate's three photographs, grades them into deep blue, and lights the photo's own
+    lines: ::before crisp and contrast-isolated, ::after the same copy blurred, both screen-blended in mint."""
+    css = _css_code()
+    urls = re.findall(r"url\(\"([^\"]+)\"\)", css)
+    assert sorted(urls) == [
+        "/static/friday-night-stadium/clash/baseball-ballpark-background.png",
+        "/static/friday-night-stadium/clash/football-field-background.png",
+        "/static/friday-night-stadium/clash/softball-ballpark-background.png",
+    ]
+    for path in urls:
+        assert (ROOT / path.lstrip("/")).is_file(), path
+    stage = _rule(css, ".package-collegiate-neon .bl-college-stage-field {")
+    assert "background-blend-mode: normal, normal, normal, normal, multiply" in stage and "isolation: isolate" in stage
+    wash = _rule(
+        css,
+        ".package-collegiate-neon .bl-college-stage-field,\n"
+        '.package-collegiate-neon .bl-college-stage-field[data-sport="baseball"],\n'
+        '.package-collegiate-neon .bl-college-stage-field[data-sport="softball"] {',
+    )
+    assert "var(--vn)" in wash and "var(--hn)" in wash and "var(--neon-photo)" in wash   # team tint survives
+    core = _rule(css, ".package-collegiate-neon .bl-college-stage-field::before {")
+    bloom = _rule(css, ".package-collegiate-neon .bl-college-stage-field::after {")
+    assert "contrast(" in core and "blur(" not in core
+    assert "contrast(" in bloom and "blur(" in bloom
+    shared = _rule(
+        css,
+        ".package-collegiate-neon .bl-college-stage-field::before,\n"
+        ".package-collegiate-neon .bl-college-stage-field::after {",
+    )
+    assert "mix-blend-mode: screen" in shared and "var(--turf-bloom)" in shared
+    # the softball sky is bright enough to pass the isolation, so its glow layers are masked to the ground
+    assert "mask-image: linear-gradient(180deg, transparent" in css
+
+
+def test_the_field_bar_keeps_its_readable_structure_and_the_redesigned_ball_marker() -> None:
+    css = _css_code()
+    grid = _rule(css, ".package-collegiate-neon .bl-college-field-grid {")
+    assert "repeating-linear-gradient(90deg, rgba(0, 255, 160" in grid
+    ball = _rule(css, ".package-collegiate-neon .bl-college-ball-marker {")
+    assert "border-radius: 0 100% 0 100%" in ball and "rotate(-45deg)" in ball and "var(--poss)" in ball
+    assert ".bl-college-ball-marker > * { transform: rotate(45deg); }" in css
+    engine = read(ENGINE)
+    for hook in ("bl-college-yard-numbers", "bl-college-five-yard-lines", "bl-college-hashmarks", "bl-college-endzone"):
+        assert hook in engine  # the DOM the linework rules style is Collegiate's
