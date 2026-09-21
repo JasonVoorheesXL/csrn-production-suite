@@ -24,7 +24,8 @@ player-uniform recolour pipeline stays out of scope.
   animation** (a pulsing glow was ruled out as distracting on air).
 - **Football Down & Distance:** a small rounded neon **pill**, same cell footprint as
   today's bar; the same pill shape for baseball/softball's Count (checkpoint 3).
-- **Basketball:** palette + glow only, no callout (Collegiate's basketball strip has
+- **Basketball:** *(superseded by `docs/BASKETBALL_PANEL_PARITY.md`: basketball is now a full Collegiate Tech board, so Neon
+  gives it the same panels, rails, court-photo clash screen and a LAST BASKET pill.)* Originally: palette + glow only, no callout (Collegiate's basketball strip has
   no readout bar).
 - Old Neon code/tests are **archived**, not deleted.
 
@@ -114,7 +115,7 @@ swaps to the home colour in the bottom half. **Count** is the callout: the same 
 football's Down & Distance, the second cell of the Batting / Count / Outs bar. Collegiate's 320px
 diamond column truncated "2–1" inside a pill, so Neon widens it to 430px.
 
-**Basketball** is Collegiate's older compact strip (no readout bar, no video board), so by decision
+**Basketball** *(superseded, see `docs/BASKETBALL_PANEL_PARITY.md`)* was Collegiate's older compact strip (no readout bar, no video board), so by decision
 it gets palette + glow only, no callout: dark glass, the gradient ring and team halo, each side
 in its own neon, glowing digits and clocks. That strip puts **home on the left** (football's
 board has the visitor there), so its ring and halo run home → visitor.
@@ -189,7 +190,8 @@ were redefined for the sport under test in the console (the tool itself is uncha
 ## Known limits
 
 - Neon inherits Collegiate's limits: no isolated ticker component (so no ticker placement), and
-  basketball has no themed video board or readout bar.
+  basketball has no themed video board or readout bar. *(No longer true: see `docs/BASKETBALL_PANEL_PARITY.md`, which also
+  records the basketball Layout Builder matrices under Neon.)*
 - The softball photo is a bright sunset, so its glow layers are masked to the ground and the
   sky reads hot pink/orange under the blacklight grade. Grade values are a few lines in
   `static/csrn-collegiate-neon.css` if the owner wants it darker.

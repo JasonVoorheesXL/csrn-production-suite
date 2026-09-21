@@ -43,6 +43,25 @@ same `mergeRuntimeState()` fields every sport uses):
 | `possession` | `"home"` / `"visitor"` — Phase C explicitly keeps `possession` meaningful for basketball (`hasPossession = family === "football" || family === "basketball"`). The engine's own `possession_arrow` (alternating-possession) is a *different*, engine-internal field with no wire-contract equivalent yet (see Sec.3, out of contract). |
 | `home_score` / `visitor_score` | Reuses football's existing top-level score fields — no new basketball-specific score field. |
 
+> **Update (basketball panel parity, `docs/BASKETBALL_PANEL_PARITY.md`).** The flat fields above were never actually
+> published on `/api/runtime-state` (only the engine's own `state["hoops"]` block is: `home_team_fouls`,
+> `home_bonus`, `home_timeouts` …), so they read blank live. `productionBasketballState()` now falls back to
+> `state["hoops"]` for fouls / bonus / timeouts; a flat field still wins when present. `shot_clock` is never
+> read by Collegiate (no shot clock, ever).
+>
+> **New public feed `GET /api/hoops/panel-state`** (`hoops_overlay_panel.py`), consumed by Collegiate Tech's
+> basketball board; roster-resolved and derived from the rebuilt event ledger:
+>
+> | Field | Shape |
+> | --- | --- |
+> | `leaders.home` / `.visitor` | `{name, number, pts, reb, ast, line}` for the team's top scorer, or `null` |
+> | `team_stats.home` / `.visitor` | `{fg: "made/att", fg3: "made", reb}` — blank strings until a play is attributed |
+> | `last_basket` | `{team, points, name, number}` of the most recent made shot / free throw, or `null` |
+> | `on_floor.home` / `.visitor` | `[{number, name}, …]` from the lineup (blank fields for ids not on the roster) |
+>
+> This delivers the "leading scorer + line" and (partly) the `fg_pct` / `last_basket_text` items listed below; the
+> others remain out of contract.
+
 ## 2. What the renderer does NOT yet read (explicitly out of contract)
 
 Per the scoping doc's own Sec.7 gap list — these are real future rail-panel

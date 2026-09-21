@@ -84,8 +84,12 @@ def test_the_uniform_recolour_pipeline_stays_retired() -> None:
     # the only clash-folder files Neon may name are the three plain field photographs (the stage background), never
     # the keyed player layers; the softball sky mask is the one place a mask is allowed
     named = re.findall(r"clash/([\w.-]+)", code)
-    assert sorted(named) == ["baseball-ballpark-background.png", "football-field-background.png", "softball-ballpark-background.png"]
-    assert "layers-v10" not in neon_css and code.count("mask-image") == 2
+    assert sorted(named) == [
+        "baseball-ballpark-background.png", "basketball-court-background.png",
+        "football-field-background.png", "softball-ballpark-background.png",
+    ]
+    # the only masks: the softball sky and the basketball floor (each written -webkit- and standard)
+    assert "layers-v10" not in neon_css and code.count("mask-image") == 4
     assert "football-athletes" not in neon_css and "athletes-keyed" not in neon_css
 
 
@@ -430,18 +434,36 @@ def test_the_count_pill_has_room_in_the_diamond_column() -> None:
     assert ".package-collegiate-neon .bl-college-baseball-bank { grid-template-columns: minmax(0, 1fr) 430px; }" in css
 
 
-def test_basketball_gets_palette_and_glow_only_no_callout() -> None:
+def test_basketball_is_a_full_board_so_the_compact_strip_skin_is_gone() -> None:
+    """Basketball panel parity (docs/BASKETBALL_PANEL_PARITY.md): basketball renders the same Collegiate Tech board as
+    football and baseball, so Neon needs no basketball-specific shell / panel / rail / ring rule. The old palette+glow
+    block for the compact strip (`:not(.bl-collegiate-tech)`) is retired; what remains is the court photo and the
+    foul & timeout board."""
     css = read(NEON_CSS)
-    block = css[css.index("/* ---- basketball"):]
-    assert ":not(.bl-collegiate-tech)" in block  # only Collegiate's compact strip
-    assert "999px" not in block and "nth-child" not in block  # no pill / callout (owner decision)
-    # this strip has HOME on the left, so its ring and halo run home -> visitor
-    ring = block.split(".bl-collegiate:not(.bl-collegiate-tech)::after {")[1].split("}")[0]
-    assert "linear-gradient(90deg, var(--hn), var(--mn) 50%, var(--vn))" in ring
-    assert "-12px 0 40px -8px var(--hn), 12px 0 40px -8px var(--vn)" in block
-    engine = read(ENGINE)
-    strip = engine.split('return `<div class="bl-scorebug bl-collegiate bl-sport-${sport}">')[1].split("</div>`;")[0]
-    assert strip.index("explicitTeam(state.home") < strip.index("explicitTeam(state.visitor")  # home first
+    assert ":not(.bl-collegiate-tech)" not in css
+    block = css[css.index("/* ---- basketball (docs/BASKETBALL_PANEL_PARITY.md)"):]
+    assert ".bl-college-court" in block and ".bl-court-row" in block
+    # the LAST BASKET pill is the callout, in the neon of the team that scored (not the possession team)
+    pill = _rule(block, ".package-collegiate-neon .bl-college-court-meta span:nth-child(2) {")
+    assert "999px" in pill and "var(--callout)" in pill
+    assert 'data-last-team="visitor"] { --callout: var(--vn); }' in block
+    assert 'data-last-team="home"] { --callout: var(--hn); }' in block
+
+
+def test_the_basketball_court_photo_is_lit_by_inverting_it_first() -> None:
+    """The court's lines are BLACK on light wood, so the line-light layers invert the photo (a white `difference`
+    blend), grayscale it, then isolate it exactly as the fields do; the bloom is tinted afterwards. The glow is masked
+    to the floor, and to the middle of it (the far corner boxes are dark maroon and would light up as blocks)."""
+    css = _css_code()
+    layers = _rule(css, '.package-collegiate-neon .bl-college-stage-field[data-sport="basketball"]::before,\n'
+                        '.package-collegiate-neon .bl-college-stage-field[data-sport="basketball"]::after {')
+    assert "background-color: #fff;" in layers and "background-blend-mode: difference;" in layers
+    assert "mask-composite: intersect;" in layers
+    assert "grayscale(1)" in _rule(css, '.package-collegiate-neon .bl-college-stage-field[data-sport="basketball"]::before {')
+    bloom = _rule(css, '.package-collegiate-neon .bl-college-stage-field[data-sport="basketball"]::after {')
+    assert "blur(" in bloom and "hue-rotate(" in bloom
+    # a deep-violet floor, not the shared grade's red
+    assert 'data-sport="basketball"] { background-color: rgba(58, 52, 255, 1); }' in css
 
 
 # --- what full-resolution captures caught ------------------------------------------------------------------------
@@ -540,6 +562,7 @@ def test_the_clash_screen_is_the_real_field_photo_under_a_blacklight_grade() -> 
     urls = re.findall(r"url\(\"([^\"]+)\"\)", css)
     assert sorted(urls) == [
         "/static/friday-night-stadium/clash/baseball-ballpark-background.png",
+        "/static/friday-night-stadium/clash/basketball-court-background.png",
         "/static/friday-night-stadium/clash/football-field-background.png",
         "/static/friday-night-stadium/clash/softball-ballpark-background.png",
     ]

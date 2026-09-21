@@ -44,4 +44,7 @@ def test_basketball_patcher_targets_each_theme_clock() -> None:
     assert ".bl-8bit-basketball-control-bank .bl-8bit-clock-led" in body
     assert ".bl-fns-basketball-clock" in body
     assert 'labeledCell(root, "CLOCK")' in body
-    assert '[data-bind="game.clock"]' in body and '[data-bind="game.shotClock"]' in body
+    assert '[data-bind="game.clock"]' in body
+    # Collegiate no longer patches (or renders) a shot clock: product decision 2026-09-14, see
+    # docs/BASKETBALL_PANEL_PARITY.md. The other themes' clock patchers are unchanged.
+    assert '[data-bind="game.shotClock"]' not in body
