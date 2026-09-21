@@ -133,13 +133,15 @@ applies.
   Gameday (the themes with an isolated ticker component); Heritage / Collegiate
   keep their built-in ticker position (verified clean no-op). Ticker
   *visibility* works everywhere.
-- **Neon** (`digital_neon`) is hidden from selection and fails to bind even on
-  trunk; it also never stamps `data-component`, so score_box overrides no-op.
+- ~~**Neon** (`digital_neon`) is hidden from selection, fails to bind, and never stamps
+  `data-component`.~~ **Closed by the Neon redesign** (`docs/NEON_REDESIGN.md`): Neon now
+  renders through the shared engine, so `applyRect()` stamps it, and it is selectable
+  again. The in-game matrix and score_box placement matrix pass on all four sports.
 - ~~An unparseable `identity_profile.json` silently falls back to the Caledonia
   seed.~~ **Closed in P2 (Part B, below):** still survivable, no longer silent.
 - ~~The builder shows no live preview.~~ **Closed in P2 (Part A, below):** the
   builder previews the real overlay with your unsaved edits.
-- **Still open:** Neon (above). Freeform drag-and-drop placement (the real P2 of
+- **Still open:** Freeform drag-and-drop placement (the real P2 of
   the original plan) and a compact corner scorebug are untouched.
 - **Preview limits (P2):** it previews the *loaded game's* sport, so an edit under
   another sport's scope is not visible until such a game is loaded (the page says

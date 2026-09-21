@@ -4,8 +4,7 @@
  * this is the repeatable form of the checks that were done by hand.
  *
  * Setup: an isolated instance with production_template_state package_id
- * "digital_neon" (Neon is still gated by DISABLED_PACKAGE_IDS until its final
- * re-enable step, so an isolated runner must allow it), /overlay at 1920x1080.
+ * "digital_neon" (selectable in the picker since the Neon redesign), /overlay at 1920x1080.
  *
  *   __nx = {home:['#4B2E83','#FFFFFF'], visitor:['#00693E','#FFFFFF'],
  *           possession:'home', down:'4th', distance:'Goal', video:true}

@@ -1,9 +1,8 @@
 # Neon redesign — a team-tinted neon skin over Collegiate Tech
 
 **Round:** `neon-redesign-20260920`, worktree `CSRN-Prod-neon`, off `main` (`5c60393`).
-**Status:** checkpoints 2 (football) and 3 (baseball, softball, basketball, and the neon
-field art) built and live-verified. Not yet done: checkpoint 4 (final pass and
-**re-enable in the pickers**). Neon is still hidden from the pickers.
+**Status:** all four checkpoints built and live-verified. Neon is **re-enabled** in every
+picker (checkpoint 4). Not merged, not pushed: awaiting the owner's sign-off.
 
 ## Why a redesign, not a fix
 
@@ -156,8 +155,43 @@ Captures use two rig-only adjustments that do not affect the product: rail cards
 their first card (headless virtual time freezes Collegiate's 24s CSS crossfade at its midpoint), and
 a backdrop page supplies a dark arena or a bright "camera feed" behind the transparent overlay.
 
-## Not yet done
+## Checkpoint 4: the final pass
 
-- Checkpoint 4: theme catalog entry / Theme Manager preview for `digital_neon`, final
-  `data-component` audit on all four sports, **re-enable** (`DISABLED_PACKAGE_IDS` and
-  both JS `DISABLED` sets), final shared-engine hash re-pin, suite, docs.
+**Re-enabled.** `DISABLED_PACKAGE_IDS` (production_template_service.py) and the `DISABLED` sets in
+`static/csrn-pregame-theme-selector.js` and `static/csrn-production-template-menu.js` are now empty,
+and `templates/index.html`'s Production Theme select gained `<option value="digital_neon">Neon</option>`
+(the hide had removed it from the markup, not just from the script). The hide mechanism is kept, so any
+package can be hidden again by adding its id to the three lists. A Neon selection round-trips through
+the authoritative template-state file. Flipped tests: `test_theme_picker_neon_disabled.py` became
+`test_theme_picker_neon_enabled.py`; gate165's "disabled cannot be selected" test now proves Neon
+persists and that the hide mechanism still works for any other id.
+
+**Theme Manager.** The `digital_neon` preset in `theme_service.py` is now named "Neon" with a new
+description and Collegiate-family tokens, and its scorebug preview layout is `collegiate` (in the
+preset and in `static/csrn-scorebug-engine.js`'s `PRESET_LAYOUTS`), not the retired angular-wings
+`neon` renderer. That renderer stays defined (the layout-coverage tests need it) but no preset uses it.
+
+**Layout Builder, verified live on all four sports** (headless-free real browser against the scratch
+server, real polling; `tools/layout_builder_smoke.js`): `data-component="scorebug"` is stamped on the
+bonded board in every sport (through `applyRect()`; the other components are stamped as they appear).
+The in-game override matrix (hide sponsor / spotlight / video, fall-through, no legacy leak) passes 13/13
+on football, baseball and softball, and the score_box placement matrix 11/11 on all three; the ticker matrix
+is a clean no-op (Neon, like Collegiate, has no isolated ticker component). **Basketball** is Collegiate's
+compact strip (1140x150, no themed video board), so there is no board for the mode matrix to
+measure; placement passes 9/11 and the two "failures" are the football-sized expectation that a
+top-left / bottom-center zone must refuse a fit scale under 0.5: the small strip legitimately fits those zones
+(scale 0.67 and 1.0), so it is placed inside the zone, which is the correct behaviour. The smoke file's
+`__hide` / `__place` helpers hardcode `football` in the layouts document; for the other sports they
+were redefined for the sport under test in the console (the tool itself is unchanged).
+
+**Shared-engine hash pins** were not touched: checkpoint 4 changed no engine JS.
+
+## Known limits
+
+- Neon inherits Collegiate's limits: no isolated ticker component (so no ticker placement), and
+  basketball has no themed video board or readout bar.
+- The softball photo is a bright sunset, so its glow layers are masked to the ground and the
+  sky reads hot pink/orange under the blacklight grade. Grade values are a few lines in
+  `static/csrn-collegiate-neon.css` if the owner wants it darker.
+- The in-game diamond and the football field bar are drawn graphics (near-black turf with glowing
+  linework), not photographs.

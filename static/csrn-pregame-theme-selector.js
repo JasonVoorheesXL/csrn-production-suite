@@ -18,10 +18,9 @@
     collegiate_traditional: "Collegiate Tech"
   });
 
-  // Temporarily hidden from selection -- Neon code is kept, it comes back.
-  // TO RE-ENABLE NEON: remove "digital_neon" here (and from
-  // DISABLED_PACKAGE_IDS in production_template_service.py). Nothing else.
-  const DISABLED = new Set(["digital_neon"]);
+  // Package ids hidden from selection (mirrors DISABLED_PACKAGE_IDS in
+  // production_template_service.py). Empty since the Neon redesign re-enabled Neon.
+  const DISABLED = new Set([]);
 
   const APPROVED = new Set(
     Object.keys(LABELS).filter(id => !DISABLED.has(id))

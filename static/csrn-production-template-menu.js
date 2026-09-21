@@ -15,10 +15,9 @@ const OPTIONS = Object.freeze([
   Object.freeze({id:"collegiate_traditional", label:"Collegiate"})
 ]);
 
-// Temporarily hidden from selection (Neon code kept; it comes back).
-// TO RE-ENABLE NEON: remove "digital_neon" here + in
-// production_template_service.py's DISABLED_PACKAGE_IDS.
-const DISABLED = Object.freeze(new Set(["digital_neon"]));
+// Package ids hidden from selection (mirrors production_template_service.py's
+// DISABLED_PACKAGE_IDS). Empty since the Neon redesign re-enabled Neon.
+const DISABLED = Object.freeze(new Set([]));
 const SELECTABLE_OPTIONS = Object.freeze(OPTIONS.filter(option => !DISABLED.has(option.id)));
 
 function valid(value) {

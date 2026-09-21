@@ -8,7 +8,7 @@
     minimal_radio: "minimal",
     heritage_press_box: "press",
     friday_night_stadium: "stadium",
-    digital_neon: "neon",
+    digital_neon: "collegiate",
     collegiate_traditional: "collegiate"
   });
   const RUNTIME_IDS = Object.freeze(["homeLogo","visitorLogo","homeName","visitorName","homeMascot","visitorMascot","homeRecord","visitorRecord","homeScore","visitorScore","quarter","clock","down","homePos","visitorPos"]);

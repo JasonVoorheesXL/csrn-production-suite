@@ -33,20 +33,28 @@ def test_gate165_invalid_package_rejected(tmp_path, monkeypatch):
     assert not path.exists()
 
 
-def test_disabled_package_cannot_be_selected_and_reads_back_as_default(tmp_path, monkeypatch):
-    # digital_neon is temporarily hidden: still "approved" (a known id) but
-    # not "selectable". write rejects it; a stale state file naming it reads
-    # back as the default rather than persisting a hidden selection.
-    assert "digital_neon" in service.DISABLED_PACKAGE_IDS
+def test_neon_is_selectable_and_persists(tmp_path, monkeypatch):
+    # The Neon redesign (docs/NEON_REDESIGN.md) re-enabled Neon: it is approved AND selectable, and a
+    # selection round-trips through the state file. The disable mechanism stays (an empty set).
     assert "digital_neon" in service.APPROVED_PACKAGE_IDS
-    assert "digital_neon" not in service.SELECTABLE_PACKAGE_IDS
+    assert "digital_neon" in service.SELECTABLE_PACKAGE_IDS
+    assert "digital_neon" not in service.DISABLED_PACKAGE_IDS
 
     path = tmp_path / "state.json"
     monkeypatch.setenv("CSRN_PRODUCTION_TEMPLATE_STATE_PATH", str(path))
-    with pytest.raises(ValueError, match="invalid_production_template"):
-        service.write_production_template_state("digital_neon")
+    service.write_production_template_state("digital_neon")
+    assert service.read_production_template_state()["package_id"] == "digital_neon"
 
-    path.write_text(json.dumps({"schema": service.SCHEMA, "package_id": "digital_neon"}), encoding="utf-8")
+
+def test_a_hidden_package_cannot_be_selected_and_reads_back_as_default(tmp_path, monkeypatch):
+    # The hide mechanism still works for any id placed in DISABLED_PACKAGE_IDS.
+    monkeypatch.setattr(service, "DISABLED_PACKAGE_IDS", frozenset({"heritage_press"}))
+    monkeypatch.setattr(service, "SELECTABLE_PACKAGE_IDS", service.APPROVED_PACKAGE_IDS - {"heritage_press"})
+    path = tmp_path / "state.json"
+    monkeypatch.setenv("CSRN_PRODUCTION_TEMPLATE_STATE_PATH", str(path))
+    with pytest.raises(ValueError, match="invalid_production_template"):
+        service.write_production_template_state("heritage_press")
+    path.write_text(json.dumps({"schema": service.SCHEMA, "package_id": "heritage_press"}), encoding="utf-8")
     assert service.read_production_template_state()["package_id"] == service.DEFAULT_PACKAGE_ID
 
 

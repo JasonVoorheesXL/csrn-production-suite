@@ -139,8 +139,11 @@ def test_component_theme_engine_is_shared_by_preview_and_live() -> None:
 
 def test_theme_manifests_select_distinct_scorebug_renderers() -> None:
     source = (ROOT / "theme_service.py").read_text(encoding="utf-8")
-    for layout in ("classic","pixel","modern","minimal","press","stadium","neon","collegiate"):
+    # "neon" is no longer a preset layout: since the Neon redesign the Neon preset previews with the Collegiate
+    # renderer (see tests/test_theme_picker_neon_enabled.py). The angular-wings renderer stays defined (gate 6 above).
+    for layout in ("classic","pixel","modern","minimal","press","stadium","collegiate"):
         assert f'"scorebug": "{layout}"' in source
+    assert '"scorebug": "neon"' not in source
     assert "def _preset_layout_css(" not in source
 
 

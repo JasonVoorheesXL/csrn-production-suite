@@ -24,13 +24,11 @@ APPROVED_PACKAGE_IDS = frozenset(
     }
 )
 
-# Temporarily hidden from the operator's theme picker. All Neon code
-# (engines, renderer, adapter entries) is intentionally left intact -- this
-# is a hide, not a removal, and it is coming back.
-#   TO RE-ENABLE NEON: delete "digital_neon" from this one set (and from the
-#   matching DISABLED set in static/csrn-pregame-theme-selector.js). Nothing
-#   else needs to change.
-DISABLED_PACKAGE_IDS = frozenset({"digital_neon"})
+# Package ids hidden from the operator's theme picker. Empty since the Neon
+# redesign (docs/NEON_REDESIGN.md) re-enabled Neon; the mechanism is kept so a
+# package can be hidden again by adding its id here and to the matching DISABLED
+# sets in static/csrn-pregame-theme-selector.js and static/csrn-production-template-menu.js.
+DISABLED_PACKAGE_IDS: frozenset[str] = frozenset()
 
 # What the picker may actually select / persist right now.
 SELECTABLE_PACKAGE_IDS = APPROVED_PACKAGE_IDS - DISABLED_PACKAGE_IDS
