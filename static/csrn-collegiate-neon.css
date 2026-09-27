@@ -273,7 +273,10 @@
 }
 .package-collegiate-neon .bl-college-field-meta span:nth-child(2) small { color: var(--poss); text-shadow: 0 0 8px var(--poss); }
 .package-collegiate-neon .bl-college-field-meta span:nth-child(2) b {
-  font-size: 25px;
+  /* Item 1 (viewer feedback, 2026-09-26): Collegiate's base readout-value size went 19px -> 26px so it
+     reads on a phone-scaled OBS feed; the callout pill must stay the largest cell in the bar, not fall
+     behind its own siblings, so it grows with it (25px -> 32px). */
+  font-size: 32px;
   color: #fff;
   text-shadow: 0 0 5px #fff, 0 0 14px var(--poss), 0 0 30px var(--poss);
 }

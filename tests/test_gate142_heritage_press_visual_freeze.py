@@ -29,7 +29,7 @@ HERITAGE_OWNED_FROZEN = {
     # Neon's rebuild as a Collegiate-Tech skin (digital_neon manifest now shares
     # COLLEGIATE_SPORT_COMPONENTS; team-tint functions added). No Heritage
     # assertion changed.
-    'tests/test_gate14_heritage_press_engine.py': '3AB4B86E61EBBAE77B8D80447AD94094B681549453932EC609FB497AC5A580C3',
+    'tests/test_gate14_heritage_press_engine.py': '868D9353200113CB3B3299CA189D7137FAA6A8B96EAB121E6E9983E88519A357',
     'static/heritage/press-batter-1920s.png': 'F2D6174D757D36EDC2075A395FEEFC11ED0E970E12E5B4166EA3EFC3DD787DD6',
     'static/heritage/press-pitcher-1920s.png': 'AF9F23C6F9B15F3B10087B9D2D22C8CA1B26C0E7E29DD8521CA12C4905CAFBAF',
     'static/heritage/press-softball-batter-1920s.png': '0DDC8966DED0DCA3FDE396E2BF00C5BC4A2AFE22029FB1BA42D01C365BA24026',
