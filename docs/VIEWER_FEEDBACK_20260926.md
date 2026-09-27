@@ -1,15 +1,15 @@
 # Viewer/operator feedback - Caledonia vs. East Webster (2026-09-26)
 
 Four items from viewer/operator feedback after the broadcast (`FB-2026-OPEN-W05-001`, Collegiate
-Traditional live). Same discipline as `docs/FOOTBALL_INCIDENT_20260918.md`: each item was
-investigated and, where possible, reproduced by execution before any fix landed - not diagnosed
-from source alone. Branch `viewer-feedback-20260926`, worktree `CSRN-Prod-viewerfb`, off `main`
-(`d240082`).
+Traditional live), plus one mid-round addition (item 5, a final-score social graphic). Same
+discipline as `docs/FOOTBALL_INCIDENT_20260918.md`: each item was investigated and, where
+possible, reproduced by execution before any fix landed - not diagnosed from source alone.
+Branch `viewer-feedback-20260926`, worktree `CSRN-Prod-viewerfb`, off `main` (`d240082`).
 
-**Status: all four items investigated, one commit each** (`a921a97`, `dc03824`, `328a7e2`,
-`07c5257`). Items 1, 3 and 4 shipped code fixes; item 2 found no defect (documented, not fixed).
-Full suite: 3198 passed, the two known environment-only `test_state_mirror_throttle` failures.
-**Not merged, not pushed** - for review.
+**Status: all five items done, one commit each** (`a921a97`, `dc03824`, `328a7e2`, `07c5257`,
+plus item 5's commit below). Items 1, 3, 4 and 5 shipped code; item 2 found no defect
+(documented, not fixed). Full suite: 3203 passed, the two known environment-only
+`test_state_mirror_throttle` failures. **Not merged, not pushed** - for review.
 
 **Known gap, not in this round's scope:** item 4's rules-engine change has no operator-facing
 control yet. The crew cannot actually trigger `kick_out_of_bounds` from the live control panel
@@ -220,4 +220,39 @@ explanation, not a certainty. If it's right, the crew's workaround **shortchange
 both times**: from a kick spot around the 40, the `25_yard_line` choice this round adds would typically
 land well inside midfield, better field position than the own-20 a touchback gives.
 
-*(in progress)*
+## Item 5 - final score social graphic (added mid-round)
+
+**"A final score graphic similar to the pregame social graphic we've built previously."**
+`social_media_preview_service.py`'s `generate()` already builds a themed 1080x1080 promo image
+(Playwright-rasterized, theme-tokens-driven, team logos/mascots over a stadium-art stage, a
+sponsor row) served at `GET /api/broadcasts/<id>/social-preview.png`. New sibling method
+`generate_final_score()`, same rendering system and served the same way at
+`GET /api/broadcasts/<id>/final-score-preview.png`, reusing every shared building block (theme
+tokens, sponsor selection, team logo/stage-side HTML, the field/court art) so the two graphics
+stay visually consistent - only the content below the team stage is different:
+
+- The center badge is the org logo (no "VS" - there's no game left to play).
+- A `FINAL` tag over a large score line, the winner's name and number picked out in the theme's
+  accent color with a soft glow; a tie marks neither side (no false winner).
+- Each team's final record underneath, when the broadcast has one
+  (`home_postgame_record`/`visitor_postgame_record`), formatted `W-L` (`W-L-T` only when there
+  really is a tie, so a placeholder `0-0-0` never renders as a fake 3-number record).
+- No kickoff time, no pregame storylines - both dropped, they don't apply after the game.
+- The score itself prefers the frozen `final_home_score`/`final_visitor_score` fields (written
+  once at completion) over the generic, possibly-stale `home_score`/`visitor_score`, falling back
+  to the live/archived state's score for a game that just ended and hasn't been archived yet -
+  the same fallback chain `generate()` already uses.
+
+Verified by execution, not just source reading: a real end-to-end Playwright render through the
+test fixture (`tests/test_social_media_preview_service.py`, 5 new tests, including one asserting
+the frozen final score wins over a deliberately-stale `home_score`/`visitor_score` pair in the
+same broadcast record) and, separately, a real HTTP round-trip through the actual running app and
+the new route (a broadcast seeded into `Data/Broadcasts/broadcasts.json`, `curl` against
+`/api/broadcasts/<id>/final-score-preview.png`), confirming the real static assets (org logo,
+stadium art) resolve correctly outside the test fixture's stub images too.
+
+Operator access: a new "Final Score Graphic" button next to the existing "Social Media Preview"
+one on each broadcast's card in Game Manager (`templates/index.html`), opening the same
+image-preview/download modal the existing graphic uses.
+
+Full suite: 3203 passed, the two known environment-only failures - unchanged.

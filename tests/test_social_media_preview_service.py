@@ -224,6 +224,87 @@ def test_score_line_hidden_for_planned_games(tmp_path: Path) -> None:
     assert "V 7" in html_live and "H 3" in html_live
 
 
+# -- final score graphic (viewer feedback, 2026-09-26: "a final score graphic similar to the
+# pregame social graphic we've built previously") ---------------------------------------------
+
+
+def test_final_record_text_formats_wins_losses_and_only_shows_ties_when_real(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    assert service._final_record_text({"wins": 6, "losses": 2, "ties": 0}) == "6-2"
+    assert service._final_record_text({"wins": 6, "losses": 2, "ties": 1}) == "6-2-1"
+    # the nested {"overall": {...}} shape broadcast_service.py actually stores
+    assert service._final_record_text({"overall": {"wins": 3, "losses": 4, "ties": 0}}) == "3-4"
+    assert service._final_record_text({"wins": 0, "losses": 0, "ties": 0}) == ""  # placeholder, not a real record
+    assert service._final_record_text(None) == ""
+    assert service._final_record_text("not a dict") == ""
+
+
+def test_final_score_banner_marks_the_winner_not_a_tie(tmp_path: Path) -> None:
+    service = make_service(tmp_path)
+    win = service._final_score_banner_html(visitor_name="Visitor", home_name="Home", visitor_score=24, home_score=17)
+    assert "FINAL" in win
+    assert 'final-team final-winner">Visitor' in win
+    assert 'final-score final-winner">24' in win
+    assert 'final-team final-winner">Home' not in win  # only the actual winner is marked
+    tie = service._final_score_banner_html(visitor_name="Visitor", home_name="Home", visitor_score=14, home_score=14)
+    assert "final-winner" not in tie  # a tie marks neither side
+
+
+def test_generate_final_score_broadcast_not_found(tmp_path: Path) -> None:
+    service = make_service(tmp_path, broadcasts=[])
+    result = service.generate_final_score("missing")
+    assert result.code == "BROADCAST_NOT_FOUND"
+
+
+def test_generate_final_score_renders_real_png_with_the_frozen_final_score_and_records(tmp_path: Path) -> None:
+    """Prefers final_home_score/final_visitor_score (frozen at completion) over whatever
+    home_score/visitor_score last was -- a completed broadcast can have a stale in-progress
+    score sitting in those generic fields."""
+    broadcasts = [{
+        "broadcast_id": "BC-1",
+        "home_team": "Home High", "visitor_team": "Visitor High",
+        "home_school_id": "home-high", "visitor_school_id": "visitor-high",
+        "home_identity": {"school_id": "home-high", "logo": "/school-logos/home-high/logo.png", "mascot": "Bears", "primary_color": "#0A2342"},
+        "visitor_identity": {"mascot": "Wolves"},
+        "status": "completed", "sport": "Football",
+        "home_score": 3, "visitor_score": 1,  # stale -- should be ignored in favor of final_*
+        "final_home_score": 24, "final_visitor_score": 17,
+        "home_postgame_record": {"wins": 6, "losses": 2, "ties": 0},
+        "visitor_postgame_record": {"wins": 5, "losses": 3, "ties": 0},
+    }]
+    service = make_service(tmp_path, broadcasts=broadcasts)
+    result = service.generate_final_score("BC-1")
+    assert result.ok, result.data
+    image_bytes = result.data["image"]
+    assert image_bytes[:8] == b"\x89PNG\r\n\x1a\n"
+    assert result.data["filename"] == "BC-1-final-score.png"
+    assert (tmp_path / "Cards" / result.data["filename"]).is_file()
+    assert result.data["filename"] != "BC-1-social-preview.png"  # a distinct file from the pregame graphic
+
+    document = service._render_final_score_document(
+        broadcast=broadcasts[0], state={}, theme=service._theme_tokens(), sponsors=[],
+    )
+    assert ">24<" in document and ">17<" in document
+    assert ">3<" not in document and ">1<" not in document  # the stale score never appears
+    assert "6-2" in document and "5-3" in document
+    assert "kickoff-line" not in document and "storylines" not in document  # pregame-only sections are gone
+
+
+def test_generate_final_score_falls_back_to_state_score_when_not_yet_archived(tmp_path: Path) -> None:
+    """A game that just ended may not have final_*_score written yet -- the live/archived
+    state's own home_score/visitor_score (the same fallback generate() already uses) covers it."""
+    broadcasts = [{
+        "broadcast_id": "BC-1", "home_team": "Home High", "visitor_team": "Visitor High",
+        "home_school_id": "home-high", "visitor_school_id": "visitor-high",
+        "home_identity": {}, "visitor_identity": {}, "status": "completed", "sport": "Football",
+    }]
+    service = make_service(tmp_path, broadcasts=broadcasts)
+    document = service._render_final_score_document(
+        broadcast=broadcasts[0], state={"home_score": 24, "visitor_score": 17}, theme=service._theme_tokens(), sponsors=[],
+    )
+    assert ">24<" in document and ">17<" in document
+
+
 if __name__ == "__main__":
     import tempfile
 
@@ -242,6 +323,11 @@ if __name__ == "__main__":
         test_background_resolves_per_sport,
         test_generate_renders_real_png_end_to_end_with_promo_layout,
         test_score_line_hidden_for_planned_games,
+        test_final_record_text_formats_wins_losses_and_only_shows_ties_when_real,
+        test_final_score_banner_marks_the_winner_not_a_tie,
+        test_generate_final_score_broadcast_not_found,
+        test_generate_final_score_renders_real_png_with_the_frozen_final_score_and_records,
+        test_generate_final_score_falls_back_to_state_score_when_not_yet_archived,
     ]
     for test in tests:
         with tempfile.TemporaryDirectory() as td:

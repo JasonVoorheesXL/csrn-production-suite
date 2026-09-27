@@ -168,4 +168,33 @@ def create_broadcast_blueprint(
         response.headers["Cache-Control"] = "no-store"
         return response
 
+    @routes.get("/api/broadcasts/<broadcast_id>/final-score-preview.png")
+    @dependencies.require_auth
+    def final_score_preview(broadcast_id: str):
+        result = dependencies.get_social_media_preview_service().generate_final_score(broadcast_id)
+
+        if result.code == "BROADCAST_NOT_FOUND":
+            return jsonify({"error": result.code}), 404
+
+        if result.code == "IMAGE_GENERATION_FAILED":
+            return jsonify(
+                {
+                    "error": result.code,
+                    "message": result.data.get(
+                        "message",
+                        "Unable to generate the final score graphic.",
+                    ),
+                }
+            ), 500
+
+        response = Response(
+            result.data["image"],
+            mimetype="image/png",
+        )
+        response.headers["Content-Disposition"] = (
+            f'inline; filename="{result.data["filename"]}"'
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
     return routes

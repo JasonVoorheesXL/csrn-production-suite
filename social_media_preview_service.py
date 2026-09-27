@@ -781,3 +781,302 @@ class SocialMediaPreviewService:
                 "storyline_count": len(storylines),
             },
         )
+
+    # -- final score graphic -----------------------------------------------
+
+    @staticmethod
+    def _final_record_text(record: Any) -> str:
+        """Formats a *_postgame_record value (either the flat {wins,losses,ties} shape
+        normalize_record()/_record_dict() use elsewhere, or that same dict nested one level
+        under "overall", the shape broadcast_service.py stores it in) as "W-L", or "W-L-T"
+        only when there actually is a tie -- ties are rare enough that always showing a
+        trailing "-0" would read as a typo rather than a real 3-number record."""
+        if not isinstance(record, Mapping):
+            return ""
+        overall = record.get("overall") if isinstance(record.get("overall"), Mapping) else record
+        try:
+            wins = max(0, int(overall.get("wins", 0) or 0))
+            losses = max(0, int(overall.get("losses", 0) or 0))
+            ties = max(0, int(overall.get("ties", 0) or 0))
+        except (TypeError, ValueError):
+            return ""
+        if wins == 0 and losses == 0 and ties == 0:
+            return ""
+        return f"{wins}-{losses}-{ties}" if ties else f"{wins}-{losses}"
+
+    def _final_score_banner_html(
+        self, *, visitor_name: str, home_name: str, visitor_score: int, home_score: int,
+    ) -> str:
+        # The winner's name gets the accent treatment; a tie leaves both sides equal
+        # weight rather than guessing a "winner". Order stays visitor-then-home,
+        # matching every other scoreboard in the product (the live overlay, the
+        # pregame graphic's own score-line).
+        visitor_win = visitor_score > home_score
+        home_win = home_score > visitor_score
+        return (
+            '<div class="final-banner">'
+            f'<span class="final-tag">FINAL</span>'
+            '<div class="final-score-row">'
+            f'<span class="final-team{" final-winner" if visitor_win else ""}">{self._text(visitor_name)}</span>'
+            f'<span class="final-score{" final-winner" if visitor_win else ""}">{self._text(visitor_score, "0")}</span>'
+            '<span class="final-score-dash">–</span>'
+            f'<span class="final-score{" final-winner" if home_win else ""}">{self._text(home_score, "0")}</span>'
+            f'<span class="final-team{" final-winner" if home_win else ""}">{self._text(home_name)}</span>'
+            '</div></div>'
+        )
+
+    def _final_records_html(self, *, visitor_record: str, home_record: str) -> str:
+        if not visitor_record and not home_record:
+            return ""
+        return (
+            '<div class="final-records">'
+            f'<span>{self._text(visitor_record, "—")}</span>'
+            '<span class="final-records-sep">FINAL RECORD</span>'
+            f'<span>{self._text(home_record, "—")}</span>'
+            '</div>'
+        )
+
+    def _render_final_score_document(
+        self,
+        *,
+        broadcast: Mapping[str, Any],
+        state: Mapping[str, Any],
+        theme: Mapping[str, Any],
+        sponsors: list[dict[str, Any]],
+    ) -> str:
+        home_identity = broadcast.get("home_identity") if isinstance(broadcast.get("home_identity"), Mapping) else {}
+        visitor_identity = broadcast.get("visitor_identity") if isinstance(broadcast.get("visitor_identity"), Mapping) else {}
+
+        home_name = broadcast.get("home_team") or "Home"
+        visitor_name = broadcast.get("visitor_team") or "Visitor"
+        # Prefer the frozen final_*_score fields (written once at game completion) over the
+        # generic, possibly-still-live home_score/visitor_score -- this graphic's whole job is
+        # to be the correct, final number, not whatever the in-progress score last was.
+        home_score = broadcast.get("final_home_score")
+        if home_score is None:
+            home_score = state.get("home_score", broadcast.get("home_score", 0)) if state else broadcast.get("home_score", 0)
+        visitor_score = broadcast.get("final_visitor_score")
+        if visitor_score is None:
+            visitor_score = state.get("visitor_score", broadcast.get("visitor_score", 0)) if state else broadcast.get("visitor_score", 0)
+        try:
+            home_score = int(home_score or 0)
+            visitor_score = int(visitor_score or 0)
+        except (TypeError, ValueError):
+            home_score, visitor_score = 0, 0
+
+        organization = {}
+        try:
+            config = self._load_config() or {}
+            organization = dict(config.get("organization") or {})
+        except Exception:
+            pass
+        org_name = self._text(organization.get("short_name") or organization.get("name") or "CSRN")
+        org_logo_uri = self._org_logo_uri(organization)
+
+        home_side = self._stage_side_html(
+            name=home_name,
+            mascot=home_identity.get("mascot", ""),
+            logo_uri=self._team_logo_uri(home_identity, broadcast.get("home_school_id")),
+            align="home",
+        )
+        visitor_side = self._stage_side_html(
+            name=visitor_name,
+            mascot=visitor_identity.get("mascot", ""),
+            logo_uri=self._team_logo_uri(visitor_identity, broadcast.get("visitor_school_id")),
+            align="visitor",
+        )
+
+        visitor_primary = self._hex(visitor_identity.get("primary_color"), "#064624")
+        home_primary = self._hex(home_identity.get("primary_color"), "#0A2342")
+        background_uri = self._background_uri(broadcast.get("sport", "football"))
+        background_layer = (
+            f"linear-gradient(90deg, {visitor_primary}66, transparent 44% 56%, {home_primary}66),"
+            f"url('{background_uri}') center 58%/cover no-repeat"
+            if background_uri
+            else f"linear-gradient(90deg, {visitor_primary}, {home_primary})"
+        )
+
+        final_banner = self._final_score_banner_html(
+            visitor_name=visitor_name, home_name=home_name,
+            visitor_score=visitor_score, home_score=home_score,
+        )
+        final_records = self._final_records_html(
+            visitor_record=self._final_record_text(broadcast.get("visitor_postgame_record")),
+            home_record=self._final_record_text(broadcast.get("home_postgame_record")),
+        )
+
+        return f"""<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  :root {{
+    --primary: {theme['primary']};
+    --secondary: {theme['secondary']};
+    --accent: {theme['accent']};
+    --surface: {theme['surface']};
+    --surface-alt: {theme['surface_alt']};
+    --text: {theme['text']};
+    --muted: {theme['muted']};
+    --border: {theme['border']};
+    --radius: {theme['radius_px'] * 2}px;
+    --shadow: {theme['shadow']};
+    --font: {theme['font_stack']};
+  }}
+  * {{ box-sizing: border-box; }}
+  html, body {{ margin: 0; padding: 0; }}
+  body {{
+    width: {self.WIDTH}px; height: {self.HEIGHT}px; overflow: hidden;
+    font-family: var(--font); color: var(--text);
+    background: linear-gradient(155deg, var(--surface) 0%, var(--surface-alt) 100%);
+    display: flex; flex-direction: column; padding: 48px;
+  }}
+  /* .stage / .stage-side / .stage-logo / .sponsor* below are byte-identical to the pregame
+     graphic's own rules (_render_document) -- same look, same team-art system; only the
+     center badge and the content below the stage are final-score specific. */
+  .stage {{
+    position: relative; flex: 0 0 460px; display: grid;
+    grid-template-columns: minmax(0,1fr) 170px minmax(0,1fr); align-items: center;
+    border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+    box-shadow: var(--shadow); margin-bottom: 28px;
+  }}
+  .stage-field {{ position: absolute; inset: 0; background: {background_layer}; opacity: .78; filter: saturate(.85) brightness(.68); }}
+  .stage::after {{ content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,.14), transparent 25% 75%, rgba(0,0,0,.25)); pointer-events: none; }}
+  .stage-side {{
+    position: relative; z-index: 2; display: grid; justify-items: center; gap: 8px;
+    padding: 48px 20px 24px; text-align: center; text-transform: uppercase; color: #fff; text-shadow: 0 3px 10px rgba(0,0,0,.7);
+  }}
+  .stage-logo {{ width: 168px; height: 168px; border-radius: 18px; background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.3); display: grid; place-items: center; overflow: hidden; }}
+  .stage-logo img {{ width: 84%; height: 84%; object-fit: contain; }}
+  .stage-logo-fallback {{ font-size: 72px; font-weight: 950; color: #fff; }}
+  .stage-name {{ font-size: 40px; font-weight: 950; line-height: 1.05; max-width: 100%; white-space: nowrap; }}
+  .stage-mascot {{ font-size: 22px; font-weight: 800; letter-spacing: .1em; color: #e3edf9; }}
+  .stage-vs {{
+    position: relative; z-index: 3; justify-self: center; display: grid; place-items: center;
+    width: 140px; height: 140px; border-radius: 50%; border: 1px solid rgba(255,255,255,.45);
+    background: rgba(4,12,20,.6); box-shadow: 0 0 26px rgba(180,220,255,.25), inset 0 1px 0 rgba(255,255,255,.28);
+    font-size: 44px; font-weight: 950; color: #fff; overflow: hidden;
+  }}
+  .stage-vs img {{ width: 60%; height: 60%; object-fit: contain; }}
+  .final-banner {{ text-align: center; margin-bottom: 18px; }}
+  .final-tag {{
+    display: inline-block; padding: 6px 22px; border-radius: 999px; margin-bottom: 14px;
+    background: var(--primary); color: #fff; font-size: 22px; font-weight: 950; letter-spacing: .22em;
+    box-shadow: 0 8px 20px rgba(0,0,0,.35);
+  }}
+  .final-score-row {{ display: flex; align-items: baseline; justify-content: center; gap: 18px; }}
+  .final-team {{ font-size: 30px; font-weight: 800; letter-spacing: .04em; color: var(--muted); text-transform: uppercase; }}
+  .final-score {{ font-size: 92px; font-weight: 950; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }}
+  .final-score-dash {{ font-size: 48px; color: var(--muted); }}
+  .final-winner.final-team {{ color: var(--text); }}
+  .final-winner.final-score {{ color: var(--accent); text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 55%, transparent); }}
+  .final-records {{
+    display: flex; align-items: center; justify-content: center; gap: 18px; margin-bottom: 20px;
+    font-size: 24px; font-weight: 800; color: var(--muted);
+  }}
+  .final-records-sep {{ font-size: 15px; letter-spacing: .16em; text-transform: uppercase; color: var(--primary); }}
+  .flex-spacer {{ flex: 1 1 auto; min-height: 0; }}
+  .sponsors {{ flex: 0 0 auto; }}
+  .sponsors-title {{ text-align: center; font-size: 20px; color: var(--muted); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 12px; }}
+  .sponsors-grid {{ display: flex; flex-wrap: nowrap; gap: 16px; justify-content: center; align-items: stretch; }}
+  .sponsor-chip {{
+    position: relative; border-radius: 20px; padding: 14px 18px;
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    flex: 1 1 0; min-width: 150px; max-width: 280px; height: 190px;
+  }}
+  .sponsor-chip.chip-dark {{
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.22);
+    box-shadow: 0 10px 26px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.12);
+  }}
+  .sponsor-chip.chip-dark img {{ filter: drop-shadow(0 2px 6px rgba(0,0,0,.5)); }}
+  .sponsor-chip.chip-light {{
+    background: rgba(255,255,255,.85); border: 1px solid rgba(255,255,255,.7);
+    box-shadow: 0 10px 26px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.6);
+  }}
+  .sponsor-chip img {{ position: relative; z-index: 1; max-width: 100%; max-height: 100%; object-fit: contain; }}
+  .sponsor-chip-text {{
+    color: var(--text); font-weight: 700; font-size: 22px; text-align: center;
+  }}
+</style></head>
+<body>
+  <div class="stage">
+    <div class="stage-field"></div>
+    {visitor_side}
+    <div class="stage-vs">{f'<img src="{org_logo_uri}" alt="{org_name}">' if org_logo_uri else org_name}</div>
+    {home_side}
+  </div>
+  {final_banner}
+  {final_records}
+  <div class="flex-spacer"></div>
+  {self._sponsors_html(sponsors)}
+  <script>
+  (function() {{
+    var minFont = 22;
+    document.querySelectorAll('.stage-name').forEach(function(el) {{
+      var container = el.closest('.stage-side');
+      if (!container) return;
+      var maxWidth = container.clientWidth - 8;
+      var fontSize = parseFloat(window.getComputedStyle(el).fontSize);
+      while (el.scrollWidth > maxWidth && fontSize > minFont) {{
+        fontSize -= 2;
+        el.style.fontSize = fontSize + 'px';
+      }}
+      if (el.scrollWidth > maxWidth) {{
+        el.style.whiteSpace = 'normal';
+        el.style.fontSize = minFont + 'px';
+      }}
+    }});
+  }})();
+  </script>
+</body></html>"""
+
+    def generate_final_score(self, broadcast_id: str) -> SocialMediaPreviewResult:
+        """Same rendering system as generate() (Playwright, theme tokens, team art, sponsor
+        row) -- a dedicated card for after the game instead of before it: a prominent FINAL
+        score with the winner picked out, the postgame records if the broadcast has them, no
+        kickoff time or pregame storylines."""
+        broadcast = self._find_broadcast(broadcast_id)
+        if broadcast is None:
+            return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
+
+        state = self._resolve_game_state(broadcast)
+        theme = self._theme_tokens()
+        sponsors = self._select_sponsors()
+
+        document = self._render_final_score_document(
+            broadcast=broadcast,
+            state=state,
+            theme=theme,
+            sponsors=sponsors,
+        )
+
+        try:
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch(headless=True)
+                try:
+                    page = browser.new_page(viewport={"width": self.WIDTH, "height": self.HEIGHT})
+                    page.set_content(document, wait_until="load")
+                    image_bytes = page.screenshot(type="png")
+                finally:
+                    browser.close()
+        except Exception as exc:
+            return SocialMediaPreviewResult(
+                "IMAGE_GENERATION_FAILED",
+                {"message": str(exc)},
+            )
+
+        safe_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(broadcast_id)).strip("-") or "broadcast"
+        filename = f"{safe_id}-final-score.png"
+        try:
+            (self.output_dir / filename).write_bytes(image_bytes)
+        except OSError:
+            pass
+
+        return SocialMediaPreviewResult(
+            "OK",
+            {
+                "image": image_bytes,
+                "filename": filename,
+                "theme_id": theme.get("name", ""),
+                "sponsor_count": len(sponsors),
+            },
+        )
