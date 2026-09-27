@@ -111,7 +111,44 @@ Q1->Q2 boundary, so that class of bug does not apply here regardless. No code ch
 
 ## Item 3 - phantom scroll bar behind the overlay
 
-*(in progress)*
+**Located the only candidate surface-wide.** Grepped every `overflow:auto`/`overflow-y:auto`/`scroll`
+rule in every template and stylesheet the codebase can serve: everything outside
+`templates/pregame_universal_overlay.html` is an operator-facing control panel (Theme Manager, Layout
+Builder, roster/statistics modals, `index.html`) that OBS never captures. `templates/overlay.html` (the
+live game board) has none at all. The one hit on a broadcast-visible surface is `.content` in the
+pregame/halftime/delay overlay (`/pregame-overlay`) - and it is the exact same element a prior bug
+report already named (`tests/test_pregame_overlay_layout_fix.py`'s docstring: "a stray scrollbar behind
+the opaque `.topbar`"), which is presumably why this is described as recurring: the earlier fix (`min-
+height:0`, top-anchoring, `overflow-y:auto`) stopped a tall card from blowing the whole grid row past the
+1920x1080 canvas, but left `.content` with a real native scrollbar for whenever a card is taller than the
+panel - which is exactly what shows up as a bar sitting over the live broadcast.
+
+**Could not reproduce with last night's own archived content.** Seeded the real, four-item storylines
+list actually saved for `FB-2026-OPEN-W05-001` (`Data/Runtime/pregame_presentation.json`) and measured
+all four pregame cards live: the tallest (Storylines, 595px) came nowhere near `.content`'s available
+896px. So whatever a viewer saw last night, it was not this exact card with this exact data.
+
+**Reproduced the underlying mechanism by execution anyway.** Forced the storylines card to genuinely
+overflow `.content` (appended real DOM nodes live against the running instance, no mocking) and
+confirmed a real, visible native scrollbar renders in that state - `content.scrollHeight` (1976) >
+`content.clientHeight` (896), an actual scrollbar track reserving real layout width. Screenshots
+(1920x1080, headless Chrome, native scrollbars **not** suppressed by the capture flags) of that exact
+forced-overflow state:
+- **Before** (`overflow-y:auto` alone): a light scrollbar track visible the full height of the canvas
+  along the right edge, starting right at the top red border.
+- **After** (this fix): the same overflowing card, same clipped last line - no scrollbar anywhere.
+
+**Fix.** `.content` keeps `overflow-y:auto` (a too-tall card still clips instead of reintroducing the
+original grid-overflow bug), but its native scrollbar chrome is hidden: `scrollbar-width:none` (Firefox),
+`-ms-overflow-style:none` (old Edge), and a `.content::-webkit-scrollbar{display:none}` pseudo-element
+for the WebKit-family engines Chrome/Safari/OBS's own Chromium browser source actually use. Confirmed
+live post-fix: `getComputedStyle(content).scrollbarWidth === "none"` and
+`content.offsetWidth - content.clientWidth === 0` (zero width reserved for a scrollbar track) while
+`content.scrollHeight > content.clientHeight` stays `true` - the overflow is still really being clipped,
+nothing about the layout behaviour changed, only the visible bar is gone. Nobody can scroll a live
+broadcast on air, so removing the affordance costs nothing real.
+
+Commit: pending.
 
 ## Item 4 - kickoff out-of-bounds is not modeled by the rules engine
 

@@ -46,6 +46,26 @@ def test_content_panel_is_top_anchored_with_internal_scroll_and_no_grid_overflow
     assert "align-items:center" not in rule
 
 
+def test_content_panel_still_clips_overflow_but_hides_the_native_scrollbar() -> None:
+    """Viewer feedback (2026-09-26): a real scrollbar was visible on-air along the right edge of the
+    canvas whenever a card (e.g. many/long pregame storylines) grew taller than .content. Nobody can
+    scroll a live broadcast, so the native scrollbar affordance serves no purpose there and is a pure
+    visual defect. .content keeps overflow-y:auto (a too-tall card still clips instead of blowing the
+    grid row past the fixed 1920x1080 canvas -- the original bug this file covers), but the scrollbar's
+    own chrome is hidden: standard + Firefox + the old Edge properties, plus the WebKit pseudo-element
+    OBS's Chromium engine (and Chrome/Safari) actually render. Verified live: forcing a card to overflow
+    a real running instance showed the bar before this rule and no visible bar after it, with the
+    overflow still measurably clipped (scrollHeight > clientHeight) either way."""
+    rule = _content_rule()
+    assert "overflow-y:auto" in rule
+    assert "scrollbar-width:none" in rule
+    assert "-ms-overflow-style:none" in rule
+    html = _read("templates/pregame_universal_overlay.html")
+    webkit_start = html.index(".content::-webkit-scrollbar{")
+    webkit_rule = html[webkit_start: html.index("}", webkit_start) + 1]
+    assert "display:none" in webkit_rule
+
+
 def test_pregame_cards_share_halftimes_large_type_scale() -> None:
     html = _read("templates/pregame_universal_overlay.html")
     kicker_rule = html[html.index(".card-kicker{"): html.index("}", html.index(".card-kicker{")) + 1]
