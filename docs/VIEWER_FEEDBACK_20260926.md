@@ -6,6 +6,17 @@ investigated and, where possible, reproduced by execution before any fix landed 
 from source alone. Branch `viewer-feedback-20260926`, worktree `CSRN-Prod-viewerfb`, off `main`
 (`d240082`).
 
+**Status: all four items investigated, one commit each** (`a921a97`, `dc03824`, `328a7e2`,
+`07c5257`). Items 1, 3 and 4 shipped code fixes; item 2 found no defect (documented, not fixed).
+Full suite: 3198 passed, the two known environment-only `test_state_mirror_throttle` failures.
+**Not merged, not pushed** - for review.
+
+**Known gap, not in this round's scope:** item 4's rules-engine change has no operator-facing
+control yet. The crew cannot actually trigger `kick_out_of_bounds` from the live control panel
+today - `rules_service.py` accepts and correctly enforces it, but nothing in `templates/index.html`'s
+kickoff play-entry form submits it. A follow-up round is needed before this is usable on a real
+broadcast; flagging this now rather than leaving it undiscovered.
+
 ## Item 1 - on-air Down & Distance too small on a phone screen
 
 **Report's framing didn't hold up.** The report named `.bl-down` with "per-package font-size
