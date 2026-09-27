@@ -148,8 +148,65 @@ live post-fix: `getComputedStyle(content).scrollbarWidth === "none"` and
 nothing about the layout behaviour changed, only the visible bar is gone. Nobody can scroll a live
 broadcast on air, so removing the affordance costs nothing real.
 
-Commit: pending.
+Commit: `328a7e2`.
 
 ## Item 4 - kickoff out-of-bounds is not modeled by the rules engine
+
+**Confirmed from the archive.** All 10 kickoffs in `FB-2026-OPEN-W05-001` were recorded as either a
+return or a touchback; no play carries any out-of-bounds representation, matching the report.
+Confirmed in the code too: `rules_service.py`'s shared kickoff/punt handler has `touchback`,
+`fair_catch`, `blocked` and `muffed_punt`, and nothing else - there is no way to record a kickoff going
+out of bounds untouched. (A separate, unrelated `out_of_bounds` field already exists for ordinary
+run/pass plays - it just stops the clock; it isn't reachable from a kickoff and doesn't model the foul.)
+
+**Rule, confirmed against real rule text, not guessed.** NFHS's free-kick-out-of-bounds rule (a state
+association's NFHS/NCAA rules-differences summary, compiled by George Demetriou, an NFHS rules
+interpreter - the same kind of source-checked citation the 9/18 round used):
+
+> **Free Kick Out-of-Bounds.** NFHS: Place ball 25 yards from previous spot, **or** a 5-yard penalty and
+> re-kick, **or** a five-yard penalty from where the ball belongs to R.
+
+So a free kick (kickoff) that goes out of bounds between the goal lines untouched by the receiving team
+is a foul on the kicking team, and **the receiving team chooses** one of three remedies. This is a
+**free-kick-only** foul - it does not apply to punts (a scrimmage kick going out of bounds is ordinary,
+no foul, no choice), so the fix is scoped to `kind == "kickoff"` only.
+
+**Fix.** A new sibling branch in `rules_service.py`'s `play()` (`kind == "kickoff" and
+incoming["kick_out_of_bounds"]`), deliberately kept separate from the existing ~120-line kickoff/punt
+return branch rather than threaded into it, so the well-tested return/touchback/fair-catch/muffed-punt
+logic is untouched. Two new fields: `landing_spot` (reused - the out-of-bounds spot) and
+`out_of_bounds_choice` (`"25_yard_line"` | `"rekick"` | `"spot_plus_5"`), both required - missing either
+returns a named refusal (`OUT_OF_BOUNDS_SPOT_REQUIRED` / `OUT_OF_BOUNDS_CHOICE_REQUIRED`) rather than
+guessing, the same pattern the codebase already uses for other choice-requiring fouls (e.g. the
+second-half kickoff direction). All three enforcement spots are computed from the existing
+`spot_to_coord`/`coord_to_spot`/`team_direction` helpers (no new coordinate logic) and clamped to the
+field so a foul deep in a team's own territory can't walk the ball past a goal line. `rekick` is the one
+choice where possession never changes: it puts `special_game_phase` back to `"kickoff"` for the same
+kicking team rather than flipping possession to the receiver, reusing the existing kickoff-phase gate
+instead of adding a new one.
+
+Verified live (real `RulesService`, no mocks) from the same start/landing spot for all three choices:
+
+| choice | result |
+| --- | --- |
+| `25_yard_line` | kicked from `LEFT 40`, out at `LEFT 15` -> ball at `RIGHT 35`, R's possession, fresh 1st & 10 |
+| `rekick` | -> ball at `LEFT 35` (5 yards behind the kick spot), possession and `kicking_team` unchanged, `special_game_phase` back to `"kickoff"` |
+| `spot_plus_5` | -> ball at `LEFT 20` (5 yards past the out-of-bounds spot), R's possession |
+
+A punt with the same `kick_out_of_bounds` flag set is confirmed inert (falls through to the ordinary,
+unchanged punt-return branch) - the flag only ever fires for `kind == "kickoff"`.
+
+**The specific kickoff Jason wasn't sure about.** Two kickoffs in the archive, plays **#24** (Q1) and
+**#142** (Q4), both have `landing_spot == "LEFT 40"` - nowhere near either goal line, which a real
+touchback requires reaching or crossing - and both are recorded as touchbacks, both placing the ball at
+the receiving team's own 20. The same, goal-line-nowhere-near landing spot recorded on two separate
+kicks is best explained by the operator using "touchback" as the only outcome available that gives a
+clean placement, standing in for a kick that actually went out of bounds around the 40 - there was
+nothing else to record it with before this round. I can't confirm this with certainty (`live_state.
+recent_commands`, the only command-level log, is a 200-entry rolling ledger per item 2's finding, and
+both kicks are long past its retained window by archival time), so this is reported as the likely
+explanation, not a certainty. If it's right, the crew's workaround **shortchanged the receiving team
+both times**: from a kick spot around the 40, the `25_yard_line` choice this round adds would typically
+land well inside midfield, better field position than the own-20 a touchback gives.
 
 *(in progress)*

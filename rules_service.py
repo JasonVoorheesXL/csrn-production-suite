@@ -627,6 +627,75 @@ class RulesService:
                             if numbers["receiver"] or names["receiver"]
                             else f"{team_name} complete a pass for {yards} yards"
                         )
+            elif kind == "kickoff" and bool(incoming.get("kick_out_of_bounds")):
+                # A free kick that goes out of bounds between the goal lines
+                # untouched by the receiving team is a foul on the kicking
+                # team (NFHS "Free Kick Out-of-Bounds"; confirmed against the
+                # SDHSAA/Demetriou NFHS-NCAA rules-differences summary, docs/
+                # VIEWER_FEEDBACK_20260926.md item 4). This is a kickoff-only
+                # infraction -- a scrimmage-kick punt going out of bounds is
+                # ordinary and already handled by the return branch below --
+                # so it is deliberately its own sibling branch, not folded
+                # into the shared kickoff/punt return logic. R gets to choose
+                # the enforcement, same as the operator UI already asks for a
+                # receiving-team choice on the other special-enforcement fouls
+                # (e.g. second-half kickoff direction).
+                receiving = self.opposite(team)
+                landing_value = incoming.get("landing_spot")
+                if landing_value in (None, ""):
+                    return RulesResult(
+                        "OUT_OF_BOUNDS_SPOT_REQUIRED",
+                        {"message": "Enter the spot where the kickoff went out of bounds."},
+                    )
+                landing = self.spot_to_coord(landing_value, state)
+                oob_choice = str(incoming.get("out_of_bounds_choice", "") or "").lower()
+                if oob_choice not in {"25_yard_line", "rekick", "spot_plus_5"}:
+                    return RulesResult(
+                        "OUT_OF_BOUNDS_CHOICE_REQUIRED",
+                        {
+                            "message": "Select how the receiving team wants the kickoff out-of-bounds foul enforced.",
+                            "choices": ["25_yard_line", "rekick", "spot_plus_5"],
+                        },
+                    )
+                kick_distance = abs(landing - start)
+                return_yards = 0
+                muffed_punt = False
+                muff_recovered_by_kicking_team = False
+                if oob_choice == "rekick":
+                    # Team K re-kicks 5 yards behind the previous spot; the ball never changes hands.
+                    end = max(0, min(length, start - 5 * direction))
+                    state["possession"] = team
+                    state["kicking_team"] = team
+                    state["special_game_phase"] = "kickoff"
+                    state["ball_spot"] = self.coord_to_spot(end, state)
+                    label = "Kickoff Out of Bounds"
+                    description = (
+                        f"Kickoff by #{numbers['kicker'] or '?'} out of bounds at "
+                        f"{self.coord_to_spot(landing, state)} — {self._team_fallback(state, receiving)} "
+                        f"choose a re-kick, 5-yard penalty from {self.coord_to_spot(start, state)}"
+                    )
+                else:
+                    if oob_choice == "25_yard_line":
+                        end = max(0, min(length, start + 25 * direction))
+                        enforcement_note = f"{self._team_fallback(state, receiving)} take the ball 25 yards from the previous spot"
+                    else:  # spot_plus_5
+                        end = max(0, min(length, landing + 5 * direction))
+                        enforcement_note = (
+                            f"{self._team_fallback(state, receiving)} take the ball at "
+                            f"{self.coord_to_spot(landing, state)} plus a 5-yard penalty"
+                        )
+                    state["possession"] = receiving
+                    CanonicalStateFoundation.clear_special_phase(state)
+                    state["ball_spot"] = self.coord_to_spot(end, state)
+                    state["down"] = "1st"
+                    state["distance"] = "10"
+                    label = "Kickoff Out of Bounds"
+                    description = (
+                        f"Kickoff by #{numbers['kicker'] or '?'} out of bounds at "
+                        f"{self.coord_to_spot(landing, state)} — {enforcement_note}, "
+                        f"ball at {self.coord_to_spot(end, state)}"
+                    )
+                self._stop_clock(state)
             else:
                 receiving = self.opposite(team)
                 state["possession"] = receiving
