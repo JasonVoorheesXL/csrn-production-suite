@@ -1382,7 +1382,8 @@ class EventService:
 
         if event_code == "FG":
             kick_outcome = str(incoming.get("kick_outcome", "made") or "made").lower()
-            base = f"{yards}-yard field goal by {scorer_name or team_name}" if yards else f"{scorer_name or team_name} field goal"
+            fg_distance = str(incoming.get("fg_distance", "") or "").strip()
+            base = f"{fg_distance}-yard field goal by {scorer_name or team_name}" if fg_distance else f"{scorer_name or team_name} field goal"
             if kick_outcome == "made":
                 return "Field Goal", base + " good"
             if kick_outcome == "blocked":
@@ -1430,6 +1431,7 @@ class EventService:
                 else ""
             ),
             "kick_outcome": str(incoming.get("kick_outcome", "made") or "made").lower() if event_code == "FG" else "",
+            "fg_distance": str(incoming.get("fg_distance", "") or "").strip() if event_code == "FG" else "",
             "created_at": values["created_at"],
             "quarter": str(state.get("quarter", "1") or "1"),
             "broadcast_id": state.get("broadcast_id", ""),
@@ -1502,6 +1504,7 @@ class EventService:
                     else ""
                 ),
                 "kick_outcome": str(incoming.get("kick_outcome", "made") or "made").lower() if event_code == "FG" else "",
+                "fg_distance": str(incoming.get("fg_distance", "") or "").strip() if event_code == "FG" else "",
                 "kick_result_spot": str(incoming.get("kick_result_spot", "") or ""),
                 "kick_touchback": bool(incoming.get("kick_touchback")),
                 "turnover": (
@@ -1555,6 +1558,7 @@ class EventService:
             "first_down": event_code == "FIRST_DOWN" or bool(incoming.get("first_down")),
             "touchdown": event_code == "TD" or values["return_td"],
             "kick_outcome": str(incoming.get("kick_outcome", "made") or "made").lower() if event_code == "FG" else "",
+            "fg_distance": str(incoming.get("fg_distance", "") or "").strip() if event_code == "FG" else "",
             "conversion_outcome": str(incoming.get("conversion_outcome", "good") or "good").lower() if event_code in {"XP", "2PT"} else "",
             "turnover": (
                 event_code == "TURNOVER"

@@ -23,6 +23,7 @@ def make_service(
     sponsors: list[dict] | None = None,
     storylines: list[str] | None = None,
     rng: random.Random | None = None,
+    players: list[dict] | None = None,
 ) -> SocialMediaPreviewService:
     output_dir = tmp_path / "Cards"
     logos_dir = tmp_path / "Logos" / "home-high"
@@ -111,8 +112,9 @@ def make_service(
                     "home_score": 24,
                     "visitor_score": 17,
                 }
-            ]
-        } if state else {"scoring_summary": []},
+            ],
+            "players": players or [],
+        } if state else {"scoring_summary": [], "players": []},
         load_config=lambda: {
             "organization": {"short_name": "CSRN"},
             "streaming": {"youtube_live": "", "facebook_live": ""},
@@ -228,26 +230,110 @@ def test_score_line_hidden_for_planned_games(tmp_path: Path) -> None:
 # pregame social graphic we've built previously") ---------------------------------------------
 
 
-def test_final_record_text_formats_wins_losses_and_only_shows_ties_when_real(tmp_path: Path) -> None:
-    service = make_service(tmp_path)
-    assert service._final_record_text({"wins": 6, "losses": 2, "ties": 0}) == "6-2"
-    assert service._final_record_text({"wins": 6, "losses": 2, "ties": 1}) == "6-2-1"
-    # the nested {"overall": {...}} shape broadcast_service.py actually stores
-    assert service._final_record_text({"overall": {"wins": 3, "losses": 4, "ties": 0}}) == "3-4"
-    assert service._final_record_text({"wins": 0, "losses": 0, "ties": 0}) == ""  # placeholder, not a real record
-    assert service._final_record_text(None) == ""
-    assert service._final_record_text("not a dict") == ""
+def _final_document(tmp_path: Path, *, visitor_score: int, home_score: int, players: list[dict] | None = None, sport: str = "Football") -> str:
+    broadcast = {
+        "broadcast_id": "BC-1", "home_team": "Home High", "visitor_team": "Visitor High",
+        "home_school_id": "home-high", "visitor_school_id": "visitor-high",
+        "home_identity": {}, "visitor_identity": {}, "status": "completed", "sport": sport,
+        "final_home_score": home_score, "final_visitor_score": visitor_score,
+    }
+    service = make_service(tmp_path, broadcasts=[broadcast], players=players)
+    return service._render_final_score_document(
+        broadcast=broadcast, state={}, theme=service._theme_tokens(), sponsors=[], players=players or [],
+    )
 
 
-def test_final_score_banner_marks_the_winner_not_a_tie(tmp_path: Path) -> None:
-    service = make_service(tmp_path)
-    win = service._final_score_banner_html(visitor_name="Visitor", home_name="Home", visitor_score=24, home_score=17)
-    assert "FINAL" in win
-    assert 'final-team final-winner">Visitor' in win
-    assert 'final-score final-winner">24' in win
-    assert 'final-team final-winner">Home' not in win  # only the actual winner is marked
-    tie = service._final_score_banner_html(visitor_name="Visitor", home_name="Home", visitor_score=14, home_score=14)
-    assert "final-winner" not in tie  # a tie marks neither side
+def test_final_score_marks_only_the_winning_side_and_never_a_tie(tmp_path: Path) -> None:
+    win = _final_document(tmp_path, visitor_score=24, home_score=17)
+    assert 'stage-side stage-side-visitor final-winner"' in win
+    assert 'stage-side stage-side-home"' in win  # the loser carries no winner class
+    assert 'class="final-tag">FINAL<' in win
+    tie = _final_document(tmp_path, visitor_score=14, home_score=14)
+    assert 'stage-side stage-side-visitor final-winner"' not in tie
+    assert 'stage-side stage-side-home final-winner"' not in tie
+
+
+def test_final_score_document_has_no_final_record_line(tmp_path: Path) -> None:
+    broadcast = {
+        "broadcast_id": "BC-1", "home_team": "Home High", "visitor_team": "Visitor High",
+        "status": "completed", "sport": "Football", "final_home_score": 24, "final_visitor_score": 17,
+        "home_postgame_record": {"wins": 6, "losses": 2, "ties": 0},
+        "visitor_postgame_record": {"wins": 5, "losses": 3, "ties": 0},
+    }
+    service = make_service(tmp_path, broadcasts=[broadcast])
+    document = service._render_final_score_document(
+        broadcast=broadcast, state={}, theme=service._theme_tokens(), sponsors=[], players=[],
+    )
+    assert "FINAL RECORD" not in document
+    assert "final-records" not in document and "final-banner" not in document
+
+
+FOOTBALL_PLAYERS = [
+    {"team": "home", "name": "Marcus Johnson", "number": "21", "rushing_attempts": 18, "rushing_yards": 142, "rushing_touchdowns": 2,
+     "pass_attempts": 0, "passing_yards": 0, "receptions": 0, "receiving_yards": 0, "receiving_touchdowns": 0, "field_goal_distances": []},
+    {"team": "home", "name": "Dre Carter", "number": "7", "rushing_attempts": 0, "rushing_yards": 0, "rushing_touchdowns": 0,
+     "pass_attempts": 14, "completions": 9, "passing_yards": 168, "passing_touchdowns": 2,
+     "receptions": 0, "receiving_yards": 0, "receiving_touchdowns": 0, "field_goal_distances": []},
+    {"team": "home", "name": "Tay Brooks", "number": "84", "rushing_attempts": 0, "rushing_yards": 0, "rushing_touchdowns": 0,
+     "pass_attempts": 0, "passing_yards": 0, "receptions": 5, "receiving_yards": 96, "receiving_touchdowns": 1, "field_goal_distances": []},
+    {"team": "home", "name": "Owen Hale", "number": "9", "rushing_attempts": 0, "rushing_yards": 0, "rushing_touchdowns": 0,
+     "pass_attempts": 0, "passing_yards": 0, "receptions": 0, "receiving_yards": 0, "receiving_touchdowns": 0,
+     "field_goal_distances": [32, 41]},
+    {"team": "visitor", "name": "Jo Ramirez", "number": "3", "rushing_attempts": 12, "rushing_yards": 58, "rushing_touchdowns": 0,
+     "pass_attempts": 0, "passing_yards": 0, "receptions": 0, "receiving_yards": 0, "receiving_touchdowns": 0, "field_goal_distances": []},
+]
+
+
+def test_highlights_pick_leaders_per_category_with_touchdowns_and_longest_fg(tmp_path: Path) -> None:
+    document = _final_document(tmp_path, visitor_score=7, home_score=24, players=FOOTBALL_PLAYERS)
+    assert "M. Johnson — 142 rush yds, 2 TD" in document
+    assert "D. Carter — 168 pass yds, 2 TD" in document
+    assert "T. Brooks — 96 rec yds, 1 TD" in document
+    assert "O. Hale — 41-yd FG" in document  # longest made FG, not the first one recorded
+    assert "J. Ramirez — 58 rush yds" in document
+    assert "J. Ramirez — 58 rush yds, " not in document  # no TD suffix when there are none
+
+
+def test_highlights_break_yardage_ties_by_touchdowns_then_lower_jersey(tmp_path: Path) -> None:
+    tied = [
+        {"team": "visitor", "name": "A Back", "number": "30", "rushing_attempts": 5, "rushing_yards": 40, "rushing_touchdowns": 0},
+        {"team": "visitor", "name": "B Back", "number": "22", "rushing_attempts": 5, "rushing_yards": 40, "rushing_touchdowns": 1},
+        {"team": "visitor", "name": "C Back", "number": "11", "rushing_attempts": 5, "rushing_yards": 40, "rushing_touchdowns": 0},
+    ]
+    document = _final_document(tmp_path, visitor_score=7, home_score=0, players=tied)
+    assert "B. Back — 40 rush yds, 1 TD" in document  # the touchdown wins the tie
+    tied[1]["rushing_touchdowns"] = 0
+    document = _final_document(tmp_path, visitor_score=7, home_score=0, players=tied)
+    assert "C. Back — 40 rush yds" in document  # then the lower jersey number
+
+
+def test_highlights_omitted_for_sports_without_confirmed_categories(tmp_path: Path) -> None:
+    document = _final_document(tmp_path, visitor_score=3, home_score=2, players=FOOTBALL_PLAYERS, sport="Basketball")
+    assert 'class="final-highlights"' not in document
+
+
+def test_highlights_omitted_when_no_player_stats_are_recorded(tmp_path: Path) -> None:
+    document = _final_document(tmp_path, visitor_score=24, home_score=17, players=[])
+    assert 'class="final-highlights"' not in document
+
+
+def test_fg_distance_is_only_shown_when_recorded(tmp_path: Path) -> None:
+    kicker_no_distance = [
+        {"team": "home", "name": "Owen Hale", "number": "9", "rushing_attempts": 0, "field_goal_distances": []},
+    ]
+    document = _final_document(tmp_path, visitor_score=0, home_score=0, players=kicker_no_distance)
+    assert 'class="final-highlights"' not in document
+    assert "-yd FG" not in document
+
+def test_resolve_game_state_falls_back_to_archive_when_live_state_was_cleared_post_game(tmp_path: Path) -> None:
+    """Regression: a completed game whose live authority state had its events/plays cleared
+    (end_game() archived them) must not resolve to that empty live state -- the highlights
+    would silently disappear. The archive is the durable record."""
+    broadcast = {"broadcast_id": "BC-1", "home_team": "Home High", "visitor_team": "Visitor High", "status": "completed"}
+    service = make_service(tmp_path, broadcasts=[broadcast])
+    service._load_state = lambda: {"broadcast_id": "BC-1", "status": "completed", "events": [], "plays": []}
+    state = service._resolve_game_state(broadcast)
+    assert state.get("events"), "must use the archived play data, not the cleared live state"
 
 
 def test_generate_final_score_broadcast_not_found(tmp_path: Path) -> None:
@@ -286,7 +372,7 @@ def test_generate_final_score_renders_real_png_with_the_frozen_final_score_and_r
     )
     assert ">24<" in document and ">17<" in document
     assert ">3<" not in document and ">1<" not in document  # the stale score never appears
-    assert "6-2" in document and "5-3" in document
+    assert "6-2" not in document and "FINAL RECORD" not in document  # the record line is gone
     assert "kickoff-line" not in document and "storylines" not in document  # pregame-only sections are gone
 
 
@@ -323,8 +409,14 @@ if __name__ == "__main__":
         test_background_resolves_per_sport,
         test_generate_renders_real_png_end_to_end_with_promo_layout,
         test_score_line_hidden_for_planned_games,
-        test_final_record_text_formats_wins_losses_and_only_shows_ties_when_real,
-        test_final_score_banner_marks_the_winner_not_a_tie,
+        test_final_score_marks_only_the_winning_side_and_never_a_tie,
+        test_final_score_document_has_no_final_record_line,
+        test_highlights_pick_leaders_per_category_with_touchdowns_and_longest_fg,
+        test_highlights_break_yardage_ties_by_touchdowns_then_lower_jersey,
+        test_highlights_omitted_for_sports_without_confirmed_categories,
+        test_highlights_omitted_when_no_player_stats_are_recorded,
+        test_fg_distance_is_only_shown_when_recorded,
+        test_resolve_game_state_falls_back_to_archive_when_live_state_was_cleared_post_game,
         test_generate_final_score_broadcast_not_found,
         test_generate_final_score_renders_real_png_with_the_frozen_final_score_and_records,
         test_generate_final_score_falls_back_to_state_score_when_not_yet_archived,
