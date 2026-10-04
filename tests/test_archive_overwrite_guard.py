@@ -13,7 +13,7 @@ from broadcast_lifecycle_service import BroadcastLifecycleService
 from game_operations_service import GameOperationsService
 
 BROADCAST_ID = "FB-TEST-ARCHIVE"
-ARCHIVE_ERROR = "Broadcast archive could not be confirmed; live game history was not cleared."
+ALREADY_ARCHIVED = "This broadcast's final stats were already archived; nothing further was recorded."
 
 
 def play_state():
@@ -73,7 +73,7 @@ def test_final_game_archives_and_clears_then_end_game_leaves_the_good_archive_al
 
     assert h.writer_calls == 1, "end_game must not re-archive a finished broadcast"
     assert h.archives[BROADCAST_ID] == good, "the existing good archive must be untouched"
-    assert second.data["state"].get("archive_error") == ARCHIVE_ERROR
+    assert second.data["state"].get("archive_error") == ALREADY_ARCHIVED
 
 
 def test_single_final_game_archives_and_clears_with_no_error() -> None:

@@ -459,8 +459,8 @@ class GameOperationsService:
         if already_archived:
             archived = False
             error_message = (
-                "Broadcast archive could not be confirmed; "
-                "live game history was not cleared."
+                "This broadcast's final stats were already archived; "
+                "nothing further was recorded."
             )
         else:
             try:
