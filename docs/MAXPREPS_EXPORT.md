@@ -346,17 +346,22 @@ fields, not from `events`/`plays`), but it's the same latent pattern and
 worth a look in a future round rather than assuming it's fine by inspection
 alone.
 
-**3. Caledonia vs Amory (`FB-2026-OPEN-W00-001`) -- genuine data gap, not a
-bug.** Jason reported the same "no stats" symptom for a second game. This
-one is different: its `final_state_archive`'s own `history` shows the
-broadcast was created with `broadcast_created: True`, `quarter: 4`, and the
-final score (27-7) already set -- it was entered as a final-score-only
-record and was never live-tracked play-by-play. `events`/`plays` are
-genuinely `[]` everywhere (live state, `live_state` mirror, and the
-archive), so `StatisticsService.report()` correctly returns 0 players and
-all-zero team stats (only `score` is populated). There is no bug to fix
-here -- CSRN never recorded individual plays for this game, so there is
-nothing for any exporter to serialize.
+**3. Caledonia vs Amory (`FB-2026-OPEN-W00-001`) -- this game WAS live-tracked;
+its play data was lost, and this section's original conclusion was wrong.**
+Earlier this section read the archive's `history` and concluded the game was
+a final-score-only entry that was never tracked. That was incorrect. The
+archive's own `recent_commands` ledger (the last 200 commands) records live
+play commands through 9/4 21:44 local (rules_play run/pass/punt/kickoff, clock
+controls, corrections, one undo, one event edit). The game's play numbers run
+to 145. The Caledonia-Amory PDF report
+(printed 9/4 21:50 from CSRN's own statistics module) reproduces all 145
+plays. `events`/`plays` are empty in the archive and in the live state now,
+because the archive that holds them was overwritten. See
+`docs/AMORY_DATA_LOSS_INVESTIGATION.md` for the mechanism and evidence.
+
+The export itself was correct for what it was given: with no play data
+present, `StatisticsService.report()` returns 0 players, and the
+`NO_PLAYER_DATA` refusal is the right behavior for an empty archive.
 
 What *was* fixable: the exporter silently produced the same MaxPreps-
 rejected header-only file for this case as for the real bug above, with no
