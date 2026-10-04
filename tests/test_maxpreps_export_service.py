@@ -322,3 +322,36 @@ def test_falls_back_to_final_state_archive_when_live_state_is_a_different_broadc
     result = service.generate(BROADCAST_ID, "home")
     assert result.ok
     assert "22|" in result.data["content"]
+
+
+def test_falls_back_to_archive_when_the_live_state_matches_by_id_but_was_cleared_post_game() -> None:
+    """Regression for a real failed upload (Itawamba vs Caledonia,
+    2026-10-04): GameOperationsService.end_game() clears history/events/
+    plays from the live authority state once it has archived them, but
+    broadcast_id and status stay put. A completed game is therefore still
+    "the live state" by id while actually carrying zero plays -- trusting
+    that produced a real export with a header and NO data rows at all,
+    which is exactly the "Insufficient data... needs at least header and
+    one data row" MaxPreps rejected it for. Must prefer the archive
+    whenever the id-matching live state has no events/plays of its own.
+    """
+    state = game_state()
+    cleared_live_state = {
+        "broadcast_id": BROADCAST_ID,
+        "status": "completed",
+        "events": [],
+        "plays": [],
+    }
+    service = MaxPrepsExportService(
+        load_broadcasts=lambda: [
+            {"broadcast_id": BROADCAST_ID, "home_team": "Home Eagles", "visitor_team": "Visitor Hawks", "date": "2026-10-04"}
+        ],
+        load_state=lambda: cleared_live_state,
+        load_final_state_archive=lambda broadcast_id: state if broadcast_id == BROADCAST_ID else None,
+        get_statistics_service=lambda: StatisticsService(now=lambda: 1_700_000_000.0),
+    )
+    result = service.generate(BROADCAST_ID, "home")
+    assert result.ok
+    lines = result.data["content"].splitlines()
+    assert len(lines) > 1, "export must not be header-only for a completed, archived game"
+    assert "22|" in result.data["content"]
