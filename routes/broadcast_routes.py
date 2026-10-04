@@ -217,6 +217,11 @@ def create_broadcast_blueprint(
         if result.code == "BROADCAST_NOT_FOUND":
             return jsonify({"error": result.code}), 404
 
+        if result.code == "NO_PLAYER_DATA":
+            return jsonify(
+                {"error": result.code, "message": result.data["message"]}
+            ), 422
+
         response = Response(
             result.data["content"],
             mimetype="text/plain",

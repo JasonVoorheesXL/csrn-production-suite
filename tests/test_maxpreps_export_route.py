@@ -68,6 +68,38 @@ def test_route_404s_for_an_unknown_broadcast(maxpreps_client) -> None:
     assert response.status_code == 404
 
 
+def test_route_422s_with_a_clear_message_for_a_final_score_only_game(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    empty_state = {"broadcast_id": BROADCAST_ID, "events": [], "plays": []}
+    broadcasts = [
+        {
+            "broadcast_id": BROADCAST_ID,
+            "home_team": "Home Eagles",
+            "visitor_team": "Visitor Hawks",
+            "date": "2026-10-04",
+            "sport": "Football",
+        }
+    ]
+    monkeypatch.setattr(app_module, "MAXPREPS_EXPORT_SERVICE", None, raising=False)
+    monkeypatch.setattr(app_module, "pin_is_configured", lambda: True)
+    monkeypatch.setattr(app_module, "load_broadcasts", lambda: copy.deepcopy(broadcasts))
+    monkeypatch.setattr(app_module, "load_state", lambda: copy.deepcopy(empty_state))
+    monkeypatch.setattr(app_module, "load_final_state_archive", lambda broadcast_id: None)
+    monkeypatch.setitem(app_module.app.config, "TESTING", True)
+    monkeypatch.setitem(app_module.app.config, "SECRET_KEY", "maxpreps-export-route-test-empty")
+    with app_module.app.test_client() as client:
+        with client.session_transaction() as active_session:
+            active_session["authenticated"] = True
+        response = client.get(
+            f"/api/broadcasts/{BROADCAST_ID}/maxpreps-export.txt?team=home"
+        )
+    assert response.status_code == 422
+    body = response.get_json()
+    assert body["error"] == "NO_PLAYER_DATA"
+    assert "Home Eagles" in body["message"]
+
+
 def test_route_requires_auth(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(app_module, "pin_is_configured", lambda: True)
     monkeypatch.setitem(app_module.app.config, "TESTING", True)

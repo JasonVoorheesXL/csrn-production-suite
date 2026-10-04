@@ -5146,10 +5146,22 @@ function generateFinalScoreGraphic(id){
   openImagePreviewInApp(`/api/broadcasts/${encodeURIComponent(id)}/final-score-preview.png`,`Final Score Graphic — ${id}`);
 }
 
-function downloadMaxPrepsExport(id,team){
+async function downloadMaxPrepsExport(id,team){
+  const response=await fetch(`/api/broadcasts/${encodeURIComponent(id)}/maxpreps-export.txt?team=${encodeURIComponent(team)}`,{credentials:'same-origin'});
+  if(!response.ok){
+    const data=await response.json().catch(()=>({}));
+    alert(data.message||'Unable to generate the MaxPreps export.');
+    return;
+  }
+  const disposition=response.headers.get('Content-Disposition')||'';
+  const match=disposition.match(/filename="([^"]+)"/);
+  const filename=match?match[1]:`${id}-${team}-maxpreps.txt`;
+  const blob=await response.blob();
   const a=document.createElement('a');
-  a.href=`/api/broadcasts/${encodeURIComponent(id)}/maxpreps-export.txt?team=${encodeURIComponent(team)}`;
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
   a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function printRoster(){if(!currentRoster)return;const players=(currentRoster.players||[]).filter(p=>p.status!=='inactive').slice().sort((a,b)=>(Number(a.number)||999)-(Number(b.number)||999));const school=(schools||[]).find(s=>s.id===currentRoster.school_id);const teamLogo=(school&&(school.primary_logo||school.approved_round_logo_path||school.logo_path||school.logo))||'';const rows=players.map(p=>{const full=[p.first_name,p.last_name].filter(Boolean).join(' ').trim();const photoSrc=p.headshot?rosterHeadshotDisplayUrl(p.headshot):'/static/player-silhouette.svg';return `<tr><td class="photo"><img class="roster-print-thumb" src="${escapeHtml(photoSrc)}" alt="" onerror="this.onerror=null;this.src='/static/player-silhouette.svg'"></td><td>${escapeHtml(p.number||'')}</td><td>${escapeHtml(full)}</td><td>${escapeHtml(p.preferred_name||'')}</td><td>${escapeHtml([p.position,p.secondary_position].filter(Boolean).join(' / '))}</td><td>${escapeHtml(p.grade||'')}</td><td>${escapeHtml(p.height||'')}</td><td>${escapeHtml(p.weight||'')}</td><td>${escapeHtml(p.pronunciation||'')}</td></tr>`}).join('');const watermark=teamLogo?`<img class="roster-print-watermark" src="${escapeHtml(teamLogo)}" alt="" onerror="this.style.display='none'">`:'';printHtmlInApp(`<!doctype html><title>${escapeHtml((school&&school.name)||'Roster')}</title><style>body{font-family:Arial;margin:0}.roster-print-watermark{position:fixed;left:50%;top:50%;width:4.2in;height:4.2in;transform:translate(-50%,-50%);object-fit:contain;opacity:.07;z-index:0}.roster-print-body{position:relative;z-index:1;padding:24px}h1{margin:0}p{margin-top:4px;color:#555}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #999;padding:6px 7px;text-align:left;vertical-align:middle}th{background:#eee}th.photo,td.photo{width:44px;text-align:center;padding:4px}.roster-print-thumb{width:32px;height:32px;object-fit:cover;border-radius:5px;border:1px solid #999;background:#f2f2f2;display:block;margin:0 auto}</style>${watermark}<div class="roster-print-body"><h1>${escapeHtml((school&&school.name)||'Team Roster')}</h1><p>${escapeHtml(currentRoster.season)} ${escapeHtml(currentRoster.level)} ${escapeHtml(currentRoster.sport)}</p><table><thead><tr><th class="photo"></th><th>#</th><th>Full Name</th><th>Preferred Name</th><th>Position</th><th>Class</th><th>Height</th><th>Weight</th><th>Pronunciation</th></tr></thead><tbody>${rows}</tbody></table></div>`)}
