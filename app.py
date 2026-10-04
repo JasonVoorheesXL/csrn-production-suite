@@ -45,6 +45,7 @@ from venue_service import VenueService
 from broadcast_service import BroadcastService
 from broadcaster_print_service import BroadcasterPrintService
 from social_media_preview_service import SocialMediaPreviewService
+from maxpreps_export_service import MaxPrepsExportService
 from pregame_presentation import _presentation_settings as _pregame_presentation_settings
 from personnel_service import PersonnelService
 from asset_service import AssetService
@@ -2000,6 +2001,24 @@ def get_social_media_preview_service() -> SocialMediaPreviewService:
 
     return SOCIAL_MEDIA_PREVIEW_SERVICE
 
+
+MAXPREPS_EXPORT_SERVICE: MaxPrepsExportService | None = None
+
+
+def get_maxpreps_export_service() -> MaxPrepsExportService:
+    global MAXPREPS_EXPORT_SERVICE
+
+    if MAXPREPS_EXPORT_SERVICE is None:
+        MAXPREPS_EXPORT_SERVICE = MaxPrepsExportService(
+            load_broadcasts=load_broadcasts,
+            load_state=load_state,
+            load_final_state_archive=load_final_state_archive,
+            get_statistics_service=get_statistics_service,
+        )
+
+    return MAXPREPS_EXPORT_SERVICE
+
+
 def normalize_roster_id(value: str) -> str:
     return normalize_school_id(value)
 
@@ -3241,6 +3260,7 @@ BROADCAST_ROUTES_BLUEPRINT = create_broadcast_blueprint(
         get_broadcast_service=get_broadcast_service,
         get_broadcaster_print_service=get_broadcaster_print_service,
         get_social_media_preview_service=get_social_media_preview_service,
+        get_maxpreps_export_service=get_maxpreps_export_service,
         sport_scope=current_exact_sport_scope,
     )
 )
