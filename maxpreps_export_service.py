@@ -134,7 +134,13 @@ class MaxPrepsExportService:
             jersey = str(player.get("number", "")).strip()
             row = [jersey] + [str(self._field_value(player, name)) for name in self.FIELD_ORDER]
             lines.append("|".join(row))
-        content = "\n".join(lines) + "\n"
+        # CRLF, not bare LF: MaxPreps' importer is a classic Windows/ASP.NET
+        # text-upload tool and, in live testing, rejected an LF-only file as
+        # "Insufficient data... needs at least header and one data row" --
+        # it collapsed the whole file into a single row because it splits on
+        # \r\n. The field spec page never documents this; found by testing
+        # a real upload, not from the written spec.
+        content = "\r\n".join(lines) + "\r\n"
 
         team_name = str(broadcast.get(f"{team_key}_team") or team_key.title())
         filename = self._filename(broadcast, team_key, team_name)
