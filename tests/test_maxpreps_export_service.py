@@ -302,6 +302,25 @@ def test_jersey_is_the_only_column_maxpreps_requires_and_is_always_present() -> 
         assert jersey.strip() != ""
 
 
+def test_no_player_data_is_refused_with_a_clear_message_instead_of_a_header_only_file() -> None:
+    """Regression for a real failed upload (Caledonia vs Amory,
+    FB-2026-OPEN-W00-001): this broadcast was created with its final score
+    (27-7) already set at quarter 4 -- a final-score-only record, never
+    live-tracked play-by-play. events/plays are genuinely empty everywhere
+    (live state, live_state mirror, and the archive), so
+    StatisticsService.report() correctly returns zero players. Exporting a
+    header-only file for that is exactly what MaxPreps rejects as
+    "Insufficient data... needs at least header and one data row" -- the
+    service should say so plainly instead of producing that file.
+    """
+    state = game_state()
+    state["events"] = []
+    state["plays"] = []
+    result = build_service(state).generate(BROADCAST_ID, "home")
+    assert result.code == "NO_PLAYER_DATA"
+    assert "Home Eagles" in result.data["message"]
+
+
 def test_filename_has_no_quotes_or_parentheses_and_ends_txt() -> None:
     result = build_service(game_state()).generate(BROADCAST_ID, "home")
     filename = result.data["filename"]

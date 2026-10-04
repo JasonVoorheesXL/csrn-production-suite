@@ -346,7 +346,27 @@ fields, not from `events`/`plays`), but it's the same latent pattern and
 worth a look in a future round rather than assuming it's fine by inspection
 alone.
 
-## Scope notes
+**3. Caledonia vs Amory (`FB-2026-OPEN-W00-001`) -- genuine data gap, not a
+bug.** Jason reported the same "no stats" symptom for a second game. This
+one is different: its `final_state_archive`'s own `history` shows the
+broadcast was created with `broadcast_created: True`, `quarter: 4`, and the
+final score (27-7) already set -- it was entered as a final-score-only
+record and was never live-tracked play-by-play. `events`/`plays` are
+genuinely `[]` everywhere (live state, `live_state` mirror, and the
+archive), so `StatisticsService.report()` correctly returns 0 players and
+all-zero team stats (only `score` is populated). There is no bug to fix
+here -- CSRN never recorded individual plays for this game, so there is
+nothing for any exporter to serialize.
+
+What *was* fixable: the exporter silently produced the same MaxPreps-
+rejected header-only file for this case as for the real bug above, with no
+way to tell the two apart. Added a dedicated `NO_PLAYER_DATA` result
+(`generate()` now checks for an empty player list before writing any
+content) with a message naming the team and explaining a final score alone
+isn't enough; the route returns `422` with that message instead of a `200`
+download, and the Game Manager button now fetches first and shows an alert
+with the real message rather than blindly downloading whatever the
+response body is.
 
 Football only, per the brief ("CSRN's most mature stats engine and Jason's
 actual priority"). The `partners.aspx` check confirms MaxPreps' format is

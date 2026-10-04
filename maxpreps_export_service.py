@@ -129,6 +129,21 @@ class MaxPrepsExportService:
         ]
         players.sort(key=self._player_sort_key)
 
+        if not players:
+            team_name = str(broadcast.get(f"{team_key}_team") or team_key.title())
+            return MaxPrepsExportResult(
+                "NO_PLAYER_DATA",
+                {
+                    "message": f"CSRN has no play-by-play stats recorded for "
+                    f"{team_name} in this game -- only a final score (or "
+                    "nothing was ever live-tracked). A header-only file "
+                    "with no data rows is what MaxPreps rejects as "
+                    "\"Insufficient data in file: needs at least header "
+                    "and one data row\" -- there is nothing to export "
+                    "until this game has real play-by-play data.",
+                },
+            )
+
         lines = ["Jersey|" + "|".join(self.FIELD_ORDER)]
         for player in players:
             jersey = str(player.get("number", "")).strip()
