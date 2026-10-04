@@ -81,11 +81,12 @@ def broadcast_client():
             BroadcastRoutesDependencies(
                 require_auth=require_auth,
                 get_broadcast_service=lambda: service,
-                # broadcaster-print-sheet.pdf and the social-media preview
-                # were both added after this fixture was last updated;
-                # nothing in this file exercises either one.
+                # broadcaster-print-sheet.pdf, the social-media preview, and
+                # the MaxPreps export were all added after this fixture was
+                # last updated; nothing in this file exercises any of them.
                 get_broadcaster_print_service=lambda: None,
                 get_social_media_preview_service=lambda: None,
+                get_maxpreps_export_service=lambda: None,
             )
         )
     )
@@ -147,6 +148,7 @@ def test_list_broadcasts_threads_the_operators_exact_sport_scope() -> None:
                 get_broadcast_service=lambda: service,
                 get_broadcaster_print_service=lambda: None,
                 get_social_media_preview_service=lambda: None,
+                get_maxpreps_export_service=lambda: None,
                 sport_scope=lambda: "canadian_football",
             )
         )

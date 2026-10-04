@@ -19,6 +19,7 @@ class BroadcastRoutesDependencies:
     get_broadcast_service: Callable[[], Any]
     get_broadcaster_print_service: Callable[[], Any]
     get_social_media_preview_service: Callable[[], Any]
+    get_maxpreps_export_service: Callable[[], Any]
     # The operator's exact active sport context (not base_family-collapsed --
     # Game Manager fully separates football/canadian_football broadcasts,
     # matching the roster/sponsor fix). "" -> list every broadcast.
@@ -193,6 +194,35 @@ def create_broadcast_blueprint(
         )
         response.headers["Content-Disposition"] = (
             f'inline; filename="{result.data["filename"]}"'
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @routes.get("/api/broadcasts/<broadcast_id>/maxpreps-export.txt")
+    @dependencies.require_auth
+    def maxpreps_export(broadcast_id: str):
+        team = request.args.get("team", "")
+        result = dependencies.get_maxpreps_export_service().generate(broadcast_id, team)
+
+        if result.code == "INVALID_TEAM":
+            return jsonify(
+                {
+                    "error": result.code,
+                    "message": "Pass ?team=home or ?team=visitor -- MaxPreps' "
+                    "import is itself scoped to one team's account, so CSRN "
+                    "exports one file per team rather than one per game.",
+                }
+            ), 400
+
+        if result.code == "BROADCAST_NOT_FOUND":
+            return jsonify({"error": result.code}), 404
+
+        response = Response(
+            result.data["content"],
+            mimetype="text/plain",
+        )
+        response.headers["Content-Disposition"] = (
+            f'attachment; filename="{result.data["filename"]}"'
         )
         response.headers["Cache-Control"] = "no-store"
         return response
