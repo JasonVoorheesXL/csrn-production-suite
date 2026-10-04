@@ -170,7 +170,19 @@ class MaxPrepsExportService:
             live = self._load_state()
         except Exception:
             live = {}
-        if isinstance(live, dict) and str(live.get("broadcast_id", "")) == broadcast_id:
+        live_is_this_broadcast = (
+            isinstance(live, dict) and str(live.get("broadcast_id", "")) == broadcast_id
+        )
+        # A broadcast_id match alone is not enough: GameOperationsService.
+        # end_game() clears history/events/plays from the live authority
+        # state once it has confirmed a full final_state_archive was
+        # written, but broadcast_id and status stay put. A completed game
+        # is therefore still "the live state" by id while carrying zero
+        # events/plays -- trusting that produced a real empty export (no
+        # data rows at all) for a finished game. Only trust the live state
+        # when it actually still has play data; otherwise prefer the
+        # archive, which is the durable record for a finished game.
+        if live_is_this_broadcast and (live.get("events") or live.get("plays")):
             return live
         live_mirror = broadcast.get("live_state")
         if isinstance(live_mirror, dict) and (live_mirror.get("events") or live_mirror.get("plays")):
@@ -181,6 +193,8 @@ class MaxPrepsExportService:
             archive = None
         if isinstance(archive, dict):
             return archive
+        if live_is_this_broadcast:
+            return live
         return live_mirror if isinstance(live_mirror, dict) else {}
 
     # -- field computation ---------------------------------------------

@@ -295,29 +295,56 @@ above, done against a real generated file:
   file, column order, not field names or values, would be the first thing to
   check.
 
-### Real-upload finding (2026-10-04, post-merge): line endings must be CRLF
+### Real-upload findings (2026-10-04, post-merge)
 
-Jason test-uploaded a real generated file through MaxPreps Team Admin's
-actual Import Stats screen (something this round's own verification
-explicitly couldn't do, with no MaxPreps account to test against). It was
-rejected: "File contains validation errors and cannot be imported" /
-"Insufficient data in file: needs at least header and one data row" -- even
-though the file plainly had a header and real data rows.
+Jason test-uploaded a real generated file (Itawamba AHS vs Caledonia,
+`FB-2026-4A-W01-001`) through MaxPreps Team Admin's actual Import Stats
+screen -- something this round's own verification explicitly couldn't do,
+with no MaxPreps account to test against. It was rejected twice, for two
+different reasons found in sequence:
 
-Root cause: the exporter originally joined rows with a bare `\n`. MaxPreps'
-import parser is a classic Windows/ASP.NET upload tool and evidently splits
-rows on `\r\n`; an LF-only file collapses into a single unbroken line, which
-reads as "no distinct header-then-data-row structure" to its validator.
-Nothing in the documented field spec mentions line-ending requirements --
-this was only found by an actual upload attempt, not by reading
-`field_specs.aspx` again.
+**1. Line endings (secondary, fixed first, didn't fully explain the symptom).**
+The exporter originally joined rows with a bare `\n`. MaxPreps' import
+parser is a classic Windows/ASP.NET upload tool and most likely splits rows
+on `\r\n` -- confirmed by pulling a real, independently-produced sample file
+from a third-party MaxPreps-compatible stat program (Statman,
+`myweb.fsu.edu/abrady/Statman/Sample/`), whose actual output uses `\r\n`
+throughout. Fixed by writing `\r\n` between rows. Good practice regardless
+of the finding below, but re-uploading after only this fix still failed.
 
-Fixed by writing `\r\n` between rows (and a trailing `\r\n`) in
-`maxpreps_export_service.py`. This is believed correct given how precisely
-the symptom matches the known LF-vs-CRLF failure mode for this class of
-tool, but it has not yet been re-confirmed with another real upload --
-that's the next real verification step, not something this round can
-self-certify.
+**2. The real root cause: a stale "live" state masked the real play data.**
+Jason reported the re-exported file still had no stats in it. Reading the
+actual production data directly (`Data/Broadcasts/FB-2026-4A-W01-001.json`
+and the live authority `state.json`) showed why: `GameOperationsService.
+end_game()` clears `events`/`plays` from the live authority state once it
+has confirmed a full `final_state_archive` was written, but leaves
+`broadcast_id` and `status` (`"completed"`) in place. `_resolve_game_state`
+(copied from `social_media_preview_service.py`'s own helper) matched the
+live state purely by `broadcast_id`, so it kept returning that now-empty
+live state for this finished game instead of falling through to the
+archive that actually has all 117 real plays -- producing a technically
+valid file with a correct header and **zero data rows**, which is exactly
+what MaxPreps' "Insufficient data... needs at least header and one data
+row" message was honestly describing. `StatisticsService.report()` itself
+was never the problem -- run directly against the real archived state for
+this game it produces 24 players with correct, real stats.
+
+Fixed by only trusting the live state when it is both this broadcast *and*
+still actually carries events/plays; a `broadcast_id` match on an otherwise
+empty live state now falls through to the richer `live_state` mirror, then
+the archive, exactly as it should for a completed game. Added a regression
+test (`test_falls_back_to_archive_when_the_live_state_matches_by_id_but_was_cleared_post_game`)
+reproducing this exact shape. Re-verified directly against the real
+Itawamba broadcast data (not a synthetic fixture): both the home and
+visitor exports now produce a correct header plus real player rows (12 and
+13 players respectively, both with real jersey numbers and stats).
+
+`social_media_preview_service.py`'s own `_resolve_game_state` has the same
+`broadcast_id`-only matching logic. It likely doesn't manifest the same way
+there (its score fields mostly come from frozen `final_*_score` broadcast
+fields, not from `events`/`plays`), but it's the same latent pattern and
+worth a look in a future round rather than assuming it's fine by inspection
+alone.
 
 ## Scope notes
 
