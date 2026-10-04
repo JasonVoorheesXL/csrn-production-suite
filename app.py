@@ -2524,6 +2524,11 @@ def write_broadcast_final_archive(state: Mapping[str, Any]) -> bool:
     expected_events = list(snapshot.get("events") or [])
     expected_plays = list(snapshot.get("plays") or [])
 
+    if not (expected_events or expected_plays) and archive_has_play_data(
+        load_final_state_archive(broadcast_id)
+    ):
+        return False
+
     try:
         items = load_broadcasts()
         item = next(
@@ -2566,6 +2571,10 @@ def write_broadcast_final_archive(state: Mapping[str, Any]) -> bool:
     ):
         return False
     return True
+
+
+def archive_has_play_data(archive: Any) -> bool:
+    return isinstance(archive, dict) and bool(archive.get("events") or archive.get("plays"))
 
 
 def load_final_state_archive(broadcast_id: str) -> dict[str, Any] | None:
@@ -3284,6 +3293,9 @@ def get_game_operations_service() -> GameOperationsService:
             load_config=load_config,
             command_scorebug_visibility=command_scorebug_visibility,
             archive_final_state=write_broadcast_final_archive,
+            has_play_archive=lambda broadcast_id: archive_has_play_data(
+                load_final_state_archive(broadcast_id)
+            ),
             transaction_lock=lock,
         )
     return GAME_OPERATIONS_SERVICE

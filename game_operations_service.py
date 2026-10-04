@@ -105,8 +105,10 @@ class GameOperationsService:
         command_scorebug_visibility: Callable[[bool], Any],
         transaction_lock: Any,
         archive_final_state: Callable[[Mapping[str, Any]], bool] | None = None,
+        has_play_archive: Callable[[str], bool] | None = None,
     ) -> None:
         self._load_state = load_state
+        self._has_play_archive = has_play_archive
         self._save_state = save_state
         self._default_state = default_state
         self._push_history = push_history
@@ -449,15 +451,27 @@ class GameOperationsService:
         if str(state.get("status", "")).strip().lower() != "completed":
             return
 
-        try:
-            archived = bool(self._archive_final_state(state))
-            error_message = "" if archived else (
+        already_archived = (
+            self._has_play_archive is not None
+            and not (state.get("events") or state.get("plays"))
+            and self._has_play_archive(str(state.get("broadcast_id", "") or ""))
+        )
+        if already_archived:
+            archived = False
+            error_message = (
                 "Broadcast archive could not be confirmed; "
                 "live game history was not cleared."
             )
-        except Exception as exc:
-            archived = False
-            error_message = f"Broadcast archive failed: {exc}"
+        else:
+            try:
+                archived = bool(self._archive_final_state(state))
+                error_message = "" if archived else (
+                    "Broadcast archive could not be confirmed; "
+                    "live game history was not cleared."
+                )
+            except Exception as exc:
+                archived = False
+                error_message = f"Broadcast archive failed: {exc}"
 
         response_state = dict(result_data.get("state") or {})
         if archived:
