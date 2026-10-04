@@ -73,9 +73,8 @@ class BroadcastLifecycleService:
             return BroadcastLifecycleResult("NOT_FOUND", {})
 
         current = copy.deepcopy(dict(self._load_state()))
-        if (
-            str(current.get("broadcast_id", "")) == key
-            and current.get("broadcast_created")
+        if str(current.get("broadcast_id", "")) == key and (
+            current.get("broadcast_created") or current.get("events") or current.get("plays")
         ):
             return BroadcastLifecycleResult("OK", {"state": current})
 
