@@ -118,7 +118,11 @@ class SocialMediaPreviewService:
             live = self._load_state()
         except Exception:
             live = {}
-        if isinstance(live, dict) and str(live.get("broadcast_id", "")) == broadcast_id:
+        live_is_this_broadcast = isinstance(live, dict) and str(live.get("broadcast_id", "")) == broadcast_id
+        # A broadcast_id match alone isn't enough: end_game() clears events/plays from the live
+        # state once the archive is written, but leaves broadcast_id and status behind. Trusting
+        # that empty state would blank the stat highlights for a finished game.
+        if live_is_this_broadcast and (live.get("events") or live.get("plays")):
             return live
         live_mirror = broadcast.get("live_state")
         if isinstance(live_mirror, dict) and (live_mirror.get("events") or live_mirror.get("plays")):
@@ -129,6 +133,8 @@ class SocialMediaPreviewService:
             archive = None
         if isinstance(archive, dict):
             return archive
+        if live_is_this_broadcast:
+            return live
         return live_mirror if isinstance(live_mirror, dict) else {}
 
     # -- image helpers -------------------------------------------------
@@ -473,7 +479,10 @@ class SocialMediaPreviewService:
 
     # -- rendering -------------------------------------------------------
 
-    def _stage_side_html(self, *, name: str, mascot: str, logo_uri: str, align: str) -> str:
+    def _stage_side_html(
+        self, *, name: str, mascot: str, logo_uri: str, align: str,
+        score_html: str = "", winner: bool = False,
+    ) -> str:
         monogram = self._text(name)[:1].upper() or "?"
         logo_html = (
             f'<img src="{logo_uri}" alt="">'
@@ -481,11 +490,13 @@ class SocialMediaPreviewService:
             else f'<span class="stage-logo-fallback">{monogram}</span>'
         )
         mascot_html = f'<span class="stage-mascot">{self._text(mascot)}</span>' if mascot else ""
+        winner_class = " final-winner" if winner else ""
         return (
-            f'<div class="stage-side stage-side-{align}">'
+            f'<div class="stage-side stage-side-{align}{winner_class}">'
             f'<div class="stage-logo">{logo_html}</div>'
             f'<strong class="stage-name">{self._text(name, "TEAM")}</strong>'
             f'{mascot_html}'
+            f'{score_html}'
             f'</div>'
         )
 
@@ -784,55 +795,102 @@ class SocialMediaPreviewService:
 
     # -- final score graphic -----------------------------------------------
 
+    # Football only: these three per-player categories are the ones statistics_service
+    # aggregates for every football game. Other sports have no confirmed mapping here, so
+    # they get no highlights block rather than invented categories.
+    FINAL_HIGHLIGHT_SPORTS = frozenset({"football"})
+    _FINAL_HIGHLIGHT_CATEGORIES = (
+        ("rushing_yards", "rushing_attempts", "rushing_touchdowns", "rush yds"),
+        ("passing_yards", "pass_attempts", "passing_touchdowns", "pass yds"),
+        ("receiving_yards", "receptions", "receiving_touchdowns", "rec yds"),
+    )
+
     @staticmethod
-    def _final_record_text(record: Any) -> str:
-        """Formats a *_postgame_record value (either the flat {wins,losses,ties} shape
-        normalize_record()/_record_dict() use elsewhere, or that same dict nested one level
-        under "overall", the shape broadcast_service.py stores it in) as "W-L", or "W-L-T"
-        only when there actually is a tie -- ties are rare enough that always showing a
-        trailing "-0" would read as a typo rather than a real 3-number record."""
-        if not isinstance(record, Mapping):
-            return ""
-        overall = record.get("overall") if isinstance(record.get("overall"), Mapping) else record
+    def _final_int(value: Any) -> int:
         try:
-            wins = max(0, int(overall.get("wins", 0) or 0))
-            losses = max(0, int(overall.get("losses", 0) or 0))
-            ties = max(0, int(overall.get("ties", 0) or 0))
+            return int(value or 0)
         except (TypeError, ValueError):
-            return ""
-        if wins == 0 and losses == 0 and ties == 0:
-            return ""
-        return f"{wins}-{losses}-{ties}" if ties else f"{wins}-{losses}"
+            return 0
 
-    def _final_score_banner_html(
-        self, *, visitor_name: str, home_name: str, visitor_score: int, home_score: int,
+    @classmethod
+    def _final_jersey_sort(cls, player: Mapping[str, Any]) -> int:
+        number = str(player.get("number", "") or "")
+        return int(number) if number.isdigit() else 999999
+
+    @staticmethod
+    def _final_short_name(player: Mapping[str, Any]) -> str:
+        name = str(player.get("name", "") or "").strip()
+        if not name or name.startswith("Player "):
+            number = str(player.get("number", "") or "").strip()
+            return f"#{number}" if number else "Unknown"
+        parts = name.split()
+        if len(parts) == 1:
+            return parts[0]
+        return f"{parts[0][0]}. {parts[-1]}"
+
+    @classmethod
+    def _final_highlight_lines(cls, players: list[Mapping[str, Any]], sport: str) -> list[str]:
+        """Up to four lines for one team: the leading rusher, passer, and receiver by yardage
+        (ties broken by touchdowns, then lower jersey number), then the longest made field
+        goal if any kicker on the team has a recorded distance. The three core categories
+        always come first, so a long field goal never displaces them."""
+        if str(sport or "").strip().lower() not in cls.FINAL_HIGHLIGHT_SPORTS:
+            return []
+        lines: list[str] = []
+        for yards_key, usage_key, td_key, unit in cls._FINAL_HIGHLIGHT_CATEGORIES:
+            eligible = [p for p in players if cls._final_int(p.get(usage_key)) > 0]
+            if not eligible:
+                continue
+            leader = max(
+                eligible,
+                key=lambda p: (
+                    cls._final_int(p.get(yards_key)),
+                    cls._final_int(p.get(td_key)),
+                    -cls._final_jersey_sort(p),
+                ),
+            )
+            line = f"{cls._final_short_name(leader)} — {cls._final_int(leader.get(yards_key))} {unit}"
+            touchdowns = cls._final_int(leader.get(td_key))
+            if touchdowns:
+                line += f", {touchdowns} TD"
+            lines.append(line)
+        made_fgs: list[tuple[int, Mapping[str, Any]]] = []
+        for player in players:
+            for distance in player.get("field_goal_distances") or []:
+                if cls._final_int(distance) > 0:
+                    made_fgs.append((cls._final_int(distance), player))
+        if made_fgs:
+            distance, kicker = max(made_fgs, key=lambda c: (c[0], -cls._final_jersey_sort(c[1])))
+            lines.append(f"{cls._final_short_name(kicker)} — {distance}-yd FG")
+        return lines
+
+    def _final_players(self, state: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+        if not state:
+            return []
+        try:
+            statistics = self._build_statistics(dict(state)) or {}
+        except Exception:
+            return []
+        return [p for p in (statistics.get("players") or []) if isinstance(p, Mapping)]
+
+    def _final_highlights_html(
+        self, *, visitor_name: str, home_name: str, visitor_lines: list[str], home_lines: list[str],
     ) -> str:
-        # The winner's name gets the accent treatment; a tie leaves both sides equal
-        # weight rather than guessing a "winner". Order stays visitor-then-home,
-        # matching every other scoreboard in the product (the live overlay, the
-        # pregame graphic's own score-line).
-        visitor_win = visitor_score > home_score
-        home_win = home_score > visitor_score
-        return (
-            '<div class="final-banner">'
-            f'<span class="final-tag">FINAL</span>'
-            '<div class="final-score-row">'
-            f'<span class="final-team{" final-winner" if visitor_win else ""}">{self._text(visitor_name)}</span>'
-            f'<span class="final-score{" final-winner" if visitor_win else ""}">{self._text(visitor_score, "0")}</span>'
-            '<span class="final-score-dash">–</span>'
-            f'<span class="final-score{" final-winner" if home_win else ""}">{self._text(home_score, "0")}</span>'
-            f'<span class="final-team{" final-winner" if home_win else ""}">{self._text(home_name)}</span>'
-            '</div></div>'
-        )
-
-    def _final_records_html(self, *, visitor_record: str, home_record: str) -> str:
-        if not visitor_record and not home_record:
+        if not visitor_lines and not home_lines:
             return ""
+
+        def column(name: str, lines: list[str], side: str) -> str:
+            items = "".join(f'<li>{self._text(line)}</li>' for line in lines) or '<li class="final-highlight-empty">—</li>'
+            return (
+                f'<div class="final-highlight-col final-highlight-{side}">'
+                f'<div class="final-highlight-team">{self._text(name, "TEAM")}</div>'
+                f'<ul>{items}</ul></div>'
+            )
+
         return (
-            '<div class="final-records">'
-            f'<span>{self._text(visitor_record, "—")}</span>'
-            '<span class="final-records-sep">FINAL RECORD</span>'
-            f'<span>{self._text(home_record, "—")}</span>'
+            '<div class="final-highlights">'
+            f'{column(visitor_name, visitor_lines, "visitor")}'
+            f'{column(home_name, home_lines, "home")}'
             '</div>'
         )
 
@@ -843,6 +901,7 @@ class SocialMediaPreviewService:
         state: Mapping[str, Any],
         theme: Mapping[str, Any],
         sponsors: list[dict[str, Any]],
+        players: list[Mapping[str, Any]] | None = None,
     ) -> str:
         home_identity = broadcast.get("home_identity") if isinstance(broadcast.get("home_identity"), Mapping) else {}
         visitor_identity = broadcast.get("visitor_identity") if isinstance(broadcast.get("visitor_identity"), Mapping) else {}
@@ -873,17 +932,23 @@ class SocialMediaPreviewService:
         org_name = self._text(organization.get("short_name") or organization.get("name") or "CSRN")
         org_logo_uri = self._org_logo_uri(organization)
 
+        visitor_wins = visitor_score > home_score
+        home_wins = home_score > visitor_score
         home_side = self._stage_side_html(
             name=home_name,
             mascot=home_identity.get("mascot", ""),
             logo_uri=self._team_logo_uri(home_identity, broadcast.get("home_school_id")),
             align="home",
+            score_html=f'<div class="stage-final-score">{home_score}</div>',
+            winner=home_wins,
         )
         visitor_side = self._stage_side_html(
             name=visitor_name,
             mascot=visitor_identity.get("mascot", ""),
             logo_uri=self._team_logo_uri(visitor_identity, broadcast.get("visitor_school_id")),
             align="visitor",
+            score_html=f'<div class="stage-final-score">{visitor_score}</div>',
+            winner=visitor_wins,
         )
 
         visitor_primary = self._hex(visitor_identity.get("primary_color"), "#064624")
@@ -896,13 +961,17 @@ class SocialMediaPreviewService:
             else f"linear-gradient(90deg, {visitor_primary}, {home_primary})"
         )
 
-        final_banner = self._final_score_banner_html(
-            visitor_name=visitor_name, home_name=home_name,
-            visitor_score=visitor_score, home_score=home_score,
-        )
-        final_records = self._final_records_html(
-            visitor_record=self._final_record_text(broadcast.get("visitor_postgame_record")),
-            home_record=self._final_record_text(broadcast.get("home_postgame_record")),
+        sport = broadcast.get("sport", "")
+        all_players = list(players or [])
+        highlights = self._final_highlights_html(
+            visitor_name=visitor_name,
+            home_name=home_name,
+            visitor_lines=self._final_highlight_lines(
+                [p for p in all_players if str(p.get("team", "")) == "visitor"], sport,
+            ),
+            home_lines=self._final_highlight_lines(
+                [p for p in all_players if str(p.get("team", "")) == "home"], sport,
+            ),
         )
 
         return f"""<!doctype html>
@@ -956,23 +1025,29 @@ class SocialMediaPreviewService:
     font-size: 44px; font-weight: 950; color: #fff; overflow: hidden;
   }}
   .stage-vs img {{ width: 60%; height: 60%; object-fit: contain; }}
-  .final-banner {{ text-align: center; margin-bottom: 18px; }}
   .final-tag {{
-    display: inline-block; padding: 6px 22px; border-radius: 999px; margin-bottom: 14px;
+    position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 4;
+    padding: 6px 22px; border-radius: 999px;
     background: var(--primary); color: #fff; font-size: 22px; font-weight: 950; letter-spacing: .22em;
     box-shadow: 0 8px 20px rgba(0,0,0,.35);
   }}
-  .final-score-row {{ display: flex; align-items: baseline; justify-content: center; gap: 18px; }}
-  .final-team {{ font-size: 30px; font-weight: 800; letter-spacing: .04em; color: var(--muted); text-transform: uppercase; }}
-  .final-score {{ font-size: 92px; font-weight: 950; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }}
-  .final-score-dash {{ font-size: 48px; color: var(--muted); }}
-  .final-winner.final-team {{ color: var(--text); }}
-  .final-winner.final-score {{ color: var(--accent); text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 55%, transparent); }}
-  .final-records {{
-    display: flex; align-items: center; justify-content: center; gap: 18px; margin-bottom: 20px;
-    font-size: 24px; font-weight: 800; color: var(--muted);
+  .stage-final-score {{
+    font-size: 84px; font-weight: 950; line-height: 1; color: var(--text);
+    font-variant-numeric: tabular-nums; margin-top: 4px;
   }}
-  .final-records-sep {{ font-size: 15px; letter-spacing: .16em; text-transform: uppercase; color: var(--primary); }}
+  .final-winner .stage-final-score {{ color: var(--accent); text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 55%, transparent); }}
+  .final-winner .stage-name {{ color: var(--accent); }}
+  .final-highlights {{
+    display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 24px; margin-bottom: 24px;
+  }}
+  .final-highlight-col {{
+    background: rgba(0,0,0,.22); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 22px;
+  }}
+  .final-highlight-team {{ font-size: 18px; font-weight: 900; letter-spacing: .1em; color: var(--primary); margin-bottom: 6px; text-transform: uppercase; }}
+  .final-highlight-col ul {{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }}
+  .final-highlight-col li {{ font-size: 22px; line-height: 1.25; color: var(--text); }}
+  .final-highlight-empty {{ color: var(--muted); }}
   .flex-spacer {{ flex: 1 1 auto; min-height: 0; }}
   .sponsors {{ flex: 0 0 auto; }}
   .sponsors-title {{ text-align: center; font-size: 20px; color: var(--muted); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 12px; }}
@@ -1000,12 +1075,12 @@ class SocialMediaPreviewService:
 <body>
   <div class="stage">
     <div class="stage-field"></div>
+    <div class="final-tag">FINAL</div>
     {visitor_side}
     <div class="stage-vs">{f'<img src="{org_logo_uri}" alt="{org_name}">' if org_logo_uri else org_name}</div>
     {home_side}
   </div>
-  {final_banner}
-  {final_records}
+  {highlights}
   <div class="flex-spacer"></div>
   {self._sponsors_html(sponsors)}
   <script>
@@ -1041,12 +1116,14 @@ class SocialMediaPreviewService:
         state = self._resolve_game_state(broadcast)
         theme = self._theme_tokens()
         sponsors = self._select_sponsors()
+        players = self._final_players(state)
 
         document = self._render_final_score_document(
             broadcast=broadcast,
             state=state,
             theme=theme,
             sponsors=sponsors,
+            players=players,
         )
 
         try:

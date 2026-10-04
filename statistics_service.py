@@ -147,6 +147,14 @@ class StatisticsService:
         }
 
     @staticmethod
+    def _fg_distance_value(value: Any) -> int | None:
+        text = str(value or "").strip()
+        if not text.isdigit():
+            return None
+        distance = int(text)
+        return distance if 1 <= distance <= 99 else None
+
+    @staticmethod
     def _player_row(teams: Mapping[str, Mapping[str, Any]], team: str, name: Any, number: Any) -> dict[str, Any] | None:
         player_name = str(name or "").strip()
         player_number = str(number or "").strip()
@@ -157,6 +165,7 @@ class StatisticsService:
             "team_name": str(teams.get(team, {}).get("name", "")),
             "name": player_name or f"Player {player_number}",
             "number": player_number,
+            "field_goal_distances": [],
             "touchdowns": 0,
             "rushing_touchdowns": 0,
             "receiving_touchdowns": 0,
@@ -330,6 +339,9 @@ class StatisticsService:
                     scorer["field_goal_attempts"] += 1
                     if delta == 3:
                         scorer["field_goals"] += 1
+                        distance = self._fg_distance_value(automation.get("fg_distance"))
+                        if distance is not None:
+                            scorer["field_goal_distances"].append(distance)
                 elif code == "XP":
                     scorer["extra_point_attempts"] += 1
                     if delta == 1:
