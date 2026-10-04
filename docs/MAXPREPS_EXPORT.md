@@ -295,6 +295,30 @@ above, done against a real generated file:
   file, column order, not field names or values, would be the first thing to
   check.
 
+### Real-upload finding (2026-10-04, post-merge): line endings must be CRLF
+
+Jason test-uploaded a real generated file through MaxPreps Team Admin's
+actual Import Stats screen (something this round's own verification
+explicitly couldn't do, with no MaxPreps account to test against). It was
+rejected: "File contains validation errors and cannot be imported" /
+"Insufficient data in file: needs at least header and one data row" -- even
+though the file plainly had a header and real data rows.
+
+Root cause: the exporter originally joined rows with a bare `\n`. MaxPreps'
+import parser is a classic Windows/ASP.NET upload tool and evidently splits
+rows on `\r\n`; an LF-only file collapses into a single unbroken line, which
+reads as "no distinct header-then-data-row structure" to its validator.
+Nothing in the documented field spec mentions line-ending requirements --
+this was only found by an actual upload attempt, not by reading
+`field_specs.aspx` again.
+
+Fixed by writing `\r\n` between rows (and a trailing `\r\n`) in
+`maxpreps_export_service.py`. This is believed correct given how precisely
+the symptom matches the known LF-vs-CRLF failure mode for this class of
+tool, but it has not yet been re-confirmed with another real upload --
+that's the next real verification step, not something this round can
+self-certify.
+
 ## Scope notes
 
 Football only, per the brief ("CSRN's most mature stats engine and Jason's
