@@ -534,6 +534,7 @@ class RulesService:
                     required_roles.append("sacker")
             if own_recovery:
                 required_roles.append("recoverer")
+            team_mismatch_players: list[dict[str, str]] = []
             for role in required_roles:
                 permitted_team = roles.defense if role == "sacker" else roles.offense
                 ref = refs[role]
@@ -557,26 +558,38 @@ class RulesService:
                 if ref.get("resolved"):
                     continue
                 other_team = roles.offense if role == "sacker" else roles.defense
-                # Preserve the established unresolved-jersey workflow: an unknown
-                # number may still be recorded and surfaced as unresolved. Reject
-                # only when the same submitted jersey definitively resolves on the
-                # non-permitted team.
+                # An unknown number is recorded and surfaced as unresolved. That
+                # includes a number that only resolves on the OTHER team: it used
+                # to be hard-rejected (PLAYER_TEAM_MISMATCH), but a blank jersey on
+                # the permitted team's roster looks exactly the same, and rejecting
+                # dropped real plays (2026-10-09: 7 Columbus plays lost, 52 of 90
+                # Columbus jerseys blank in rosters.json). The play records with
+                # this role unresolved and is flagged in team_mismatch_players so
+                # the number can be corrected post-game.
                 wrong_team_ref = self._resolve(state, other_team, numbers[role])
                 if wrong_team_ref.get("resolved"):
-                    return RulesResult(
-                        "PLAYER_TEAM_MISMATCH",
+                    team_mismatch_players.append(
                         {
-                            "message": f"Player #{numbers[role]} is not eligible for the requested {role} role.",
                             "role": role,
                             "number": numbers[role],
                             "permitted_team": permitted_team,
                             "resolved_team": other_team,
-                        },
+                            "resolved_name": str(wrong_team_ref.get("name", "") or "").strip(),
+                        }
                     )
-            names = {
-                role: str(refs[role].get("name", "") or incoming.get(f"{role}_name", "")).strip()
-                for role in refs
+            # A browser-supplied name that is the other team's player at that
+            # number would credit the play to the wrong person; keep it #number only.
+            wrong_team_names = {
+                mismatch["role"]: mismatch["resolved_name"].lower()
+                for mismatch in team_mismatch_players
+                if mismatch["resolved_name"]
             }
+            names = {}
+            for role in refs:
+                supplied_name = str(incoming.get(f"{role}_name", "") or "").strip()
+                if role in wrong_team_names and supplied_name.lower() == wrong_team_names[role]:
+                    supplied_name = ""
+                names[role] = str(refs[role].get("name", "") or supplied_name).strip()
 
             landing = end
             kick_distance = 0
@@ -1203,6 +1216,7 @@ class RulesService:
                     for role, ref in refs.items()
                     if ref.get("number") and not ref.get("resolved")
                 ],
+                "team_mismatch_players": copy.deepcopy(team_mismatch_players),
                 "landing_spot": (
                     self.coord_to_spot(landing, state)
                     if kind in {"kickoff", "punt"}
@@ -1238,6 +1252,14 @@ class RulesService:
                 result=result_data,
             )
             self._save_state(state)
+            for mismatch in team_mismatch_players:
+                get_runtime_diagnostics().record(
+                    "SERVER_RULES_PLAYER_TEAM_MISMATCH",
+                    command_id=command_id_for_log,
+                    play_id=play.get("play_id", ""),
+                    play_number=play.get("play_number", ""),
+                    **mismatch,
+                )
             return RulesResult("OK", result_data)
         finally:
             self._transaction_lock.release()
