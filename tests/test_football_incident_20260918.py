@@ -653,10 +653,11 @@ def test_a_lost_fumble_ignores_the_recoverer_field() -> None:
     assert g.store["possession"] == "visitor"
 
 
-def test_recoverer_must_be_on_the_offense() -> None:
-    """#22 exists on both rosters here; a number that only resolves on the
-    defence (visitor #22 under a home play, with no home #22) is rejected the
-    same way the other offensive roles are."""
+def test_recoverer_resolving_only_on_the_defense_records_unresolved() -> None:
+    """A number that only resolves on the defence (visitor #22 under a home
+    play, with no home #22) is recorded unresolved and flagged, the same way
+    the other offensive roles are (no longer a PLAYER_TEAM_MISMATCH reject,
+    2026-10-11)."""
     only_visitor = {("home", "7"): "Caleb Lang", ("visitor", "22"): "Visitor Twenty-Two"}
 
     def resolver(state, team, number):
@@ -668,9 +669,12 @@ def test_recoverer_must_be_on_the_offense() -> None:
         "team": "home", "play_type": "run", "start_spot": "LEFT 30", "end_spot": "LEFT 40",
         "player_number": "7", "fumble": True, "recoverer_number": "22", "recovery_spot": "LEFT 35",
     })
-    assert result.code == "PLAYER_TEAM_MISMATCH"
-    assert result.data["role"] == "recoverer"
-    assert g.store["events"] == []  # nothing recorded
+    assert result.code == "OK"
+    play = result.data["play"]
+    assert play["recoverer_number"] == "22" and play["recoverer_name"] == ""
+    assert "recoverer" in play["unresolved_players"]
+    assert [m["role"] for m in play["team_mismatch_players"]] == ["recoverer"]
+    assert len(g.store["events"]) == 1
 
 
 def test_pass_fumble_recovered_by_a_teammate_splits_receiving_yards_and_the_td() -> None:

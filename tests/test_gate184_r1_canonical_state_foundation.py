@@ -107,7 +107,9 @@ def test_wrong_team_offensive_play_is_rejected_before_stats_record_creation():
     assert holder["state"]["events"] == []
 
 
-def test_wrong_team_jersey_on_possessing_team_request_is_rejected():
+def test_wrong_team_jersey_on_possessing_team_request_records_unresolved():
+    # Was a hard PLAYER_TEAM_MISMATCH reject until 2026-10-11: a blank jersey on the
+    # possessing team's roster is indistinguishable, and rejecting dropped real plays.
     state = base_state()
     def resolver(_state, team, number):
         # #22 only exists for Northwood, never for Pine Valley.
@@ -123,8 +125,12 @@ def test_wrong_team_jersey_on_possessing_team_request_is_rejected():
         "start_spot": "LEFT 25",
         "end_spot": "LEFT 30",
     })
-    assert result.code == "PLAYER_TEAM_MISMATCH"
-    assert holder["state"]["plays"] == []
+    assert result.code == "OK"
+    play = result.data["play"]
+    assert play["unresolved_players"] == ["player"]
+    assert play["player_name"] == ""
+    assert play["team_mismatch_players"][0]["resolved_team"] == "visitor"
+    assert len(holder["state"]["plays"]) == 1
 
 
 def test_unknown_jersey_remains_recordable_and_unresolved():
