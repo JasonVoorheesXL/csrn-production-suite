@@ -197,7 +197,7 @@ def pass_play(w: Walk, team: str, passer: str, outcome: str, end: int | None = N
 
 def kick_play(w: Walk, team: str, kind: str, kicker: str, landing: int, end: int | None = None, *,
               returner: str = "", touchback: bool = False, fair_catch: bool = False,
-              shot: str | None = None) -> None:
+              downed: bool = False, shot: str | None = None) -> None:
     if kind == "kickoff":
         w.click("#statisticianKickoffActions button", 1500)
     else:
@@ -211,6 +211,8 @@ def kick_play(w: Walk, team: str, kind: str, kicker: str, landing: int, end: int
         w.check("playTouchback")
     if fair_catch:
         w.check("playFairCatch")
+    if downed:
+        w.check("playDowned")
     if shot:
         w.shot(shot, PLAY_SHEET)
     w.record_play()
@@ -322,8 +324,8 @@ def phase_q1_plays(w: Walk) -> None:
     run_play(w, "visitor", "5", 53, fumble_lost=True, turnover_at=50, recovered_by="52",
              shot="fumble_lost_form")
     w.top_half("after_fumble")
-    # Northgate punts from RIGHT 47; lands RIGHT 10; Riverside #1 returns to RIGHT 15.
-    kick_play(w, "home", "punt", "3", 90, 85, returner="1", shot="punt_form")
+    # Northgate punts from RIGHT 47; it bounces dead at RIGHT 15 and Northgate downs it.
+    kick_play(w, "home", "punt", "3", 85, downed=True, shot="punt_downed_form")
     w.top_half("after_punt")
     w.shot("register_q1", REGISTER)
 
@@ -438,7 +440,9 @@ def phase_q3_q4(w: Walk) -> None:
     w.period("End Quarter")
     w.top_half("after_end_q3")
     # Q4: Riverside punts, Northgate returns to midfield and runs it in.
-    kick_play(w, "visitor", "punt", "15", own(w, "home", 15), own(w, "home", 50), returner="21")
+    kick_play(w, "visitor", "punt", "15", own(w, "home", 15), own(w, "home", 50), returner="21",
+              shot="punt_return_form")
+    w.top_half("after_punt_return")
     run_play(w, "home", "22", own(w, "home", 100))
     w.top_half("q4_td_try_pending")
     try_kick(w, "XP NO GOOD", "3", "xp_no_good_form")
