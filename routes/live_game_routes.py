@@ -353,6 +353,29 @@ def create_live_game_blueprint(
             return jsonify(result.data), 409
         return jsonify(result.data)
 
+    @routes.post("/api/plays/<event_id>/reenter")
+    @dependencies.require_auth
+    def reenter_play(event_id: str):
+        # Edit Play: the play form re-submitted for a recorded play, re-run
+        # through the rules engine with every later event replayed after it.
+        request_id = new_request_id()
+        payload = mutation_payload()
+        started = perf_counter()
+        before = load_summary_safely()
+        result = dependencies.get_rules_service().reenter(event_id, payload)
+        status = (
+            200 if result.ok
+            else 404 if result.code == "EVENT_NOT_FOUND"
+            else 400 if result.code in {"INVALID_PLAY", "NOT_A_RULES_PLAY"} or result.code.startswith("OUT_OF_BOUNDS_")
+            else 409
+        )
+        log_route(event_type="SERVER_MUTATION", route="/api/plays/<event_id>/reenter", action="play_edit", request_id=request_id, payload=payload, status=status, started=started, before=before, after=load_summary_safely(), result=result)
+        if status == 200:
+            return jsonify(result.data)
+        data = dict(result.data or {})
+        data.setdefault("error", result.code)
+        return jsonify(data), status
+
     @routes.get("/api/corrections")
     @dependencies.require_auth
     def corrections_report():
