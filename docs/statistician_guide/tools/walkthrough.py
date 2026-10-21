@@ -406,6 +406,17 @@ def phase_halftime(w: Walk) -> None:
 def phase_second_half_kickoff(w: Walk) -> None:
     w.period("Start Second Half")
     w.top_half("second_half_kickoff_pending")
+    # Scenario: the teams did NOT simply mirror the first half -- on the field Northgate
+    # is kicking the other way. Spot it in the kickoff form, close it, flip the direction.
+    w.click("#statisticianKickoffActions button", 1500)
+    w.shot("direction_wrong_kickoff_form", PLAY_SHEET)
+    w.click("#playEntryModal button:text-is('Cancel')", 800)
+    w.region("direction_before_fix", "#statisticianFieldPosition", "#statisticianModule .rules-card:has(#driveDirLeft)")
+    current = w.page.evaluate("currentState[currentState.possession + '_direction']")
+    flip = "Left" if current == "right" else "Right"
+    w.click(f"#statisticianDrive{flip}", 2200)
+    w.region("direction_after_fix", "#statisticianFieldPosition", "#statisticianModule .rules-card:has(#driveDirLeft)")
+    w.top_half("direction_fixed_kickoff_pending")
     kick_play(w, "home", "kickoff", "3", own(w, "visitor", 8), own(w, "visitor", 32),
               returner="1", shot="second_half_kickoff_form")
     w.top_half("after_second_half_kickoff")

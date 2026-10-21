@@ -519,7 +519,7 @@ BODY = [
     ("fig", "after_end_q1", "Q2 begins. Same down, distance and possession &mdash; but the ball spot flipped from LEFT 20 to "
      "RIGHT 20 because the teams changed ends. That's correct: it's still Northgate's own 20."),
     ("pair", ("period_card_end_q3", "End of Q3: status QUARTER &middot; Q3."),
-             ("after_end_q3", "After End Quarter: Q4, ends switched again (RIGHT 20 &rarr; LEFT 20).")),
+             ("after_end_q3", "After End Quarter: Q4, ends switched again (LEFT 20 &rarr; RIGHT 20).")),
 
     # ------------------------------------------------------------------ 7
     ("section", "7", "Halftime",
@@ -537,8 +537,9 @@ BODY = [
     ("fields", [
         ("Second-half receiving team", "Filled in automatically from the coin toss (Riverside deferred, so Riverside receives). "
                                        "Change only if the officials tell you otherwise."),
-        ("Second-half receiving team drives", "<i>Mirror first half (default)</i> is right in most games. Change only if the "
-                                              "receiving team chooses a different end."),
+        ("Second-half receiving team drives", "<i>Mirror first half (default)</i> is right in most games. If the receiving "
+                                              "team chooses a different end, set it here before starting the second half. "
+                                              "Missed it? See &ldquo;Direction looks wrong after halftime?&rdquo; in Phase 8."),
     ]),
     ("callout", "tip", "DURING THE BREAK",
      "Use halftime to tell your producer about any amber/unresolved plays you noted in the first half."),
@@ -553,10 +554,47 @@ BODY = [
         "Press " + ui("Open Detailed Kickoff", "red") + " and enter the kick, the returner and the spots.",
     ]),
     ("fig", "second_half_kickoff_pending", "Q3, KICKOFF REQUIRED &mdash; NORTHGATE."),
-    ("side", "second_half_kickoff_form", "Second-half kickoff: Northgate #3 to Riverside #1.", [
-        ("p", "Notice the drive badge has flipped compared with the opening kickoff &mdash; the teams changed ends for the second half."),
+    ("h2", "Direction looks wrong after halftime?"),
+    ("p", "By default the screen assumes the teams simply swap ends from the first half. Sometimes they don't. For "
+          "example, the receiving team chooses the other goal, or the halftime dropdown was left on <i>Mirror first half</i>. "
+          "<b>Check the arrow before you enter the second-half kickoff.</b> In this example Northgate is actually kicking "
+          "toward the LEFT goal, but the screen still has it driving &rarr;."),
+    ("side", "direction_wrong_kickoff_form", "The tell: the kickoff form's badge reads N &rarr; and the kick starts at LEFT 40, "
+     "but on the field Northgate is kicking toward the LEFT goal.", [
+        ("h3", "Fixing it at the kickoff (the common case)"),
+        ("steps", [
+            "Press " + ui("Cancel") + " to close the kickoff form without recording.",
+            "Scroll to <b>Field Position</b> and press the correct " + ui("&larr; Drive") + " or " + ui("Drive &rarr;") +
+            " button. The big arrows in the <b>Drive Direction</b> card do the same thing. Either one sets the team shown in the "
+            "POSSESSION strip, and the other team automatically switches to the opposite direction.",
+            "Press " + ui("Open Detailed Kickoff", "red") + " again. The badge now reads <b>&larr; N</b> and the kick starts from "
+            "Northgate's own 40 (RIGHT 40). Enter the kickoff as normal.",
+        ]),
+        ("p", "That's all a kickoff needs, because the kickoff form re-places the kicker at their own 40 based on direction."),
     ]),
-    ("fig", "after_second_half_kickoff", "Riverside ball, 1st &amp; 10 at RIGHT 32. You're back to normal play entry."),
+    ("pair", ("direction_before_fix", "Before: Drive &rarr; is lit; Game Context says <i>LEFT 40 &middot; Northgate &middot; 60 to goal</i>."),
+             ("direction_after_fix", "After pressing &larr; Drive: the ball has <b>not</b> moved, so the same LEFT 40 now reads "
+                                     "<i>40 to goal</i>.")),
+    ("callout", "stop", "IF YOU NOTICE IN THE MIDDLE OF A DRIVE",
+     "Changing the direction does <b>not</b> move the ball. The spot stays on the same side of the field (here LEFT 40), "
+     "so its meaning flips: what was the team's own 40 becomes the opponent's 40. Mid-drive, after pressing the correct "
+     "Drive button you must also drag the <b>Field Position</b> ball to where the ball really is. Then check that "
+     "<b>Game Context</b> shows the right &ldquo;yards to goal.&rdquo; Otherwise the next plays will count yards, first downs "
+     "and touchdowns toward the wrong goal. Plays already entered while the direction was wrong may have wrong yardage. "
+     "Don't undo the drive; note the play numbers for your producer."),
+    ("callout", "warn", "THE &ldquo;BALL:&rdquo; LABEL USES FIXED SIDES",
+     "The <b>Ball:</b> label above the green field always names the left half after the home team and the right half "
+     "after the visitor, even after the teams switch ends. After the fix above it still reads <i>&ldquo;Northgate 40&rdquo;</i>, "
+     "although LEFT 40 is now the end Riverside defends. Trust the ball's position, the Drive arrow and Game Context, "
+     "not the team name in that label."),
+    ("callout", "tip", "PREVENT IT AT HALFTIME",
+     "If you know the receiving team picked a different end, set <b>Second-half receiving team drives</b> in Period "
+     "Administration <i>before</i> pressing Start Second Half."),
+    ("h2", "Entering the second-half kickoff"),
+    ("side", "second_half_kickoff_form", "Second-half kickoff after the fix: &larr; N, from RIGHT 40. Northgate #3 to Riverside #1.", [
+        ("p", "Same form as the opening kickoff: kicker, Landed / Caught Spot, returner, End Spot, " + ui("Record Play", "red") + "."),
+    ]),
+    ("fig", "after_second_half_kickoff", "Riverside ball, 1st &amp; 10 at LEFT 32, now driving &rarr;. You're back to normal play entry."),
     ("callout", "warn", "&ldquo;SECOND HALF CAN START ONLY FROM HALFTIME&rdquo;",
      "If you see this pop-up, the game was never put into halftime (or the second half already started). Check the "
      "Period Administration status line before pressing anything else, and ask your producer if it doesn't say HALFTIME."),
@@ -575,7 +613,7 @@ BODY = [
     ("pair", ("after_end_regulation", "Tied 16&ndash;16, Q4 complete."),
              ("period_card_end_regulation", "Period Administration just before End Quarter in Q4.")),
     ("h2", "Starting overtime"),
-    ("side", "period_card_overtime_setup", "Overtime setup: Riverside (Visitor) first, starting spot RIGHT 10.", [
+    ("side", "period_card_overtime_setup", "Overtime setup: Riverside (Visitor) first, starting spot LEFT 10.", [
         ("fields", [
             ("Overtime possession", "The team that goes on offense first (decided by the overtime coin toss)."),
             ("Overtime starting spot", "Where the ball is placed, in field-spot language: <code>LEFT 10</code> or "
@@ -588,13 +626,13 @@ BODY = [
             "Press " + ui("Start Overtime") + ". Both fields are required.",
         ]),
     ]),
-    ("fig", "overtime_started", "QOT: Riverside, 1st &amp; 10 at RIGHT 10. Overtime is untimed, so the clock is hidden "
+    ("fig", "overtime_started", "QOT: Riverside, 1st &amp; 10 at LEFT 10. Overtime is untimed, so the clock is hidden "
      "from the broadcast."),
     ("h2", "First overtime possession"),
     ("side", "ot_fg_missed_form", "Riverside FG attempt from the 10: Outcome &ldquo;Missed / No Good&rdquo;, 27 yards.", [
         ("p", "Enter overtime plays exactly as in regulation. Here Riverside's possession ends with a missed field goal."),
     ]),
-    ("fig", "after_ot_fg_missed", "After the miss, possession switched to Northgate &mdash; but the ball is still at RIGHT 10, "
+    ("fig", "after_ot_fg_missed", "After the miss, possession switched to Northgate &mdash; but the ball is still at LEFT 10, "
      "Riverside's attacking spot. Northgate's possession must start at the other 10."),
     ("h2", "Second overtime possession: place the ball yourself"),
     ("p", "The system hands the ball to the other team but does <b>not</b> move it to their overtime starting spot. "
@@ -602,16 +640,11 @@ BODY = [
     ("steps", [
         "<b>Possession:</b> confirm the correct team is highlighted (press it if not).",
         "<b>Field Position:</b> drag the ball on the green field to this team's overtime spot. Here Northgate is "
-        "driving &larr;, so its spot is the 10-yard line nearest the LEFT goal.",
+        "driving &rarr;, so its spot is the 10-yard line nearest the RIGHT goal.",
         "<b>Down &amp; Distance:</b> press " + ui("1st") + " if needed.",
     ]),
     ("fig", "ot_second_possession_setup", "Northgate's overtime possession set up: Possession Home, 1st &amp; 10, ball at the "
-     "left-hand 10 (driving &larr;).", "narrow"),
-    ("callout", "warn", "THE FIELD POSITION LABEL USES FIXED SIDES",
-     "The <b>Ball:</b> label above the green field always names the <b>left half after the home team</b> and the <b>right "
-     "half after the visitor</b>, even after the teams have switched ends. So here it reads <i>&ldquo;Northgate 10&rdquo;</i> "
-     "although that 10-yard line is the end Riverside is defending. Trust the ball's position on the field and the "
-     "&larr;/&rarr; Drive arrow, not the team name in that label."),
+     "right-hand 10 (driving &rarr;). Remember the &ldquo;Ball:&rdquo; label uses fixed sides (Phase 8).", "narrow"),
     ("side", "ot_fg_good_form", "Northgate FG from the 10: Made, 27 yards.", [
         ("p", "Northgate kicks the winning field goal: " + ui("FG") + " on the Northgate card, Outcome <b>Made</b>."),
     ]),
@@ -687,6 +720,7 @@ BODY = [
         ["End of quarter", ui("End Quarter", "gold"), "&mdash;", "Ends switch; spot label flips"],
         ["Halftime", ui("End Quarter", "gold") + " after Q2", "&mdash;", "HALFTIME &middot; Q2"],
         ["Second half", ui("Start Second Half"), "Then the kickoff", "Q3 KICKOFF REQUIRED"],
+        ["Direction wrong", ui("&larr; Drive") + " / " + ui("Drive &rarr;"), "Mid-drive: also move the ball", "Game Context yards-to-goal"],
         ["Overtime", ui("Start Overtime"), "Possession + spot", "Move ball yourself for 2nd possession"],
         ["Game over", ui("Confirm Final", "red"), "OK the browser prompt", "FINAL badge; register archived"],
     ]),
