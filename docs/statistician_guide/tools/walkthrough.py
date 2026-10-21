@@ -341,20 +341,15 @@ def phase_ball_fixes(w: Walk) -> None:
     #    but the End Spot is left at RIGHT 17 (2 yards).
     run_play(w, "visitor", "5", start - 2)
     w.region("spot_mistake_recorded", SCOREBOARD, ".statistician-action-bar")
-    # 2. Quick Edit Last Play: move the end spot, then fix the resulting down & distance.
-    w.click("#statisticianModule .statistician-action-bar button:text-is('Quick Edit Last Play')", 1200)
-    w.shot("quick_edit_open", "#editEventModal .event-confirm-sheet")
-    w.slider("editEndCoord", start - 12)
-    w.shot("quick_edit_spot_moved", "#editEventModal .event-confirm-sheet")
-    w.page.fill("#editEventDescription", "#5 Jordan Reyes run for 12 yards, first down")
-    w.select("editEventDown", "1st")
-    w.page.fill("#editEventDistance", "10")
-    w.page.fill("#editEventNote", "End spot keyed at RIGHT 17; runner reached RIGHT 27")
-    # The lower half of the form (Resulting Down/Distance, note) sits below the fold.
-    w.page.evaluate("""() => { const s = document.querySelector('#editEventModal .event-confirm-sheet');
-        s.scrollTop = s.scrollHeight; document.getElementById('editEventDown').scrollIntoView({block: 'center'}); }""")
-    w.shot("quick_edit_ready", "#editEventModal .event-confirm-sheet")
-    w.click("#editEventModal button.primary:text-is('Save Edit')", 2400)
+    # 2. Quick Edit Last Play: the play form re-opens pre-filled; move the end spot and save.
+    w.click("#statisticianModule .statistician-action-bar button:text-is('Quick Edit Last Play')", 1500)
+    w.shot("quick_edit_open", PLAY_SHEET)
+    w.slider("playEndCoord", start - 12)
+    w.page.fill("#playEditNote", "End spot keyed at RIGHT 17; runner reached RIGHT 27")
+    w.shot("quick_edit_ready", PLAY_SHEET)
+    w.click("#playEntrySubmit", 2600)
+    if w.page.is_visible("#playEntryModal"):
+        raise RuntimeError("Edit not saved: " + w.page.locator("#playEntryMessage").inner_text())
     w.region("after_quick_edit", SCOREBOARD, ".statistician-action-bar")
     w.shot("register_after_quick_edit", REGISTER)
     # 3. The officials spot the ball a yard back from where the screen has it.
@@ -521,6 +516,21 @@ def phase_overtime(w: Walk) -> None:
 
 
 def phase_final(w: Walk) -> None:
+    # Before confirming Final: fix the 1st-quarter amber jersey from the notes (#22 was really Riverside #5).
+    row = w.page.locator("#statisticianEventRegister > *", has_text="#22 run for 5 yards").first
+    row.scroll_into_view_if_needed()
+    w.shot("amber_row_before_fix", REGISTER)
+    row.locator("button:text-is('Edit')").click()
+    w.page.wait_for_timeout(1500)
+    w.jersey("playBallCarrier", "5")
+    w.page.fill("#playEditNote", "Ball carrier was Riverside #5, not #22 (stat notes)")
+    w.shot("amber_fix_form", PLAY_SHEET)
+    w.click("#playEntrySubmit", 2600)
+    if w.page.is_visible("#playEntryModal"):
+        raise RuntimeError("Edit not saved: " + w.page.locator("#playEntryMessage").inner_text())
+    w.page.locator("#statisticianEventRegister > *", has_text="#5 Jordan Reyes run for 5 yards").first.scroll_into_view_if_needed()
+    w.shot("amber_row_after_fix", REGISTER)
+    w.region("score_after_amber_fix", SCOREBOARD, SCOREBOARD)
     w.shot("register_before_final", REGISTER)
     w.period("Confirm Final", 3000)
     w.shot("final_page_header", "header, .suite-header, .app-header")
