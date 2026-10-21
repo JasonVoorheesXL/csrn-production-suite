@@ -37,7 +37,10 @@ def data_uri(path: Path, mime: str) -> str:
 
 
 def shot(slug: str) -> Path:
-    matches = sorted(SHOTS.glob(f"[0-9][0-9]_{slug}.png"))
+    matches = sorted(
+        path for path in SHOTS.glob("*.png")
+        if path.stem.split("_", 1)[0].isdigit() and path.stem.split("_", 1)[1] == slug
+    )
     if not matches:
         raise SystemExit(f"Missing screenshot for '{slug}'")
     return matches[0]

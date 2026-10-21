@@ -166,7 +166,7 @@ BODY = [
      "Drive Direction, Game Context and Period Administration. You'll mostly use Period Administration.", "narrow"),
     ("callout", "tip", "HANDS OFF THE CORRECTION BUTTONS",
      "Possession, Quarter, Down &amp; Distance and Field Position are <b>manual overrides</b>. In a normal game the "
-     "system keeps them right for you. You'll use them only for overtime setup (Phase 9) or if your producer asks."),
+     "system keeps them right for you. You'll use them for overtime setup (Phase 9), when the officials re-spot the ball (Phase 3, <i>Ball in the wrong place?</i>), or if your producer asks."),
     ("h2", "Step 3 &mdash; Record the opening coin toss"),
     ("side", "coin_toss_form", "Opening Coin Toss form: Riverside (visitor) won and deferred.", [
         ("p", "Before the first play the console shows <b>OPENING COIN TOSS &mdash; COIN TOSS REQUIRED</b>. "
@@ -255,7 +255,7 @@ BODY = [
           "possession change it caused. Your browser first asks <i>&ldquo;Undo this: &hellip;?&rdquo;</i> naming the play "
           "&mdash; check it's the right one and press <b>OK</b>. Then simply enter the play again. " + ui("Restore Last Undone") + " brings back "
           "something you undid by accident. " + ui("Quick Edit Last Play", "red") + " opens the last play's correction form "
-          "&mdash; handy for fixing a jersey or spot without undoing."),
+          "&mdash; see <b>Ball in the wrong place?</b> at the end of this phase."),
     ("callout", "warn", "UNDO ONLY THE MOST RECENT PLAY",
      "Undo always removes the <i>latest</i> event. If the mistake was several plays ago, don't undo a string of good "
      "plays to reach it &mdash; note the play number and let it be fixed after the game."),
@@ -393,6 +393,62 @@ BODY = [
         [ui("Play Commercial", "green"), "Plays the next sponsor ad. Only if your producer asks you to run commercials."],
     ]),
 
+    ("h2", "Ball in the wrong place?"),
+    ("p", "The ball spot drives everything: yards, first downs, touchdowns and safeties are all measured from it. If the screen's "
+          "spot doesn't match where the officials put the ball, fix it before the next snap. Which tool you use depends on "
+          "<i>why</i> it's wrong:"),
+    ("table", ["Situation", "Use", "Shown below"], [
+        ["You just recorded a play and dragged the End Spot to the wrong place", ui("Quick Edit Last Play", "red") +
+         " (or " + ui("Undo Last Event", "gold") + " and re-enter)", "Fix 1"],
+        ["No play is wrong, but the officials spotted the ball somewhere else (re-spot, measurement, inadvertent whistle)",
+         "<b>Field Position</b> slider", "Fix 2"],
+        ["You're already in the next play's form and the Start Spot is wrong", ui("Correct Start Spot"), "Fix 3"],
+        ["The bad spot was several plays ago", "Don't undo good plays. Fix the current spot (Fix 2) and note the play number for your producer", "&mdash;"],
+    ]),
+    ("h3", "Fix 1 &mdash; Quick Edit Last Play"),
+    ("p", "Here Riverside's #5 actually ran from RIGHT 15 to RIGHT 27 (12 yards, a first down), but the End Spot was left at "
+          "RIGHT 17. The screen now shows 2nd &amp; 8 at RIGHT 17."),
+    ("fig", "spot_mistake_recorded", "The mis-keyed play: 2nd &amp; 8 at RIGHT 17 instead of 1st &amp; 10 at RIGHT 27.", "narrow"),
+    ("pair", ("quick_edit_spot_moved", "Edit Play / Event: dragging End / Ball Spot to RIGHT 27 updates the yards to 12."),
+             ("quick_edit_ready", "Lower half of the form: Resulting Down/Distance set to 1st &amp; 10, plus a correction note.")),
+    ("steps", [
+        "Press " + ui("Quick Edit Last Play", "red") + " in the action bar. The <b>Edit Play / Event</b> form opens on the most recent play.",
+        "Drag <b>End / Ball Spot</b> to the correct spot (use " + ui("End &minus;1") + " / " + ui("End +1") + " to fine-tune). "
+        "<i>Calculated result</i> and <b>Yards</b> update to match.",
+        "Retype the <b>Description</b> (e.g. <i>run for 12 yards, first down</i>). It is <b>not</b> rewritten for you, and it's "
+        "what the Play Register shows.",
+        "Scroll down. <b>Resulting Down</b> and <b>Resulting Distance</b> still show the values from your original entry (2nd &amp; 8). "
+        "Set them to what the officials have now (1st &amp; 10).",
+        "Optionally add a <b>Correction Note</b>, then press " + ui("Save Edit", "red") + ".",
+    ]),
+    ("pair", ("after_quick_edit", "After Save Edit: 1st &amp; 10 at RIGHT 27."),
+             ("register_after_quick_edit", "The register now reads <i>#5 Jordan Reyes run for 12 yards, first down</i>.")),
+    ("callout", "warn", "THE EDIT FORM DOESN'T REDO THE MATH FOR YOU",
+     "Unlike the play form, moving the spot in Edit Play / Event only changes the yards. You set the resulting down, "
+     "distance and description yourself. If that feels like too much mid-game, " + ui("Undo Last Event", "gold") +
+     " and re-entering the play is just as good, and lets the system work everything out again."),
+    ("h3", "Fix 2 &mdash; the officials spotted it somewhere else"),
+    ("p", "Your entry was right, but the ball ends up elsewhere: the officials re-spot it, a measurement moves it, or a whistle "
+          "kills the play early. In this example the officials place the ball one yard back, at RIGHT 26."),
+    ("pair", ("respot_before", "Before: Ball: Riverside 27."),
+             ("respot_after", "After dragging the ball one yard back: Ball: Riverside 26.")),
+    ("steps", [
+        "Scroll to <b>Field Position</b>. The <b>Ball:</b> label names whose end of the field the ball is in.",
+        "Drag the football on the green field to the officials' spot and let go. The spot saves when you release.",
+        "Check <b>Down &amp; Distance</b>. The slider keeps the current down and distance. If the line to gain didn't move "
+        "(it usually doesn't), pick the new distance in the distance dropdown, e.g. 2nd &amp; 6 becoming 2nd &amp; 7.",
+    ]),
+    ("fig", "after_respot", "The POSSESSION strip and Game Context now show RIGHT 26.", "narrow"),
+    ("h3", "Fix 3 &mdash; Correct Start Spot inside a play form"),
+    ("side", "correct_start_spot_unlocked", "Correct Start Spot pressed: the Start Spot slider is unlocked and the button reads "
+     "Lock Start Spot.", [
+        ("p", "If you open " + ui("Run") + ", " + ui("Pass") + " or " + ui("Punt") + " and notice the <b>Start Spot</b> is wrong, "
+              "you don't have to cancel. Press " + ui("Correct Start Spot") + ", drag the Start Spot to the real line of scrimmage, "
+              "press " + ui("Lock Start Spot") + ", then enter the play as normal. Yards are measured from the corrected start."),
+        ("p", "This changes only the start of the play you're entering. It doesn't change the down or the distance, so "
+              "if the spot moved because of something the officials did, Fix 2 is usually the better choice."),
+    ]),
+
     # ------------------------------------------------------------------ 4
     ("section", "4", "Jerseys That Don't Match (Unresolved Players)",
      "Sometimes the number you see isn't on that team's roster &mdash; a wrong number on the roster, a blank "
@@ -409,14 +465,14 @@ BODY = [
         ("callout", "tip", "STALE MESSAGE",
          "The &ldquo;Play recorded.&rdquo; under the buttons in this screenshot is left over from the previous play &mdash; ignore it."),
     ]),
-    ("fig", "mismatch_after", "After recording: 2nd &amp; 5 at RIGHT 20. The game moved on exactly as it should."),
+    ("fig", "mismatch_after", "After recording: 2nd &amp; 5 at RIGHT 31. The game moved on exactly as it should."),
     ("h2", "Case 2: the number isn't on anyone's roster"),
     ("side", "offroster_pass_form", "Riverside pass to #44, a number on neither roster.", [
         ("p", "Exactly the same treatment: amber &ldquo;Not found on active roster,&rdquo; record it anyway. The "
               "completion and yardage count for the team; only the receiver's name is missing."),
     ]),
     ("fig", "register_unresolved", "In the register the unresolved plays show a bare number with no name: "
-     "<i>#22 run for 5 yards</i> and <i>complete to #44 for 8 yards</i>."),
+     "<i>#22 run for 5 yards</i> and <i>complete to #44 for 8 yards, first down</i>."),
     ("fig", "unresolved_play_detail", "Tap a play to see its canonical record on the right side of the register.", "narrow"),
     ("callout", "rule", "WHAT TO DO WHEN YOU SEE AMBER",
      "<b>1.</b> Double-check the number on the field if you can do it in a second or two. If you misread it, retype it.<br>"
@@ -430,7 +486,7 @@ BODY = [
      "You never type a score. Touchdowns and safeties come from the End Spot; tries and field goals have "
      "their own guided pop-up. One example of every scoring outcome follows."),
     ("h2", "Touchdown (run)"),
-    ("side", "td_run_form", "Riverside #5 run from RIGHT 28: End Spot dragged all the way to LEFT GOAL.", [
+    ("side", "td_run_form", "Riverside #5 run from RIGHT 39: End Spot dragged all the way to LEFT GOAL.", [
         ("p", "Enter it like any run, but drag <b>End Spot</b> all the way into the end zone the team is attacking "
               "(the slider label reads <code>LEFT GOAL</code> or <code>RIGHT GOAL</code>). The preview shows the full yardage."),
         ("p", "On " + ui("Record Play", "red") + " the system scores <b>6 points</b> and opens the <b>TRY REQUIRED</b> panel."),
@@ -730,6 +786,8 @@ BODY = [
         ["Safety", ui("Run") + "/" + ui("Pass") + ", End in <b>own</b> end zone", "As normal", "+2 defense, free kick"],
         ["Wrong jersey (amber)", ui("Record Play", "red") + " anyway", "&mdash;", "Note play number for producer"],
         ["Mistake just now", ui("Undo Last Event", "gold"), "Re-enter play", "Only undoes the latest event"],
+        ["Last play's spot wrong", ui("Quick Edit Last Play", "red"), "End spot, description, down &amp; distance", "Down/distance don't recalculate"],
+        ["Officials re-spot the ball", "Field Position slider", "Drag the ball, then distance", "Ball: label, Game Context"],
         ["End of quarter", ui("End Quarter", "gold"), "&mdash;", "Ends switch; spot label flips"],
         ["Halftime", ui("End Quarter", "gold") + " after Q2", "&mdash;", "HALFTIME &middot; Q2"],
         ["Second half", ui("Start Second Half"), "Then the kickoff", "Q3 KICKOFF REQUIRED"],

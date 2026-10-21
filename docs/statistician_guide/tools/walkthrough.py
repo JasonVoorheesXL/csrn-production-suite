@@ -330,11 +330,52 @@ def phase_q1_plays(w: Walk) -> None:
     w.shot("register_q1", REGISTER)
 
 
+def ball_coord(w: Walk) -> int:
+    return int(w.page.evaluate("coordFromSpot(currentState.ball_spot)"))
+
+
+def phase_ball_fixes(w: Walk) -> None:
+    # Riverside ball at RIGHT 15 driving left (coordinates go DOWN as Riverside gains).
+    start = ball_coord(w)
+    # 1. Mis-keyed end spot: the runner actually reached RIGHT 27 (12 yards, a first down),
+    #    but the End Spot is left at RIGHT 17 (2 yards).
+    run_play(w, "visitor", "5", start - 2)
+    w.region("spot_mistake_recorded", SCOREBOARD, ".statistician-action-bar")
+    # 2. Quick Edit Last Play: move the end spot, then fix the resulting down & distance.
+    w.click("#statisticianModule .statistician-action-bar button:text-is('Quick Edit Last Play')", 1200)
+    w.shot("quick_edit_open", "#editEventModal .event-confirm-sheet")
+    w.slider("editEndCoord", start - 12)
+    w.shot("quick_edit_spot_moved", "#editEventModal .event-confirm-sheet")
+    w.page.fill("#editEventDescription", "#5 Jordan Reyes run for 12 yards, first down")
+    w.select("editEventDown", "1st")
+    w.page.fill("#editEventDistance", "10")
+    w.page.fill("#editEventNote", "End spot keyed at RIGHT 17; runner reached RIGHT 27")
+    # The lower half of the form (Resulting Down/Distance, note) sits below the fold.
+    w.page.evaluate("""() => { const s = document.querySelector('#editEventModal .event-confirm-sheet');
+        s.scrollTop = s.scrollHeight; document.getElementById('editEventDown').scrollIntoView({block: 'center'}); }""")
+    w.shot("quick_edit_ready", "#editEventModal .event-confirm-sheet")
+    w.click("#editEventModal button.primary:text-is('Save Edit')", 2400)
+    w.region("after_quick_edit", SCOREBOARD, ".statistician-action-bar")
+    w.shot("register_after_quick_edit", REGISTER)
+    # 3. The officials spot the ball a yard back from where the screen has it.
+    w.region("respot_before", "#statisticianFieldPosition", "#statisticianFieldPosition")
+    w.slider("statisticianFieldSlider", ball_coord(w) + 1)
+    w.page.wait_for_timeout(1500)
+    w.region("respot_after", "#statisticianFieldPosition", "#statisticianFieldPosition")
+    w.top_half("after_respot")
+    # 4. Correct Start Spot inside a play form (opened, unlocked, then cancelled).
+    w.team_button("visitor", "Run")
+    w.click("#unlockStartSpot", 500)
+    w.shot("correct_start_spot_unlocked", PLAY_SHEET)
+    w.click("#playEntryModal button:text-is('Cancel')", 800)
+
+
 def phase_unresolved(w: Walk) -> None:
-    # Riverside ball at RIGHT 15 driving left. #22 is a NORTHGATE number.
+    # Riverside ball driving left. #22 is a NORTHGATE number.
+    start = ball_coord(w)
     w.team_button("visitor", "Run")
     w.jersey("playBallCarrier", "22")
-    w.slider("playEndCoord", 80)
+    w.slider("playEndCoord", start - 5)
     w.shot("mismatch_run_form", PLAY_SHEET)
     w.record_play()
     w.top_half("mismatch_after")
@@ -342,7 +383,7 @@ def phase_unresolved(w: Walk) -> None:
     w.team_button("visitor", "Pass")
     w.jersey("playPasser", "12")
     w.jersey("playReceiver", "44")
-    w.slider("playEndCoord", 72)
+    w.slider("playEndCoord", start - 13)
     w.shot("offroster_pass_form", PLAY_SHEET)
     w.record_play()
     w.shot("register_unresolved", REGISTER)
@@ -490,7 +531,7 @@ def phase_final(w: Walk) -> None:
     (GUIDE / "capture_statistics.json").write_text(json.dumps(stats, indent=2), encoding="utf-8")
 
 
-PHASES = ["pregame", "opening_kickoff", "q1_plays", "unresolved", "scoring_first_half",
+PHASES = ["pregame", "opening_kickoff", "q1_plays", "ball_fixes", "unresolved", "scoring_first_half",
           "quarter_two", "scoring_q2", "halftime", "second_half_kickoff", "q3_q4", "overtime",
           "final"]
 

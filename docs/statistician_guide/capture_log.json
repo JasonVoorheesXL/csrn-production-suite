@@ -1088,12 +1088,12 @@
     }
   },
   {
-    "file": "32_mismatch_run_form.png",
+    "file": "32_spot_mistake_recorded.png",
     "score": "Northgate 0 - Riverside 0",
     "quarter": "1",
-    "down": "1st",
-    "distance": "10",
-    "ball_spot": "RIGHT 15",
+    "down": "2nd",
+    "distance": "8",
+    "ball_spot": "RIGHT 17",
     "possession": "visitor",
     "phase": "",
     "kicking": "",
@@ -1108,27 +1108,27 @@
     "visitor_direction": "left",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q1",
-    "plays": 9,
+    "plays": 10,
     "last_play": {
-      "type": "punt",
-      "result": "Punt by #3 landed at RIGHT 15, downed by the kicking team",
+      "type": "run",
+      "result": "#5 Jordan Reyes run for 2 yards",
       "description": null,
       "unresolved": [],
       "mismatch": [],
       "touchdown": false,
       "safety": false,
-      "yards": 32,
+      "yards": 2,
       "down": null,
       "distance": null
     }
   },
   {
-    "file": "33_mismatch_after.png",
+    "file": "33_quick_edit_open.png",
     "score": "Northgate 0 - Riverside 0",
     "quarter": "1",
     "down": "2nd",
-    "distance": "5",
-    "ball_spot": "RIGHT 20",
+    "distance": "8",
+    "ball_spot": "RIGHT 17",
     "possession": "visitor",
     "phase": "",
     "kicking": "",
@@ -1144,6 +1144,356 @@
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q1",
     "plays": 10,
+    "last_play": {
+      "type": "run",
+      "result": "#5 Jordan Reyes run for 2 yards",
+      "description": null,
+      "unresolved": [],
+      "mismatch": [],
+      "touchdown": false,
+      "safety": false,
+      "yards": 2,
+      "down": null,
+      "distance": null
+    }
+  },
+  {
+    "file": "34_quick_edit_spot_moved.png",
+    "score": "Northgate 0 - Riverside 0",
+    "quarter": "1",
+    "down": "2nd",
+    "distance": "8",
+    "ball_spot": "RIGHT 17",
+    "possession": "visitor",
+    "phase": "",
+    "kicking": "",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "Play recorded.",
+    "period_text": "QUARTER \u00b7 Q1",
+    "plays": 10,
+    "last_play": {
+      "type": "run",
+      "result": "#5 Jordan Reyes run for 2 yards",
+      "description": null,
+      "unresolved": [],
+      "mismatch": [],
+      "touchdown": false,
+      "safety": false,
+      "yards": 2,
+      "down": null,
+      "distance": null
+    }
+  },
+  {
+    "file": "35_quick_edit_ready.png",
+    "score": "Northgate 0 - Riverside 0",
+    "quarter": "1",
+    "down": "2nd",
+    "distance": "8",
+    "ball_spot": "RIGHT 17",
+    "possession": "visitor",
+    "phase": "",
+    "kicking": "",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "Play recorded.",
+    "period_text": "QUARTER \u00b7 Q1",
+    "plays": 10,
+    "last_play": {
+      "type": "run",
+      "result": "#5 Jordan Reyes run for 2 yards",
+      "description": null,
+      "unresolved": [],
+      "mismatch": [],
+      "touchdown": false,
+      "safety": false,
+      "yards": 2,
+      "down": null,
+      "distance": null
+    }
+  },
+  {
+    "file": "36_after_quick_edit.png",
+    "score": "Northgate 0 - Riverside 0",
+    "quarter": "1",
+    "down": "1st",
+    "distance": "10",
+    "ball_spot": "RIGHT 27",
+    "possession": "visitor",
+    "phase": "",
+    "kicking": "",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "COMMITTED \u00b7 /api/events/evt-1792601822598-10/edit \u00b7 rev 17",
+    "period_text": "QUARTER \u00b7 Q1",
+    "plays": 10,
+    "last_play": {
+      "type": "run",
+      "result": "#5 Jordan Reyes run for 12 yards, first down",
+      "description": null,
+      "unresolved": [],
+      "mismatch": [],
+      "touchdown": false,
+      "safety": false,
+      "yards": 12,
+      "down": "1st",
+      "distance": "10"
+    }
+  },
+  {
+    "file": "37_register_after_quick_edit.png",
+    "score": "Northgate 0 - Riverside 0",
+    "quarter": "1",
+    "down": "1st",
+    "distance": "10",
+    "ball_spot": "RIGHT 27",
+    "possession": "visitor",
+    "phase": "",
+    "kicking": "",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "COMMITTED \u00b7 /api/events/evt-1792601822598-10/edit \u00b7 rev 17",
+    "period_text": "QUARTER \u00b7 Q1",
+    "plays": 10,
+    "last_play": {
+      "type": "run",
+      "result": "#5 Jordan Reyes run for 12 yards, first down",
+      "description": null,
+      "unresolved": [],
+      "mismatch": [],
+      "touchdown": false,
+      "safety": false,
+      "yards": 12,
+      "down": "1st",
+      "distance": "10"
+    }
+  },
+  {
+    "file": "38_respot_before.png",
+    "score": "Northgate 0 - Riverside 0",
+    "quarter": "1",
+    "down": "1st",
+    "distance": "10",
+    "ball_spot": "RIGHT 27",
+    "possession": "visitor",
+    "phase": "",
+    "kicking": "",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "COMMITTED \u00b7 /api/events/evt-1792601822598-10/edit \u00b7 rev 17",
+    "period_text": "QUARTER \u00b7 Q1",
+    "plays": 10,
+    "last_play": {
+      "type": "run",
+      "result": "#5 Jordan Reyes run for 12 yards, first down",
+      "description": null,
+      "unresolved": [],
+      "mismatch": [],
+      "touchdown": false,
+      "safety": false,
+      "yards": 12,
+      "down": "1st",
+      "distance": "10"
+    }
+  },
+  {
+    "file": "39_respot_after.png",
+    "score": "Northgate 0 - Riverside 0",
+    "quarter": "1",
+    "down": "1st",
+    "distance": "10",
+    "ball_spot": "RIGHT 26",
+    "possession": "visitor",
+    "phase": "",
+    "kicking": "",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "COMMITTED \u00b7 /api/game-correction \u00b7 rev 18",
+    "period_text": "QUARTER \u00b7 Q1",
+    "plays": 10,
+    "last_play": {
+      "type": "run",
+      "result": "#5 Jordan Reyes run for 12 yards, first down",
+      "description": null,
+      "unresolved": [],
+      "mismatch": [],
+      "touchdown": false,
+      "safety": false,
+      "yards": 12,
+      "down": "1st",
+      "distance": "10"
+    }
+  },
+  {
+    "file": "40_after_respot.png",
+    "score": "Northgate 0 - Riverside 0",
+    "quarter": "1",
+    "down": "1st",
+    "distance": "10",
+    "ball_spot": "RIGHT 26",
+    "possession": "visitor",
+    "phase": "",
+    "kicking": "",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "COMMITTED \u00b7 /api/game-correction \u00b7 rev 18",
+    "period_text": "QUARTER \u00b7 Q1",
+    "plays": 10,
+    "last_play": {
+      "type": "run",
+      "result": "#5 Jordan Reyes run for 12 yards, first down",
+      "description": null,
+      "unresolved": [],
+      "mismatch": [],
+      "touchdown": false,
+      "safety": false,
+      "yards": 12,
+      "down": "1st",
+      "distance": "10"
+    }
+  },
+  {
+    "file": "41_correct_start_spot_unlocked.png",
+    "score": "Northgate 0 - Riverside 0",
+    "quarter": "1",
+    "down": "1st",
+    "distance": "10",
+    "ball_spot": "RIGHT 26",
+    "possession": "visitor",
+    "phase": "",
+    "kicking": "",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "COMMITTED \u00b7 /api/game-correction \u00b7 rev 18",
+    "period_text": "QUARTER \u00b7 Q1",
+    "plays": 10,
+    "last_play": {
+      "type": "run",
+      "result": "#5 Jordan Reyes run for 12 yards, first down",
+      "description": null,
+      "unresolved": [],
+      "mismatch": [],
+      "touchdown": false,
+      "safety": false,
+      "yards": 12,
+      "down": "1st",
+      "distance": "10"
+    }
+  },
+  {
+    "file": "42_mismatch_run_form.png",
+    "score": "Northgate 0 - Riverside 0",
+    "quarter": "1",
+    "down": "1st",
+    "distance": "10",
+    "ball_spot": "RIGHT 26",
+    "possession": "visitor",
+    "phase": "",
+    "kicking": "",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "COMMITTED \u00b7 /api/game-correction \u00b7 rev 18",
+    "period_text": "QUARTER \u00b7 Q1",
+    "plays": 10,
+    "last_play": {
+      "type": "run",
+      "result": "#5 Jordan Reyes run for 12 yards, first down",
+      "description": null,
+      "unresolved": [],
+      "mismatch": [],
+      "touchdown": false,
+      "safety": false,
+      "yards": 12,
+      "down": "1st",
+      "distance": "10"
+    }
+  },
+  {
+    "file": "43_mismatch_after.png",
+    "score": "Northgate 0 - Riverside 0",
+    "quarter": "1",
+    "down": "2nd",
+    "distance": "5",
+    "ball_spot": "RIGHT 31",
+    "possession": "visitor",
+    "phase": "",
+    "kicking": "",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "Play recorded.",
+    "period_text": "QUARTER \u00b7 Q1",
+    "plays": 11,
     "last_play": {
       "type": "run",
       "result": "#22 run for 5 yards",
@@ -1168,12 +1518,12 @@
     }
   },
   {
-    "file": "34_offroster_pass_form.png",
+    "file": "44_offroster_pass_form.png",
     "score": "Northgate 0 - Riverside 0",
     "quarter": "1",
     "down": "2nd",
     "distance": "5",
-    "ball_spot": "RIGHT 20",
+    "ball_spot": "RIGHT 31",
     "possession": "visitor",
     "phase": "",
     "kicking": "",
@@ -1188,7 +1538,7 @@
     "visitor_direction": "left",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q1",
-    "plays": 10,
+    "plays": 11,
     "last_play": {
       "type": "run",
       "result": "#22 run for 5 yards",
@@ -1213,12 +1563,12 @@
     }
   },
   {
-    "file": "35_register_unresolved.png",
+    "file": "45_register_unresolved.png",
     "score": "Northgate 0 - Riverside 0",
     "quarter": "1",
     "down": "1st",
     "distance": "10",
-    "ball_spot": "RIGHT 28",
+    "ball_spot": "RIGHT 39",
     "possession": "visitor",
     "phase": "",
     "kicking": "",
@@ -1233,7 +1583,7 @@
     "visitor_direction": "left",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q1",
-    "plays": 11,
+    "plays": 12,
     "last_play": {
       "type": "pass",
       "result": "#12 Bryce Talbot complete to #44 for 8 yards, first down",
@@ -1250,12 +1600,12 @@
     }
   },
   {
-    "file": "36_unresolved_play_detail.png",
+    "file": "46_unresolved_play_detail.png",
     "score": "Northgate 0 - Riverside 0",
     "quarter": "1",
     "down": "1st",
     "distance": "10",
-    "ball_spot": "RIGHT 28",
+    "ball_spot": "RIGHT 39",
     "possession": "visitor",
     "phase": "",
     "kicking": "",
@@ -1270,7 +1620,7 @@
     "visitor_direction": "left",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q1",
-    "plays": 11,
+    "plays": 12,
     "last_play": {
       "type": "pass",
       "result": "#12 Bryce Talbot complete to #44 for 8 yards, first down",
@@ -1287,12 +1637,12 @@
     }
   },
   {
-    "file": "37_td_run_form.png",
+    "file": "47_td_run_form.png",
     "score": "Northgate 0 - Riverside 0",
     "quarter": "1",
     "down": "1st",
     "distance": "10",
-    "ball_spot": "RIGHT 28",
+    "ball_spot": "RIGHT 39",
     "possession": "visitor",
     "phase": "",
     "kicking": "",
@@ -1307,7 +1657,7 @@
     "visitor_direction": "left",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q1",
-    "plays": 11,
+    "plays": 12,
     "last_play": {
       "type": "pass",
       "result": "#12 Bryce Talbot complete to #44 for 8 yards, first down",
@@ -1324,7 +1674,7 @@
     }
   },
   {
-    "file": "38_td_try_pending.png",
+    "file": "48_td_try_pending.png",
     "score": "Northgate 0 - Riverside 6",
     "quarter": "1",
     "down": "Off",
@@ -1344,22 +1694,22 @@
     "visitor_direction": "left",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q1 \u00b7 PENDING TRY",
-    "plays": 12,
+    "plays": 13,
     "last_play": {
       "type": "run",
-      "result": "#5 Jordan Reyes run for 72 yards, touchdown",
+      "result": "#5 Jordan Reyes run for 61 yards, touchdown",
       "description": null,
       "unresolved": [],
       "mismatch": [],
       "touchdown": true,
       "safety": false,
-      "yards": 72,
+      "yards": 61,
       "down": null,
       "distance": null
     }
   },
   {
-    "file": "39_two_point_run_form.png",
+    "file": "49_two_point_run_form.png",
     "score": "Northgate 0 - Riverside 6",
     "quarter": "1",
     "down": "Off",
@@ -1379,22 +1729,22 @@
     "visitor_direction": "left",
     "notice": "2PT GOOD selected for Riverside. Select the player attribution, then confirm the event.",
     "period_text": "QUARTER \u00b7 Q1 \u00b7 PENDING TRY",
-    "plays": 12,
+    "plays": 13,
     "last_play": {
       "type": "run",
-      "result": "#5 Jordan Reyes run for 72 yards, touchdown",
+      "result": "#5 Jordan Reyes run for 61 yards, touchdown",
       "description": null,
       "unresolved": [],
       "mismatch": [],
       "touchdown": true,
       "safety": false,
-      "yards": 72,
+      "yards": 61,
       "down": null,
       "distance": null
     }
   },
   {
-    "file": "40_after_two_point_run.png",
+    "file": "50_after_two_point_run.png",
     "score": "Northgate 0 - Riverside 8",
     "quarter": "1",
     "down": "Off",
@@ -1412,9 +1762,9 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 2PT \u00b7 rev 19",
+    "notice": "COMMITTED \u00b7 2PT \u00b7 rev 22",
     "period_text": "QUARTER \u00b7 Q1 \u00b7 KICKOFF",
-    "plays": 13,
+    "plays": 14,
     "last_play": {
       "type": "rush",
       "result": "Jordan Reyes two-point conversion run",
@@ -1429,7 +1779,7 @@
     }
   },
   {
-    "file": "41_kickoff_touchback_form.png",
+    "file": "51_kickoff_touchback_form.png",
     "score": "Northgate 0 - Riverside 8",
     "quarter": "1",
     "down": "Off",
@@ -1449,7 +1799,7 @@
     "visitor_direction": "left",
     "notice": "Riverside kickoff to Northgate \u2014 complete the detailed kickoff play.",
     "period_text": "QUARTER \u00b7 Q1 \u00b7 KICKOFF",
-    "plays": 13,
+    "plays": 14,
     "last_play": {
       "type": "rush",
       "result": "Jordan Reyes two-point conversion run",
@@ -1464,7 +1814,7 @@
     }
   },
   {
-    "file": "42_after_touchback.png",
+    "file": "52_after_touchback.png",
     "score": "Northgate 0 - Riverside 8",
     "quarter": "1",
     "down": "1st",
@@ -1484,7 +1834,7 @@
     "visitor_direction": "left",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q1",
-    "plays": 14,
+    "plays": 15,
     "last_play": {
       "type": "kickoff",
       "result": "Kickoff by #15 landed at RIGHT GOAL, ball at LEFT 20 \u2014 touchback",
@@ -1499,7 +1849,7 @@
     }
   },
   {
-    "file": "43_period_card_q1.png",
+    "file": "53_period_card_q1.png",
     "score": "Northgate 0 - Riverside 8",
     "quarter": "1",
     "down": "1st",
@@ -1519,7 +1869,7 @@
     "visitor_direction": "left",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q1",
-    "plays": 14,
+    "plays": 15,
     "last_play": {
       "type": "kickoff",
       "result": "Kickoff by #15 landed at RIGHT GOAL, ball at LEFT 20 \u2014 touchback",
@@ -1534,7 +1884,7 @@
     }
   },
   {
-    "file": "44_after_end_q1.png",
+    "file": "54_after_end_q1.png",
     "score": "Northgate 0 - Riverside 8",
     "quarter": "2",
     "down": "1st",
@@ -1552,9 +1902,9 @@
     "authority": "statistician",
     "home_direction": "left",
     "visitor_direction": "right",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 21",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 24",
     "period_text": "QUARTER \u00b7 Q2",
-    "plays": 14,
+    "plays": 15,
     "last_play": {
       "type": "kickoff",
       "result": "Kickoff by #15 landed at RIGHT GOAL, ball at LEFT 20 \u2014 touchback",
@@ -1569,7 +1919,7 @@
     }
   },
   {
-    "file": "45_period_card_q2.png",
+    "file": "55_period_card_q2.png",
     "score": "Northgate 0 - Riverside 8",
     "quarter": "2",
     "down": "1st",
@@ -1587,9 +1937,9 @@
     "authority": "statistician",
     "home_direction": "left",
     "visitor_direction": "right",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 21",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 24",
     "period_text": "QUARTER \u00b7 Q2",
-    "plays": 14,
+    "plays": 15,
     "last_play": {
       "type": "kickoff",
       "result": "Kickoff by #15 landed at RIGHT GOAL, ball at LEFT 20 \u2014 touchback",
@@ -1604,7 +1954,7 @@
     }
   },
   {
-    "file": "46_td_pass_form.png",
+    "file": "56_td_pass_form.png",
     "score": "Northgate 0 - Riverside 8",
     "quarter": "2",
     "down": "1st",
@@ -1622,9 +1972,9 @@
     "authority": "statistician",
     "home_direction": "left",
     "visitor_direction": "right",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 21",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 24",
     "period_text": "QUARTER \u00b7 Q2",
-    "plays": 14,
+    "plays": 15,
     "last_play": {
       "type": "kickoff",
       "result": "Kickoff by #15 landed at RIGHT GOAL, ball at LEFT 20 \u2014 touchback",
@@ -1639,7 +1989,7 @@
     }
   },
   {
-    "file": "47_td_pass_try_pending.png",
+    "file": "57_td_pass_try_pending.png",
     "score": "Northgate 6 - Riverside 8",
     "quarter": "2",
     "down": "Off",
@@ -1659,7 +2009,7 @@
     "visitor_direction": "right",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q2 \u00b7 PENDING TRY",
-    "plays": 15,
+    "plays": 16,
     "last_play": {
       "type": "pass",
       "result": "#7 Marcus Hale complete to #88 Owen Castillo for 80 yards, touchdown",
@@ -1674,7 +2024,7 @@
     }
   },
   {
-    "file": "48_xp_good_form.png",
+    "file": "58_xp_good_form.png",
     "score": "Northgate 6 - Riverside 8",
     "quarter": "2",
     "down": "Off",
@@ -1694,7 +2044,7 @@
     "visitor_direction": "right",
     "notice": "XP GOOD selected for Northgate. Select the kicker, then confirm the event.",
     "period_text": "QUARTER \u00b7 Q2 \u00b7 PENDING TRY",
-    "plays": 15,
+    "plays": 16,
     "last_play": {
       "type": "pass",
       "result": "#7 Marcus Hale complete to #88 Owen Castillo for 80 yards, touchdown",
@@ -1709,7 +2059,7 @@
     }
   },
   {
-    "file": "49_after_xp_good.png",
+    "file": "59_after_xp_good.png",
     "score": "Northgate 7 - Riverside 8",
     "quarter": "2",
     "down": "Off",
@@ -1727,9 +2077,9 @@
     "authority": "statistician",
     "home_direction": "left",
     "visitor_direction": "right",
-    "notice": "COMMITTED \u00b7 XP \u00b7 rev 23",
+    "notice": "COMMITTED \u00b7 XP \u00b7 rev 26",
     "period_text": "QUARTER \u00b7 Q2 \u00b7 KICKOFF",
-    "plays": 16,
+    "plays": 17,
     "last_play": {
       "type": "kick",
       "result": "Extra point good by Eli Sanderson",
@@ -1744,7 +2094,7 @@
     }
   },
   {
-    "file": "50_kickoff_return_form.png",
+    "file": "60_kickoff_return_form.png",
     "score": "Northgate 7 - Riverside 8",
     "quarter": "2",
     "down": "Off",
@@ -1764,7 +2114,7 @@
     "visitor_direction": "right",
     "notice": "Northgate kickoff to Riverside \u2014 complete the detailed kickoff play.",
     "period_text": "QUARTER \u00b7 Q2 \u00b7 KICKOFF",
-    "plays": 16,
+    "plays": 17,
     "last_play": {
       "type": "kick",
       "result": "Extra point good by Eli Sanderson",
@@ -1779,7 +2129,7 @@
     }
   },
   {
-    "file": "51_punt_fair_catch_form.png",
+    "file": "61_punt_fair_catch_form.png",
     "score": "Northgate 7 - Riverside 8",
     "quarter": "2",
     "down": "1st",
@@ -1799,7 +2149,7 @@
     "visitor_direction": "right",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q2",
-    "plays": 17,
+    "plays": 18,
     "last_play": {
       "type": "kickoff",
       "result": "Kickoff by #3 landed at LEFT 5, returned by #1 Kai Holloway for 20 yards to LEFT 25",
@@ -1814,7 +2164,7 @@
     }
   },
   {
-    "file": "52_after_fair_catch.png",
+    "file": "62_after_fair_catch.png",
     "score": "Northgate 7 - Riverside 8",
     "quarter": "2",
     "down": "1st",
@@ -1834,7 +2184,7 @@
     "visitor_direction": "right",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q2",
-    "plays": 18,
+    "plays": 19,
     "last_play": {
       "type": "punt",
       "result": "Punt by #15 landed at RIGHT 2, ball at RIGHT 2 \u2014 fair catch",
@@ -1849,7 +2199,7 @@
     }
   },
   {
-    "file": "53_safety_run_form.png",
+    "file": "63_safety_run_form.png",
     "score": "Northgate 7 - Riverside 8",
     "quarter": "2",
     "down": "1st",
@@ -1869,7 +2219,7 @@
     "visitor_direction": "right",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q2",
-    "plays": 18,
+    "plays": 19,
     "last_play": {
       "type": "punt",
       "result": "Punt by #15 landed at RIGHT 2, ball at RIGHT 2 \u2014 fair catch",
@@ -1884,7 +2234,7 @@
     }
   },
   {
-    "file": "54_after_safety_free_kick_pending.png",
+    "file": "64_after_safety_free_kick_pending.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "Off",
@@ -1904,7 +2254,7 @@
     "visitor_direction": "right",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q2 \u00b7 FREE KICK",
-    "plays": 19,
+    "plays": 20,
     "last_play": {
       "type": "run",
       "result": "#22 Devin Okafor run for -2 yards",
@@ -1919,7 +2269,7 @@
     }
   },
   {
-    "file": "55_free_kick_form.png",
+    "file": "65_free_kick_form.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "Off",
@@ -1939,7 +2289,7 @@
     "visitor_direction": "right",
     "notice": "Northgate kickoff to Riverside \u2014 complete the detailed kickoff play.",
     "period_text": "QUARTER \u00b7 Q2 \u00b7 FREE KICK",
-    "plays": 19,
+    "plays": 20,
     "last_play": {
       "type": "run",
       "result": "#22 Devin Okafor run for -2 yards",
@@ -1954,7 +2304,7 @@
     }
   },
   {
-    "file": "56_after_free_kick.png",
+    "file": "66_after_free_kick.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "1st",
@@ -1974,7 +2324,7 @@
     "visitor_direction": "right",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q2",
-    "plays": 20,
+    "plays": 21,
     "last_play": {
       "type": "kickoff",
       "result": "Kickoff by #3 landed at LEFT 30, returned by #1 Kai Holloway for 10 yards to LEFT 40",
@@ -1989,7 +2339,7 @@
     }
   },
   {
-    "file": "57_kneel_form.png",
+    "file": "67_kneel_form.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "1st",
@@ -2009,7 +2359,7 @@
     "visitor_direction": "right",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q2",
-    "plays": 20,
+    "plays": 21,
     "last_play": {
       "type": "kickoff",
       "result": "Kickoff by #3 landed at LEFT 30, returned by #1 Kai Holloway for 10 yards to LEFT 40",
@@ -2024,7 +2374,7 @@
     }
   },
   {
-    "file": "58_register_q2.png",
+    "file": "68_register_q2.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "2nd",
@@ -2044,7 +2394,7 @@
     "visitor_direction": "right",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q2",
-    "plays": 21,
+    "plays": 22,
     "last_play": {
       "type": "run",
       "result": "#12 Bryce Talbot kneel for -2 yards",
@@ -2059,7 +2409,7 @@
     }
   },
   {
-    "file": "59_after_end_q2.png",
+    "file": "69_after_end_q2.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "2nd",
@@ -2077,9 +2427,9 @@
     "authority": "statistician",
     "home_direction": "left",
     "visitor_direction": "right",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 29",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 32",
     "period_text": "HALFTIME \u00b7 Q2",
-    "plays": 21,
+    "plays": 22,
     "last_play": {
       "type": "run",
       "result": "#12 Bryce Talbot kneel for -2 yards",
@@ -2094,7 +2444,7 @@
     }
   },
   {
-    "file": "60_period_card_end_q2.png",
+    "file": "70_period_card_end_q2.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "2nd",
@@ -2112,9 +2462,9 @@
     "authority": "statistician",
     "home_direction": "left",
     "visitor_direction": "right",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 29",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 32",
     "period_text": "HALFTIME \u00b7 Q2",
-    "plays": 21,
+    "plays": 22,
     "last_play": {
       "type": "run",
       "result": "#12 Bryce Talbot kneel for -2 yards",
@@ -2129,7 +2479,7 @@
     }
   },
   {
-    "file": "61_second_half_kickoff_pending.png",
+    "file": "71_second_half_kickoff_pending.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "Off",
@@ -2147,9 +2497,9 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 30",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 33",
     "period_text": "QUARTER \u00b7 Q3 \u00b7 KICKOFF",
-    "plays": 21,
+    "plays": 22,
     "last_play": {
       "type": "run",
       "result": "#12 Bryce Talbot kneel for -2 yards",
@@ -2164,42 +2514,7 @@
     }
   },
   {
-    "file": "62_direction_wrong_kickoff_form.png",
-    "score": "Northgate 7 - Riverside 10",
-    "quarter": "3",
-    "down": "Off",
-    "distance": "Off",
-    "ball_spot": "LEFT 40",
-    "possession": "home",
-    "phase": "kickoff",
-    "kicking": "home",
-    "halftime": null,
-    "status": "live",
-    "game_status": "",
-    "final": null,
-    "period_state": "quarter",
-    "clock": null,
-    "authority": "statistician",
-    "home_direction": "right",
-    "visitor_direction": "left",
-    "notice": "Northgate kickoff to Riverside \u2014 complete the detailed kickoff play.",
-    "period_text": "QUARTER \u00b7 Q3 \u00b7 KICKOFF",
-    "plays": 21,
-    "last_play": {
-      "type": "run",
-      "result": "#12 Bryce Talbot kneel for -2 yards",
-      "description": null,
-      "unresolved": [],
-      "mismatch": [],
-      "touchdown": false,
-      "safety": false,
-      "yards": -2,
-      "down": null,
-      "distance": null
-    }
-  },
-  {
-    "file": "63_direction_before_fix.png",
+    "file": "72_direction_wrong_kickoff_form.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "Off",
@@ -2219,7 +2534,7 @@
     "visitor_direction": "left",
     "notice": "Northgate kickoff to Riverside \u2014 complete the detailed kickoff play.",
     "period_text": "QUARTER \u00b7 Q3 \u00b7 KICKOFF",
-    "plays": 21,
+    "plays": 22,
     "last_play": {
       "type": "run",
       "result": "#12 Bryce Talbot kneel for -2 yards",
@@ -2234,7 +2549,42 @@
     }
   },
   {
-    "file": "64_direction_after_fix.png",
+    "file": "73_direction_before_fix.png",
+    "score": "Northgate 7 - Riverside 10",
+    "quarter": "3",
+    "down": "Off",
+    "distance": "Off",
+    "ball_spot": "LEFT 40",
+    "possession": "home",
+    "phase": "kickoff",
+    "kicking": "home",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "quarter",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "Northgate kickoff to Riverside \u2014 complete the detailed kickoff play.",
+    "period_text": "QUARTER \u00b7 Q3 \u00b7 KICKOFF",
+    "plays": 22,
+    "last_play": {
+      "type": "run",
+      "result": "#12 Bryce Talbot kneel for -2 yards",
+      "description": null,
+      "unresolved": [],
+      "mismatch": [],
+      "touchdown": false,
+      "safety": false,
+      "yards": -2,
+      "down": null,
+      "distance": null
+    }
+  },
+  {
+    "file": "74_direction_after_fix.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "Off",
@@ -2252,9 +2602,9 @@
     "authority": "statistician",
     "home_direction": "left",
     "visitor_direction": "right",
-    "notice": "COMMITTED \u00b7 /api/field-direction \u00b7 rev 31",
+    "notice": "COMMITTED \u00b7 /api/field-direction \u00b7 rev 34",
     "period_text": "QUARTER \u00b7 Q3 \u00b7 KICKOFF",
-    "plays": 21,
+    "plays": 22,
     "last_play": {
       "type": "run",
       "result": "#12 Bryce Talbot kneel for -2 yards",
@@ -2269,7 +2619,7 @@
     }
   },
   {
-    "file": "65_direction_fixed_kickoff_pending.png",
+    "file": "75_direction_fixed_kickoff_pending.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "Off",
@@ -2287,9 +2637,9 @@
     "authority": "statistician",
     "home_direction": "left",
     "visitor_direction": "right",
-    "notice": "COMMITTED \u00b7 /api/field-direction \u00b7 rev 31",
+    "notice": "COMMITTED \u00b7 /api/field-direction \u00b7 rev 34",
     "period_text": "QUARTER \u00b7 Q3 \u00b7 KICKOFF",
-    "plays": 21,
+    "plays": 22,
     "last_play": {
       "type": "run",
       "result": "#12 Bryce Talbot kneel for -2 yards",
@@ -2304,7 +2654,7 @@
     }
   },
   {
-    "file": "66_second_half_kickoff_form.png",
+    "file": "76_second_half_kickoff_form.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "Off",
@@ -2324,7 +2674,7 @@
     "visitor_direction": "right",
     "notice": "Northgate kickoff to Riverside \u2014 complete the detailed kickoff play.",
     "period_text": "QUARTER \u00b7 Q3 \u00b7 KICKOFF",
-    "plays": 21,
+    "plays": 22,
     "last_play": {
       "type": "run",
       "result": "#12 Bryce Talbot kneel for -2 yards",
@@ -2339,7 +2689,7 @@
     }
   },
   {
-    "file": "67_after_second_half_kickoff.png",
+    "file": "77_after_second_half_kickoff.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "1st",
@@ -2359,7 +2709,7 @@
     "visitor_direction": "right",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q3",
-    "plays": 22,
+    "plays": 23,
     "last_play": {
       "type": "kickoff",
       "result": "Kickoff by #3 landed at LEFT 8, returned by #1 Kai Holloway for 24 yards to LEFT 32",
@@ -2374,7 +2724,7 @@
     }
   },
   {
-    "file": "68_q3_td_pass_try_pending.png",
+    "file": "78_q3_td_pass_try_pending.png",
     "score": "Northgate 7 - Riverside 16",
     "quarter": "3",
     "down": "Off",
@@ -2394,7 +2744,7 @@
     "visitor_direction": "right",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q3 \u00b7 PENDING TRY",
-    "plays": 23,
+    "plays": 24,
     "last_play": {
       "type": "pass",
       "result": "#12 Bryce Talbot complete to #80 Mason Albright for 68 yards, touchdown",
@@ -2409,7 +2759,7 @@
     }
   },
   {
-    "file": "69_two_point_pass_failed_form.png",
+    "file": "79_two_point_pass_failed_form.png",
     "score": "Northgate 7 - Riverside 16",
     "quarter": "3",
     "down": "Off",
@@ -2429,7 +2779,7 @@
     "visitor_direction": "right",
     "notice": "2PT attempt selected for Riverside. Select the player attribution, then confirm the event.",
     "period_text": "QUARTER \u00b7 Q3 \u00b7 PENDING TRY",
-    "plays": 23,
+    "plays": 24,
     "last_play": {
       "type": "pass",
       "result": "#12 Bryce Talbot complete to #80 Mason Albright for 68 yards, touchdown",
@@ -2444,7 +2794,7 @@
     }
   },
   {
-    "file": "70_after_two_point_failed.png",
+    "file": "80_after_two_point_failed.png",
     "score": "Northgate 7 - Riverside 16",
     "quarter": "3",
     "down": "Off",
@@ -2462,9 +2812,9 @@
     "authority": "statistician",
     "home_direction": "left",
     "visitor_direction": "right",
-    "notice": "COMMITTED \u00b7 2PT \u00b7 rev 34",
+    "notice": "COMMITTED \u00b7 2PT \u00b7 rev 37",
     "period_text": "QUARTER \u00b7 Q3 \u00b7 KICKOFF",
-    "plays": 24,
+    "plays": 25,
     "last_play": {
       "type": "reception",
       "result": "Two-point conversion failed for Riverside",
@@ -2479,7 +2829,7 @@
     }
   },
   {
-    "file": "71_fg_good_form.png",
+    "file": "81_fg_good_form.png",
     "score": "Northgate 7 - Riverside 16",
     "quarter": "3",
     "down": "1st",
@@ -2499,7 +2849,7 @@
     "visitor_direction": "right",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q3",
-    "plays": 26,
+    "plays": 27,
     "last_play": {
       "type": "pass",
       "result": "#7 Marcus Hale complete to #17 Luke Danvers for 65 yards, first down",
@@ -2514,7 +2864,7 @@
     }
   },
   {
-    "file": "72_after_fg_good.png",
+    "file": "82_after_fg_good.png",
     "score": "Northgate 10 - Riverside 16",
     "quarter": "3",
     "down": "Off",
@@ -2532,9 +2882,9 @@
     "authority": "statistician",
     "home_direction": "left",
     "visitor_direction": "right",
-    "notice": "COMMITTED \u00b7 FG \u00b7 rev 37",
+    "notice": "COMMITTED \u00b7 FG \u00b7 rev 40",
     "period_text": "QUARTER \u00b7 Q3 \u00b7 KICKOFF",
-    "plays": 27,
+    "plays": 28,
     "last_play": {
       "type": "kick",
       "result": "32-yard field goal by Eli Sanderson good",
@@ -2549,7 +2899,7 @@
     }
   },
   {
-    "file": "73_period_card_end_q3.png",
+    "file": "83_period_card_end_q3.png",
     "score": "Northgate 10 - Riverside 16",
     "quarter": "3",
     "down": "1st",
@@ -2569,7 +2919,7 @@
     "visitor_direction": "right",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q3",
-    "plays": 28,
+    "plays": 29,
     "last_play": {
       "type": "kickoff",
       "result": "Kickoff by #3 landed at LEFT GOAL, ball at LEFT 20 \u2014 touchback",
@@ -2584,7 +2934,7 @@
     }
   },
   {
-    "file": "74_after_end_q3.png",
+    "file": "84_after_end_q3.png",
     "score": "Northgate 10 - Riverside 16",
     "quarter": "4",
     "down": "1st",
@@ -2602,9 +2952,9 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 39",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 42",
     "period_text": "QUARTER \u00b7 Q4",
-    "plays": 28,
+    "plays": 29,
     "last_play": {
       "type": "kickoff",
       "result": "Kickoff by #3 landed at LEFT GOAL, ball at LEFT 20 \u2014 touchback",
@@ -2619,7 +2969,7 @@
     }
   },
   {
-    "file": "75_punt_return_form.png",
+    "file": "85_punt_return_form.png",
     "score": "Northgate 10 - Riverside 16",
     "quarter": "4",
     "down": "1st",
@@ -2637,9 +2987,9 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 39",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 42",
     "period_text": "QUARTER \u00b7 Q4",
-    "plays": 28,
+    "plays": 29,
     "last_play": {
       "type": "kickoff",
       "result": "Kickoff by #3 landed at LEFT GOAL, ball at LEFT 20 \u2014 touchback",
@@ -2654,7 +3004,7 @@
     }
   },
   {
-    "file": "76_after_punt_return.png",
+    "file": "86_after_punt_return.png",
     "score": "Northgate 10 - Riverside 16",
     "quarter": "4",
     "down": "1st",
@@ -2674,7 +3024,7 @@
     "visitor_direction": "left",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q4",
-    "plays": 29,
+    "plays": 30,
     "last_play": {
       "type": "punt",
       "result": "Punt by #15 landed at LEFT 15, returned by #21 Andre Lyle for 35 yards to 50",
@@ -2689,7 +3039,7 @@
     }
   },
   {
-    "file": "77_q4_td_try_pending.png",
+    "file": "87_q4_td_try_pending.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "4",
     "down": "Off",
@@ -2709,7 +3059,7 @@
     "visitor_direction": "left",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q4 \u00b7 PENDING TRY",
-    "plays": 30,
+    "plays": 31,
     "last_play": {
       "type": "run",
       "result": "#22 Devin Okafor run for 50 yards, touchdown",
@@ -2724,7 +3074,7 @@
     }
   },
   {
-    "file": "78_xp_no_good_form.png",
+    "file": "88_xp_no_good_form.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "4",
     "down": "Off",
@@ -2744,7 +3094,7 @@
     "visitor_direction": "left",
     "notice": "XP attempt selected for Northgate. Select the kicker, then confirm the event.",
     "period_text": "QUARTER \u00b7 Q4 \u00b7 PENDING TRY",
-    "plays": 30,
+    "plays": 31,
     "last_play": {
       "type": "run",
       "result": "#22 Devin Okafor run for 50 yards, touchdown",
@@ -2759,7 +3109,7 @@
     }
   },
   {
-    "file": "79_after_xp_no_good_tied.png",
+    "file": "89_after_xp_no_good_tied.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "4",
     "down": "Off",
@@ -2777,9 +3127,9 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 XP \u00b7 rev 42",
+    "notice": "COMMITTED \u00b7 XP \u00b7 rev 45",
     "period_text": "QUARTER \u00b7 Q4 \u00b7 KICKOFF",
-    "plays": 31,
+    "plays": 32,
     "last_play": {
       "type": "kick",
       "result": "Extra point no good for Northgate",
@@ -2794,7 +3144,7 @@
     }
   },
   {
-    "file": "80_register_q4.png",
+    "file": "90_register_q4.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "4",
     "down": "2nd",
@@ -2814,7 +3164,7 @@
     "visitor_direction": "left",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q4",
-    "plays": 33,
+    "plays": 34,
     "last_play": {
       "type": "run",
       "result": "#12 Bryce Talbot kneel for -2 yards",
@@ -2829,7 +3179,7 @@
     }
   },
   {
-    "file": "81_period_card_end_regulation.png",
+    "file": "91_period_card_end_regulation.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "4",
     "down": "2nd",
@@ -2849,7 +3199,7 @@
     "visitor_direction": "left",
     "notice": "Play recorded.",
     "period_text": "QUARTER \u00b7 Q4",
-    "plays": 33,
+    "plays": 34,
     "last_play": {
       "type": "run",
       "result": "#12 Bryce Talbot kneel for -2 yards",
@@ -2864,7 +3214,7 @@
     }
   },
   {
-    "file": "82_after_end_regulation.png",
+    "file": "92_after_end_regulation.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "4",
     "down": "2nd",
@@ -2882,9 +3232,9 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 45",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 48",
     "period_text": "Q4 COMPLETE \u00b7 Q4 \u00b7 Final/OT decision required",
-    "plays": 33,
+    "plays": 34,
     "last_play": {
       "type": "run",
       "result": "#12 Bryce Talbot kneel for -2 yards",
@@ -2899,7 +3249,7 @@
     }
   },
   {
-    "file": "83_period_card_overtime_setup.png",
+    "file": "93_period_card_overtime_setup.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "4",
     "down": "2nd",
@@ -2917,9 +3267,9 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 45",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 48",
     "period_text": "Q4 COMPLETE \u00b7 Q4 \u00b7 Final/OT decision required",
-    "plays": 33,
+    "plays": 34,
     "last_play": {
       "type": "run",
       "result": "#12 Bryce Talbot kneel for -2 yards",
@@ -2934,7 +3284,7 @@
     }
   },
   {
-    "file": "84_overtime_started.png",
+    "file": "94_overtime_started.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "OT",
     "down": "1st",
@@ -2952,9 +3302,9 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 46",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 49",
     "period_text": "OVERTIME \u00b7 QOT",
-    "plays": 33,
+    "plays": 34,
     "last_play": {
       "type": "run",
       "result": "#12 Bryce Talbot kneel for -2 yards",
@@ -2969,7 +3319,7 @@
     }
   },
   {
-    "file": "85_ot_fg_missed_form.png",
+    "file": "95_ot_fg_missed_form.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "OT",
     "down": "1st",
@@ -2987,9 +3337,9 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 46",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 49",
     "period_text": "OVERTIME \u00b7 QOT",
-    "plays": 33,
+    "plays": 34,
     "last_play": {
       "type": "run",
       "result": "#12 Bryce Talbot kneel for -2 yards",
@@ -3004,117 +3354,12 @@
     }
   },
   {
-    "file": "86_after_ot_fg_missed.png",
+    "file": "96_after_ot_fg_missed.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "OT",
     "down": "1st",
     "distance": "10",
     "ball_spot": "LEFT 10",
-    "possession": "home",
-    "phase": "",
-    "kicking": "",
-    "halftime": null,
-    "status": "live",
-    "game_status": "",
-    "final": null,
-    "period_state": "overtime",
-    "clock": null,
-    "authority": "statistician",
-    "home_direction": "right",
-    "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 FG \u00b7 rev 47",
-    "period_text": "OVERTIME \u00b7 QOT",
-    "plays": 34,
-    "last_play": {
-      "type": "kick",
-      "result": "27-yard field goal by Sam Ostrander no good",
-      "description": null,
-      "unresolved": null,
-      "mismatch": null,
-      "touchdown": false,
-      "safety": false,
-      "yards": "",
-      "down": null,
-      "distance": null
-    }
-  },
-  {
-    "file": "87_ot_second_possession_setup.png",
-    "score": "Northgate 16 - Riverside 16",
-    "quarter": "OT",
-    "down": "1st",
-    "distance": "10",
-    "ball_spot": "RIGHT 10",
-    "possession": "home",
-    "phase": "",
-    "kicking": "",
-    "halftime": null,
-    "status": "live",
-    "game_status": "",
-    "final": null,
-    "period_state": "overtime",
-    "clock": null,
-    "authority": "statistician",
-    "home_direction": "right",
-    "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 49",
-    "period_text": "OVERTIME \u00b7 QOT",
-    "plays": 34,
-    "last_play": {
-      "type": "kick",
-      "result": "27-yard field goal by Sam Ostrander no good",
-      "description": null,
-      "unresolved": null,
-      "mismatch": null,
-      "touchdown": false,
-      "safety": false,
-      "yards": "",
-      "down": null,
-      "distance": null
-    }
-  },
-  {
-    "file": "88_ot_fg_good_form.png",
-    "score": "Northgate 16 - Riverside 16",
-    "quarter": "OT",
-    "down": "1st",
-    "distance": "10",
-    "ball_spot": "RIGHT 10",
-    "possession": "home",
-    "phase": "",
-    "kicking": "",
-    "halftime": null,
-    "status": "live",
-    "game_status": "",
-    "final": null,
-    "period_state": "overtime",
-    "clock": null,
-    "authority": "statistician",
-    "home_direction": "right",
-    "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 49",
-    "period_text": "OVERTIME \u00b7 QOT",
-    "plays": 34,
-    "last_play": {
-      "type": "kick",
-      "result": "27-yard field goal by Sam Ostrander no good",
-      "description": null,
-      "unresolved": null,
-      "mismatch": null,
-      "touchdown": false,
-      "safety": false,
-      "yards": "",
-      "down": null,
-      "distance": null
-    }
-  },
-  {
-    "file": "89_after_ot_fg_good.png",
-    "score": "Northgate 19 - Riverside 16",
-    "quarter": "OT",
-    "down": "Off",
-    "distance": "Off",
-    "ball_spot": "RIGHT 10",
     "possession": "home",
     "phase": "",
     "kicking": "",
@@ -3132,6 +3377,111 @@
     "plays": 35,
     "last_play": {
       "type": "kick",
+      "result": "27-yard field goal by Sam Ostrander no good",
+      "description": null,
+      "unresolved": null,
+      "mismatch": null,
+      "touchdown": false,
+      "safety": false,
+      "yards": "",
+      "down": null,
+      "distance": null
+    }
+  },
+  {
+    "file": "97_ot_second_possession_setup.png",
+    "score": "Northgate 16 - Riverside 16",
+    "quarter": "OT",
+    "down": "1st",
+    "distance": "10",
+    "ball_spot": "RIGHT 10",
+    "possession": "home",
+    "phase": "",
+    "kicking": "",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "overtime",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 52",
+    "period_text": "OVERTIME \u00b7 QOT",
+    "plays": 35,
+    "last_play": {
+      "type": "kick",
+      "result": "27-yard field goal by Sam Ostrander no good",
+      "description": null,
+      "unresolved": null,
+      "mismatch": null,
+      "touchdown": false,
+      "safety": false,
+      "yards": "",
+      "down": null,
+      "distance": null
+    }
+  },
+  {
+    "file": "98_ot_fg_good_form.png",
+    "score": "Northgate 16 - Riverside 16",
+    "quarter": "OT",
+    "down": "1st",
+    "distance": "10",
+    "ball_spot": "RIGHT 10",
+    "possession": "home",
+    "phase": "",
+    "kicking": "",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "overtime",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 52",
+    "period_text": "OVERTIME \u00b7 QOT",
+    "plays": 35,
+    "last_play": {
+      "type": "kick",
+      "result": "27-yard field goal by Sam Ostrander no good",
+      "description": null,
+      "unresolved": null,
+      "mismatch": null,
+      "touchdown": false,
+      "safety": false,
+      "yards": "",
+      "down": null,
+      "distance": null
+    }
+  },
+  {
+    "file": "99_after_ot_fg_good.png",
+    "score": "Northgate 19 - Riverside 16",
+    "quarter": "OT",
+    "down": "Off",
+    "distance": "Off",
+    "ball_spot": "RIGHT 10",
+    "possession": "home",
+    "phase": "",
+    "kicking": "",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "overtime",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "COMMITTED \u00b7 FG \u00b7 rev 53",
+    "period_text": "OVERTIME \u00b7 QOT",
+    "plays": 36,
+    "last_play": {
+      "type": "kick",
       "result": "27-yard field goal by Eli Sanderson good",
       "description": null,
       "unresolved": null,
@@ -3144,7 +3494,7 @@
     }
   },
   {
-    "file": "90_overtime_period_complete.png",
+    "file": "100_overtime_period_complete.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -3162,9 +3512,9 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 51",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 54",
     "period_text": "OVERTIME COMPLETE \u00b7 QOT \u00b7 Final/OT decision required",
-    "plays": 35,
+    "plays": 36,
     "last_play": {
       "type": "kick",
       "result": "27-yard field goal by Eli Sanderson good",
@@ -3179,7 +3529,7 @@
     }
   },
   {
-    "file": "91_period_card_overtime_complete.png",
+    "file": "101_period_card_overtime_complete.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -3197,9 +3547,9 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 51",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 54",
     "period_text": "OVERTIME COMPLETE \u00b7 QOT \u00b7 Final/OT decision required",
-    "plays": 35,
+    "plays": 36,
     "last_play": {
       "type": "kick",
       "result": "27-yard field goal by Eli Sanderson good",
@@ -3214,7 +3564,7 @@
     }
   },
   {
-    "file": "92_register_before_final.png",
+    "file": "102_register_before_final.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -3232,9 +3582,9 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 51",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 54",
     "period_text": "OVERTIME COMPLETE \u00b7 QOT \u00b7 Final/OT decision required",
-    "plays": 35,
+    "plays": 36,
     "last_play": {
       "type": "kick",
       "result": "27-yard field goal by Eli Sanderson good",
@@ -3249,7 +3599,7 @@
     }
   },
   {
-    "file": "93_final_page_header.png",
+    "file": "103_final_page_header.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -3267,7 +3617,7 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 52",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 55",
     "period_text": "FINAL \u00b7 QOT",
     "plays": 0,
     "last_play": {
@@ -3287,7 +3637,7 @@
     ]
   },
   {
-    "file": "94_final_console.png",
+    "file": "104_final_console.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -3305,7 +3655,7 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 52",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 55",
     "period_text": "FINAL \u00b7 QOT",
     "plays": 0,
     "last_play": {
@@ -3322,7 +3672,7 @@
     }
   },
   {
-    "file": "95_period_card_final.png",
+    "file": "105_period_card_final.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -3340,7 +3690,7 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 52",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 55",
     "period_text": "FINAL \u00b7 QOT",
     "plays": 0,
     "last_play": {
@@ -3357,7 +3707,7 @@
     }
   },
   {
-    "file": "96_register_final.png",
+    "file": "106_register_final.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -3375,7 +3725,7 @@
     "authority": "statistician",
     "home_direction": "right",
     "visitor_direction": "left",
-    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 52",
+    "notice": "COMMITTED \u00b7 /api/set \u00b7 rev 55",
     "period_text": "FINAL \u00b7 QOT",
     "plays": 0,
     "last_play": {
