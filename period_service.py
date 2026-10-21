@@ -280,6 +280,9 @@ class PeriodService:
             if str(current.get("period_state", "") or "") not in {"q4_complete", "overtime_complete"}:
                 return PeriodResult("INVALID_PERIOD_ACTION", current, {"message": "Final game can be confirmed only after Q4 or overtime is complete."})
             cls._stop_clock(current)
+            # A game-ending score can leave a kickoff/free-kick phase behind
+            # that will never be played; don't carry it into the final.
+            CanonicalStateFoundation.clear_special_phase(current)
             current["broadcast_phase"] = "final"
             current["period_state"] = "final"
             current["awaiting_period_decision"] = False

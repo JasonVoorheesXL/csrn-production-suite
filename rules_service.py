@@ -487,6 +487,11 @@ class RulesService:
                     "recoverer",
                 )
             }
+            # A punt downed by the kicking team has no return: the returner
+            # fields are ignored outright so nobody is credited with one.
+            punt_downed = kind == "punt" and bool(incoming.get("downed"))
+            if punt_downed:
+                numbers["returner"] = ""
             # Own-team fumble recovery: the carrier fumbles and a *teammate*
             # recovers (no turnover). Possession and the ball never change
             # hands, but credit for the yardage from the recovery spot on -- and
@@ -590,6 +595,8 @@ class RulesService:
                 if role in wrong_team_names and supplied_name.lower() == wrong_team_names[role]:
                     supplied_name = ""
                 names[role] = str(refs[role].get("name", "") or supplied_name).strip()
+            if punt_downed:
+                names["returner"] = ""
 
             landing = end
             kick_distance = 0
@@ -716,10 +723,12 @@ class RulesService:
                 landing_value = incoming.get("landing_spot")
                 landing = self.spot_to_coord(
                     landing_value if landing_value not in (None, "") else end, state)
-                touchback = bool(incoming.get("touchback"))
+                # Downed is exclusive of touchback / fair catch / muff (the
+                # console clears the others when it is checked).
+                touchback = bool(incoming.get("touchback")) and not punt_downed
                 # A ruleset with no fair catch (Canadian) ignores the signal
                 # outright -- the returner must run it or concede a single.
-                fair_catch = bool(incoming.get("fair_catch")) and not self._no_fair_catch(state)
+                fair_catch = bool(incoming.get("fair_catch")) and not self._no_fair_catch(state) and not punt_downed
                 blocked = bool(incoming.get("blocked"))
                 # A muffed punt is its own outcome, distinct from a generic
                 # fumble: the returning team bobbles the catch, and if the
@@ -732,7 +741,7 @@ class RulesService:
                 # generic Fumble/Fumble-lost turnover the way it used to be
                 # (that generic pair was computed earlier for every play
                 # kind, punts included, and was never reset for this branch).
-                muffed_punt = bool(incoming.get("muffed_punt"))
+                muffed_punt = bool(incoming.get("muffed_punt")) and not punt_downed
                 muff_recovered_by_kicking_team = muffed_punt and bool(
                     incoming.get("fumble_lost")
                 )
@@ -751,6 +760,8 @@ class RulesService:
                         if receiving_direction == 1
                         else length - touchback_yard
                     )
+                if punt_downed:
+                    end = landing
                 kick_distance = abs(landing - start)
                 return_direction = self.team_direction(state, receiving)
                 return_yards = max(0, (end - landing) * return_direction)
@@ -803,6 +814,8 @@ class RulesService:
                         f", returned by {returner} for {return_yards} yards "
                         f"to {self.coord_to_spot(end, state)}"
                     )
+                elif punt_downed:
+                    description += ", downed by the kicking team"
                 else:
                     description += f", ball at {self.coord_to_spot(end, state)}"
                 description += (
@@ -1099,6 +1112,7 @@ class RulesService:
                         else names["returner"] if turnover else ""
                     ),
                     "muffed_punt": muffed_punt,
+                    "downed": punt_downed,
                     "recoverer_number": numbers["recoverer"] if own_recovery else "",
                     "recoverer_name": names["recoverer"] if own_recovery else "",
                     "recovery_spot": recovery_spot_text,
@@ -1156,6 +1170,12 @@ class RulesService:
                 "end_spot": self.coord_to_spot(end, state),
                 "play_type": kind,
                 "result": description,
+                # Display enrichment (state_service._enrich_play and the
+                # console's resolvedPlayDisplay) keys its completion rewrite
+                # off this; without it every pass read as "complete".
+                "pass_outcome": (
+                    outcome if outcome in {"incomplete", "spike", "interception", "sack"} else "complete"
+                ) if kind == "pass" else "",
                 "yards": yards,
                 "first_down": first_down,
                 "touchdown": touchdown,
@@ -1177,6 +1197,7 @@ class RulesService:
                 ),
                 "safety": safety,
                 "muffed_punt": muffed_punt,
+                "downed": punt_downed,
                 "recoverer_number": numbers["recoverer"] if own_recovery else "",
                 "recoverer_name": names["recoverer"] if own_recovery else "",
                 "recovery_spot": recovery_spot_text,

@@ -622,42 +622,71 @@ class StateService:
                     if name:
                         play[name_key] = name
 
+        # The stored result is built by RulesService with every roster name
+        # it knew at entry. Rebuild it only to fill in a name that resolved
+        # later, and only for a plain run or a completion: incompletions,
+        # sacks, interceptions, fumbles and safeties carry detail this short
+        # form would drop.
         kind = str(play.get("play_type", "") or "").lower()
         yards = play.get("yards", "")
-        if kind == "run" and play.get("player_number") and play.get("player_name"):
-            suffix = "kneel" if play.get("kneel") else "run"
-            play["result"] = (
-                f"#{play['player_number']} {play['player_name']} "
-                f"{suffix} for {yards} yards"
-            )
-            if play.get("recoverer_number") and play.get("fumble") and not play.get("fumble_lost"):
-                play["result"] += (
-                    f", fumble recovered by #{play['recoverer_number']}"
-                    + (f" {play['recoverer_name']}" if play.get("recoverer_name") else "")
-                )
-            if play.get("touchdown"):
-                play["result"] += ", touchdown"
-            elif play.get("first_down"):
-                play["result"] += ", first down"
-        elif kind == "pass":
-            outcome = str(play.get("pass_outcome", "complete") or "complete").lower()
-            passer = (
-                f"#{play.get('passer_number', '')} "
-                f"{play.get('passer_name', '')}"
-            ).strip()
-            receiver = (
-                f"#{play.get('receiver_number', '')} "
-                f"{play.get('receiver_name', '')}"
-            ).strip()
-            if outcome == "complete" and receiver:
+        result = str(play.get("result", "") or "")
+        plain = not any(
+            play.get(flag)
+            for flag in ("fumble", "fumble_lost", "turnover", "safety", "muffed_punt")
+        )
+        if kind == "run" and plain and play.get("player_number") and play.get("player_name"):
+            if str(play["player_name"]) not in result:
+                suffix = "kneel" if play.get("kneel") else "run"
                 play["result"] = (
-                    f"{passer} complete to {receiver} for {yards} yards"
+                    f"#{play['player_number']} {play['player_name']} "
+                    f"{suffix} for {yards} yards"
+                )
+                if play.get("touchdown"):
+                    play["result"] += ", touchdown"
+                elif play.get("first_down"):
+                    play["result"] += ", first down"
+        elif (
+            kind == "pass"
+            and plain
+            and self.play_pass_outcome(play) == "complete"
+            and play.get("receiver_number")
+            and play.get("receiver_name")
+        ):
+            if str(play["receiver_name"]) not in result:
+                passer = (
+                    f"#{play.get('passer_number', '')} "
+                    f"{play.get('passer_name', '')}"
+                ).strip() if play.get("passer_number") else str(play.get("passer_name", "") or "")
+                play["result"] = (
+                    f"{passer} complete to #{play['receiver_number']} "
+                    f"{play['receiver_name']} for {yards} yards"
                 ).strip()
                 if play.get("touchdown"):
                     play["result"] += ", touchdown"
-            elif outcome == "incomplete":
-                play["result"] = f"{passer} pass incomplete".strip()
+                elif play.get("first_down"):
+                    play["result"] += ", first down"
         return play
+
+    # Play records written before pass_outcome was persisted only carry the
+    # outcome in their label.
+    _PASS_OUTCOME_BY_LABEL = {
+        "pass": "complete",
+        "touchdown pass": "complete",
+        "incomplete pass": "incomplete",
+        "spike": "spike",
+        "sack": "sack",
+        "interception": "interception",
+        "interception return touchdown": "interception",
+    }
+
+    @classmethod
+    def play_pass_outcome(cls, play: dict[str, Any]) -> str:
+        explicit = str(play.get("pass_outcome", "") or "").strip().lower()
+        if explicit:
+            return explicit
+        return cls._PASS_OUTCOME_BY_LABEL.get(
+            str(play.get("label", "") or "").strip().lower(), ""
+        )
 
     def _team_key(self, state: dict[str, Any], value: Any) -> str:
         if self._canonical_team_key is not None:
