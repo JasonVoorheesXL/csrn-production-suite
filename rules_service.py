@@ -1156,6 +1156,12 @@ class RulesService:
                 "end_spot": self.coord_to_spot(end, state),
                 "play_type": kind,
                 "result": description,
+                # Display enrichment (state_service._enrich_play and the
+                # console's resolvedPlayDisplay) keys its completion rewrite
+                # off this; without it every pass read as "complete".
+                "pass_outcome": (
+                    outcome if outcome in {"incomplete", "spike", "interception", "sack"} else "complete"
+                ) if kind == "pass" else "",
                 "yards": yards,
                 "first_down": first_down,
                 "touchdown": touchdown,
