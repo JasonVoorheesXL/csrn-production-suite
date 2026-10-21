@@ -515,12 +515,13 @@ class StatisticsService:
                 return_yards = self._safe_int(play.get("return_yards", 0))
                 fair_catch = "fair catch" in str(play.get("result", "")).lower()
                 touchback = "touchback" in str(play.get("result", "")).lower()
+                downed = bool(play.get("downed")) or "downed by the kicking team" in str(play.get("result", "")).lower()
                 if kicking in teams:
                     teams[kicking]["kickoffs" if kind == "kickoff" else "punts"] += 1
                     kicker = player_row(kicking, play.get("kicker_name", ""), play.get("kicker_number", ""))
                     if kicker is not None:
                         kicker["kickoffs" if kind == "kickoff" else "punts"] += 1
-                if receiving in teams and not fair_catch and not touchback and (play.get("returner_number") or play.get("returner_name")):
+                if receiving in teams and not fair_catch and not touchback and not downed and (play.get("returner_number") or play.get("returner_name")):
                     key = "kickoff_returns" if kind == "kickoff" else "punt_returns"
                     yards_key = "kickoff_return_yards" if kind == "kickoff" else "punt_return_yards"
                     teams[receiving][key] += 1

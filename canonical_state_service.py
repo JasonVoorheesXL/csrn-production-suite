@@ -428,8 +428,26 @@ class CanonicalStateFoundation:
         state["clock_started_at"] = 0
 
     @classmethod
+    def is_overtime(cls, state: Mapping[str, Any]) -> bool:
+        quarter = str(state.get("quarter", "") or "").strip().upper()
+        period_state = str(state.get("period_state", "") or "").strip().lower()
+        return quarter.startswith("OT") or period_state in {"overtime", "overtime_complete"}
+
+    @classmethod
     def enter_kickoff(cls, state: dict[str, Any], scoring_team: str) -> None:
         kicking = scoring_team if scoring_team in cls.VALID_TEAMS else str(state.get("possession", "home"))
+        if cls.is_overtime(state):
+            # NFHS overtime has no kickoffs: a score ends the series and the
+            # operator ends the OT period / starts the next one (or confirms
+            # the final) from the period controls. Entering the kickoff phase
+            # here left "KICKOFF REQUIRED" up through Confirm Final.
+            cls.clear_special_phase(state)
+            state["possession"] = kicking
+            state["down"] = "Off"
+            state["distance"] = "Off"
+            state["clock_running"] = False
+            state["clock_started_at"] = 0
+            return
         receiving = cls.opposite(kicking)
         state["possession"] = kicking
         state["special_game_phase"] = "kickoff"
