@@ -24,6 +24,7 @@ from state_service import StateService
 HTML = (Path(__file__).resolve().parents[1] / "templates" / "index.html").read_text(encoding="utf-8")
 
 ROSTERS = {
+    ("home", "3"): "Punter",
     ("home", "7"): "Marcus Hale",
     ("home", "11"): "Wide Out",
     ("home", "22"): "Tail Back",
@@ -259,3 +260,83 @@ def test_confirm_final_clears_a_leftover_regulation_kickoff_phase() -> None:
     final = PeriodService.transition(state, "final_game")
     assert final.ok
     assert (final.state["special_game_phase"], final.state["kicking_team"], final.state["receiving_team"]) == ("", "", "")
+
+
+# --- 4. Punt downed by the kicking team -----------------------------------------
+
+
+def _punt(**extra):
+    # Home punts from LEFT 40 (driving right); it lands at RIGHT 12.
+    svc, holder = _rules(_base_state(ball_spot="LEFT 40", down="4th", distance="7"))
+    payload = {"team": "home", "play_type": "punt", "kicker_number": "3",
+               "start_spot": "LEFT 40", "landing_spot": "RIGHT 12", "end_spot": "RIGHT 12"}
+    payload.update(extra)
+    result = svc.play(payload)
+    assert result.ok, result.code
+    return holder["state"]
+
+
+def test_downed_punt_ends_at_the_landing_spot_with_no_return() -> None:
+    # A returner jersey and a stray end spot are ignored: nobody returned it.
+    state = _punt(downed=True, returner_number="35", end_spot="RIGHT 30")
+    play = state["plays"][-1]
+    assert play["result"] == "Punt by #3 landed at RIGHT 12, downed by the kicking team"
+    assert play["downed"] is True
+    assert (play["returner_number"], play["returner_name"], play["return_yards"]) == ("", "", 0)
+    assert play["end_spot"] == "RIGHT 12"
+    assert state["events"][-1]["automation"]["downed"] is True
+    assert (state["possession"], state["down"], state["distance"], state["ball_spot"]) == ("visitor", "1st", "10", "RIGHT 12")
+    assert _public_plays(state)[-1]["result"] == play["result"]
+
+
+def test_downed_overrides_fair_catch_touchback_and_muff() -> None:
+    state = _punt(downed=True, fair_catch=True, touchback=True, muffed_punt=True, fumble_lost=True)
+    play = state["plays"][-1]
+    assert play["result"] == "Punt by #3 landed at RIGHT 12, downed by the kicking team"
+    assert play["muffed_punt"] is False and play["turnover"] is False
+    assert (state["possession"], state["ball_spot"]) == ("visitor", "RIGHT 12")
+
+
+def test_undowned_punt_with_a_returner_is_unchanged() -> None:
+    play = _punt(returner_number="35", end_spot="RIGHT 20")["plays"][-1]
+    assert play["downed"] is False
+    assert "returned by #35 Jackson Bell for 8 yards" in play["result"]
+
+
+def test_downed_punt_statistics_count_the_punt_and_no_return() -> None:
+    from statistics_service import StatisticsService
+
+    state = _punt(downed=True, returner_number="35")
+    stats = StatisticsService().report(state).data["statistics"]
+    assert stats["teams"]["home"]["punts"] == 1
+    assert stats["teams"]["visitor"]["punt_returns"] == 0
+    assert stats["teams"]["visitor"]["punt_return_yards"] == 0
+    # a legacy record recognised from its result text alone
+    legacy = dict(state["plays"][-1], downed=False, returner_number="35", returner_name="Jackson Bell")
+    stats = StatisticsService().report(dict(state, plays=[legacy])).data["statistics"]
+    assert stats["teams"]["visitor"]["punt_returns"] == 0
+
+
+def test_punt_form_offers_downed_and_sends_it() -> None:
+    assert ('<label id="playDownedWrap" class="hidden"><input id="playDowned" type="checkbox" '
+            'onchange="puntResultChanged(this.id)"> Downed by kicking team</label>') in HTML
+    for box in ("playFairCatch", "playTouchback", "playMuffedPunt"):
+        assert f'<input id="{box}" type="checkbox" onchange="puntResultChanged(this.id)">' in HTML
+    opener = HTML[HTML.index("show('playMuffedPuntWrap',kind==='punt');"):][:200]
+    assert "show('playDownedWrap',kind==='punt');" in opener
+    assert "'playMuffedPunt','playDowned','playOutOfBounds'" in HTML
+    submit = _js_function("submitPlayEntry")
+    assert "downed:puntDowned()," in submit
+    assert "returner_number:puntDowned()?'':document.getElementById('playReturner').value," in submit
+
+
+def test_downed_is_exclusive_and_locks_the_end_spot_to_the_landing_spot() -> None:
+    changed = _js_function("puntResultChanged")
+    assert "const others=['playFairCatch','playTouchback','playMuffedPunt'];" in changed
+    assert "others.forEach(o=>document.getElementById(o).checked=false)" in changed
+    assert "document.getElementById('playDowned').checked=false" in changed
+    outcome = _js_function("playOutcomeChanged")
+    assert "(['kickoff','punt'].includes(kind)&&!downed)||turnover" in outcome
+    assert "||downed;syncDownedEndSpot();" in outcome
+    assert "setSpotControl('end',document.getElementById('playLandingCoord').value)" in _js_function("syncDownedEndSpot")
+    assert "if(el.disabled&&which==='end')return;" in _js_function("nudgeSpot")
