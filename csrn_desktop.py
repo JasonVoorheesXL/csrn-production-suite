@@ -245,6 +245,38 @@ def _window_icon() -> str | None:
     return str(WINDOW_ICON) if WINDOW_ICON.is_file() else None
 
 
+def _warn_operator(title: str, message: str) -> None:
+    """Show a blocking native warning box (Windows), else just log.
+
+    The desktop shell may have no visible console (a windowed frozen build),
+    so a print() alone would never reach the operator.
+    """
+
+    _LOGGER.warning("%s: %s", title, message)
+    try:
+        import ctypes  # noqa: PLC0415
+
+        # MB_OK | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST
+        ctypes.windll.user32.MessageBoxW(None, message, title, 0x0 | 0x30 | 0x10000 | 0x40000)
+    except Exception:  # noqa: BLE001 -- no dialog available; the log line stands
+        pass
+
+
+def _report_startup_snapshot(outcome: dict | None) -> None:
+    """Warn the operator when the startup safety snapshot failed.
+
+    Startup continues either way: a missing rollback point must never keep a
+    game off the air, but the operator has to know about it before going live.
+    """
+
+    if not outcome or outcome.get("ok", True):
+        return
+    _warn_operator(
+        "CSRN - Game-day safety snapshot FAILED",
+        str(outcome.get("message", "The startup safety snapshot failed.")),
+    )
+
+
 def run(*, health_timeout: int = HEALTH_TIMEOUT_SECONDS) -> int:
     """Start (or attach to) the server in-process, then run the pywebview
     loop; on window close, shut a shell-started server down cleanly."""
@@ -270,6 +302,7 @@ def run(*, health_timeout: int = HEALTH_TIMEOUT_SECONDS) -> int:
             target=server.run, name="csrn-command-center", daemon=True
         )
         server_thread.start()
+        _report_startup_snapshot(getattr(app, "STARTUP_SAFETY_SNAPSHOT", None))
 
     if not wait_until_healthy(health_timeout):
         _LOGGER.error(
