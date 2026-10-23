@@ -97,8 +97,11 @@ one switch, with `video_mode` as the single source of truth:
 3. Size/position the camera source to the video window (Collegiate Tech,
    sidebars visible: `(414, 222)` `1091 x 527`; hidden: `(72, 222)`
    `1775 x 527`) or just fill the canvas -- only the window shows it.
-4. The program scene stacks Program Visual (nested scene) *under* the CSRN
-   browser source, so the overlay sits on top.
+4. In the scene that goes to air, the CSRN overlay browser source must be
+   *above* the Program Visual scene (add `10.02 - PROGRAM VISUAL` as a
+   nested Scene source below the browser source). The browser source needs
+   a transparent background (OBS's default page CSS), or the hole shows
+   nothing.
 
 ## Collegiate Tech: the shipped implementation
 
