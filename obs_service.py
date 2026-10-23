@@ -79,28 +79,78 @@ class OBSService:
         self._save_status(result)
         return OBSServiceResult("OK", {"obs": result})
 
-    def program_visual_mode(self, mode: Any) -> OBSServiceResult:
-        normalized_mode = str(mode or "").strip().lower()
-        settings = self._obs_settings()
-        blocked = self._controlled_command_block(settings)
-        if blocked is not None:
-            return blocked
+    VISUAL_MODES = {"graphic", "camera"}
 
-        try:
-            result = copy.deepcopy(
-                self._set_program_visual_mode(settings, normalized_mode)
-            )
-        except Exception as exc:
+    def program_visual_mode(self, mode: Any) -> OBSServiceResult:
+        """Switch the overlay's video window and, when OBS allows, its layer.
+
+        The overlay side (video_mode) always follows the operator: Camera
+        opens the theme's transparent video window, Graphic closes it. The
+        OBS layer switch is best effort -- if OBS is off, unreachable or
+        missing the camera source, the overlay still changes and the result
+        carries a warning naming what OBS needs.
+        """
+        normalized_mode = str(mode or "").strip().lower()
+        if normalized_mode not in self.VISUAL_MODES:
             return OBSServiceResult(
                 "OBS_COMMAND_BLOCKED",
-                {"message": str(exc)},
+                {"message": "Program visual mode must be graphic or camera."},
             )
 
-        self._save_status(result)
+        settings = self._obs_settings()
+        obs: dict[str, Any] = {}
+        obs_message = ""
+        blocked = self._controlled_command_block(settings)
+        if blocked is not None:
+            obs_message = str(blocked.data.get("message", ""))
+        else:
+            try:
+                obs = copy.deepcopy(
+                    self._set_program_visual_mode(settings, normalized_mode)
+                )
+            except Exception as exc:
+                obs_message = str(exc)
+            else:
+                self._save_status(obs)
+
         state = copy.deepcopy(self._update_visual_state(normalized_mode))
-        return OBSServiceResult(
-            "OK",
-            {"state": state, "obs": result},
+        data: dict[str, Any] = {
+            "state": state,
+            "obs": obs,
+            "obs_switched": not obs_message,
+        }
+        if obs_message:
+            data["warning"] = self._obs_switch_warning(
+                settings, normalized_mode, obs_message
+            )
+        return OBSServiceResult("OK", data)
+
+    @staticmethod
+    def _obs_switch_warning(
+        settings: dict[str, Any], mode: str, reason: str
+    ) -> str:
+        scene = str(
+            settings.get("program_visual_scene") or "10.02 - PROGRAM VISUAL"
+        ).strip()
+        if mode == "camera":
+            source = str(
+                settings.get("camera_source") or "CAM - Primary Camera"
+            ).strip()
+            return (
+                "Video mode is on: the overlay's video window is open. "
+                f"OBS was not switched ({reason.rstrip('.')}). "
+                f'For CSRN to switch it, OBS needs scene "{scene}" with a '
+                f'source named "{source}" (Settings > OBS > Camera Source '
+                "Name changes the name CSRN looks for). Otherwise place the "
+                "camera behind the overlay in OBS yourself."
+            )
+        source = str(
+            settings.get("graphic_source") or "IMG - Broadcast Background"
+        ).strip()
+        return (
+            "Video mode is off: the overlay's graphic is back. "
+            f"OBS was not switched ({reason.rstrip('.')}). "
+            f'Check that OBS scene "{scene}" shows "{source}".'
         )
 
     def command_scorebug_visibility(self, visible: bool) -> dict[str, Any]:

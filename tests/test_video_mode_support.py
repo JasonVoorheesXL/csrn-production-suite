@@ -171,7 +171,9 @@ def test_calibration_guide_measurement_lives_in_the_unpinned_runtime_not_the_fro
 
 
 def test_operator_ui_exposes_all_three_toggles() -> None:
-    assert "onclick=\"setState('video_mode',!Boolean(currentState.video_mode))\"" in INDEX_HTML
+    # Video Mode goes through Program Visual's endpoint (one switch, see
+    # tests/test_camera_video_mode_link.py).
+    assert "onclick=\"changeProgramVisual(currentState.video_mode?'graphic':'camera')\"" in INDEX_HTML
     assert "onclick=\"setState('sidebars_hidden',!Boolean(currentState.sidebars_hidden))\"" in INDEX_HTML
     assert "onclick=\"setState('video_calibration_guide',!Boolean(currentState.video_calibration_guide))\"" in INDEX_HTML
 

@@ -2773,6 +2773,9 @@ def update_obs_visual_state(mode: str) -> dict[str, Any]:
         state = load_state()
         push_history(state)
         state["visual_mode"] = mode
+        # Program Visual and the Video Mode toggle are one control: Camera
+        # opens the theme's transparent video window, Graphic closes it.
+        state["video_mode"] = mode == "camera"
         save_state(state)
         return state
 
