@@ -323,7 +323,13 @@ class RulesService:
             or incoming.get("home_direction")
             or "right"
         ).lower()
-        if team not in self.VALID_TEAMS or direction not in self.VALID_DIRECTIONS:
+        # ball_spot is screen-fixed (LEFT/RIGHT), so flipping the ends changes
+        # which team's yard line it names. "screen" (default) leaves the ball
+        # where it is on the field -- right when the ball was placed where it
+        # really is and only the arrow was wrong. "yard_line" mirrors it so it
+        # keeps naming the same team's yard line (LEFT 28 -> RIGHT 28).
+        ball = str(incoming.get("ball") or "screen").lower()
+        if team not in self.VALID_TEAMS or direction not in self.VALID_DIRECTIONS or ball not in {"screen", "yard_line"}:
             return RulesResult("INVALID_DIRECTION", {})
 
         with self._transaction_lock:
@@ -331,6 +337,9 @@ class RulesService:
             duplicate = duplicate_result(state, command_id)
             if duplicate is not None:
                 return RulesResult("OK", duplicate)
+            flips = str(state.get(f"{team}_direction", "") or "").lower() != direction
+            if flips and ball == "yard_line" and state.get("ball_spot"):
+                state["ball_spot"] = CanonicalStateFoundation.mirror_spot(state["ball_spot"], state)
             state[f"{team}_direction"] = direction
             state[f"{self.opposite(team)}_direction"] = (
                 "left" if direction == "right" else "right"
@@ -386,6 +395,14 @@ class RulesService:
             if blocked is not None:
                 return blocked
 
+            # Opt-in (the console's play form asks for it): stop before saving
+            # a play that looks like it was entered against a wrong drive arrow,
+            # so the statistician can flip the arrow or confirm.
+            if incoming.get("direction_check") and not incoming.get("direction_confirmed"):
+                warning = self.direction_warning(state, incoming, team=team, kind=kind)
+                if warning is not None:
+                    return RulesResult("DIRECTION_SUSPECT", warning)
+
             ledger = state.pop("recent_commands", None)
             self._push_history(state)
             if isinstance(state.get("history"), list):
@@ -432,6 +449,112 @@ class RulesService:
             return RulesResult("OK", result_data)
         finally:
             self._transaction_lock.release()
+
+    # A loss is normal; a run of them is how a wrong drive arrow shows up (every
+    # gain is saved as a loss). Warn on the third loss in a row, or the second
+    # when together they lose this much.
+    DIRECTION_SUSPECT_STREAK = 3
+    DIRECTION_SUSPECT_TWO_PLAY_LOSS = 15
+
+    def direction_warning(
+        self,
+        state: Mapping[str, Any],
+        incoming: Mapping[str, Any],
+        *,
+        team: str,
+        kind: str,
+    ) -> dict[str, Any] | None:
+        """Why this play-form entry looks like the drive arrow is wrong, or None.
+
+        Spots are screen-fixed (LEFT/RIGHT) and yards are derived from the
+        team's drive direction, so a wrong arrow turns every gain into a loss
+        and sends kicks backwards. Flagged: a kickoff or punt that lands behind
+        the kicker, and a run/pass loss that continues a streak of losses by the
+        same offense in the same quarter (sacks and kneels are expected losses
+        and neither count nor break the streak; 0-yard plays are skipped)."""
+        length = self._field_length(state)
+        direction = self.team_direction(state, team)
+        drives = "RIGHT" if direction == 1 else "LEFT"
+        team_name = str(state.get(f"{team}_team") or team.title())
+        start = self.spot_to_coord(
+            incoming.get("start_spot") or state.get("ball_spot") or (length // 2), state
+        )
+        base = {
+            "error": "DIRECTION_SUSPECT",
+            "team": team,
+            "team_name": team_name,
+            "team_direction": drives.lower(),
+        }
+        if kind in {"kickoff", "punt"}:
+            landing_value = incoming.get("landing_spot")
+            if landing_value in (None, "") or incoming.get("blocked"):
+                return None
+            distance = (self.spot_to_coord(landing_value, state) - start) * direction
+            if distance >= 0:
+                return None
+            return {
+                **base,
+                "reason": "kick_backwards",
+                "yards": distance,
+                "flipped_yards": -distance,
+                "message": (
+                    f"This {kind} lands {-distance} yards BEHIND the kicker: {team_name} is set to drive "
+                    f"{drives}. If the arrow is wrong, flip it and the kick becomes {-distance} yards."
+                ),
+            }
+        if kind not in {"run", "pass"}:
+            return None
+        outcome = str(incoming.get("pass_outcome", "") or "complete").lower()
+        if kind == "pass" and outcome in {"incomplete", "spike", "interception", "sack"}:
+            return None
+        if incoming.get("kneel") or incoming.get("fumble_lost"):
+            return None
+        end_value = incoming.get("end_spot")
+        end = self.spot_to_coord(end_value if end_value not in (None, "") else start, state)
+        yards = (end - start) * direction
+        if yards >= 0:
+            return None
+        losses = [yards]
+        quarter = str(state.get("quarter", "") or "")
+        for prior in reversed(list(state.get("plays") or [])):
+            if not isinstance(prior, Mapping) or prior.get("undone"):
+                continue
+            if (
+                str(prior.get("play_type", "") or "").lower() not in {"run", "pass"}
+                or str(prior.get("offense", "") or "").lower() != team
+                or str(prior.get("quarter", "") or "") != quarter
+                or prior.get("turnover")
+            ):
+                break
+            if str(prior.get("label", "") or "").lower() == "sack" or prior.get("kneel"):
+                continue
+            try:
+                prior_yards = int(prior.get("yards") or 0)
+            except (TypeError, ValueError):
+                prior_yards = 0
+            if prior_yards > 0:
+                break
+            if prior_yards < 0:
+                losses.append(prior_yards)
+            if len(losses) >= self.DIRECTION_SUSPECT_STREAK:
+                break
+        suspect = len(losses) >= self.DIRECTION_SUSPECT_STREAK or (
+            len(losses) >= 2 and -sum(losses) >= self.DIRECTION_SUSPECT_TWO_PLAY_LOSS
+        )
+        if not suspect:
+            return None
+        listed = ", ".join(str(value) for value in reversed(losses))
+        return {
+            **base,
+            "reason": "loss_streak",
+            "yards": yards,
+            "flipped_yards": -yards,
+            "losses": list(reversed(losses)),
+            "message": (
+                f"{team_name} would have {len(losses)} losses in a row ({listed}) driving {drives}. "
+                f"If the arrow is wrong, flip it and this play becomes +{-yards} yards."
+            ),
+        }
 
     def _resolve_play(
         self,
@@ -1545,7 +1668,37 @@ class RulesService:
             },
         )
 
-    def reenter(self, event_id: str, payload: Mapping[str, Any] | None) -> RulesResult:
+    @staticmethod
+    def _flipped_ends(snapshot: Mapping[str, Any]) -> dict[str, Any]:
+        flipped = copy.deepcopy(dict(snapshot))
+        for field in ("home_direction", "visitor_direction"):
+            value = str(flipped.get(field, "") or "").lower()
+            if value in {"left", "right"}:
+                flipped[field] = "left" if value == "right" else "right"
+        return flipped
+
+    def repair_direction(self, event_id: str, payload: Mapping[str, Any] | None) -> RulesResult:
+        """Re-run plays that were entered with the drive arrow the wrong way.
+
+        Every event from ``event_id`` through ``payload["last_event_id"]`` is
+        replayed with both teams' directions flipped. Spots are screen-fixed and
+        stay where they were set on the field, so each gain that was saved as a
+        loss becomes a gain again (and kicks that went "backwards" go forward);
+        downs, first downs, possession and scoring re-derive. Later events then
+        replay as for an edit, with the ends they were recorded with. Same
+        conflict rule as reenter(): nothing is saved if a later event can no
+        longer be replayed."""
+        incoming = dict(payload or {})
+        last_event_id = str(incoming.get("last_event_id") or event_id)
+        return self.reenter(event_id, incoming, flip_through=last_event_id)
+
+    def reenter(
+        self,
+        event_id: str,
+        payload: Mapping[str, Any] | None,
+        *,
+        flip_through: str | None = None,
+    ) -> RulesResult:
         """Edit a recorded play by re-entering it through the play form.
 
         ``payload`` is a play-form submission (the same fields ``play()`` takes)
@@ -1556,6 +1709,10 @@ class RulesService:
         were set on the field, stay where they were), other events by the
         changes they recorded. Nothing is saved if a later event can no longer
         be replayed (EDIT_CONFLICTS_WITH_LATER_EVENTS).
+
+        ``flip_through`` (see repair_direction()) re-runs the target play from
+        its own entry instead of ``payload``, and every event from it through
+        that event id with both drive directions flipped.
         """
         incoming = dict(payload or {})
         command_id = command_id_from(incoming)
@@ -1607,23 +1764,63 @@ class RulesService:
                     "Only run, pass, punt and kickoff plays are re-entered; edit this event with the event form.",
                     target,
                 )
-            team = str(incoming.get("team", "")).lower()
-            kind = str(incoming.get("play_type", "")).lower()
+            flip_last_index = -1
+            if flip_through is not None:
+                flip_last_index = next(
+                    (index for index, row in enumerate(timeline) if str(row.get("id", "")) == str(flip_through)),
+                    -1,
+                )
+                if flip_last_index < target_index:
+                    return RulesResult(
+                        "INVALID_REPAIR_RANGE",
+                        {
+                            "error": "INVALID_REPAIR_RANGE",
+                            "message": "Pick the last play of the run that was entered with the arrow the wrong way (at or after the first one).",
+                        },
+                    )
+                target_entry = self.entry_from_play(target_play, target)
+                team = str(target_entry.get("team", "")).lower()
+                kind = str(target_entry.get("play_type", "")).lower()
+            else:
+                team = str(incoming.get("team", "")).lower()
+                kind = str(incoming.get("play_type", "")).lower()
+                target_entry = {key: value for key, value in incoming.items() if key not in self._REQUEST_KEYS}
             if team not in self.VALID_TEAMS or kind not in valid_kinds:
                 return RulesResult("INVALID_PLAY", {"error": "INVALID_PLAY"})
-            target_entry = {key: value for key, value in incoming.items() if key not in self._REQUEST_KEYS}
+            target_entry["team"] = team
+            target_entry["play_type"] = kind
             target_entry.setdefault("clock", str(target_play.get("clock", "") or ""))
 
+            def flipped(index: int, snapshot: Mapping[str, Any]) -> dict[str, Any]:
+                if target_index <= index <= flip_last_index:
+                    return self._flipped_ends(snapshot)
+                return copy.deepcopy(dict(snapshot))
+
+            def leave_flip(previous_original_after: Mapping[str, Any]) -> None:
+                # Leaving the flipped run: the ends after it are what they were
+                # recorded as, and the change back is not a change of ends (the
+                # ball does not mirror), so the replay just takes the recorded ends.
+                for field in ("home_direction", "visitor_direction"):
+                    if field in previous_original_after:
+                        running[field] = previous_original_after[field]
+
             running = copy.deepcopy(state)
-            running.update(copy.deepcopy(dict(target.get("before") or {})))
+            running.update(flipped(target_index, target.get("before") or {}))
             replaced_events: dict[str, dict[str, Any]] = {}
             replaced_plays: dict[str, dict[str, Any]] = {}
             previous_after: Mapping[str, Any] = {}
+            previous_original_after: Mapping[str, Any] = {}
+            previous_flipped = False
             for offset, event in enumerate(timeline[target_index:]):
-                recorded_before = copy.deepcopy(dict(event.get("before") or {}))
-                recorded_after = copy.deepcopy(dict(event.get("after") or {}))
+                index = target_index + offset
+                recorded_before = flipped(index, event.get("before") or {})
+                recorded_after = flipped(index, event.get("after") or {})
+                is_flipped = index <= flip_last_index
                 later = offset > 0
                 if later:
+                    if previous_flipped and not is_flipped:
+                        leave_flip(previous_original_after)
+                        previous_after = previous_original_after
                     self._carry_gap(running, previous_after, recorded_before)
                     for field in self.REPLAY_CHECKED_FIELDS:
                         if field in recorded_before and str(running.get(field) or "") != str(recorded_before.get(field) or ""):
@@ -1653,6 +1850,8 @@ class RulesService:
                     )
                     replaced_events[str(event.get("id", ""))] = rewritten
                     previous_after = recorded_after
+                    previous_original_after = copy.deepcopy(dict(event.get("after") or {}))
+                    previous_flipped = is_flipped
                     continue
                 if later:
                     entry = self.entry_from_play(row, event)
@@ -1703,9 +1902,15 @@ class RulesService:
                 replaced_events[str(event.get("id", ""))] = merged_event
                 replaced_plays[str(row.get("play_id", ""))] = merged_play
                 previous_after = recorded_after
+                previous_original_after = copy.deepcopy(dict(event.get("after") or {}))
+                previous_flipped = is_flipped
 
             # Across to the live state: whatever happened since the last event
-            # (a period break, Quick Correction) still stands.
+            # (a period break, Quick Correction) still stands. A repair never
+            # changes the live drive direction.
+            if previous_flipped:
+                leave_flip(previous_original_after)
+                previous_after = previous_original_after
             self._carry_gap(running, previous_after, state)
             for field in self.REPLAY_CARRIED_FIELDS + self.REPLAY_SCORE_FIELDS:
                 if field in running:
@@ -1728,11 +1933,19 @@ class RulesService:
             new_target_event = replaced_events[str(target.get("id", ""))]
             new_target_play = replaced_plays[str(target_play.get("play_id", ""))]
             replayed = len(timeline) - target_index - 1
+            repair = flip_through is not None
             corrections = list(state.get("correction_log") or [])
             corrections.append(
                 {
                     "id": f"COR-{int(self._now() * 1000)}",
-                    "kind": "play_edit",
+                    "kind": "direction_repair" if repair else "play_edit",
+                    **(
+                        {
+                            "last_event_id": str(timeline[flip_last_index].get("id", "")),
+                            "flipped_events": flip_last_index - target_index + 1,
+                        }
+                        if repair else {}
+                    ),
                     "operator": source,
                     "event_id": str(target.get("id", "")),
                     "before": copy.deepcopy(target),
@@ -1746,7 +1959,9 @@ class RulesService:
             )
             state["correction_log"] = corrections[-500:]
             revision = assign_next_revision(state)
-            metadata = command_metadata(incoming, action=f"play_edit:{kind}", state_revision=revision)
+            metadata = command_metadata(
+                incoming, action="direction_repair" if repair else f"play_edit:{kind}", state_revision=revision
+            )
             result_data = attach_metadata(
                 {
                     "state": command_result_state(state),

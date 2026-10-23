@@ -376,6 +376,29 @@ def create_live_game_blueprint(
         data.setdefault("error", result.code)
         return jsonify(data), status
 
+    @routes.post("/api/plays/<event_id>/repair-direction")
+    @dependencies.require_auth
+    def repair_play_direction(event_id: str):
+        # Post-game repair: re-run plays event_id..last_event_id with the drive
+        # direction flipped (they were entered with the arrow the wrong way).
+        request_id = new_request_id()
+        payload = mutation_payload()
+        started = perf_counter()
+        before = load_summary_safely()
+        result = dependencies.get_rules_service().repair_direction(event_id, payload)
+        status = (
+            200 if result.ok
+            else 404 if result.code == "EVENT_NOT_FOUND"
+            else 400 if result.code in {"INVALID_PLAY", "NOT_A_RULES_PLAY", "INVALID_REPAIR_RANGE"}
+            else 409
+        )
+        log_route(event_type="SERVER_MUTATION", route="/api/plays/<event_id>/repair-direction", action="direction_repair", request_id=request_id, payload=payload, status=status, started=started, before=before, after=load_summary_safely(), result=result)
+        if status == 200:
+            return jsonify(result.data)
+        data = dict(result.data or {})
+        data.setdefault("error", result.code)
+        return jsonify(data), status
+
     @routes.get("/api/corrections")
     @dependencies.require_auth
     def corrections_report():
@@ -470,7 +493,7 @@ def create_live_game_blueprint(
             elif result.code == "NO_ACTIVE_BROADCAST":
                 status = 409
                 response = jsonify({"error": result.code})
-            elif result.code == "CONTROL_SOURCE_LOCKED":
+            elif result.code in {"CONTROL_SOURCE_LOCKED", "DIRECTION_SUSPECT"}:
                 status = 409
                 response = jsonify(result.data)
             else:
