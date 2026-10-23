@@ -659,10 +659,11 @@
       </section>
 
       <section class="panel compact utility-row live-operator-controls">
-        <div class="section-heading compact"><div><h3>Video Mode</h3><p class="section-note">CSRN never ingests video -- a composited camera feed in OBS shows through a transparent window this theme's video-board region opens. Live-togglable at any point in the broadcast. Currently built for Collegiate Tech only; other themes report the toggle as inert until they add their own video-window geometry.</p></div></div>
-        <button id="videoModeToggle" onclick="setState('video_mode',!Boolean(currentState.video_mode))">Video Mode: <span id="videoModeToggleState">Off</span></button>
+        <div class="section-heading compact"><div><h3>Video Mode</h3><p class="section-note">CSRN never ingests video -- a composited camera feed in OBS shows through a transparent window this theme's video-board region opens. Live-togglable at any point in the broadcast. Same switch as Program Visual: Video Mode On = Camera, Off = Graphic. Currently built for Collegiate Tech only; other themes report the toggle as inert until they add their own video-window geometry.</p></div></div>
+        <button id="videoModeToggle" onclick="changeProgramVisual(currentState.video_mode?'graphic':'camera')">Video Mode: <span id="videoModeToggleState">Off</span></button>
         <button id="sidebarsHiddenToggle" onclick="setState('sidebars_hidden',!Boolean(currentState.sidebars_hidden))">Hide Sidebars: <span id="sidebarsHiddenToggleState">Off</span></button>
         <button id="videoCalibrationGuideToggle" class="warning" onclick="setState('video_calibration_guide',!Boolean(currentState.video_calibration_guide))">Calibration Guide: <span id="videoCalibrationGuideToggleState">Off</span></button>
+        <div id="videoModeMessage" class="status"></div>
       </section>
 
       <section id="finalPanel" class="panel compact final-panel hidden">
@@ -755,7 +756,7 @@
       </section>
 
       <section class="panel compact pregame-program-visual-panel">
-        <div class="section-heading compact"><div><h3>Program Visual</h3><p class="section-note">Choose whether OBS should show the graphic package or camera/program feed.</p></div></div>
+        <div class="section-heading compact"><div><h3>Program Visual</h3><p class="section-note">Graphic shows the full graphic package. Camera opens the theme's video window (Video Mode) so the camera layer behind the overlay shows, and switches OBS to the camera source when it is set up.</p></div></div>
         <div class="button-row" id="visualModeButtons">
           <button data-value="graphic" onclick="changeProgramVisual('graphic')">Graphic</button>
           <button data-value="camera" onclick="changeProgramVisual('camera')">Camera</button>
@@ -4015,16 +4016,20 @@ async function periodAction(action) {
   }catch(e){alert(e.data?.message||e.message)}
 }
 
+// Program Visual and the Video Mode toggle both land here: one endpoint sets
+// visual_mode + video_mode together, and switches OBS when it can.
 async function changeProgramVisual(mode) {
-  const message = document.getElementById('visualModeMessage');
-  message.textContent = `Switching to ${mode}…`;
+  const messages = ['visualModeMessage','videoModeMessage'].map(id=>document.getElementById(id)).filter(Boolean);
+  const show = (text, tone) => messages.forEach(el => { el.textContent = text; el.className = tone ? `status ${tone}` : 'status'; });
+  show(`Switching to ${mode}…`);
   try {
     const result = await api('/api/obs/program-visual-mode', {mode});
     currentState = result.state;
-    message.textContent = mode === 'graphic' ? 'Broadcast graphic active.' : 'Camera active.';
+    if (result.warning) show(result.warning, 'warning');
+    else show(mode === 'graphic' ? 'Broadcast graphic active.' : 'Camera active: video window open and OBS switched to the camera.', 'success');
     render();
   } catch (err) {
-    message.textContent = (err.data && err.data.message) || err.message || 'Unable to change program visual.';
+    show((err.data && err.data.message) || err.message || 'Unable to change program visual.', 'error');
   }
 }
 
@@ -4323,6 +4328,8 @@ function render() {
   // too (not just football's).
   const videoModeState = document.getElementById('videoModeToggleState');
   if (videoModeState) videoModeState.textContent = currentState.video_mode ? 'On' : 'Off';
+  // Program Visual's Graphic/Camera buttons read the same video_mode flag.
+  markActive('visualModeButtons', currentState.video_mode ? 'camera' : 'graphic');
   const sidebarsHiddenState = document.getElementById('sidebarsHiddenToggleState');
   if (sidebarsHiddenState) sidebarsHiddenState.textContent = currentState.sidebars_hidden ? 'On' : 'Off';
   const videoCalibrationGuideState = document.getElementById('videoCalibrationGuideToggleState');
@@ -4445,7 +4452,6 @@ function render() {
   markActive('clockVisibilityButtons', String(Boolean(currentState.clock_visible)));
   markActive('downDistanceVisibilityButtons', String(currentState.down_distance_visible !== false));
   markActive('possessionButtons', currentState.possession);
-  markActive('visualModeButtons', currentState.visual_mode || 'graphic');
 
   const phase = currentState.broadcast_phase;
   const badge = document.getElementById('phaseBadge');

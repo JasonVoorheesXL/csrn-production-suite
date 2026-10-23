@@ -318,6 +318,8 @@ class BroadcastLifecycleService:
             "date": item.get("date", ""),
             "scheduled_start": item.get("scheduled_start", "07:00 PM"),
             "visual_mode": item.get("visual_mode", "graphic"),
+            # A broadcast planned to open on Camera opens the video window.
+            "video_mode": item.get("visual_mode", "graphic") == "camera",
             "crew": copy.deepcopy(item.get("crew", {})),
             "status": status,
             "broadcast_phase": self.phase_for_status(status),
