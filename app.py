@@ -4446,6 +4446,72 @@ def _record_clean_shutdown_and_stop(signum, frame):
     raise SystemExit(0)
 
 
+# Outcome of the startup safety snapshot taken by build_command_center_server()
+# in this process (None until it has run). The desktop shell reads it to warn
+# the operator, since its console may not be visible.
+STARTUP_SAFETY_SNAPSHOT: dict[str, Any] | None = None
+
+
+def run_startup_safety_snapshot() -> dict[str, Any]:
+    """Take (or reuse) the automatic game-day safety snapshot at startup.
+
+    The same ``ensure_startup_snapshot()`` that tools/game_day_preflight.py
+    runs for RUN_CSRN_COMMAND_CENTER.bat, so the desktop shell gets it too;
+    a "startup" snapshot under 12 hours old that still verifies is reused.
+
+    Never raises and never blocks startup: a failure is printed as a loud
+    warning and returned with ``ok`` False so the caller can surface it.
+    The .bat still refuses to start on a failed preflight, because it runs
+    the preflight tool (which exits 1) before it ever reaches this point.
+    """
+    global STARTUP_SAFETY_SNAPSHOT
+    try:
+        result = get_game_day_safety_service().ensure_startup_snapshot()
+        code = result.code
+        data = result.data
+    except Exception as exc:  # noqa: BLE001 -- a backup error must not stop a live launch
+        code = "SNAPSHOT_FAILED"
+        data = {"message": f"{type(exc).__name__}: {exc}"}
+
+    failed_checks = [
+        f"{check.get('label', check.get('key', 'Check'))}: {check.get('note', '')}"
+        for check in data.get("preflight", {}).get("checks", [])
+        if not check.get("ok") and check.get("required", True)
+    ]
+    snapshot_id = str(data.get("snapshot", {}).get("snapshot_id", ""))
+    ok = code in {"SNAPSHOT_CREATED", "SNAPSHOT_CURRENT"}
+    if code == "SNAPSHOT_CURRENT":
+        message = f"Game-day safety snapshot is current: {snapshot_id}"
+    elif code == "SNAPSHOT_CREATED":
+        message = f"Game-day safety snapshot created: {snapshot_id}"
+    else:
+        detail = "; ".join(failed_checks) or str(data.get("message", "")).strip()
+        message = (
+            f"Game-day safety snapshot FAILED ({code})"
+            + (f": {detail}" if detail else ".")
+            + " CSRN is starting WITHOUT a fresh rollback point. Fix the problem"
+            " and restart CSRN before going live, or run"
+            " RUN_CSRN_COMMAND_CENTER.bat for the full preflight report."
+        )
+
+    if ok:
+        print(message)
+    else:
+        print("\n" + "!" * 72)
+        print(f"[WARN] {message}")
+        print("!" * 72 + "\n")
+
+    STARTUP_SAFETY_SNAPSHOT = {
+        "ok": ok,
+        "code": code,
+        "snapshot_id": snapshot_id,
+        "message": message,
+        "failed_checks": failed_checks,
+        "backup_root": str(GAME_DAY_BACKUP_DIR),
+    }
+    return STARTUP_SAFETY_SNAPSHOT
+
+
 def build_command_center_server():
     """Do the one-time Command Center setup and return a configured,
     socket-bound Waitress server.
@@ -4455,10 +4521,14 @@ def build_command_center_server():
     (``csrn_desktop.py``), which runs the returned server on a daemon
     thread in the same process as the window. Call ``server.run()`` to
     serve and ``server.close()`` to stop it.
+
+    Takes the automatic game-day safety snapshot first (see
+    ``run_startup_safety_snapshot``), so every launcher gets one.
     """
 
     ensure_data_architecture()
     load_config()
+    run_startup_safety_snapshot()
     from waitress import create_server
 
     ip = local_ip()
