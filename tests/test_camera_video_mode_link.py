@@ -212,3 +212,35 @@ def test_ui_shows_the_obs_warning_instead_of_failing() -> None:
     fn = fn[: fn.index("\n}\n") + 2]
     assert "result.warning" in fn
     assert "'videoModeMessage'" in fn and "'visualModeMessage'" in fn
+
+
+# --- overlay: the window really is see-through -----------------------------------
+
+RUNTIME_JS = (ROOT / "static" / "csrn-production-theme-runtime.js").read_text(encoding="utf-8")
+
+
+def _hole_fn() -> str:
+    start = RUNTIME_JS.index("function patchVideoWindowHole(root) {")
+    return RUNTIME_JS[start: RUNTIME_JS.index("\n}\n", start) + 2]
+
+
+def test_video_window_is_cut_out_of_the_translucent_board_layers() -> None:
+    # The board card and main display paint ~93% opaque behind the
+    # transparent window; the runtime masks the window's rect out of both.
+    fn = _hole_fn()
+    assert '".bl-scorebug.bl-collegiate, .bl-college-main-display"' in fn
+    assert "mask-composite\", \"exclude\"" in fn
+    assert "-webkit-mask-composite\", \"xor\"" in fn
+
+
+def test_mask_only_for_the_real_window_never_the_guide_or_a_graphic() -> None:
+    fn = _hole_fn()
+    # The calibration guide is meant to be seen; a Player/Sponsor/Highlight
+    # graphic replaces the window element, so neither gets a hole.
+    assert '.bl-college-video-window:not(.bl-college-video-window-guide)' in fn
+    assert "VIDEO_WINDOW_MASK_PROPERTIES.forEach(name => layer.style.removeProperty(name));" in fn
+
+
+def test_mask_is_reapplied_on_both_render_paths() -> None:
+    assert RUNTIME_JS.count("patchVideoWindowHole(scoreLayout());") == 1
+    assert RUNTIME_JS.count("patchVideoWindowHole(scoreTarget);") == 1
