@@ -41,6 +41,7 @@ class BroadcastLifecycleService:
         public_state: Callable[[Mapping[str, Any]], Mapping[str, Any]],
         resume_record: Callable[[str], Any],
         transaction_lock: Any,
+        load_live_state: Callable[[str], Mapping[str, Any] | None] | None = None,
     ) -> None:
         self._load_broadcasts = load_broadcasts
         self._load_packages = load_packages
@@ -57,6 +58,9 @@ class BroadcastLifecycleService:
         self._public_state = public_state
         self._resume_record = resume_record
         self._transaction_lock = transaction_lock
+        # The index rows no longer carry live_state; it lives in the
+        # broadcast's detail file.
+        self._load_live_state = load_live_state
 
     def load(self, broadcast_id: Any) -> BroadcastLifecycleResult:
         key = str(broadcast_id or "").strip()
@@ -79,6 +83,8 @@ class BroadcastLifecycleService:
             return BroadcastLifecycleResult("OK", {"state": current})
 
         snapshot = item.get("live_state")
+        if not isinstance(snapshot, Mapping) and self._load_live_state is not None:
+            snapshot = self._load_live_state(key)
         if isinstance(snapshot, Mapping):
             state = copy.deepcopy(dict(self._normalize_state(snapshot)))
         else:

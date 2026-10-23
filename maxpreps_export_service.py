@@ -103,11 +103,13 @@ class MaxPrepsExportService:
         load_broadcasts: ObjectLoader,
         load_state: Callable[[], dict[str, Any]],
         load_final_state_archive: Callable[[str], dict[str, Any] | None],
+        load_live_state: Callable[[str], dict[str, Any] | None] | None = None,
         get_statistics_service: Callable[[], Any],
     ) -> None:
         self._load_broadcasts = load_broadcasts
         self._load_state = load_state
         self._load_final_state_archive = load_final_state_archive
+        self._load_live_state = load_live_state
         self._get_statistics_service = get_statistics_service
 
     def generate(self, broadcast_id: str, team: str) -> MaxPrepsExportResult:
@@ -179,6 +181,17 @@ class MaxPrepsExportService:
             None,
         )
 
+    def _live_mirror(self, broadcast: Mapping[str, Any], broadcast_id: str) -> Any:
+        # Index rows no longer embed live_state (it lives in the broadcast's
+        # detail file); an older row that still carries one is used as is.
+        live_mirror = broadcast.get("live_state")
+        if live_mirror is None and self._load_live_state is not None:
+            try:
+                live_mirror = self._load_live_state(broadcast_id)
+            except Exception:
+                live_mirror = None
+        return live_mirror
+
     def _resolve_game_state(self, broadcast: Mapping[str, Any]) -> dict[str, Any]:
         broadcast_id = str(broadcast.get("broadcast_id", ""))
         try:
@@ -199,7 +212,7 @@ class MaxPrepsExportService:
         # archive, which is the durable record for a finished game.
         if live_is_this_broadcast and (live.get("events") or live.get("plays")):
             return live
-        live_mirror = broadcast.get("live_state")
+        live_mirror = self._live_mirror(broadcast, broadcast_id)
         if isinstance(live_mirror, dict) and (live_mirror.get("events") or live_mirror.get("plays")):
             return live_mirror
         try:

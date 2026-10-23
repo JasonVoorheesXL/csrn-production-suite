@@ -5,6 +5,7 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, Callable, Mapping
 
+from broadcast_detail_store import HEAVY_BROADCAST_FIELDS, has_heavy_fields
 from file_cache_signature import FileCacheSignature, file_cache_signature
 from persistence_engine import (
     DataCorruptionError,
@@ -14,6 +15,12 @@ from persistence_engine import (
 
 
 BroadcastNormalizer = Callable[[list[dict[str, Any]]], bool]
+# Moves one row's heavy fields (live_state / final_state_archive) into its
+# detail file and verifies them there. ``migrating`` is True when the row came
+# from a legacy on-disk index rather than from a caller's save().
+HeavyFieldSpiller = Callable[[dict[str, Any], bool], None]
+# Copies the legacy index file somewhere safe before the first migration.
+MigrationBackup = Callable[[Path], None]
 
 
 class BroadcastRepositoryValidationError(ValueError):
@@ -29,6 +36,14 @@ class BroadcastRepository:
     Broadcast lifecycle and game-domain rules remain injectable so the
     repository does not become responsible for scoring, graphics, scheduling,
     or operator workflow behavior.
+
+    When ``spill_heavy`` is supplied the index is kept lightweight: a row's
+    live_state / final_state_archive are handed to ``spill_heavy`` (which
+    writes them to the broadcast's detail file) and stripped before the index
+    is written. A legacy index that still embeds them is migrated the same way
+    on load, after ``backup_before_migration`` has copied it. If the backup or
+    any spill fails, the legacy rows are returned unchanged and the file is
+    left alone, so no game state is ever dropped.
     """
 
     def __init__(
@@ -38,10 +53,14 @@ class BroadcastRepository:
         *,
         normalizer: BroadcastNormalizer | None = None,
         policy: PersistencePolicy | None = None,
+        spill_heavy: HeavyFieldSpiller | None = None,
+        backup_before_migration: MigrationBackup | None = None,
     ) -> None:
         self.engine = engine
         self.path = Path(path)
         self.normalizer = normalizer
+        self.spill_heavy = spill_heavy
+        self.backup_before_migration = backup_before_migration
         self.policy = policy or PersistencePolicy(
             backup_count=50,
             # Confirmed no legitimate workflow relies on saving an empty/
@@ -107,13 +126,13 @@ class BroadcastRepository:
 
                 broadcast_ids.add(broadcast_id)
 
-            live_state = broadcast.get("live_state")
+            # Legacy rows may still embed the heavy state fields; when they
+            # do, each must be an object.
+            for field in HEAVY_BROADCAST_FIELDS:
+                value = broadcast.get(field)
 
-            if live_state is not None and not isinstance(
-                live_state,
-                dict,
-            ):
-                return False
+                if value is not None and not isinstance(value, dict):
+                    return False
 
         return True
 
@@ -170,6 +189,18 @@ class BroadcastRepository:
             items = self._extract(payload)
             normalized, changed = self._normalize(items)
 
+            if self.spill_heavy is not None and any(
+                self._needs_spill(row) for row in normalized
+            ):
+                migrated = self._migrate_heavy_rows(normalized)
+
+                if migrated is None:
+                    # Leave the legacy file and cache untouched; callers
+                    # still get the full rows, so nothing is lost.
+                    return copy.deepcopy(normalized)
+
+                return self.save(migrated)
+
             if changed or not isinstance(payload, list):
                 self.save(
                     normalized,
@@ -195,6 +226,12 @@ class BroadcastRepository:
         with self._lock:
             normalized, _ = self._normalize(broadcasts)
 
+            if self.spill_heavy is not None:
+                normalized = [
+                    self._spill_row(row, migrating=False)
+                    for row in normalized
+                ]
+
             self.engine.save(
                 self.path,
                 normalized,
@@ -207,6 +244,47 @@ class BroadcastRepository:
             self._cache_signature = self._signature()
 
             return copy.deepcopy(normalized)
+
+    @staticmethod
+    def _needs_spill(row: Mapping[str, Any]) -> bool:
+        # A row without an id has no detail file to hold its state, so it
+        # keeps whatever it carries.
+        return has_heavy_fields(row) and bool(
+            str(row.get("broadcast_id", "")).strip()
+        )
+
+    def _spill_row(
+        self,
+        row: dict[str, Any],
+        *,
+        migrating: bool,
+    ) -> dict[str, Any]:
+        if not self._needs_spill(row):
+            return row
+
+        assert self.spill_heavy is not None
+        self.spill_heavy(copy.deepcopy(row), migrating)
+
+        return {
+            key: value
+            for key, value in row.items()
+            if key not in HEAVY_BROADCAST_FIELDS
+        }
+
+    def _migrate_heavy_rows(
+        self,
+        items: list[dict[str, Any]],
+    ) -> list[dict[str, Any]] | None:
+        try:
+            if self.backup_before_migration is not None:
+                self.backup_before_migration(self.path)
+
+            return [
+                self._spill_row(row, migrating=True)
+                for row in items
+            ]
+        except Exception:
+            return None
 
     def get(
         self,
