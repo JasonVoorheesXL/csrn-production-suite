@@ -258,7 +258,8 @@ BODY = [
           "&mdash; see <b>Ball in the wrong place?</b> at the end of this phase."),
     ("callout", "warn", "UNDO ONLY THE MOST RECENT PLAY",
      "Undo always removes the <i>latest</i> event. If the mistake was several plays ago, don't undo a string of good "
-     "plays to reach it &mdash; note the play number and let it be fixed after the game."),
+     "plays to reach it. Use that play's " + ui("Edit") + " button in the Play Register instead (see <b>Ball in the wrong "
+     "place?</b> at the end of this phase)."),
     ("h2", "Pass &mdash; complete"),
     ("side", "pass_complete_form", "Pass &mdash; complete from #7 to #4, ending at LEFT 48.", [
         ("fields", [
@@ -403,30 +404,42 @@ BODY = [
         ["No play is wrong, but the officials spotted the ball somewhere else (re-spot, measurement, inadvertent whistle)",
          "<b>Field Position</b> slider", "Fix 2"],
         ["You're already in the next play's form and the Start Spot is wrong", ui("Correct Start Spot"), "Fix 3"],
-        ["The bad spot was several plays ago", "Don't undo good plays. Fix the current spot (Fix 2) and note the play number for your producer", "&mdash;"],
+        ["The bad spot (or jersey) was several plays ago", ui("Edit") + " on that play in the Play Register. Same form as Fix 1",
+         "Fix 1, and Phase 10"],
     ]),
     ("h3", "Fix 1 &mdash; Quick Edit Last Play"),
     ("p", "Here Riverside's #5 actually ran from RIGHT 15 to RIGHT 27 (12 yards, a first down), but the End Spot was left at "
           "RIGHT 17. The screen now shows 2nd &amp; 8 at RIGHT 17."),
     ("fig", "spot_mistake_recorded", "The mis-keyed play: 2nd &amp; 8 at RIGHT 17 instead of 1st &amp; 10 at RIGHT 27.", "narrow"),
-    ("pair", ("quick_edit_spot_moved", "Edit Play / Event: dragging End / Ball Spot to RIGHT 27 updates the yards to 12."),
-             ("quick_edit_ready", "Lower half of the form: Resulting Down/Distance set to 1st &amp; 10, plus a correction note.")),
-    ("steps", [
-        "Press " + ui("Quick Edit Last Play", "red") + " in the action bar. The <b>Edit Play / Event</b> form opens on the most recent play.",
-        "Drag <b>End / Ball Spot</b> to the correct spot (use " + ui("End &minus;1") + " / " + ui("End +1") + " to fine-tune). "
-        "<i>Calculated result</i> and <b>Yards</b> update to match.",
-        "Retype the <b>Description</b> (e.g. <i>run for 12 yards, first down</i>). It is <b>not</b> rewritten for you, and it's "
-        "what the Play Register shows.",
-        "Scroll down. <b>Resulting Down</b> and <b>Resulting Distance</b> still show the values from your original entry (2nd &amp; 8). "
-        "Set them to what the officials have now (1st &amp; 10).",
-        "Optionally add a <b>Correction Note</b>, then press " + ui("Save Edit", "red") + ".",
+    ("side", "quick_edit_ready", "Edit Play 10 &mdash; Run &mdash; Riverside: the normal play form, filled in with what you entered. "
+     "End Spot dragged to RIGHT 27, with a correction note.", [
+        ("p", "Editing a play opens the <b>same form you used to record it</b>, filled in with everything you entered: "
+              "jerseys, spots, pass result and checkboxes. The title reads <i>Edit Play &hellip;</i> and the button reads "
+              + ui("Save Edit", "red") + "."),
+        ("steps", [
+            "Press " + ui("Quick Edit Last Play", "red") + " in the action bar.",
+            "Change whatever was wrong. Here, drag <b>End Spot</b> to <code>RIGHT 27</code>. You can also fix a jersey, the pass "
+            "result or a checkbox.",
+            "Optionally type what you fixed in <b>Correction Note</b>.",
+            "Press " + ui("Save Edit", "red") + ".",
+        ]),
+        ("p", "That's it. Saving re-runs this play <b>and every play after it</b> through the rules, so the yards, down &amp; "
+              "distance, first downs, scoring, the register description and player stats all recalculate. You don't retype "
+              "anything else."),
     ]),
-    ("pair", ("after_quick_edit", "After Save Edit: 1st &amp; 10 at RIGHT 27."),
+    ("pair", ("after_quick_edit", "After Save Edit: 1st &amp; 10 at RIGHT 27. The notice reads <i>Play edited &mdash; later "
+                                  "plays re-calculated.</i>"),
              ("register_after_quick_edit", "The register now reads <i>#5 Jordan Reyes run for 12 yards, first down</i>.")),
-    ("callout", "warn", "THE EDIT FORM DOESN'T REDO THE MATH FOR YOU",
-     "Unlike the play form, moving the spot in Edit Play / Event only changes the yards. You set the resulting down, "
-     "distance and description yourself. If that feels like too much mid-game, " + ui("Undo Last Event", "gold") +
-     " and re-entering the play is just as good, and lets the system work everything out again."),
+    ("h3", "Editing an older play"),
+    ("p", "Every row in the Play Register has an " + ui("Edit") + " button that opens the same form for that play. Saving "
+          "re-runs it and every later play. Later plays keep the end spots you gave them (where the ball really was), so the "
+          "next play's start follows your fix and only its yards change."),
+    ("callout", "warn", "SOME EDITS ARE REFUSED &mdash; ON PURPOSE",
+     "If an edit would change who had the ball, or the try/kickoff sequence, under plays that came after it (for example "
+     "turning an old play into a touchdown when the drive actually continued), " + ui("Save Edit", "red") + " is refused "
+     "with a message naming the play, and nothing changes. Fix those from the latest play backwards with " +
+     ui("Undo Last Event", "gold") + ", or leave it for your producer. Touchdowns, field goals, tries, penalties and "
+     "turnovers entered with their own buttons still use a simpler edit form."),
     ("h3", "Fix 2 &mdash; the officials spotted it somewhere else"),
     ("p", "Your entry was right, but the ball ends up elsewhere: the officials re-spot it, a measurement moves it, or a whistle "
           "kills the play early. In this example the officials place the ball one yard back, at RIGHT 26."),
@@ -477,9 +490,12 @@ BODY = [
     ("callout", "rule", "WHAT TO DO WHEN YOU SEE AMBER",
      "<b>1.</b> Double-check the number on the field if you can do it in a second or two. If you misread it, retype it.<br>"
      "<b>2.</b> Otherwise <b>record the play anyway.</b> Don't hunt through rosters, don't stop the game, don't undo.<br>"
-     "<b>3.</b> Write down the <b>play number</b> from the register (e.g. &ldquo;Play 10 &mdash; Riverside #22&rdquo;) and tell your "
-     "producer at the next break. Someone fixes the name after the game with the register's " + ui("Edit") + " button.<br>"
-     "<b>4.</b> Keep entering the next plays normally."),
+     "<b>3.</b> Write down the <b>play number</b> from the register and what you think the right jersey was (e.g. "
+     "&ldquo;Play 11 &mdash; Riverside #22, probably #5&rdquo;).<br>"
+     "<b>4.</b> Keep entering the next plays normally.<br>"
+     "<b>5.</b> At a break (halftime, or after the last whistle) fix it with that play's " + ui("Edit") + " button: retype "
+     "the jersey and " + ui("Save Edit", "red") + ". Player credit moves with it. Do this <b>before Confirm Final</b> "
+     "(Phase 10 shows it), or hand your notes to the producer."),
 
     # ------------------------------------------------------------------ 5
     ("section", "5", "Scoring Plays: TD, PAT, 2-Point, FG, Safety",
@@ -738,8 +754,26 @@ BODY = [
     ("bullets", [
         "The scoreboard matches the stadium scoreboard.",
         "The Play Register looks complete &mdash; scroll through it once.",
-        "You've told your producer about any amber/unresolved plays.",
+        "Any amber/unresolved plays from your notes are fixed (below), or handed to your producer.",
     ]),
+    ("callout", "stop", "FIX PLAYS BEFORE YOU CONFIRM FINAL",
+     "Confirm Final archives the game and empties the live Play Register, so the " + ui("Edit") + " buttons disappear. "
+     "Make every correction first."),
+    ("h3", "Fixing an amber jersey from your notes"),
+    ("p", "Your notes say Play 11 &mdash; Riverside's run by &ldquo;#22&rdquo; from the 1st quarter &mdash; was really #5."),
+    ("fig", "amber_row_before_fix", "Find the play in the register: <i>#22 run for 5 yards</i> (no name, because #22 isn't "
+     "a Riverside number).", "narrow"),
+    ("side", "amber_fix_form", "Its Edit form: Ball Carrier Jersey changed from 22 to 5, which resolves to Jordan Reyes, "
+     "with a correction note.", [
+        ("steps", [
+            "Press " + ui("Edit") + " on that row. The play form opens filled in, with Ball Carrier Jersey <b>22</b>.",
+            "Replace it with <b>5</b>. The green line confirms <b>#5 &mdash; Jordan Reyes</b>.",
+            "Add a <b>Correction Note</b> and press " + ui("Save Edit", "red") + ".",
+        ]),
+        ("p", "Nothing else about the play changed, so the score and every later play stay the same. Only the "
+              "credit moves: the 5 yards now count for #5 in the stats."),
+    ]),
+    ("fig", "amber_row_after_fix", "The row now reads <i>#5 Jordan Reyes run for 5 yards</i>.", "narrow"),
     ("fig", "register_before_final", "The register just before Final, newest play first.", "narrow"),
     ("h2", "Confirming"),
     ("steps", [
@@ -756,11 +790,11 @@ BODY = [
         ["Period status <b>FINAL &middot; QOT</b>", "The game clock is stopped for good; no more periods."],
         ["Play Register says <i>No plays recorded.</i>", "<b>Expected.</b> On Final the system moves every play into the "
                                                         "game's permanent archive and clears the live list. Nothing is lost: "
-                                                        "in this demo all 35 plays and the full box score were saved."],
+                                                        "in this demo all 36 plays and the full box score were saved."],
     ]),
     ("fig", "register_final", "After Final the live Play Register is empty because the plays have been archived.", "narrow"),
     ("callout", "rule", "YOU'RE DONE",
-     "Once you see <b>FINAL</b>, stop entering data. Hand your notes (any play numbers with amber jerseys) to the producer, "
+     "Once you see <b>FINAL</b>, stop entering data. Hand any notes you didn't get to fix to the producer, "
      "then log out with " + ui("Log Out") + " in the header. If you pressed Confirm Final by mistake, tell the producer "
      "right away rather than trying to fix it yourself."),
 
@@ -784,9 +818,10 @@ BODY = [
         ["2-point try", ui("2PT GOOD", "green") + " / " + ui("2PT FAILED", "gold"), "Scorer, Rush/Reception, passer", ui("Confirm Event", "red")],
         ["Field goal", ui("FG"), "Kicker, outcome, distance", "Made = +3, then kickoff"],
         ["Safety", ui("Run") + "/" + ui("Pass") + ", End in <b>own</b> end zone", "As normal", "+2 defense, free kick"],
-        ["Wrong jersey (amber)", ui("Record Play", "red") + " anyway", "&mdash;", "Note play number for producer"],
+        ["Wrong jersey (amber)", ui("Record Play", "red") + " anyway", "&mdash;", "Note play #; fix with Edit before Final"],
         ["Mistake just now", ui("Undo Last Event", "gold"), "Re-enter play", "Only undoes the latest event"],
-        ["Last play's spot wrong", ui("Quick Edit Last Play", "red"), "End spot, description, down &amp; distance", "Down/distance don't recalculate"],
+        ["Last play wrong", ui("Quick Edit Last Play", "red"), "Fix spot / jersey, " + ui("Save Edit", "red"), "Everything recalculates"],
+        ["Older play wrong", ui("Edit") + " on its register row", "Fix it, " + ui("Save Edit", "red"), "Later plays re-run; some edits refused"],
         ["Officials re-spot the ball", "Field Position slider", "Drag the ball, then distance", "Ball: label, Game Context"],
         ["End of quarter", ui("End Quarter", "gold"), "&mdash;", "Ends switch; spot label flips"],
         ["Halftime", ui("End Quarter", "gold") + " after Q2", "&mdash;", "HALFTIME &middot; Q2"],
