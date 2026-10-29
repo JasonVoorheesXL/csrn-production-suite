@@ -236,6 +236,7 @@ from school_repository import SchoolRepository
 from roster_repository import RosterRepository
 from sponsor_repository import SponsorRepository
 from venue_repository import VenueRepository
+from broadcast_detail_store import BroadcastDetailStore, HEAVY_BROADCAST_FIELDS
 from broadcast_repository import BroadcastRepository
 
 # Phase 3 repository boundaries remain integrated below.
@@ -1891,10 +1892,148 @@ def _normalize_broadcast_lifecycle(
     return changed
 
 
+# live_state / final_state_archive live only in Data/Broadcasts/<id>.json.
+# The index (broadcasts.json) is a lightweight list of broadcast rows.
+BROADCAST_DETAIL_STORE = BroadcastDetailStore(lambda: DATA_DIR / "Broadcasts")
+
+
+def _broadcast_index_migration_dir() -> Path:
+    return CORE_BACKUP_ROOT / "Migrations"
+
+
+def _backup_broadcast_index_before_migration(path: Path) -> None:
+    """Keep a verified, never-pruned copy of a legacy (heavy) index before its
+    game state is moved into the detail files."""
+    source = Path(path)
+    destination_dir = _broadcast_index_migration_dir()
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    destination = destination_dir / (
+        f"broadcasts-pre-index-split-{time.strftime('%Y%m%d-%H%M%S')}"
+        f"-{time.time_ns()}.json"
+    )
+    shutil.copy2(source, destination)
+    if destination.stat().st_size != source.stat().st_size:
+        raise OSError(f"Broadcast index backup is incomplete: {destination}")
+    json.loads(destination.read_text(encoding="utf-8"))
+
+
+def _heavy_state_revision(value: Mapping[str, Any]) -> int:
+    try:
+        return int(value.get("state_revision", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _heavy_row_updated_at(row: Mapping[str, Any]) -> int:
+    try:
+        return int(row.get("updated_at", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _prefer_index_heavy_value(
+    field: str,
+    broadcast_id: str,
+    index_row: Mapping[str, Any],
+    detail_row: Mapping[str, Any],
+) -> bool:
+    """Decide whether an index row's copy of ``field`` should replace the one
+    already in the detail file. Only called when both exist and differ."""
+    index_value = index_row[field]
+    detail_value = detail_row[field]
+
+    def belongs(value: Any) -> bool:
+        return (
+            isinstance(value, Mapping)
+            and str(value.get("broadcast_id", "")).strip() == broadcast_id
+        )
+
+    if belongs(index_value) != belongs(detail_value):
+        return belongs(index_value)
+    if not isinstance(detail_value, Mapping):
+        return True
+    if not isinstance(index_value, Mapping):
+        return False
+    if field == "final_state_archive":
+        # The archive is the durable record of a finished game: never trade
+        # one with more play data for one with less.
+        def play_data(value: Mapping[str, Any]) -> int:
+            return len(value.get("events") or []) + len(value.get("plays") or [])
+
+        if play_data(index_value) != play_data(detail_value):
+            return play_data(index_value) > play_data(detail_value)
+    index_revision = _heavy_state_revision(index_value)
+    detail_revision = _heavy_state_revision(detail_value)
+    if index_revision != detail_revision:
+        return index_revision > detail_revision
+    return _heavy_row_updated_at(index_row) > _heavy_row_updated_at(detail_row)
+
+
+def _preserve_displaced_heavy_value(
+    broadcast_id: str,
+    field: str,
+    value: Any,
+) -> None:
+    destination_dir = _broadcast_index_migration_dir()
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    destination = destination_dir / (
+        f"{broadcast_id}-{field}-displaced-{time.time_ns()}.json"
+    )
+    destination.write_text(json.dumps(value, indent=2), encoding="utf-8")
+
+
+def _spill_broadcast_heavy_fields(row: dict[str, Any], migrating: bool) -> None:
+    """BroadcastRepository hook: move a row's live_state/final_state_archive
+    into its detail file and verify them there before the index drops them.
+
+    When the detail file already holds a different value, the newer/fuller
+    one wins (see _prefer_index_heavy_value) and the other is written to the
+    migration folder, so no copy of a game's state is thrown away.
+    """
+    broadcast_id = str(row.get("broadcast_id", "")).strip()
+    store = BROADCAST_DETAIL_STORE
+    with store.lock:
+        detail = store.read(broadcast_id) or {}
+        chosen: dict[str, Any] = {}
+        for field in HEAVY_BROADCAST_FIELDS:
+            if field not in row:
+                continue
+            if field not in detail or detail[field] == row[field]:
+                chosen[field] = row[field]
+            elif _prefer_index_heavy_value(field, broadcast_id, row, detail):
+                _preserve_displaced_heavy_value(broadcast_id, field, detail[field])
+                chosen[field] = row[field]
+            else:
+                _preserve_displaced_heavy_value(broadcast_id, field, row[field])
+        # The detail file's own row fields are kept when they are newer.
+        if detail and _heavy_row_updated_at(detail) > _heavy_row_updated_at(row):
+            base = detail
+        else:
+            base = row
+        light = {
+            key: value
+            for key, value in base.items()
+            if key not in HEAVY_BROADCAST_FIELDS
+        }
+        store.write(light, heavy=chosen)
+        written = store.read(broadcast_id) or {}
+        for field in HEAVY_BROADCAST_FIELDS:
+            if field in row and field not in written:
+                raise OSError(
+                    f"{broadcast_id}: {field} did not reach its detail file"
+                )
+            if field in chosen and written.get(field) != chosen[field]:
+                raise OSError(
+                    f"{broadcast_id}: {field} detail write could not be verified"
+                )
+
+
 BROADCAST_REPOSITORY = BroadcastRepository(
     CORE_PERSISTENCE,
     BROADCAST_INDEX_FILE,
     normalizer=_normalize_broadcast_lifecycle,
+    spill_heavy=_spill_broadcast_heavy_fields,
+    backup_before_migration=_backup_broadcast_index_before_migration,
 )
 
 
@@ -1916,20 +2055,19 @@ def write_broadcast_detail(
     record: dict[str, Any],
     existing_only: bool = False,
 ) -> None:
-    broadcast_id = str(record.get("broadcast_id", "")).strip()
-    if not broadcast_id:
-        return
-    path = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
-    if existing_only and not path.exists():
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+    """Write a broadcast row to Data/Broadcasts/<id>.json. Heavy fields the
+    record carries are written; heavy fields it lacks (index rows never carry
+    them) are kept from the file already on disk."""
+    BROADCAST_DETAIL_STORE.write(record, existing_only=existing_only)
 
 
 def delete_broadcast_detail(broadcast_id: str) -> None:
-    path = DATA_DIR / "Broadcasts" / f"{broadcast_id}.json"
-    if path.exists():
-        path.unlink()
+    BROADCAST_DETAIL_STORE.delete(broadcast_id)
+
+
+def load_broadcast_live_state(broadcast_id: str) -> dict[str, Any] | None:
+    """The last mirrored live state of a broadcast, from its detail file."""
+    return BROADCAST_DETAIL_STORE.load_field(broadcast_id, "live_state")
 
 
 BROADCAST_SERVICE: BroadcastService | None = None
@@ -1988,6 +2126,7 @@ def get_social_media_preview_service() -> SocialMediaPreviewService:
             load_broadcasts=load_broadcasts,
             load_state=load_state,
             load_final_state_archive=load_final_state_archive,
+            load_live_state=load_broadcast_live_state,
             get_school_logo_file=lambda school_id, filename: DATA_DIR / "Logos" / normalize_school_id(school_id) / filename,
             get_asset_upload_dir=lambda: ASSET_UPLOAD_DIR,
             get_sponsor_service=get_sponsor_service,
@@ -2013,6 +2152,7 @@ def get_maxpreps_export_service() -> MaxPrepsExportService:
             load_broadcasts=load_broadcasts,
             load_state=load_state,
             load_final_state_archive=load_final_state_archive,
+            load_live_state=load_broadcast_live_state,
             get_statistics_service=get_statistics_service,
         )
 
@@ -2480,10 +2620,14 @@ def persist_linked_state_snapshot(normalized: dict[str, Any]) -> None:
     # Runs on a dedicated background thread (StateService's async linked-
     # snapshot writer) whenever async_linked_snapshot=True, as it is for the
     # production STATE_SERVICE — never inline on a request thread that might
-    # already hold `lock`. Taking `lock` here serializes this read-modify-
-    # write of Data/Broadcasts/*.json against write_broadcast_final_archive()
-    # below, which runs synchronously inside GameOperationsService's
-    # already-held transaction lock (the same `lock` object).
+    # already hold `lock`. `lock` is held only for the read-modify-write of
+    # the small index row (status/updated_at), which the other index writers
+    # also do under `lock`. The live_state goes to the detail file afterwards,
+    # outside `lock`: BROADCAST_DETAIL_STORE serializes that write against
+    # write_broadcast_final_archive() (which runs inside GameOperationsService's
+    # already-held transaction lock, the same `lock` object) and keeps any
+    # final_state_archive already in the file, so request threads never wait
+    # on the big write.
     with lock:
         items = load_broadcasts()
         item = next(
@@ -2492,14 +2636,15 @@ def persist_linked_state_snapshot(normalized: dict[str, Any]) -> None:
         )
         if not item:
             return
-        item["live_state"] = snapshot
         item["status"] = normalized.get(
             "status",
             item.get("status", "planned"),
         )
         item["updated_at"] = int(time.time())
         save_broadcasts(items)
-        write_broadcast_detail(item)
+        record = copy.deepcopy(item)
+    record["live_state"] = snapshot
+    write_broadcast_detail(record)
 
 
 def write_broadcast_final_archive(state: Mapping[str, Any]) -> bool:
@@ -2537,18 +2682,24 @@ def write_broadcast_final_archive(state: Mapping[str, Any]) -> bool:
         )
         if item is None:
             return False
-        item["final_state_archive"] = snapshot
         item["final_state_archived_at"] = int(time.time())
-        # Also bring the ongoing live-mirror up to the same, uncleared
-        # snapshot right now — the regular async mirror will overwrite it
-        # again shortly after with the (soon to be cleared) live state, which
-        # is fine: final_state_archive above is the durable record, live_state
-        # is only ever a reflection of whatever state.json currently holds.
-        item["live_state"] = copy.deepcopy(snapshot)
         item["status"] = snapshot.get("status", item.get("status", "planned"))
         item["updated_at"] = int(time.time())
         save_broadcasts(items)
-        write_broadcast_detail(item)
+        # The game state itself goes only to the detail file. Also bring the
+        # live mirror up to the same, uncleared snapshot right now — the
+        # regular async mirror will overwrite it again shortly after with the
+        # (soon to be cleared) live state, which is fine: final_state_archive
+        # is the durable record, live_state is only ever a reflection of
+        # whatever state.json currently holds.
+        record = {
+            key: value
+            for key, value in item.items()
+            if key not in HEAVY_BROADCAST_FIELDS
+        }
+        record["final_state_archive"] = snapshot
+        record["live_state"] = copy.deepcopy(snapshot)
+        write_broadcast_detail(record)
     except Exception:
         return False
 
@@ -2578,18 +2729,7 @@ def archive_has_play_data(archive: Any) -> bool:
 
 
 def load_final_state_archive(broadcast_id: str) -> dict[str, Any] | None:
-    key = str(broadcast_id or "").strip()
-    if not key:
-        return None
-    detail_path = DATA_DIR / "Broadcasts" / f"{key}.json"
-    try:
-        item = json.loads(detail_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        return None
-    if not isinstance(item, dict):
-        return None
-    archive = item.get("final_state_archive")
-    return archive if isinstance(archive, dict) else None
+    return BROADCAST_DETAIL_STORE.load_field(broadcast_id, "final_state_archive")
 
 
 def load_state_for_reporting() -> dict[str, Any]:
@@ -3254,6 +3394,7 @@ def get_broadcast_lifecycle_service() -> BroadcastLifecycleService:
             public_state=public_state,
             resume_record=get_broadcast_service().resume_record,
             transaction_lock=lock,
+            load_live_state=load_broadcast_live_state,
         )
     return BROADCAST_LIFECYCLE_SERVICE
 
