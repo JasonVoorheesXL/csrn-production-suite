@@ -258,6 +258,22 @@ class PenaltyService:
             if loss:
                 state["down"] = cls._advance_down(old_down, state)
 
+        phase = str(before.get("special_game_phase", "") or "").strip().lower()
+        if phase in {"kickoff", "free_kick"}:
+            # A foul before a kickoff only moves the kick spot; there is no
+            # series yet, so down and distance stay as they were.
+            state["down"] = before["down"]
+            state["distance"] = before["distance"]
+        else:
+            # The line to gain can never lie past the goal line: inside the
+            # opponent's 10 a first down is "& Goal", and a foul against the
+            # offense in a goal-to-go series keeps it goal to go.
+            final_coord = max(0, min(length, int(spot_to_coord(state.get("ball_spot", base_spot)))))
+            to_goal = (length - final_coord) if direction >= 0 else final_coord
+            current_distance = cls._safe_int(state.get("distance"), 0)
+            if 0 < to_goal < current_distance:
+                state["distance"] = str(to_goal)
+
         # Penalty administration never silently resolves scoring/special phases.
         # retry/untimed-down are canonical administration flags for the later
         # period/try enforcement layers.
