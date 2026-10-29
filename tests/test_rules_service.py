@@ -590,7 +590,9 @@ def test_failed_fourth_down_changes_possession() -> None:
 
 
 def test_kickoff_touchback_places_ball_at_receiving_twenty() -> None:
-    service, current, _, _, _ = build_service()
+    state = base_state()
+    state.update({"special_game_phase": "kickoff", "kicking_team": "home"})
+    service, current, _, _, _ = build_service(state)
     result = service.play(
         {
             "team": "home",
