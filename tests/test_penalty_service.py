@@ -117,15 +117,15 @@ def test_defensive_foul_that_reaches_the_line_to_gain_awards_a_first_down(direct
 
 @pytest.mark.parametrize("direction", [1, -1])
 def test_automatic_first_down_penalty_is_unaffected_by_direction(direction: int) -> None:
-    # Defensive Pass Interference is automatic_first_down regardless of
-    # enforced yardage; this branch never touched move_sign even before the
-    # fix, but is covered here as a direction-invariance sanity check.
+    # Roughing the Passer is automatic_first_down regardless of enforced
+    # yardage; this branch never touched move_sign even before the fix, but
+    # is covered here as a direction-invariance sanity check.
     state = base_state(ball_spot="30", down="2nd", distance="8")
     PenaltyService.enforce(
         state,
         selected_team="visitor",
         requested_unit="Defensive",
-        name="Pass Interference",
+        name="Roughing the Passer",
         yards=15,
         outcome="accepted",
         spot_to_coord=spot_to_coord,
@@ -174,3 +174,45 @@ def test_declined_penalty_leaves_state_untouched() -> None:
     assert state["down"] == "1st"
     assert state["distance"] == "10"
     assert state["ball_spot"] == "30"
+
+
+@pytest.mark.parametrize(
+    ("name", "yards"),
+    [("Holding", 10), ("Pass Interference", 15), ("Personal Foul", 15), ("Unsportsmanlike Conduct", 15)],
+)
+def test_nfhs_defensive_fouls_without_roughing_do_not_award_an_automatic_first_down(name: str, yards: int) -> None:
+    # NFHS: only roughing (passer / kicker) carries an automatic first down.
+    # 2nd & 20: the enforced yardage alone does not reach the line to gain,
+    # so the down is replayed with the shorter distance.
+    state = base_state(ball_spot="30", down="2nd", distance="20")
+    result = PenaltyService.enforce(
+        state,
+        selected_team="visitor",
+        requested_unit="Defensive",
+        name=name,
+        yards=yards,
+        outcome="accepted",
+        spot_to_coord=spot_to_coord,
+        coord_to_spot=coord_to_spot,
+        team_direction=make_team_direction(1),
+    )
+    assert result["automatic_first_down"] is False
+    assert state["down"] == "2nd"
+    assert state["distance"] == str(20 - yards)
+
+
+def test_defensive_holding_yardage_that_reaches_the_line_to_gain_still_gives_a_first_down() -> None:
+    state = base_state(ball_spot="30", down="3rd", distance="4")
+    PenaltyService.enforce(
+        state,
+        selected_team="visitor",
+        requested_unit="Defensive",
+        name="Holding",
+        yards=10,
+        outcome="accepted",
+        spot_to_coord=spot_to_coord,
+        coord_to_spot=coord_to_spot,
+        team_direction=make_team_direction(1),
+    )
+    assert state["down"] == "1st"
+    assert state["distance"] == "10"
