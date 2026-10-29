@@ -373,17 +373,21 @@ class GameOperationsService:
                 if transition.code == "SECOND_HALF_RECEIVER_REQUIRED":
                     # Nobody is known to receive the second-half kickoff (the
                     # opening kickoff was never recorded and no receiver was
-                    # given), so a full kickoff setup is impossible here. The
-                    # ends must still change like every other quarter break:
-                    # swap directions and mirror the ball with them.
-                    PeriodService._swap_directions(state)
-                    # A second_half_drive_direction is defined relative to the
-                    # RECEIVING team, which is exactly what is unknown, so it
-                    # cannot be applied without risking the wrong team.
-                    # Historical mirror is the only safe default -- but say so
-                    # rather than silently ignoring the operator's choice.
-                    ignored = str(incoming.get("second_half_drive_direction", "") or "").strip().lower()
-                    if ignored in {"left", "right"}:
+                    # given), so a full kickoff setup is impossible here.
+                    # "keep" / "swap" (relative to the 2nd quarter) need no
+                    # receiver, so they still apply; empty is the historical
+                    # swap, which mirrors the ball with the ends.
+                    choice = PeriodService.second_half_direction_choice(
+                        incoming.get("second_half_drive_direction", "")
+                    )
+                    if choice != "keep":
+                        PeriodService._swap_directions(state)
+                    # LEFT/RIGHT is defined relative to the RECEIVING team,
+                    # which is exactly what is unknown, so it cannot be
+                    # applied without risking the wrong team. Say so rather
+                    # than silently ignoring the operator's choice.
+                    ignored = choice if choice in {"left", "right"} else ""
+                    if ignored:
                         notice = (
                             "Second half started, but the second-half receiving team isn't known "
                             "(no opening kickoff was recorded), so your "

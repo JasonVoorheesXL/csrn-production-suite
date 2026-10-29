@@ -89,6 +89,20 @@ class PeriodService:
             "left" if visitor == "right" else "right",
         )
 
+    @staticmethod
+    def second_half_direction_choice(value: Any) -> str | None:
+        """Normalise a second-half direction choice to "keep", "swap", "left"
+        or "right" ("left"/"right" are the RECEIVING team's direction). Empty
+        means the historical mirror, i.e. "swap". None if unrecognised."""
+        text = str(value or "").strip().lower()
+        if text in {"", "mirror", "auto", "swap", "switch"}:
+            return "swap"
+        if text in {"keep", "same"}:
+            return "keep"
+        if text in {"left", "right"}:
+            return text
+        return None
+
     @classmethod
     def _stop_clock(cls, state: dict[str, Any], *, reset: bool = False) -> None:
         state["clock_running"] = False
@@ -210,18 +224,21 @@ class PeriodService:
             # kickoff (same shape as the opening coin toss), not a forced
             # mirror: teams often stay put, e.g. to keep the scoreboard in
             # view. Expressed like the coin toss: the direction the RECEIVING
-            # team's offense will drive. Empty keeps the historical mirror.
-            direction = str(second_half_drive_direction or "").strip().lower()
-            if direction in {"mirror", "auto"}:
-                direction = ""
-            if direction not in {"", "left", "right"}:
+            # team's offense will drive. It can also be given relative to the
+            # 2nd quarter: "keep" (same ends -- what every 2026 game so far
+            # did) or "swap". Empty keeps the historical mirror (= "swap") for
+            # API callers; the console makes the operator pick.
+            direction = cls.second_half_direction_choice(second_half_drive_direction)
+            if direction is None:
                 return PeriodResult(
                     "SECOND_HALF_DIRECTION_INVALID",
                     current,
-                    {"message": "Select the second-half receiving team's direction (left or right)."},
+                    {"message": "Select the second-half direction: keep the 2nd-quarter ends, switch them, or the receiving team's direction (left or right)."},
                 )
             kicker = CanonicalStateFoundation.opposite(receiver)
-            if direction:
+            if direction == "keep":
+                pass
+            elif direction in {"left", "right"}:
                 receiver_direction = direction
                 kicker_direction = "left" if direction == "right" else "right"
                 cls._set_directions(
