@@ -5,6 +5,8 @@ from typing import Any, Callable
 
 from flask import Blueprint, jsonify, request
 
+from canonical_state_service import CanonicalStateFoundation
+
 from live_command_service import (
     assign_next_revision,
     attach_metadata,
@@ -114,6 +116,7 @@ def create_coin_toss_blueprint(
             tracked = (
                 "home_direction", "visitor_direction", "possession", "down", "distance",
                 "special_game_phase", "kicking_team", "receiving_team", "second_half_receiving_team",
+                "ball_spot",
             )
             if recorded and isinstance(existing.get("before"), dict):
                 before = copy.deepcopy(existing["before"])
@@ -132,6 +135,12 @@ def create_coin_toss_blueprint(
             state["kicking_team"] = opening_kicker
             state["receiving_team"] = opening_receiver
             state["second_half_receiving_team"] = second_half_receiver
+            # The opening kickoff is taken from the kicking team's own 40, like
+            # every later kickoff (enter_kickoff); the pregame placeholder was
+            # midfield, so a pre-kick foul was walked off from the 50.
+            state["ball_spot"] = CanonicalStateFoundation._team_own_yard_spot(
+                state, opening_kicker, CanonicalStateFoundation._field_yards(state)["kickoff"]
+            )
 
             summary = (
                 f"{team_name(state, winner)} won the toss and elected {election}; "
