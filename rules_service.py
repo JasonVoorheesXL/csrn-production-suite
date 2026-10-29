@@ -1122,6 +1122,7 @@ class RulesService:
         created_at = (
             int(replay.get("created_at", 0) or 0) if replay is not None else int(self._now())
         )
+        CanonicalStateFoundation.cap_distance_to_goal(state)
         after = {
             field: copy.deepcopy(state.get(field))
             for field in self.SNAPSHOT_FIELDS
