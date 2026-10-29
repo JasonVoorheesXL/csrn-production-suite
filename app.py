@@ -4415,6 +4415,7 @@ def apply_penalty_enforcement(state: dict[str, Any], category: str, name: str, y
         loss_of_down=bool(options.get("loss_of_down")),
         untimed_down=bool(options.get("untimed_down")),
         retry_down=bool(options.get("retry_down")),
+        new_series=bool(options.get("new_series")),
     )
 
 def local_addresses() -> list[str]:
