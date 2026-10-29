@@ -303,13 +303,13 @@ def test_processing_preserves_original_bytes_and_resets_all_approval_records() -
 
 def test_review_ui_and_round_theme_frame_have_non_destructive_fitting() -> None:
     root = Path(__file__).resolve().parents[1]
-    css = (root / 'static/style.css').read_text()
+    css = (root / 'static/style.css').read_text(encoding='utf-8')
     rule = css.split('.logo-preview-card img{', 1)[1].split('}', 1)[0]
     assert 'border-radius:0' in rule
     assert 'object-fit:contain' in rule
-    theme = (root / 'static/csrn-production-theme-runtime.css').read_text()
+    theme = (root / 'static/csrn-production-theme-runtime.css').read_text(encoding='utf-8')
     rule = theme.split('#csrnProductionThemeLayout .hp-team-mark img{', 1)[1].split('}', 1)[0]
     assert 'width:70%' in rule and 'height:70%' in rule
-    page = (root / 'templates/index.html').read_text()
+    page = (root / 'templates/index.html').read_text(encoding='utf-8')
     assert 'schoolLogoOriginalLink' in page
     assert 'Reprocess Preserved Original' in page

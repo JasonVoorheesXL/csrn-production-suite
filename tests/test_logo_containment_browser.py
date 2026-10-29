@@ -58,7 +58,7 @@ def test_logo_components_and_frozen_theme_geometry():
             page.add_style_tag(path=str(ROOT/'static'/name))
         # The discovery candidate rule is inline in the real team manager.
         import re
-        template = (ROOT/'templates/index.html').read_text()
+        template = (ROOT/'templates/index.html').read_text(encoding='utf-8')
         for rules in re.findall(r'<style[^>]*>(.*?)</style>', template, re.S):
             if '.branding-logo-candidate' in rules:
                 page.add_style_tag(content=rules)
