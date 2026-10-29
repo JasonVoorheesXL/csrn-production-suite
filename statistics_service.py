@@ -227,7 +227,37 @@ class StatisticsService:
         before = event.get("before")
         if not isinstance(before, Mapping):
             return False
-        return bool(str(before.get("special_game_phase", "") or "").strip())
+        phase = str(before.get("special_game_phase", "") or "").strip().lower()
+        if not phase:
+            return False
+        # A kickoff (or a free kick by punt) is the one play that legitimately
+        # happens during the kick phase; its touchdown is real.
+        automation = event.get("automation") if isinstance(event.get("automation"), Mapping) else {}
+        kind = str(automation.get("play_type", "") or "").lower()
+        if phase in {"kickoff", "free_kick"} and kind in {"kickoff", "punt"}:
+            return False
+        return True
+
+    TEAM_PLAYER_NAME = "TEAM"
+
+    @staticmethod
+    def _entry_player(play: Mapping[str, Any], role: str) -> tuple[str, str]:
+        """(name, number) for ``role`` as the statistician entered it.
+
+        The play's own player_* fields hold the returner on a defensive-return
+        touchdown, so the stored form entry is the reliable source for who
+        actually had the ball.
+        """
+        entry = play.get("entry") if isinstance(play.get("entry"), Mapping) else None
+        source = entry if entry is not None else play
+        name = str(source.get(f"{role}_name", "") or "").strip()
+        number = str(source.get(f"{role}_number", "") or "").strip()
+        # The entry may carry only the jersey; the play row holds the name the
+        # roster resolved for that same jersey (same player row key).
+        play_number = str(play.get(f"{role}_number", "") or "").strip()
+        if not name and number and number == play_number:
+            name = str(play.get(f"{role}_name", "") or "").strip()
+        return name, number
 
     @staticmethod
     def _player_key(team: str, name: Any, number: Any) -> str:
@@ -311,8 +341,11 @@ class StatisticsService:
             if code == "TURNOVER":
                 key = str(event.get("id") or event.get("play_id") or id(event))
                 turnover_event_keys.add(key)
-                teams[team]["turnovers_gained"] += 1
                 turnover_type = str(automation.get("turnover_type", "") or "").lower()
+                # A turnover on downs changes possession but is not a turnover
+                # in the box score (no interception or fumble lost).
+                if turnover_type != "downs":
+                    teams[team]["turnovers_gained"] += 1
                 if turnover_type == "interception":
                     teams[team]["interceptions_gained"] += 1
                 elif turnover_type in {"fumble", "fumble_recovery", "muff_recovery"}:
@@ -406,8 +439,18 @@ class StatisticsService:
             if kind in {"run", "pass"} and offense in teams:
                 teams[offense]["total_plays"] += 1
                 teams[offense]["total_yards"] += yards
-                ball_carrier = player_row(offense, play.get("player_name", ""), play.get("player_number", ""))
+                # On a defensive-return touchdown the play's player_* fields
+                # hold the returner, so the runner comes from the stored entry;
+                # a pass has no ball carrier row of its own.
+                ball_carrier = player_row(offense, *self._entry_player(play, "player")) if kind == "run" else None
                 passer = player_row(offense, play.get("passer_name", ""), play.get("passer_number", ""))
+                # A run or pass with no player entered (a kneel, a botched
+                # snap) goes to the team line so player rows still add up to
+                # the team totals.
+                if kind == "run" and ball_carrier is None:
+                    ball_carrier = player_row(offense, self.TEAM_PLAYER_NAME, "")
+                if kind == "pass" and passer is None:
+                    passer = player_row(offense, self.TEAM_PLAYER_NAME, "")
                 receiver = None
 
                 # Own-team fumble recovery: a teammate recovers the carrier's
@@ -465,6 +508,8 @@ class StatisticsService:
                             passer["pass_attempts"] += 1
                     if receiver is not None and outcome not in {"sack", "spike"}:
                         receiver["targets"] += 1
+                    if outcome == "complete" and receiver is None:
+                        receiver = player_row(offense, self.TEAM_PLAYER_NAME, "")
                     if outcome == "complete":
                         teams[offense]["completions"] += 1
                         teams[offense]["passing_yards"] += yards
@@ -489,16 +534,35 @@ class StatisticsService:
                         teams[offense]["interceptions"] += 1
                         if passer is not None:
                             passer["interceptions_thrown"] += 1
-                    elif outcome == "sack" and defense in teams:
-                        teams[defense]["sacks"] += 1
-                        sacker = player_row(defense, play.get("sacker_name", ""), play.get("sacker_number", ""))
-                        if sacker is not None:
-                            sacker["sacks"] += 1
+                    elif outcome == "sack":
+                        # NFHS / MaxPreps: a sack is a rushing play for the
+                        # passer (and the team), never a pass attempt.
+                        teams[offense]["rushing_attempts"] += 1
+                        teams[offense]["rushing_yards"] += yards
+                        if passer is not None:
+                            passer["rushing_attempts"] += 1
+                            passer["rushing_yards"] += carrier_yards
+                        if defense in teams:
+                            teams[defense]["sacks"] += 1
+                            sacker = player_row(defense, play.get("sacker_name", ""), play.get("sacker_number", ""))
+                            if sacker is not None:
+                                sacker["sacks"] += 1
 
-                if play.get("fumble") and ball_carrier is not None:
-                    ball_carrier["fumbles"] += 1
-                if play.get("fumble_lost") and ball_carrier is not None:
-                    ball_carrier["fumbles_lost"] += 1
+                if play.get("fumble") or play.get("fumble_lost"):
+                    if kind == "run":
+                        fumbler_role = "player"
+                    elif outcome == "complete":
+                        fumbler_role = "receiver"
+                    else:
+                        fumbler_role = "passer"
+                    fumbler_name, fumbler_number = self._entry_player(play, fumbler_role)
+                    fumbler = player_row(offense, fumbler_name, fumbler_number) or player_row(
+                        offense, self.TEAM_PLAYER_NAME, ""
+                    )
+                    if fumbler is not None:
+                        fumbler["fumbles"] += 1
+                        if play.get("fumble_lost"):
+                            fumbler["fumbles_lost"] += 1
 
                 play_id = str(play.get("play_id", "") or "")
                 if play_touchdown and play_id not in touchdown_play_ids:
@@ -534,8 +598,21 @@ class StatisticsService:
                             returner["return_touchdowns"] += 1
                             if str(play.get("play_id", "")) not in touchdown_play_ids:
                                 returner["touchdowns"] += 1
+                kick_turnover = str(play.get("turnover_type", "") or "").lower() in {
+                    "muff_recovery", "kicking_team_recovery", "fumble_recovery",
+                }
+                if receiving in teams and (play.get("fumble") or play.get("muffed_punt") or kick_turnover):
+                    returner_name, returner_number = self._entry_player(play, "returner")
+                    fumbler = player_row(receiving, returner_name, returner_number) or player_row(
+                        receiving, self.TEAM_PLAYER_NAME, ""
+                    )
+                    if fumbler is not None:
+                        fumbler["fumbles"] += 1
+                        if play.get("fumble_lost") or kick_turnover:
+                            fumbler["fumbles_lost"] += 1
 
-            if play.get("turnover") and defense in teams:
+            play_turnover_type = str(play.get("turnover_type", "") or linked_automation.get("turnover_type", "")).lower()
+            if play.get("turnover") and defense in teams and play_turnover_type != "downs":
                 linked_code = str(linked.get("event", "")).upper()
                 # PLAY-based turnovers are not separate TURNOVER events. Count them once here.
                 if linked_code != "TURNOVER":
