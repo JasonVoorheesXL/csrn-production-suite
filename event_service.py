@@ -477,6 +477,7 @@ class EventService:
                     "loss_of_down": bool(incoming.get("penalty_loss_of_down")),
                     "untimed_down": bool(incoming.get("penalty_untimed_down")),
                     "retry_down": bool(incoming.get("penalty_retry_down")),
+                    "new_series": bool(incoming.get("penalty_new_series")),
                 }
                 try:
                     penalty_enforcement = self._apply_penalty(

@@ -40,6 +40,25 @@ class PenaltyService:
         ("Special Teams", "Running Into the Kicker"): {"yards": 5},
         ("Special Teams", "Roughing the Kicker"): {"yards": 15, "automatic_first_down": True},
         ("Special Teams", "Personal Foul"): {"yards": 15},
+        ("Offensive", "Pass Interference"): {"yards": 15},
+        ("Offensive", "Illegal Block in the Back"): {"yards": 10},
+        ("Offensive", "Clipping"): {"yards": 15},
+        ("Offensive", "Chop Block"): {"yards": 15},
+        ("Offensive", "Illegal Use of Hands"): {"yards": 10},
+        ("Offensive", "Face Mask"): {"yards": 15},
+        ("Offensive", "Illegal Forward Pass"): {"yards": 5, "loss_of_down": True},
+        ("Offensive", "Illegal Participation"): {"yards": 15},
+        ("Defensive", "Illegal Use of Hands"): {"yards": 10},
+        ("Defensive", "Horse Collar"): {"yards": 15},
+        ("Defensive", "Targeting"): {"yards": 15},
+        ("Defensive", "Illegal Participation"): {"yards": 15},
+        ("Defensive", "Delay of Game"): {"yards": 5},
+        ("Special Teams", "Offside"): {"yards": 5},
+        ("Special Teams", "Illegal Block in the Back"): {"yards": 10},
+        ("Special Teams", "Clipping"): {"yards": 15},
+        ("Special Teams", "Roughing the Holder"): {"yards": 15, "automatic_first_down": True},
+        ("Special Teams", "Roughing the Snapper"): {"yards": 15, "automatic_first_down": True},
+        ("Special Teams", "Illegal Participation"): {"yards": 15},
     }
 
     # Penalty catalogue + down cycle come from ruleset_service.active_ruleset
@@ -156,6 +175,7 @@ class PenaltyService:
         untimed_down: bool = False,
         retry_down: bool = False,
         series_before: Mapping[str, Any] | None = None,
+        new_series: bool = False,
     ) -> dict[str, Any]:
         """Enforce one penalty on ``state``.
 
@@ -280,6 +300,12 @@ class PenaltyService:
                 series_down = str(series_before.get("down") or "1st")
                 state["down"] = cls._advance_down(series_down, state) if loss else series_down
                 state["distance"] = str(min(99, remaining))
+
+        if new_series:
+            # A dead-ball foul after the offense earned a first down: the
+            # officials enforce it and award a new series (1st & 10).
+            state["down"] = "1st"
+            state["distance"] = "10"
 
         phase = str(before.get("special_game_phase", "") or "").strip().lower()
         if phase in {"kickoff", "free_kick"}:
