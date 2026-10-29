@@ -735,6 +735,13 @@ class CanonicalStateFoundation:
             if str(event.get("event", "")).upper() == "PLAY" and play and str(play.get("play_type", "")).lower() in {"run", "pass"}:
                 cls._apply_scrimmage_play(rebuilt, play)
                 cls.cap_distance_to_goal(rebuilt)
+                penalty = play.get("penalty")
+                if isinstance(penalty, Mapping) and penalty.get("applied"):
+                    # This replay has no penalty enforcement: keep the recorded
+                    # result of a flagged play (the foul set the ball and down).
+                    for field in ("possession", "down", "distance", "ball_spot"):
+                        if field in original_after:
+                            rebuilt[field] = copy.deepcopy(original_after[field])
             else:
                 recorded_before = event.get("before") if isinstance(event.get("before"), Mapping) else {}
                 after = event.get("after") if isinstance(event.get("after"), Mapping) else {}
