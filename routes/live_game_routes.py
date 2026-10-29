@@ -37,6 +37,10 @@ class LiveGameRoutesDependencies:
     # its live state cleared — see app.load_state_for_reporting().
     load_state_for_reporting: Callable[[], State] | None = None
     load_rosters: Callable[[], list[dict[str, Any]]] | None = None
+    # Optional: runs a read-only reader against the committed state without
+    # the full load() copy. Used for the before/after diagnostics summary on
+    # every mutation; falls back to load_state when not provided.
+    peek_state: Callable[[Callable[[State], Any]], Any] | None = None
 
 
 def create_live_game_blueprint(
@@ -147,6 +151,8 @@ def create_live_game_blueprint(
 
     def load_summary_safely() -> dict[str, Any]:
         try:
+            if dependencies.peek_state is not None:
+                return dependencies.peek_state(state_summary)
             return state_summary(dependencies.load_state())
         except Exception as exc:
             get_runtime_diagnostics().record(
