@@ -61,6 +61,6 @@ def test_enforce_still_applies_the_same_yardage_via_the_ruleset() -> None:
         coord_to_spot=coord_to_spot,
         team_direction=team_direction,
     )
-    # Defensive Pass Interference is 15 / automatic first down in RULES
+    # Defensive Pass Interference is 15 yards with no automatic first down (NFHS)
     assert result["yards"] == 15
-    assert result["automatic_first_down"] is True
+    assert result["automatic_first_down"] is False

@@ -375,7 +375,9 @@ class RulesService:
             thread=threading.current_thread().name,
         )
         try:
-            state = copy.deepcopy(dict(self._load_state()))
+            # load_state() hands back a private, freshly normalized copy; a
+            # second deep copy of a multi-MB late-game state is pure cost.
+            state = dict(self._load_state())
             blocked = self._phase_block(state, team, kind)
             if blocked is not None:
                 return blocked
@@ -392,6 +394,9 @@ class RulesService:
                 )
 
             blocked = self._role_block(state, team, kind)
+            if blocked is not None:
+                return blocked
+            blocked = self._stale_start_block(state, incoming, kind)
             if blocked is not None:
                 return blocked
 
@@ -1240,6 +1245,7 @@ class RulesService:
         created_at = (
             int(replay.get("created_at", 0) or 0) if replay is not None else int(self._now())
         )
+        CanonicalStateFoundation.cap_distance_to_goal(state)
         after = {
             field: copy.deepcopy(state.get(field))
             for field in self.SNAPSHOT_FIELDS
@@ -1562,27 +1568,80 @@ class RulesService:
         phase = str(state.get("special_game_phase", "") or "").lower()
         kicking_team = str(state.get("kicking_team", "") or "").lower()
         if phase == "pending_try":
-            return RulesResult("SPECIAL_PHASE_REQUIRES_RESOLUTION", {"phase": phase})
+            return RulesResult(
+                "SPECIAL_PHASE_REQUIRES_RESOLUTION",
+                {"phase": phase, "message": "The XP/2PT try is still pending. Record the try first."},
+            )
         if phase == "kickoff" and (kind != "kickoff" or (kicking_team and team != kicking_team)):
-            return RulesResult("SPECIAL_PHASE_REQUIRES_KICKOFF", {"phase": phase, "kicking_team": kicking_team})
+            return RulesResult(
+                "SPECIAL_PHASE_REQUIRES_KICKOFF",
+                {"phase": phase, "kicking_team": kicking_team,
+                 "message": "A kickoff is pending. Record the kickoff first."},
+            )
         if phase == "free_kick" and (kind not in {"kickoff", "punt"} or (kicking_team and team != kicking_team)):
-            return RulesResult("SPECIAL_PHASE_REQUIRES_FREE_KICK", {"phase": phase, "kicking_team": kicking_team})
+            return RulesResult(
+                "SPECIAL_PHASE_REQUIRES_FREE_KICK",
+                {"phase": phase, "kicking_team": kicking_team,
+                 "message": "A free kick is pending. Record the free kick first."},
+            )
+        if kind == "kickoff" and phase not in {"kickoff", "free_kick"}:
+            # A kickoff only follows a score, the start of a half or a free-kick
+            # situation; one submitted mid-series is a stale or duplicate form.
+            return RulesResult(
+                "KICKOFF_NOT_PENDING",
+                {"phase": phase, "message": "No kickoff is pending. The play was not recorded."},
+            )
         return None
 
     @staticmethod
     def _role_block(state: Mapping[str, Any], team: str, kind: str) -> "RulesResult | None":
         roles = CanonicalStateFoundation.team_roles(state)
-        if kind in {"run", "pass"} and team != roles.offense:
+        phase = str(state.get("special_game_phase", "") or "").lower()
+        scrimmage_punt = kind == "punt" and phase not in {"kickoff", "free_kick"}
+        if (kind in {"run", "pass"} or scrimmage_punt) and team != roles.offense:
             return RulesResult(
                 "TEAM_ROLE_MISMATCH",
                 {
-                    "message": "Offensive plays must be entered for the team in possession.",
+                    "message": "Offensive plays (run, pass, punt) must be entered for the team in possession.",
                     "submitted_team": team,
                     "offense": roles.offense,
                     "defense": roles.defense,
                 },
             )
         return None
+
+    STALE_CHECK_PLAY_TYPES = frozenset({"run", "pass", "punt"})
+
+    def _stale_start_block(
+        self, state: Mapping[str, Any], incoming: Mapping[str, Any], kind: str
+    ) -> "RulesResult | None":
+        """Refuse a play whose form opened on a ball spot that has since moved.
+
+        Only clients that say whether the start spot was hand-corrected
+        (``start_spot_corrected``) are checked; a corrected start is the
+        statistician's deliberate fix and is honoured as sent.
+        """
+        if kind not in self.STALE_CHECK_PLAY_TYPES or "start_spot_corrected" not in incoming:
+            return None
+        if bool(incoming.get("start_spot_corrected")):
+            return None
+        submitted = incoming.get("start_spot")
+        current = state.get("ball_spot")
+        if submitted in (None, "") or current in (None, ""):
+            return None
+        if self.spot_to_coord(submitted, state) == self.spot_to_coord(current, state):
+            return None
+        return RulesResult(
+            "STALE_PLAY_FORM",
+            {
+                "ball_spot": str(current),
+                "submitted_start_spot": str(submitted),
+                "message": (
+                    f"The ball is now at {current}, not {submitted}. The start spot was updated; "
+                    "check the end spot and record the play again."
+                ),
+            },
+        )
 
     @classmethod
     def _carry_gap(

@@ -135,13 +135,17 @@ def test_program_visual_mode_rejects_invalid_mode_without_state_change():
     assert calls["visual_state"] == []
 
 
-def test_program_visual_mode_is_blocked_before_state_update():
+def test_program_visual_mode_without_controlled_commands_still_updates_state():
+    # Camera opens the overlay's video window even when CSRN may not drive
+    # OBS; the OBS command is skipped and the result says why.
     service, _, _, state, calls = build_service(controlled=False)
     result = service.program_visual_mode("camera")
-    assert result.code == "OBS_COMMAND_BLOCKED"
-    assert state["visual_mode"] == "graphic"
+    assert result.ok
+    assert state["visual_mode"] == "camera"
     assert calls["visual"] == []
-    assert calls["visual_state"] == []
+    assert calls["visual_state"] == ["camera"]
+    assert result.data["obs_switched"] is False
+    assert "Controlled OBS commands are disabled in Settings" in result.data["warning"]
 
 
 def test_command_scorebug_visibility_returns_payload():

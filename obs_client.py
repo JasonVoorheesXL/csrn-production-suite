@@ -395,8 +395,10 @@ def set_program_visual_mode(settings: dict[str, Any], mode: str) -> dict[str, An
         validation.get("camera_source_exists")
         and validation.get("camera_scene_item_id") is not None
     ):
+        camera_source = str(settings.get("camera_source", "CAM - Primary Camera")).strip()
+        visual_scene = str(settings.get("program_visual_scene", "10.02 - PROGRAM VISUAL")).strip()
         raise OBSConnectionError(
-            "Camera mode is unavailable because CAM - Primary Camera is not configured."
+            f'OBS has no source named "{camera_source}" in scene "{visual_scene}".'
         )
 
     scene_name = str(settings.get("program_visual_scene", "10.02 - PROGRAM VISUAL")).strip()

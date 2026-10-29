@@ -3436,6 +3436,44 @@ function patchVideoWindowGuide(root, runtime) {
   label.textContent = `VIDEO WINDOW\n${w}×${h} @ (${x}, ${y})\nreference: 1920×1080`;
 }
 
+// Video mode: the video window itself is transparent, but the board card
+// (.bl-scorebug) and .bl-college-main-display paint translucent backgrounds
+// (and pseudo-element sheen) behind it -- together ~93% opaque, so the OBS
+// camera layer barely showed through. While the real (non-guide) window is
+// showing, cut its rect out of both ancestors' paint with a CSS mask. The
+// window holds nothing else, and an active Player/Sponsor/Highlight graphic
+// replaces the window (no window -> no mask), so it still renders opaquely.
+const VIDEO_WINDOW_MASK_PROPERTIES = [
+  "mask-image", "mask-size", "mask-position", "mask-repeat", "mask-composite",
+  "-webkit-mask-image", "-webkit-mask-size", "-webkit-mask-position", "-webkit-mask-repeat", "-webkit-mask-composite"
+];
+function patchVideoWindowHole(root) {
+  if (!root) return;
+  const windowEl = root.querySelector(".bl-college-video-window:not(.bl-college-video-window-guide)");
+  root.querySelectorAll(".bl-scorebug.bl-collegiate, .bl-college-main-display").forEach(layer => {
+    const outer = layer.getBoundingClientRect();
+    if (!windowEl || !layer.contains(windowEl) || !outer.width || !outer.height) {
+      VIDEO_WINDOW_MASK_PROPERTIES.forEach(name => layer.style.removeProperty(name));
+      return;
+    }
+    // Rects are in viewport px after the overlay's scale; mask geometry is
+    // in the layer's own (unscaled) px.
+    const hole = windowEl.getBoundingClientRect();
+    const sx = layer.offsetWidth / outer.width;
+    const sy = layer.offsetHeight / outer.height;
+    const size = `100% 100%, ${hole.width * sx}px ${hole.height * sy}px`;
+    const position = `0 0, ${(hole.left - outer.left) * sx}px ${(hole.top - outer.top) * sy}px`;
+    for (const prefix of ["", "-webkit-"]) {
+      layer.style.setProperty(`${prefix}mask-image`, "linear-gradient(#000 0 0), linear-gradient(#000 0 0)");
+      layer.style.setProperty(`${prefix}mask-size`, size);
+      layer.style.setProperty(`${prefix}mask-position`, position);
+      layer.style.setProperty(`${prefix}mask-repeat`, "no-repeat");
+    }
+    layer.style.setProperty("mask-composite", "exclude");
+    layer.style.setProperty("-webkit-mask-composite", "xor");
+  });
+}
+
 // Layout Builder P0 (docs/LAYOUT_BUILDER_RECONCILIATION.md) -- the In-Game
 // application hook (kickoff prompt deliverable 3). Additive: resolves the
 // active preset's in_game[base_family] overrides out of runtime.layouts
@@ -3846,6 +3884,7 @@ async function renderSelected() {
       patchLiveGameState(runtime);
       patchCollegiateRails(scoreLayout(), runtime, collegiateStatistics);
       patchVideoWindowGuide(scoreLayout(), runtime);
+      patchVideoWindowHole(scoreLayout());
       applyLayoutOverrides(scoreLayout(), runtime);
       patchThemeTicker(runtime);
       patchCaptionDom(alias, captionState);
@@ -3892,6 +3931,7 @@ async function renderSelected() {
     applyBoardOverrides(scoreTarget, alias, runtime);
     patchCollegiateRails(scoreTarget, runtime, collegiateStatistics);
     patchVideoWindowGuide(scoreTarget, runtime);
+    patchVideoWindowHole(scoreTarget);
     repairRenderedPlayerMedia(scoreTarget, state);
     mountCentralBoardMedia(scoreTarget, runtime, activeVideoMode, alias);
     populateHeritagePlayerHost(scoreTarget, runtime, state, alias, activeVideoMode);

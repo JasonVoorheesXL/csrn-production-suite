@@ -143,6 +143,27 @@ class CanonicalStateFoundation:
         return max(0, min(length, int(to_goal)))
 
     @classmethod
+    def cap_distance_to_goal(cls, state: dict[str, Any]) -> None:
+        """Keep the stored distance from reaching past the goal line.
+
+        A first down inside the opponent's 10 is "1st & Goal" (distance =
+        yards to goal), and every later down of that series stays goal to go.
+        Without this the series kept a 10-yard line to gain beyond the goal
+        line ("2nd & 16" at the 14). No-op outside a scrimmage series.
+        """
+        if str(state.get("special_game_phase", "") or "").strip():
+            return
+        if str(state.get("down", "") or "").strip().lower() in {"", "off"}:
+            return
+        try:
+            distance = int(str(state.get("distance", "")).strip())
+        except ValueError:
+            return
+        to_goal = cls.yards_to_goal(state)
+        if 0 < to_goal < distance:
+            state["distance"] = str(to_goal)
+
+    @classmethod
     def goal_to_go(cls, state: Mapping[str, Any]) -> bool:
         """True when the line to gain is the goal line: the offense is no
         farther from the goal than the distance it needs.
@@ -713,6 +734,7 @@ class CanonicalStateFoundation:
             play = play_by_event.get(str(event.get("id", ""))) or play_by_id.get(str(event.get("play_id", "")))
             if str(event.get("event", "")).upper() == "PLAY" and play and str(play.get("play_type", "")).lower() in {"run", "pass"}:
                 cls._apply_scrimmage_play(rebuilt, play)
+                cls.cap_distance_to_goal(rebuilt)
             else:
                 recorded_before = event.get("before") if isinstance(event.get("before"), Mapping) else {}
                 after = event.get("after") if isinstance(event.get("after"), Mapping) else {}

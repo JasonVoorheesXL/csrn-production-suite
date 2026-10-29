@@ -61,6 +61,48 @@ entry at the position that actually corresponds to the *other* concept,
 `polledVideoMode` — discovered, not introduced, while wiring this in. See
 the code comment there.)
 
+## Program Visual Camera = Video Mode (2026-10-23)
+
+Program Visual's **Camera** button and the live **Video Mode** toggle are now
+one switch, with `video_mode` as the single source of truth:
+
+- `POST /api/obs/program-visual-mode` with `camera` sets `video_mode = true`
+  and `visual_mode = "camera"`; `graphic` sets both back. The Video Mode
+  toggle calls the same endpoint. `POST /api/set` with `video_mode` (API
+  callers) also moves `visual_mode` with it, reset keeps the pair, and a
+  broadcast planned on Camera loads with `video_mode` on.
+- When OBS validates, the same click also enables the camera source (and
+  hides the graphic source) in the Program Visual scene. When it doesn't --
+  WebSocket or Controlled Commands off in Settings, OBS unreachable, or no
+  camera source in the scene -- the overlay still switches and the operator
+  sees a warning naming the scene, the source and the Settings field, instead
+  of a refusal.
+- The window is now really see-through: the board card (`.bl-scorebug`) and
+  `.bl-college-main-display` paint translucent backgrounds behind the
+  transparent window (together ~93% opaque), so before this the camera barely
+  showed. `patchVideoWindowHole()` in the unpinned runtime masks the window's
+  rect out of both layers while the real window is showing (never for the
+  calibration guide, never while a Player/Sponsor/Highlight graphic is up).
+
+### OBS setup for a camera behind the overlay
+
+1. Settings > OBS: WebSocket Enabled = Yes, Controlled Commands = Enabled,
+   host/port/password matching OBS (Tools > WebSocket Server Settings).
+2. Scene `10.02 - PROGRAM VISUAL` (Settings > OBS > Program Visual Scene)
+   contains `IMG - Broadcast Background` (Graphic Source Name) and the camera
+   source, named exactly `CAM - Primary Camera` -- or put the camera's real
+   name in Settings > OBS > Camera Source Name. For a phone over Wi-Fi this is
+   whatever source receives it (e.g. a Media Source/VLC source on an SRT/RTMP
+   URL, or an NDI source); mute it in the Audio Mixer if only video is wanted.
+3. Size/position the camera source to the video window (Collegiate Tech,
+   sidebars visible: `(414, 222)` `1091 x 527`; hidden: `(72, 222)`
+   `1775 x 527`) or just fill the canvas -- only the window shows it.
+4. In the scene that goes to air, the CSRN overlay browser source must be
+   *above* the Program Visual scene (add `10.02 - PROGRAM VISUAL` as a
+   nested Scene source below the browser source). The browser source needs
+   a transparent background (OBS's default page CSS), or the hole shows
+   nothing.
+
 ## Collegiate Tech: the shipped implementation
 
 - **Video window**: the idle "clash" fallback
@@ -115,8 +157,9 @@ The three fields exist on every broadcast regardless of theme (`app.py`
 `DEFAULT_STATE`), and the operator-facing toggle buttons
 (`templates/index.html`, "Video Mode" panel) are always visible. Friday
 Night Stadium, 8-Bit Gameday, and Heritage Press have **no video-window
-geometry declared** yet — toggling `video_mode` for a broadcast on one of
-those themes is currently inert (no `.bl-*-video-window` exists for them to
+geometry declared** yet — toggling `video_mode` (or Program Visual Camera) for a broadcast on one
+of those themes is currently inert -- the clash art stays opaque over the
+camera; Digital Neon, being Collegiate-family, gets the window too (no `.bl-*-video-window` exists for them to
 render into). Adding one is a per-theme follow-up, not a redesign: declare
 that theme's own video-board region's transparent-state CSS/markup the same
 way Collegiate Tech's was added here.

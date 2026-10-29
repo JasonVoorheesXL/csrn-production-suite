@@ -1069,9 +1069,11 @@ def test_holding_at_2nd_and_goal_from_the_8_is_still_goal_to_go_from_the_18() ->
 
     assert result["applied"] is True and result["enforced_yards"] == 10
     assert state["ball_spot"] == "RIGHT 18"
-    assert (state["down"], state["distance"]) == ("2nd", "20")   # 10 stored + 10 enforced
+    # The line to gain is the goal line, so the stored distance is the yards
+    # to goal (2026-10-29: it used to keep the overshoot, "2nd & 20").
+    assert (state["down"], state["distance"]) == ("2nd", "18")
     assert C.yards_to_goal(state) == 18
-    assert C.goal_to_go(state) is True                             # 18 <= 20
+    assert C.goal_to_go(state) is True                             # 18 <= 18
     fs = C.field_state(state)
     assert fs["goal_to_go"] is True and fs["distance_display"] == "Goal"
 
@@ -1081,7 +1083,7 @@ def test_goal_to_go_after_a_penalty_reaches_the_overlay_as_goal() -> None:
     _enforce(state, name="Holding", yards=10)
     _service, runtime = _runtime(state)
     assert runtime["distance"] == "Goal"
-    assert runtime["distance_yards"] == "20"
+    assert runtime["distance_yards"] == "18"
     assert runtime["canonical_field_state"]["yards_to_goal"] == 18
 
 
@@ -1107,17 +1109,17 @@ def test_full_trigger_path_penalty_keeps_goal_to_go() -> None:
     })
     assert result.ok, result.code
     s = g.store
-    assert (s["ball_spot"], s["down"], s["distance"]) == ("RIGHT 18", "2nd", "20")
+    assert (s["ball_spot"], s["down"], s["distance"]) == ("RIGHT 18", "2nd", "18")
     assert C.goal_to_go(s) is True
-    assert s["events"][-1]["after"]["distance"] == "20"
+    assert s["events"][-1]["after"]["distance"] == "18"
 
 
 @pytest.mark.parametrize("yards", [5, 10, 15])
 @pytest.mark.parametrize("distance", ["10", "8", "3"])
 def test_offensive_penalty_moves_ball_and_distance_in_lockstep(yards, distance) -> None:
-    """The invariant behind the case above: both grow by exactly the enforced
-    yardage, so a goal-to-go situation stays goal-to-go and a non-goal-to-go
-    one stays that way."""
+    """The invariant behind the case above: the ball moves back by exactly the
+    enforced yardage and a goal-to-go series stays goal to go (its distance is
+    then the yards to goal), while a non-goal-to-go one grows by the yardage."""
     state = _goal_line_state("RIGHT 8", distance, "2nd")
     was = C.goal_to_go(state)
     to_goal_before, distance_before = C.yards_to_goal(state), int(state["distance"])
@@ -1125,7 +1127,11 @@ def test_offensive_penalty_moves_ball_and_distance_in_lockstep(yards, distance) 
     result = _enforce(state, name="Holding", yards=yards)
 
     assert result["applied"] is True
-    assert C.yards_to_goal(state) - to_goal_before == int(state["distance"]) - distance_before == yards
+    assert C.yards_to_goal(state) - to_goal_before == yards
+    if was:
+        assert int(state["distance"]) == C.yards_to_goal(state)
+    else:
+        assert int(state["distance"]) - distance_before == yards
     assert C.goal_to_go(state) is was
 
 
@@ -1150,7 +1156,7 @@ def test_a_penalty_that_pushes_the_offense_out_of_goal_to_go_range_is_not_goal_t
 def test_penalty_goal_to_go_holds_in_every_orientation(possession, spot, extra) -> None:
     state = _goal_line_state(spot, "10", "2nd", possession=possession, **extra)
     _enforce(state, selected_team=possession, name="Holding", yards=10)
-    assert state["distance"] == "20"
+    assert state["distance"] == "18"
     assert C.yards_to_goal(state) == 18 and C.goal_to_go(state) is True
 
 
