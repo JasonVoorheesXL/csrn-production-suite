@@ -87,6 +87,8 @@ class GameOperationsService:
         "date",
         "scheduled_start",
         "visual_mode",
+        # Kept with visual_mode so a reset never splits the pair.
+        "video_mode",
         "crew",
         "status",
     )
@@ -292,6 +294,12 @@ class GameOperationsService:
 
             self._push_history(state)
             state.update(changes)
+            if "video_mode" in changes:
+                # visual_mode mirrors video_mode so the Program Visual
+                # Graphic/Camera buttons and the Video Mode toggle never
+                # disagree (see OBSService.program_visual_mode).
+                state["video_mode"] = bool(state["video_mode"])
+                state["visual_mode"] = "camera" if state["video_mode"] else "graphic"
             revision = assign_next_revision(state)
             metadata = command_metadata(
                 incoming,

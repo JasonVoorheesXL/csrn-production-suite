@@ -94,7 +94,8 @@ from tests.test_rules_service import base_state, build_service  # noqa: E402
 
 def _kickoff_state() -> dict:
     st = base_state()
-    st.update({"home_direction": "right", "visitor_direction": "left"})
+    st.update({"home_direction": "right", "visitor_direction": "left",
+               "special_game_phase": "kickoff", "kicking_team": "home"})
     return st
 
 
@@ -163,7 +164,9 @@ def test_kickoff_out_of_bounds_spot_plus_5_choice() -> None:
 def test_kickoff_out_of_bounds_is_a_free_kick_only_foul_punts_are_unaffected() -> None:
     """kick_out_of_bounds only ever applies to kind == 'kickoff' -- a punt with the same flag set is
     ignored and falls through to the ordinary kickoff/punt return branch, unchanged."""
-    service, current, *_ = build_service(_kickoff_state())
+    scrimmage = _kickoff_state()
+    scrimmage.update({"special_game_phase": "", "kicking_team": ""})  # a punt is a scrimmage play
+    service, current, *_ = build_service(scrimmage)
     result = service.play({
         "team": "home", "play_type": "punt", "start_spot": "LEFT 20", "kicker_number": "7",
         "kick_out_of_bounds": True, "landing_spot": "RIGHT 30", "end_spot": "RIGHT 30",

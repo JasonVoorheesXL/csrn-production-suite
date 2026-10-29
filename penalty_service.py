@@ -11,6 +11,10 @@ class PenaltyService:
     together so callers do not independently reconstruct penalty state.
     """
 
+    # NFHS: only roughing the passer / kicker (holder, snapper) carry an
+    # automatic first down. Defensive holding, pass interference, personal
+    # fouls and unsportsmanlike conduct do not (that is the NFL rule); a first
+    # down from those comes only from the enforced yardage.
     RULES: dict[tuple[str, str], dict[str, Any]] = {
         ("Offensive", "False Start"): {"yards": 5, "dead_ball": True},
         ("Offensive", "Holding"): {"yards": 10},
@@ -24,12 +28,12 @@ class PenaltyService:
         ("Offensive", "Unsportsmanlike Conduct"): {"yards": 15},
         ("Defensive", "Offside"): {"yards": 5},
         ("Defensive", "Encroachment"): {"yards": 5, "dead_ball": True},
-        ("Defensive", "Holding"): {"yards": 10, "automatic_first_down": True},
-        ("Defensive", "Pass Interference"): {"yards": 15, "automatic_first_down": True},
+        ("Defensive", "Holding"): {"yards": 10},
+        ("Defensive", "Pass Interference"): {"yards": 15},
         ("Defensive", "Roughing the Passer"): {"yards": 15, "automatic_first_down": True},
         ("Defensive", "Face Mask"): {"yards": 15},
-        ("Defensive", "Personal Foul"): {"yards": 15, "automatic_first_down": True},
-        ("Defensive", "Unsportsmanlike Conduct"): {"yards": 15, "automatic_first_down": True},
+        ("Defensive", "Personal Foul"): {"yards": 15},
+        ("Defensive", "Unsportsmanlike Conduct"): {"yards": 15},
         ("Special Teams", "Kick Catch Interference"): {"yards": 15},
         ("Special Teams", "Illegal Block"): {"yards": 10},
         ("Special Teams", "Holding"): {"yards": 10},

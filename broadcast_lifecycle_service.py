@@ -136,12 +136,22 @@ class BroadcastLifecycleService:
             },
         )
 
-    def start(self) -> BroadcastLifecycleResult:
+    def start(self, *, reopen: bool = False) -> BroadcastLifecycleResult:
         with self._transaction_lock:
             state = copy.deepcopy(dict(self._load_state()))
             broadcast_id = str(state.get("broadcast_id", "")).strip()
             if not broadcast_id:
                 return BroadcastLifecycleResult("NO_ACTIVE_BROADCAST", {})
+            # A confirmed-final game only goes back on air when the operator
+            # explicitly asks to reopen it; Go Live must never do it silently.
+            if not reopen and self._is_completed(state, broadcast_id):
+                return BroadcastLifecycleResult(
+                    "BROADCAST_COMPLETED",
+                    {
+                        "broadcast_id": broadcast_id,
+                        "message": "This game is already final. Reopen it explicitly to go live again.",
+                    },
+                )
 
             state["status"] = "live"
             state["broadcast_phase"] = "live"
@@ -176,6 +186,19 @@ class BroadcastLifecycleService:
                     "obs": copy.deepcopy(obs_result),
                 },
             )
+
+    def _is_completed(self, state: Mapping[str, Any], broadcast_id: str) -> bool:
+        if str(state.get("status", "") or "").strip().lower() == "completed":
+            return True
+        record = next(
+            (
+                row
+                for row in self._load_broadcasts()
+                if str(row.get("broadcast_id", "")) == broadcast_id
+            ),
+            None,
+        )
+        return str((record or {}).get("status", "") or "").strip().lower() == "completed"
 
     def resume(self) -> BroadcastLifecycleResult:
         with self._transaction_lock:
@@ -324,6 +347,8 @@ class BroadcastLifecycleService:
             "date": item.get("date", ""),
             "scheduled_start": item.get("scheduled_start", "07:00 PM"),
             "visual_mode": item.get("visual_mode", "graphic"),
+            # A broadcast planned to open on Camera opens the video window.
+            "video_mode": item.get("visual_mode", "graphic") == "camera",
             "crew": copy.deepcopy(item.get("crew", {})),
             "status": status,
             "broadcast_phase": self.phase_for_status(status),

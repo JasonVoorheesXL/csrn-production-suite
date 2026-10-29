@@ -473,6 +473,13 @@ def create_live_game_blueprint(
             elif result.code == "CONTROL_SOURCE_LOCKED":
                 status = 409
                 response = jsonify(result.data)
+            elif result.code != "OK":
+                # Every other rules rejection (phase, role, eligibility, stale
+                # form, ...) must reach the client as a failure. A 200 here is
+                # treated as committed and shows "Play recorded." for a play
+                # that was never saved.
+                status = 409
+                response = jsonify({**dict(result.data or {}), "error": result.code})
             else:
                 status = 200
                 response = jsonify(result.data)
