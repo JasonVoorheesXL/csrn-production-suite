@@ -120,6 +120,14 @@ def command_result_state(state: Mapping[str, Any]) -> dict[str, Any]:
         "graphics_queue",
     ):
         result.pop(key, None)
+    # The client merges this over its previous /api/state view, so the derived
+    # fields that public() adds must be recomputed here too; otherwise the old
+    # team roles and field state (offense, yards to goal) survive until the
+    # next poll and the console acts on the previous play's possession.
+    from canonical_state_service import CanonicalStateFoundation
+
+    result["team_roles"] = CanonicalStateFoundation.team_roles(result).as_dict()
+    result["canonical_field_state"] = CanonicalStateFoundation.field_state(result)
     return result
 
 
