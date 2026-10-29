@@ -427,6 +427,37 @@ def test_start_captures_obs_boundary_failure_without_losing_live_state() -> None
     assert built["state"]["status"] == "live"
 
 
+def test_start_refuses_to_reopen_a_completed_broadcast_without_explicit_reopen() -> None:
+    state = default_state()
+    state["broadcast_id"] = "FB-2026-01"
+    state["status"] = "completed"
+    built = build_service(state=state)
+    result = built["service"].start()
+    assert result.code == "BROADCAST_COMPLETED"
+    assert built["state"]["status"] == "completed"
+    assert built["linked"] == []
+
+
+def test_start_refuses_when_only_the_linked_record_is_completed() -> None:
+    state = default_state()
+    state["broadcast_id"] = "FB-2026-01"
+    built = build_service(records=[record("completed")], state=state)
+    result = built["service"].start()
+    assert result.code == "BROADCAST_COMPLETED"
+    assert built["linked"] == []
+
+
+def test_start_reopens_a_completed_broadcast_when_explicitly_asked() -> None:
+    state = default_state()
+    state["broadcast_id"] = "FB-2026-01"
+    state["status"] = "completed"
+    built = build_service(records=[record("completed")], state=state)
+    result = built["service"].start(reopen=True)
+    assert result.ok
+    assert built["state"]["status"] == "live"
+    assert built["linked"] == [("FB-2026-01", "live", None)]
+
+
 def test_resume_requires_active_broadcast() -> None:
     built = build_service()
     result = built["service"].resume()

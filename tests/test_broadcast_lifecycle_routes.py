@@ -51,8 +51,8 @@ class StubBroadcastLifecycleService:
         self.calls.append(("initialize", None))
         return self.initialize_result
 
-    def start(self) -> BroadcastLifecycleResult:
-        self.calls.append(("start", None))
+    def start(self, *, reopen: bool = False) -> BroadcastLifecycleResult:
+        self.calls.append(("start", "reopen" if reopen else None))
         return self.start_result
 
     def resume(self) -> BroadcastLifecycleResult:
@@ -125,6 +125,25 @@ def test_start_route_delegates_and_preserves_payload(lifecycle_client) -> None:
     assert response.get_json()["state"]["status"] == "live"
     assert response.get_json()["broadcast"]["broadcast_id"] == "FB-2026-01"
     assert service.calls == [("start", None)]
+
+
+def test_start_route_maps_completed_broadcast_to_conflict(lifecycle_client) -> None:
+    client, service = lifecycle_client
+    service.start_result = BroadcastLifecycleResult(
+        "BROADCAST_COMPLETED",
+        {"broadcast_id": "FB-2026-01", "message": "final"},
+    )
+    response = client.post("/api/start-broadcast", json={})
+    assert response.status_code == 409
+    assert response.get_json()["error"] == "BROADCAST_COMPLETED"
+    assert service.calls == [("start", None)]
+
+
+def test_start_route_passes_explicit_reopen(lifecycle_client) -> None:
+    client, service = lifecycle_client
+    response = client.post("/api/start-broadcast", json={"reopen": True})
+    assert response.status_code == 200
+    assert service.calls == [("start", "reopen")]
 
 
 def test_resume_route_delegates(lifecycle_client) -> None:

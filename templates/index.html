@@ -287,7 +287,7 @@
             <button class="warning" onclick="openPregamePresentationControl()">Delay / Presentation</button>
             <button onclick="window.open('/pregame-overlay','_blank')">Open Pregame Overlay</button>
             <button onclick="window.open('/overlay','_blank')">Open Game Overlay</button>
-            <button id="commandStartBroadcastButton" class="success" onclick="startBroadcast()">Start Broadcast (Go Live)</button>
+            <button id="commandStartBroadcastButton" class="success" onclick="startBroadcast('commandBroadcastSelect')">Start Broadcast (Go Live)</button>
           </div>
         </div>
       </section>
@@ -737,7 +737,7 @@
             <button onclick="loadSelectedBroadcast('plannedBroadcastSelect')">Load Broadcast</button>
             <button onclick="populatePlannedBroadcasts()">Refresh Broadcast</button>
             <button onclick="checkOBSReadiness()">Check OBS</button>
-            <button id="startBroadcastButton" class="success" onclick="startBroadcast()">Start Broadcast</button>
+            <button id="startBroadcastButton" class="success" onclick="startBroadcast('plannedBroadcastSelect')">Start Broadcast</button>
             <button class="warning" onclick="openPregamePresentationControl()">Pregame / Delay</button>
             <button onclick="window.open('/pregame-overlay','_blank')">Open Pregame Overlay</button>
             <button onclick="window.open('/overlay','_blank')">Open Game Overlay</button>
@@ -3445,10 +3445,13 @@ function applyOptimisticGameState(key,value){
 }
 async function setStateFrom(key,value,source){const previous=currentState;try{applyOptimisticGameState(key,value);await GameStateManager.mutate('/api/set',{[key]:value,source})}catch(e){currentState=previous;render();alert(e.data?.message||e.message)}}
 async function recordFirstDown(team,source){try{await GameStateManager.mutate('/api/event-trigger',{team,event:'FIRST_DOWN',source,first_down_method:'manual'},'POST',result=>result.state)}catch(e){showOperatorError(e,'First down could not be recorded.')}}
-function openPenalty(team,source){if(gameDataLockedFor(source)){alert(`Game data is controlled by the ${currentState.game_data_authority} console.`);return}document.getElementById('penaltyTeam').value=team;document.getElementById('penaltySource').value=source;document.getElementById('penaltyTeamLabel').textContent=team==='home'?currentState.home_team:currentState.visitor_team;const roles=currentState?.team_roles||{};document.getElementById('penaltyCategory').value=source==='statistician'?(team===roles.offense?'Offensive':team===roles.defense?'Defensive':'General'):'General';populatePenaltyOptions();document.getElementById('penaltyModal').classList.remove('hidden')}
+function openPenalty(team,source){if(gameDataLockedFor(source)){alert(`Game data is controlled by the ${currentState.game_data_authority} console.`);return}document.getElementById('penaltyTeam').value=team;document.getElementById('penaltySource').value=source;document.getElementById('penaltyTeamLabel').textContent=team==='home'?currentState.home_team:currentState.visitor_team;const roles=currentState?.team_roles||{};document.getElementById('penaltyCategory').value=source==='statistician'?(team===roles.offense?'Offensive':team===roles.defense?'Defensive':'General'):'General';
+  // Every flag starts fresh: a ruling or checkbox left over from the previous penalty (e.g. Declined) must never carry into this one.
+  document.getElementById('penaltyOutcome').value='accepted';document.getElementById('penaltyEnforcementSpot').value='';['penaltyHalfDistance','penaltyRetryDown','penaltyUntimedDown'].forEach(id=>document.getElementById(id).checked=false);
+  populatePenaltyOptions();document.getElementById('penaltyModal').classList.remove('hidden')}
 function closePenalty(){document.getElementById('penaltyModal').classList.add('hidden')}
 function populatePenaltyOptions(){const cat=document.getElementById('penaltyCategory').value;document.getElementById('penaltyName').innerHTML=(penaltyCatalog[cat]||[]).map(([n,y])=>`<option value="${escapeHtml(n)}" data-yards="${y}">${escapeHtml(n)}</option>`).join('');penaltySelectionChanged()}
-function penaltySelectionChanged(){const opt=document.getElementById('penaltyName').selectedOptions[0],name=opt?.value||'',unit=document.getElementById('penaltyCategory').value;document.getElementById('penaltyYards').value=opt?.dataset.yards||0;document.getElementById('penaltyAutomaticFirstDown').checked=(unit==='Defensive'&&['Holding','Pass Interference','Roughing the Passer','Personal Foul','Unsportsmanlike Conduct'].includes(name))||(unit==='Special Teams'&&name==='Roughing the Kicker');document.getElementById('penaltyLossOfDown').checked=(unit==='Offensive'&&name==='Intentional Grounding')}
+function penaltySelectionChanged(){const opt=document.getElementById('penaltyName').selectedOptions[0],name=opt?.value||'',unit=document.getElementById('penaltyCategory').value;document.getElementById('penaltyYards').value=opt?.dataset.yards||0;document.getElementById('penaltyAutomaticFirstDown').checked=(unit==='Defensive'&&name==='Roughing the Passer')||(unit==='Special Teams'&&name==='Roughing the Kicker');document.getElementById('penaltyLossOfDown').checked=(unit==='Offensive'&&name==='Intentional Grounding')}
 async function submitPenalty(){
   if(blockForPriorUnresolvedCommand('event:PENALTY'))return;
   const payload={
@@ -4525,8 +4528,10 @@ function render() {
     ctx.textContent=`${currentState.down||'1st'} & ${d} · Ball: ${spot} · ${currentState.possession==='home'?currentState.home_team:currentState.visitor_team}${toGoal!==null?` · ${toGoal} to goal`:''}${currentState.down==='4th'?' · FOURTH DOWN':''}${goalToGo?' · GOAL TO GO':''}${redZone?' · RED ZONE':''}`;}
 
   const rs=document.getElementById('readinessSummary'); if(rs) rs.dataset.broadcastStatus=currentState.status||'planned';
-  const startButton=document.getElementById('startBroadcastButton'); if(startButton){startButton.disabled=currentState.status==='completed'; startButton.title=currentState.status==='completed'?'Completed broadcasts open in review mode.':'';}
-  const cmdStartButton=document.getElementById('commandStartBroadcastButton'); if(cmdStartButton){cmdStartButton.disabled=currentState.status==='completed'; cmdStartButton.title=currentState.status==='completed'?'Completed broadcasts open in review mode.':'';}
+  // Go Live stays enabled: it starts the game picked in its own panel, and
+  // startBroadcast() asks before reopening a final game (the server refuses otherwise).
+  const startButton=document.getElementById('startBroadcastButton'); if(startButton){startButton.disabled=false; startButton.title='';}
+  const cmdStartButton=document.getElementById('commandStartBroadcastButton'); if(cmdStartButton){cmdStartButton.disabled=false; cmdStartButton.title='';}
 }
 
 
@@ -7820,7 +7825,7 @@ async function populatePlannedBroadcasts(){
   availableBroadcastCount=rows.filter(r=>!r.archived).length;
   const rank={live:0,planned:1,prepared:1,completed:2};
   const choices=rows.filter(r=>!r.archived).sort((a,b)=>(rank[a.status]??9)-(rank[b.status]??9)||(a.date||'').localeCompare(b.date||''));
-  const options='<option value="">Select any non-archived broadcast</option>'+choices.map(r=>`<option value="${r.broadcast_id}" ${r.broadcast_id===active?'selected':''}>${prettyStatus(r.status).toUpperCase()} · ${r.date||'Date TBD'} · ${r.visitor_team} @ ${r.home_team}</option>`).join('');
+  const options='<option value="">Select any non-archived broadcast</option>'+choices.map(r=>`<option value="${r.broadcast_id}" data-status="${escapeHtml(r.status||'')}" ${r.broadcast_id===active?'selected':''}>${prettyStatus(r.status).toUpperCase()} · ${r.date||'Date TBD'} · ${r.visitor_team} @ ${r.home_team}</option>`).join('');
   selects.forEach(select=>{select.innerHTML=options;});
 }
 async function openGameInCommandCenter(id){
@@ -7940,13 +7945,23 @@ async function resumeFromPregameDelay(){
   }catch(err){if(status)status.textContent=err.data?.message||err.message||'Could not clear delay presentation.'}
 }
 
-async function startBroadcast(){
-  const selected=document.getElementById('plannedBroadcastSelect')?.value||document.getElementById('commandBroadcastSelect')?.value||'';
-  if(selected && (!currentState || currentState.broadcast_id!==selected)){
-    currentState=await api(`/api/broadcasts/${encodeURIComponent(selected)}/load`,{});
-  }
-  const result=await api('/api/start-broadcast',{});
-  currentState=result.state||result; render(); await loadGameManager(); await populatePlannedBroadcasts();
+async function startBroadcast(selectId='commandBroadcastSelect'){
+  // Use the dropdown in the same panel as the button that was pressed. The two
+  // panels each keep their own selection, and the other one is often stale.
+  const select=document.getElementById(selectId);
+  const selected=select?.value||'';
+  const selectedStatus=String(select?.selectedOptions?.[0]?.dataset?.status||'').toLowerCase();
+  const targetStatus=selected&&currentState?.broadcast_id!==selected?selectedStatus:String(currentState?.status||'').toLowerCase();
+  const reopen=targetStatus==='completed';
+  if(reopen&&!confirm('This game is already FINAL. Going live will reopen it and put it back on air. Reopen it?'))return;
+  try{
+    if(selected && (!currentState || currentState.broadcast_id!==selected)){
+      currentState=await api(`/api/broadcasts/${encodeURIComponent(selected)}/load`,{});
+    }
+    const result=await api('/api/start-broadcast',reopen?{reopen:true}:{});
+    currentState=result.state||result;
+  }catch(err){showOperatorNotice(err.data?.message||err.message||'Could not start the broadcast.','error',7000)}
+  render(); await loadGameManager(); await populatePlannedBroadcasts();
 }
 
 

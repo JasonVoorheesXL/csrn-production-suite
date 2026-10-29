@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 
 
 RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
@@ -39,9 +39,16 @@ def create_broadcast_lifecycle_blueprint(
     @routes.post("/api/start-broadcast")
     @dependencies.require_auth
     def start_broadcast():
-        result = dependencies.get_lifecycle_service().start()
+        reopen = (request.get_json(silent=True) or {}).get("reopen") is True
+        result = (
+            dependencies.get_lifecycle_service().start(reopen=True)
+            if reopen
+            else dependencies.get_lifecycle_service().start()
+        )
         if result.code == "NO_ACTIVE_BROADCAST":
             return jsonify({"error": result.code}), 409
+        if result.code == "BROADCAST_COMPLETED":
+            return jsonify({"error": result.code, **result.data}), 409
         return jsonify(result.data)
 
     @routes.post("/api/resume-broadcast")
