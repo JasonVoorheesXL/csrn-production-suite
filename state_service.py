@@ -99,9 +99,43 @@ class StateService:
         with self._committed_state_lock:
             self._committed_state = copy.deepcopy(dict(state))
 
-    def normalize(self, state: Mapping[str, Any] | None) -> dict[str, Any]:
+    def peek(self, reader: Callable[[Mapping[str, Any]], Any]) -> Any:
+        """Run ``reader`` against the committed raw state without copying it.
+
+        For cheap read-only summaries (route diagnostics). A late-game state
+        is a few MB, and a full load() deep-copies it; ``reader`` must not
+        mutate or keep a reference to what it is given.
+        """
+        if self._cache_committed_state:
+            with self._committed_state_lock:
+                if self._committed_state is not None:
+                    return reader(self._committed_state)
+        return reader(self._read_committed_raw())
+
+    @staticmethod
+    def _memoized_resolver(
+        resolve: Callable[[dict[str, Any], str, Any], Mapping[str, Any]] | None,
+    ) -> Callable[[dict[str, Any], str, Any], Mapping[str, Any]] | None:
+        """Per-call cache for roster lookups: one normalize()/public() call
+        resolves the same (team, jersey) pairs for every event and play, and
+        each lookup re-reads the roster and school files."""
+        if resolve is None:
+            return None
+        cache: dict[tuple[str, str], Mapping[str, Any]] = {}
+
+        def resolve_once(state: dict[str, Any], team: str, number: Any) -> Mapping[str, Any]:
+            key = (str(team or ""), str(number or "").strip())
+            if key not in cache:
+                cache[key] = resolve(state, team, number)
+            return copy.deepcopy(cache[key])
+
+        return resolve_once
+
+    def normalize(self, state: Mapping[str, Any] | None, *, owned: bool = False) -> dict[str, Any]:
+        # ``owned``: the caller hands over a private copy (load() reading the
+        # committed cache), so a second full deep copy is skipped.
         merged = copy.deepcopy(dict(self._default_state()))
-        merged.update(copy.deepcopy(dict(state or {})))
+        merged.update(dict(state or {}) if owned else copy.deepcopy(dict(state or {})))
 
         if merged.get("broadcast_phase") not in self.VALID_PHASES:
             merged["broadcast_phase"] = "pregame"
@@ -145,12 +179,14 @@ class StateService:
         # never persisted by mutating the master roster.
         merged["player_eligibility"] = EligibilityService.derive(
             merged,
-            resolve_player=self._resolve_player,
+            resolve_player=self._memoized_resolver(self._resolve_player),
         )
         return merged
 
     def load(self) -> StateResult:
-        state = self.normalize(self._read_committed_raw())
+        # With the committed-state cache on, _read_committed_raw() already
+        # returns a private deep copy.
+        state = self.normalize(self._read_committed_raw(), owned=self._cache_committed_state)
         if state.get("clock_running"):
             now = int(self._now())
             try:
@@ -392,8 +428,9 @@ class StateService:
                         queued_graphic.get(field, "")
                     )
 
+        resolve_player = self._memoized_resolver(self._resolve_player)
         result["plays"] = [
-            self._enrich_play(result, source)
+            self._enrich_play(result, source, resolve_player=resolve_player)
             for source in list(result.get("plays") or [])
             if isinstance(source, dict)
         ]
@@ -595,7 +632,10 @@ class StateService:
         self,
         state: dict[str, Any],
         source: dict[str, Any],
+        *,
+        resolve_player: Callable[[dict[str, Any], str, Any], Mapping[str, Any]] | None = None,
     ) -> dict[str, Any]:
+        resolve_player = resolve_player or self._resolve_player
         play = copy.deepcopy(source)
         offense = self._team_key(state, play.get("offense", ""))
         defense = self._team_key(state, play.get("defense", ""))
@@ -611,13 +651,13 @@ class StateService:
             ("sacker", defense),
             ("recoverer", offense),
         )
-        if self._resolve_player is not None:
+        if resolve_player is not None:
             for role, team_key in role_specs:
                 number_key = f"{role}_number"
                 name_key = f"{role}_name"
                 number = str(play.get(number_key, "") or "").strip()
                 if number and not str(play.get(name_key, "") or "").strip():
-                    resolved = self._resolve_player(state, team_key, number)
+                    resolved = resolve_player(state, team_key, number)
                     name = str(resolved.get("name", "") or "").strip()
                     if name:
                         play[name_key] = name

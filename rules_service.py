@@ -366,7 +366,9 @@ class RulesService:
             thread=threading.current_thread().name,
         )
         try:
-            state = copy.deepcopy(dict(self._load_state()))
+            # load_state() hands back a private, freshly normalized copy; a
+            # second deep copy of a multi-MB late-game state is pure cost.
+            state = dict(self._load_state())
             blocked = self._phase_block(state, team, kind)
             if blocked is not None:
                 return blocked
