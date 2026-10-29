@@ -139,3 +139,17 @@ def test_rules_play_route_maps_control_lock(rules_client) -> None:
     assert response.get_json()["authority"] == "broadcaster"
 
 
+
+
+@pytest.mark.parametrize(
+    "code",
+    ["SPECIAL_PHASE_REQUIRES_KICKOFF", "TEAM_ROLE_MISMATCH", "KICKOFF_NOT_PENDING", "STALE_PLAY_FORM", "PLAYER_INELIGIBLE"],
+)
+def test_rules_play_route_reports_every_rejection_as_a_conflict(rules_client, code) -> None:
+    # A 200 is treated by the console as committed ("Play recorded.") even
+    # though nothing was saved, so every non-OK rules result must be a 409.
+    client, service = rules_client
+    service.play_result = RulesResult(code, {"message": "blocked"})
+    response = client.post("/api/rules-play", json={"team": "home", "play_type": "run"})
+    assert response.status_code == 409
+    assert response.get_json() == {"error": code, "message": "blocked"}
