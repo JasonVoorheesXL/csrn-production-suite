@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+from hashlib import sha256
 from dataclasses import dataclass
 from functools import wraps
 from pathlib import Path
@@ -149,13 +150,14 @@ def test_process_school_logo_writes_all_outputs(logo_client) -> None:
         content_type="multipart/form-data",
     )
     assert response.status_code == 200
+    revision = sha256(b"contain-v1\0source-image").hexdigest()[:16]
     payload = response.get_json()
-    assert payload["original"] == "data/Logos/caledonia/original.png"
-    assert payload["master"] == "/school-logos/caledonia/round-master.png"
-    assert payload["scorebug"] == "/school-logos/caledonia/round-scorebug.png"
+    assert payload["original"] == f"data/Logos/caledonia/original-{revision}.png"
+    assert payload["master"] == f"/school-logos/caledonia/round-master-{revision}.png"
+    assert payload["scorebug"] == f"/school-logos/caledonia/round-scorebug-{revision}.png"
     folder = logo_dir("Caledonia")
-    assert (folder / "original.png").read_bytes() == b"source-image"
-    assert (folder / "round-master.png").read_bytes() == b"normalized-image"
+    assert (folder / f"original-{revision}.png").read_bytes() == b"source-image"
+    assert (folder / f"round-master-{revision}.png").read_bytes() == b"normalized-image"
     assert service.calls[-1] == ("process", ("Caledonia", "crest.png", b"source-image"))
     assert folder.is_relative_to(base_dir)
 
@@ -187,3 +189,23 @@ def test_process_school_logo_preserves_error_mappings(
         assert response.get_json()["message"] == "storage failed"
 
 
+
+
+def test_reimport_keeps_previous_source_and_derivatives(logo_client) -> None:
+    client, _, _, _, logo_dir = logo_client
+    folder = logo_dir('Caledonia')
+    folder.mkdir(parents=True)
+    (folder / 'original.png').write_bytes(b'legacy-source')
+    (folder / 'round-master.png').write_bytes(b'legacy-master')
+    paths = []
+    for raw in (b'first-source', b'second-source'):
+        response = client.post('/api/schools/Caledonia/logo/process',
+            data={'logo': (io.BytesIO(raw), 'crest.png')}, headers=auth_headers())
+        assert response.status_code == 200
+        payload = response.get_json()
+        paths.append(payload['master'])
+        assert (folder / Path(payload['original']).name).read_bytes() == raw
+    assert paths[0] != paths[1]
+    assert all((folder / Path(path).name).exists() for path in paths)
+    assert (folder / 'original.png').read_bytes() == b'legacy-source'
+    assert (folder / 'round-master.png').read_bytes() == b'legacy-master'

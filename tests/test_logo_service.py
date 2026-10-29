@@ -239,3 +239,77 @@ def test_storage_failure_does_not_persist_school_or_logo_changes() -> None:
     assert school_store.saved == []
     assert logo_store.saved == []
 
+
+
+def test_fit_logo_preserves_gold_border_and_all_four_corners() -> None:
+    # Boundary artwork reproduces the circular-mask loss without assuming that
+    # this synthetic fixture is Lafayette's unavailable original source.
+    source = Image.new('RGBA', (100, 100), '#C9A227')
+    from PIL import ImageDraw
+    ImageDraw.Draw(source).rectangle((8, 8, 91, 91), fill='#B5121B')
+    result = LogoService.fit_logo(source, 100)
+    assert result.getbbox() == (6, 6, 94, 94)
+    for point in ((6, 6), (93, 6), (6, 93), (93, 93)):
+        assert result.getpixel(point) == (201, 162, 39, 255)
+    assert source.size == (100, 100)
+    assert source.getpixel((0, 0)) == (201, 162, 39, 255)
+
+
+def test_fit_logo_preserves_aspect_ratio_for_wide_tall_and_square_sources() -> None:
+    for width, height in ((400, 80), (80, 400), (100, 100), (1, 300)):
+        source = Image.new('RGBA', (width, height), (12, 45, 98, 255))
+        result = LogoService.fit_logo(source, 256)
+        left, top, right, bottom = result.getbbox()
+        scale = min(225 / width, 225 / height)
+        assert abs((right-left) - max(1, round(width*scale))) <= 1
+        assert abs((bottom-top) - max(1, round(height*scale))) <= 1
+        assert left >= 15 and top >= 15
+        assert right <= 241 and bottom <= 241
+        assert result.getpixel((0, 0)) == (0, 0, 0, 0)
+
+
+def test_fit_logo_retains_transparency_and_existing_source_margins() -> None:
+    from PIL import ImageDraw
+    source = Image.new('RGBA', (100, 100))
+    ImageDraw.Draw(source).ellipse((30, 30, 69, 69), fill=(200, 20, 50, 128))
+    original = source.tobytes()
+    result = LogoService.fit_logo(source, 100)
+    box = result.getbbox()
+    assert box[0] > 20 and box[1] > 20  # source margins were not trimmed away
+    assert result.getpixel((50, 50))[3] == 128
+    assert result.getpixel((6, 6))[3] == 0
+    assert source.tobytes() == original
+
+
+def test_processing_preserves_original_bytes_and_resets_all_approval_records() -> None:
+    current = school()
+    current.update(logo_status='approved', logo_metadata={'approval_status':'approved', 'source_url':'https://school.example/logo'})
+    school_store, logo_store = Store([current]), Store([logo()])
+    calls, original, master, scorebug = writers()
+    raw = image_bytes()
+    result = service(school_store, logo_store).process_candidate(
+        'caledonia', raw=raw, original_filename='mark.png',
+        write_original=original, write_master=master, write_scorebug=scorebug,
+    )
+    assert result.ok
+    assert calls[0] == ('original', ('.png', raw))
+    assert school_store.rows[0]['logo_status'] == 'candidate'
+    metadata = school_store.rows[0]['logo_metadata']
+    assert metadata['approval_status'] == 'candidate'
+    assert metadata['source_url'] == 'https://school.example/logo'
+    assert metadata['safe_area'] == 'rectangle-88-percent'
+    assert logo_store.rows[0]['approval_status'] == 'candidate'
+
+
+def test_review_ui_and_round_theme_frame_have_non_destructive_fitting() -> None:
+    root = Path(__file__).resolve().parents[1]
+    css = (root / 'static/style.css').read_text()
+    rule = css.split('.logo-preview-card img{', 1)[1].split('}', 1)[0]
+    assert 'border-radius:0' in rule
+    assert 'object-fit:contain' in rule
+    theme = (root / 'static/csrn-production-theme-runtime.css').read_text()
+    rule = theme.split('#csrnProductionThemeLayout .hp-team-mark img{', 1)[1].split('}', 1)[0]
+    assert 'width:70%' in rule and 'height:70%' in rule
+    page = (root / 'templates/index.html').read_text()
+    assert 'schoolLogoOriginalLink' in page
+    assert 'Reprocess Preserved Original' in page

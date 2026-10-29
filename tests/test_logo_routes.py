@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -79,6 +80,7 @@ class StubLogoService:
 @pytest.fixture
 def logo_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     service = StubLogoService()
+    monkeypatch.setattr(app_module, "_onboarding_incomplete", lambda: False)
     monkeypatch.setattr(app_module, "LOGO_SERVICE", service, raising=False)
     monkeypatch.setattr(app_module, "pin_is_configured", lambda: True)
     monkeypatch.setattr(app_module, "BASE_DIR", tmp_path)
@@ -131,15 +133,16 @@ def test_process_logo_writes_derivatives_and_preserves_response_contract(
         content_type="multipart/form-data",
     )
     assert response.status_code == 200
+    revision = sha256(b"contain-v1\0uploaded-logo").hexdigest()[:16]
     payload = response.get_json()
     assert payload["primary_color"] == "#FF0000"
     assert payload["preview_url"] == (
-        "/school-logos/caledonia/round-master.png"
+        f"/school-logos/caledonia/round-master-{revision}.png"
     )
     folder = root / "Data" / "Logos" / "caledonia"
-    assert (folder / "original.png").read_bytes() == raw
-    assert Image.open(folder / "round-master.png").size == (1024, 1024)
-    assert Image.open(folder / "round-scorebug.png").size == (256, 256)
+    assert (folder / f"original-{revision}.png").read_bytes() == raw
+    assert Image.open(folder / f"round-master-{revision}.png").size == (1024, 1024)
+    assert Image.open(folder / f"round-scorebug-{revision}.png").size == (256, 256)
     assert service.calls[0][0] == "process_candidate"
     assert service.calls[0][1]["school_id"] == "caledonia"
     assert service.calls[0][1]["original_filename"] == "warrior.png"

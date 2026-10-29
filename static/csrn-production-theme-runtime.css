@@ -1720,3 +1720,15 @@ html.csrn-production-theme-player-active #playerGraphic{
    Supersedes the R4/R5/R9 runtime-injected prototype that used to live in
    this file entirely (the throwaway bottom-bar shell and its plain-table
    line score are gone, not just restyled). */
+
+/* Team-logo containment: keep the approved circular Heritage frame, but fit
+   the full square rendition inside its inscribed square. Never mask artwork.
+   Other theme geometry, filters, artwork and animation remain theme-owned. */
+#csrnProductionThemeLayout .hp-team-mark img{
+  width:70%!important;
+  height:70%!important;
+  object-fit:contain!important;
+  object-position:center!important;
+  border-radius:0!important;
+  box-sizing:border-box;
+}

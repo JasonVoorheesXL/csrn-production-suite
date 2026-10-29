@@ -639,7 +639,7 @@ textarea {
 @media (max-width:760px) { .import-row { grid-template-columns:1fr; gap:3px; } .import-row em { text-align:left; } }
 
 .logo-preview-card{display:flex;align-items:center;gap:12px;min-height:92px;padding:10px;border:1px solid rgba(255,255,255,.15);border-radius:12px;background:rgba(0,0,0,.2)}
-.logo-preview-card img{width:76px;height:76px;object-fit:contain;border-radius:50%;background:transparent;display:none}
+.logo-preview-card img{width:76px;height:76px;object-fit:contain;object-position:center;border-radius:0;box-sizing:border-box;background:transparent;display:none}
 .logo-preview-card span{font-size:.85rem;opacity:.75}
 
 /* Build 0017 Corrected R2 Hotfix 2: branding review */
@@ -649,9 +649,9 @@ textarea {
 .logo-preview-card span{font-size:.9rem}
 .broadcast-brand-preview{min-height:218px;border:2px solid #fff;border-radius:15px;padding:22px;display:flex;align-items:center;gap:20px;overflow:hidden}
 .preview-logo-shell{width:132px;height:132px;flex:0 0 132px;border-radius:50%;background:rgba(0,0,0,.28);display:grid;place-items:center;border:1px solid rgba(255,255,255,.25)}
-.preview-logo-shell img{width:118px;height:118px;object-fit:contain;display:none}
+.preview-logo-shell img{width:70%;height:70%;object-fit:contain;object-position:center;box-sizing:border-box;display:none}
 .preview-team-copy{display:flex;flex-direction:column;gap:8px}.preview-team-copy strong{font-size:clamp(25px,3vw,42px);line-height:1;text-transform:uppercase;text-shadow:0 2px 5px rgba(0,0,0,.7)}.preview-team-copy span{color:#d0d4da;font-weight:700}
-@media(max-width:760px){.branding-preview-grid{grid-template-columns:1fr}.broadcast-brand-preview{min-height:180px}.preview-logo-shell{width:105px;height:105px;flex-basis:105px}.preview-logo-shell img{width:94px;height:94px}}
+@media(max-width:760px){.branding-preview-grid{grid-template-columns:1fr}.broadcast-brand-preview{min-height:180px}.preview-logo-shell{width:105px;height:105px;flex-basis:105px}.preview-logo-shell img{width:70%;height:70%}}
 
 
 /* Build 0018 Game Manager */

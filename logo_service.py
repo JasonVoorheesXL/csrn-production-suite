@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-from PIL import Image, ImageChops, ImageDraw
+from PIL import Image, ImageOps
 
 
 Record = dict[str, Any]
@@ -63,7 +63,7 @@ class LogoService:
             image.load()
         except Exception as exc:  # Pillow raises several format-specific errors.
             raise ValueError("Image payload is invalid.") from exc
-        return image
+        return ImageOps.exif_transpose(image)
 
     @staticmethod
     def _hex(rgb: tuple[int, int, int]) -> str:
@@ -138,43 +138,29 @@ class LogoService:
         return [cls._hex(chosen[0]), cls._hex(secondary)]
 
     @staticmethod
-    def normalize_round_logo(source: Image.Image, size: int) -> Image.Image:
+    def fit_logo(source: Image.Image, size: int) -> Image.Image:
+        """Contain the complete source on a transparent canvas, with 6% margins.
+
+        Never mask or crop artwork (including existing transparent margins).
+        Shared derivatives are rectangular images even inside round UI frames.
+        """
         target_size = max(1, int(size))
-        image = source.convert("RGBA")
-        bounding_box = image.getbbox()
-        if bounding_box:
-            image = image.crop(bounding_box)
-
-        max_content = int(target_size * 0.92)
-        scale = min(
-            max_content / max(1, image.width),
-            max_content / max(1, image.height),
+        image = ImageOps.exif_transpose(source).convert("RGBA")
+        max_content = max(1, round(target_size * 0.88))
+        image = ImageOps.contain(
+            image, (max_content, max_content), Image.Resampling.LANCZOS
         )
-        resized = (
-            max(1, round(image.width * scale)),
-            max(1, round(image.height * scale)),
-        )
-        image = image.resize(resized, Image.Resampling.LANCZOS)
-
-        canvas = Image.new(
-            "RGBA",
-            (target_size, target_size),
-            (0, 0, 0, 0),
-        )
+        canvas = Image.new("RGBA", (target_size, target_size), (0, 0, 0, 0))
         canvas.alpha_composite(
             image,
-            (
-                (target_size - image.width) // 2,
-                (target_size - image.height) // 2,
-            ),
+            ((target_size - image.width) // 2, (target_size - image.height) // 2),
         )
-        mask = Image.new("L", (target_size, target_size), 0)
-        ImageDraw.Draw(mask).ellipse(
-            (0, 0, target_size - 1, target_size - 1),
-            fill=255,
-        )
-        canvas.putalpha(ImageChops.multiply(canvas.getchannel("A"), mask))
         return canvas
+
+    @staticmethod
+    def normalize_round_logo(source: Image.Image, size: int) -> Image.Image:
+        """Compatibility entry point for older callers; no circular masking."""
+        return LogoService.fit_logo(source, size)
 
     def list_records(
         self,
@@ -249,8 +235,8 @@ class LogoService:
         except ValueError:
             return LogoResult("INVALID_IMAGE")
 
-        master = self.normalize_round_logo(source, 1024)
-        scorebug = self.normalize_round_logo(source, 256)
+        master = self.fit_logo(source, 1024)
+        scorebug = self.fit_logo(source, 256)
         colors = self.extract_colors(master)
         extension = self.safe_extension(original_filename)
 
@@ -279,10 +265,10 @@ class LogoService:
                 "scorebug_path": scorebug_path,
                 "approval_status": "candidate",
                 "transparent_background_status": "normalized",
-                "shape_standard": "round",
-                "master_canvas": "1024x1024-round",
-                "safe_area": "circle-92-percent",
-                "scorebug_derivative": "256x256-round",
+                "shape_standard": "contain",
+                "master_canvas": "1024x1024-transparent",
+                "safe_area": "rectangle-88-percent",
+                "scorebug_derivative": "256x256-transparent",
                 "extracted_colors": colors,
             }
         )
@@ -325,7 +311,7 @@ class LogoService:
                 "preview_url": round_master_path,
                 "normalized_school_id": normalized_school_id,
                 "message": (
-                    "Round candidate logo created; review colors and approve "
+                    "Contained candidate logo created; review the original source and approve "
                     "before broadcast use."
                 ),
             },

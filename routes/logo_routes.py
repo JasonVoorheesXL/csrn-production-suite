@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, Callable
 
@@ -39,12 +40,14 @@ def create_logo_blueprint(
             return jsonify({"error": "LOGO_FILE_REQUIRED"}), 400
 
         raw = upload.read()
+        # Immutable filenames retain prior originals/derivatives and avoid stale caches.
+        revision = sha256(b"contain-v1\0" + raw).hexdigest()[:16]
         normalized_school_id = dependencies.normalize_school_id(school_id)
         folder = dependencies.get_school_logo_dir(school_id)
 
         def write_original(extension: str, payload: bytes) -> str:
             folder.mkdir(parents=True, exist_ok=True)
-            path = folder / f"original{extension}"
+            path = folder / f"original-{revision}{extension}"
             path.write_bytes(payload)
             return str(
                 path.relative_to(dependencies.get_base_dir())
@@ -52,15 +55,15 @@ def create_logo_blueprint(
 
         def write_master(image: Any) -> str:
             folder.mkdir(parents=True, exist_ok=True)
-            path = folder / "round-master.png"
+            path = folder / f"round-master-{revision}.png"
             image.save(path)
-            return f"/school-logos/{normalized_school_id}/round-master.png"
+            return f"/school-logos/{normalized_school_id}/round-master-{revision}.png"
 
         def write_scorebug(image: Any) -> str:
             folder.mkdir(parents=True, exist_ok=True)
-            path = folder / "round-scorebug.png"
+            path = folder / f"round-scorebug-{revision}.png"
             image.save(path)
-            return f"/school-logos/{normalized_school_id}/round-scorebug.png"
+            return f"/school-logos/{normalized_school_id}/round-scorebug-{revision}.png"
 
         result = dependencies.get_logo_service().process_candidate(
             school_id,

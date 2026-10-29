@@ -3477,3 +3477,11 @@ Gate 16 begins with a production-overlay resumption audit. The first implementat
 - Removes the R3-R6 stripe/number visual experiments while preserving the later production binding, asset loading, and native media ownership work.
 - Keeps the frozen Friday Night Stadium engine, geometry, field background, VS treatment, and other production media modes unchanged.
 - Advances runtime binding to v44 and cache pins to 17.1-r7 to force the restored visual assets to reload.
+
+## Universal team-logo containment repair — 2026-10-29
+
+- User-authorized logo-only repair branch: `hotfix/universal-team-logo-containment`, based on GitHub main `1615ec6`; the Windows development folder and its unpushed changes were unavailable and untouched.
+- Shared logo derivatives now contain complete artwork with transparent margins, without circular alpha masking or trimming original pixels. Legacy field names remain compatible.
+- Logo review exposes the preserved original and explicit reprocessing; every processed candidate still requires approval. Content-versioned filenames preserve prior assets.
+- The production-owned Heritage circular-frame fit and school preview image fit change only logo presentation. Frozen engines, artwork, game logic, and customer records remain unchanged.
+- Focused checks: 77 passed; opt-in Chromium component/theme check: 1 passed. Full comparison: baseline 179 failures, patched 175, no newly failing test IDs. See `docs/TEAM_LOGO_RENDERING_REPAIR.md` for evidence and outstanding Windows/Lafayette verification.
