@@ -1059,3 +1059,5 @@ body.automation-modal-open{overflow:hidden!important}.automation-event-sheet{max
   border-top:2px solid rgba(255,255,255,.92);
   border-bottom:2px solid rgba(255,255,255,.92);
 }
+.play-flag{border:1px solid rgba(242,201,76,.45);border-radius:10px;padding:10px 12px;margin:12px 0}.play-flag-toggle{display:flex;align-items:center;gap:8px;font-weight:800}.play-flag .play-entry-grid{margin-top:10px}
+.play-flag .play-entry-grid label:last-child{grid-column:1/-1}.play-flag select,.play-flag input[type=number]{width:100%;min-width:0;box-sizing:border-box}

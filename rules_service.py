@@ -1181,6 +1181,30 @@ class RulesService:
             play_id = f"{token}-{play_number:04d}"
             event_id = f"evt-{int(self._now() * 1000)}-{play_number}"
 
+        # A flag on the play: the play stands and the foul is enforced in the
+        # same event (one undo removes both). A score or turnover wiped out by
+        # a foul is a no play, which the console records as a penalty alone.
+        flag = self._play_flag(incoming)
+        flag_result: dict[str, Any] | None = None
+        if flag is not None:
+            blocked = self._flag_block(
+                flag, kind=kind, touchdown=touchdown, safety=safety,
+                turnover=turnover and turnover_type != "downs",
+            )
+            if blocked is not None:
+                return blocked
+            if flag["outcome"] == "accepted":
+                if turnover_type == "downs":
+                    # The accepted foul replays the down: the offense keeps the ball.
+                    state["possession"] = team
+                    turnover = False
+                    turnover_type = ""
+                    turnover_team = ""
+                flag_result = self._enforce_flag(state, flag, before=before)
+                first_down = first_down and str(state.get("down", "")) == "1st"
+            else:
+                flag_result = {**flag, "applied": False, "enforced_yards": 0}
+
         if turnover_type == "interception":
             defender = self._display(numbers["returner"], names["returner"]) if numbers["returner"] or names["returner"] else self._team_fallback(state, self.opposite(team))
             description += f" by {defender} at {self.coord_to_spot(turnover_spot, state)}"
@@ -1214,6 +1238,8 @@ class RulesService:
             label = "Touchdown Pass" if kind == "pass" else "Touchdown Run"
         elif first_down:
             description += ", first down"
+        if flag_result is not None:
+            description += self._flag_description(state, flag_result)
 
         scoring_team = (
             turnover_team if turnover_touchdown
@@ -1358,6 +1384,7 @@ class RulesService:
             ) if kind == "pass" else "",
             "yards": yards,
             "first_down": first_down,
+            "penalty": copy.deepcopy(flag_result) if flag_result is not None else None,
             "touchdown": touchdown,
             "turnover": turnover,
             "turnover_type": turnover_type,
@@ -1490,7 +1517,108 @@ class RulesService:
             entry[key] = bool(incoming.get(key))
         for key in self.ENTRY_TEXT:
             entry[key] = str(incoming.get(key, "") or "")
+        flag = self._play_flag(incoming)
+        if flag is not None:
+            entry["flag"] = flag
         return entry
+
+    FLAG_ENFORCEMENTS = ("spot_of_foul", "end_of_play", "after_play")
+
+    @classmethod
+    def _play_flag(cls, incoming: Mapping[str, Any]) -> dict[str, Any] | None:
+        """The penalty attached to a run/pass, normalized; None when there is none.
+
+        enforcement: spot_of_foul (with spot) or end_of_play replay the
+        down from the line to gain set before it; after_play is a dead-ball
+        foul enforced from the succeeding spot with the down counted.
+        """
+        raw = incoming.get("flag")
+        if not isinstance(raw, Mapping) or not str(raw.get("name", "") or "").strip():
+            return None
+        enforcement = str(raw.get("enforcement", "") or "").lower()
+        return {
+            "team": str(raw.get("team", "") or "").lower(),
+            "unit": str(raw.get("unit", "") or "General"),
+            "name": str(raw.get("name")).strip(),
+            "yards": raw.get("yards", ""),
+            "outcome": "declined" if str(raw.get("outcome", "") or "").lower() == "declined" else "accepted",
+            "enforcement": enforcement if enforcement in cls.FLAG_ENFORCEMENTS else "end_of_play",
+            "spot": str(raw.get("spot", "") or ""),
+            "half_distance": bool(raw.get("half_distance")),
+            "automatic_first_down": bool(raw.get("automatic_first_down")),
+            "loss_of_down": bool(raw.get("loss_of_down")),
+        }
+
+    def _flag_block(
+        self, flag: Mapping[str, Any], *, kind: str, touchdown: bool, safety: bool, turnover: bool,
+    ) -> "RulesResult | None":
+        if flag["team"] not in self.VALID_TEAMS:
+            return RulesResult("FLAG_INVALID", {"message": "Choose which team the flag is on."})
+        if kind not in {"run", "pass"}:
+            return RulesResult(
+                "FLAG_NOT_SUPPORTED",
+                {"message": "Flags can be attached to a run or a pass. Record kick fouls with the Penalty button."},
+            )
+        if flag["outcome"] == "accepted" and (touchdown or safety or turnover):
+            return RulesResult(
+                "FLAG_NEEDS_NO_PLAY",
+                {"message": "A score or turnover wiped out by a penalty is a no play: choose 'No play' in the flag section."},
+            )
+        if flag["outcome"] == "accepted" and flag["enforcement"] == "spot_of_foul" and not flag["spot"]:
+            return RulesResult("FLAG_SPOT_REQUIRED", {"message": "Set the spot of the foul."})
+        return None
+
+    def _enforce_flag(
+        self, state: dict[str, Any], flag: Mapping[str, Any], *, before: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        from penalty_service import PenaltyService
+
+        enforcement = flag["enforcement"]
+        spot = flag["spot"] if enforcement == "spot_of_foul" else str(state.get("ball_spot", "") or "")
+        result = PenaltyService.enforce(
+            state,
+            selected_team=flag["team"],
+            requested_unit=flag["unit"],
+            name=flag["name"],
+            yards=flag["yards"],
+            outcome="accepted",
+            spot_to_coord=lambda value: self.spot_to_coord(value, state),
+            coord_to_spot=lambda coord: self.coord_to_spot(coord, state),
+            team_direction=self.team_direction,
+            enforcement_spot=spot,
+            half_distance=flag["half_distance"],
+            automatic_first_down=flag["automatic_first_down"],
+            loss_of_down=flag["loss_of_down"],
+            series_before=None if enforcement == "after_play" else {
+                "down": before.get("down"),
+                "distance": before.get("distance"),
+                "ball_spot": before.get("ball_spot"),
+            },
+        )
+        return {
+            **dict(flag),
+            "applied": bool(result.get("applied")),
+            "unit": result.get("unit", flag["unit"]),
+            "enforced_yards": int(result.get("enforced_yards", 0) or 0),
+            "enforcement_spot": result.get("enforcement_spot", spot),
+            "result_spot": result.get("result_spot", state.get("ball_spot", "")),
+            "automatic_first_down": bool(result.get("automatic_first_down")),
+            "loss_of_down": bool(result.get("loss_of_down")),
+        }
+
+    def _flag_description(self, state: Mapping[str, Any], flag: Mapping[str, Any]) -> str:
+        team_name = str(state.get(f"{flag.get('team', '')}_team") or flag.get("team", "")).strip()
+        if not flag.get("applied"):
+            return f", penalty on {team_name}: {flag.get('name')}, declined"
+        where = {
+            "spot_of_foul": f"from the spot of the foul ({flag.get('enforcement_spot')})",
+            "end_of_play": "from the end of the play",
+            "after_play": "after the play",
+        }.get(str(flag.get("enforcement")), "")
+        return (
+            f", penalty on {team_name}: {flag.get('name')}, {flag.get('enforced_yards', 0)} yards {where}"
+            f", ball at {flag.get('result_spot')}"
+        )
 
     @classmethod
     def entry_from_play(
@@ -1562,6 +1690,9 @@ class RulesService:
         )
         entry["clock"] = str(play.get("clock", "") or "")
         entry["notes"] = str(play.get("notes", "") or "")
+        flag = cls._play_flag({"flag": play.get("penalty")})
+        if flag is not None:
+            entry["flag"] = flag
         return entry
 
     def _phase_block(self, state: Mapping[str, Any], team: str, kind: str) -> "RulesResult | None":

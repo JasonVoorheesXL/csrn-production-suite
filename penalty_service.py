@@ -155,7 +155,16 @@ class PenaltyService:
         loss_of_down: bool = False,
         untimed_down: bool = False,
         retry_down: bool = False,
+        series_before: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Enforce one penalty on ``state``.
+
+        ``series_before`` (down, distance, ball_spot before the down) marks a
+        live-ball foul on a play that stands: the down is replayed from the
+        line to gain set before that down, not advanced from the play's
+        result, unless the foul carries loss of down / an automatic first
+        down or its yardage reaches the line to gain.
+        """
         before = {
             "possession": state.get("possession", "home"),
             "down": state.get("down", "1st"),
@@ -257,6 +266,20 @@ class PenaltyService:
                     state["distance"] = str(remaining)
             if loss:
                 state["down"] = cls._advance_down(old_down, state)
+
+        if series_before is not None and not automatic:
+            series_coord = max(0, min(length, int(spot_to_coord(series_before.get("ball_spot") or base_spot))))
+            series_distance = cls._safe_int(series_before.get("distance"), 10) or 10
+            line_to_gain = series_coord + direction * series_distance
+            final_coord = max(0, min(length, int(spot_to_coord(state.get("ball_spot", base_spot)))))
+            remaining = (line_to_gain - final_coord) * direction
+            if remaining <= 0:
+                state["down"] = "1st"
+                state["distance"] = "10"
+            else:
+                series_down = str(series_before.get("down") or "1st")
+                state["down"] = cls._advance_down(series_down, state) if loss else series_down
+                state["distance"] = str(min(99, remaining))
 
         phase = str(before.get("special_game_phase", "") or "").strip().lower()
         if phase in {"kickoff", "free_kick"}:
