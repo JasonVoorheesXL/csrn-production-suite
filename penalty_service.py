@@ -59,6 +59,13 @@ class PenaltyService:
         ("Special Teams", "Roughing the Holder"): {"yards": 15, "automatic_first_down": True},
         ("Special Teams", "Roughing the Snapper"): {"yards": 15, "automatic_first_down": True},
         ("Special Teams", "Illegal Participation"): {"yards": 15},
+        ("Offensive", "Illegal Procedure"): {"yards": 5},
+        ("Offensive", "Illegal Substitution"): {"yards": 5},
+        ("Defensive", "Illegal Substitution"): {"yards": 5},
+        ("Special Teams", "Illegal Procedure"): {"yards": 5},
+        ("Special Teams", "Illegal Substitution"): {"yards": 5},
+        ("Special Teams", "Face Mask"): {"yards": 15},
+        ("Special Teams", "Unsportsmanlike Conduct"): {"yards": 15},
     }
 
     # Penalty catalogue + down cycle come from ruleset_service.active_ruleset

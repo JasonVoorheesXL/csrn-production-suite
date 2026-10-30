@@ -139,8 +139,9 @@ def _wrong_arrow_game(**patch):
 
 
 def _checked_run(g, start, end, **extra):
+    # A named ball carrier: a TEAM run losing 1-2 yards reads as a kneel and is skipped.
     return g.rules.play({
-        "team": "home", "play_type": "run", "start_spot": start, "end_spot": end,
+        "team": "home", "play_type": "run", "player_number": "22", "start_spot": start, "end_spot": end,
         "direction_check": True, **extra,
     })
 
