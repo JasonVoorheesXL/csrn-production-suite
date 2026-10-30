@@ -630,6 +630,10 @@ class RulesService:
             return_end = self.spot_to_coord(
                 return_value if return_value not in (None, "") else self.coord_to_spot(turnover_spot, state), state)
             gaining_direction = self.team_direction(state, turnover_team)
+            if bool(incoming.get("touchback")):
+                # Downed in its own end zone: touchback, ball at its own 20.
+                own_goal = 0 if gaining_direction == 1 else length
+                return_end = own_goal + gaining_direction * 20
             turnover_return_yards = max(0, (return_end - turnover_spot) * gaining_direction)
             turnover_touchdown = (
                 (gaining_direction == 1 and return_end == length)
@@ -1008,6 +1012,8 @@ class RulesService:
                     f", returned by {returner} for {return_yards} yards "
                     f"to {self.coord_to_spot(end, state)}"
                 )
+                if bool(incoming.get("return_out_of_bounds")) and not touchdown:
+                    description += ", out of bounds"
             elif punt_downed:
                 description += ", downed by the kicking team"
             else:
@@ -1212,6 +1218,7 @@ class RulesService:
             blocked = self._flag_block(
                 flag, kind=kind, touchdown=touchdown, safety=safety,
                 turnover=turnover and turnover_type != "downs",
+                gaining_team=turnover_team if turnover and turnover_type != "downs" else "",
             )
             if blocked is not None:
                 return blocked
@@ -1222,15 +1229,27 @@ class RulesService:
                     turnover = False
                     turnover_type = ""
                     turnover_team = ""
-                flag_result = self._enforce_flag(state, flag, before=before)
+                # After a kick or a turnover the ball belongs to a new series:
+                # the foul is enforced from the result (end of the return, or
+                # the spot of the foul) and the new offense gets 1st & 10. A
+                # dead-ball foul after a play that earned a first down also
+                # starts the new series after enforcement (NFHS).
+                changed_hands = kind in {"kickoff", "punt"} or (turnover and turnover_type != "downs")
+                flag_result = self._enforce_flag(
+                    state, flag, before=before, from_result=changed_hands,
+                    new_series=changed_hands or (flag["enforcement"] == "after_play" and first_down),
+                )
                 first_down = first_down and str(state.get("down", "")) == "1st"
             else:
                 flag_result = {**flag, "applied": False, "enforced_yards": 0}
 
+        turnover_touchback = turnover_type in {"interception", "fumble_recovery"} and bool(incoming.get("touchback"))
         if turnover_type == "interception":
             defender = self._display(numbers["returner"], names["returner"]) if numbers["returner"] or names["returner"] else self._team_fallback(state, self.opposite(team))
             description += f" by {defender} at {self.coord_to_spot(turnover_spot, state)}"
-            if turnover_return_yards:
+            if turnover_touchback:
+                description += ", touchback"
+            elif turnover_return_yards:
                 description += f", returned {turnover_return_yards} yards to {self.coord_to_spot(return_end, state)}"
         if lateral and own_recovery:
             description += (
@@ -1249,7 +1268,9 @@ class RulesService:
             if bool(incoming.get("fumble_lost")):
                 recoverer = self._display(numbers["returner"], names["returner"]) if numbers["returner"] or names["returner"] else self._team_fallback(state, self.opposite(team))
                 description += f", recovered by {recoverer} at {self.coord_to_spot(turnover_spot, state)}"
-                if turnover_return_yards:
+                if turnover_touchback:
+                    description += ", touchback"
+                elif turnover_return_yards:
                     description += f", returned {turnover_return_yards} yards to {self.coord_to_spot(return_end, state)}"
         if turnover_type == "downs":
             description += ", turnover on downs"
@@ -1510,7 +1531,7 @@ class RulesService:
     ENTRY_SPOTS = ("start_spot", "end_spot", "landing_spot", "turnover_spot", "return_end_spot", "recovery_spot", "fumble_spot")
     ENTRY_FLAGS = (
         "kneel", "fumble", "fumble_lost", "muffed_punt", "downed", "out_of_bounds",
-        "touchback", "fair_catch", "blocked", "kick_out_of_bounds", "lateral",
+        "touchback", "fair_catch", "blocked", "kick_out_of_bounds", "lateral", "return_out_of_bounds",
     )
     ENTRY_TEXT = ("pass_outcome", "out_of_bounds_choice", "clock", "notes")
     # Where the game is (period, clock, ends, the on-air graphic) -- never
@@ -1590,15 +1611,19 @@ class RulesService:
 
     def _flag_block(
         self, flag: Mapping[str, Any], *, kind: str, touchdown: bool, safety: bool, turnover: bool,
+        gaining_team: str = "",
     ) -> "RulesResult | None":
         if flag["team"] not in self.VALID_TEAMS:
             return RulesResult("FLAG_INVALID", {"message": "Choose which team the flag is on."})
-        if kind not in {"run", "pass"}:
+        if kind not in {"run", "pass", "kickoff", "punt"}:
             return RulesResult(
                 "FLAG_NOT_SUPPORTED",
-                {"message": "Flags can be attached to a run or a pass. Record kick fouls with the Penalty button."},
+                {"message": "Flags can be attached to a run, pass, kickoff or punt. Record other fouls with the Penalty button."},
             )
-        if flag["outcome"] == "accepted" and (touchdown or safety or turnover):
+        # A foul by the team that gained the ball (during its return) leaves
+        # the turnover standing; only a foul by the team that lost it wipes it out.
+        turnover_wiped = turnover and flag["team"] != gaining_team
+        if flag["outcome"] == "accepted" and (touchdown or safety or turnover_wiped):
             return RulesResult(
                 "FLAG_NEEDS_NO_PLAY",
                 {"message": "A score or turnover wiped out by a penalty is a no play: choose 'No play' in the flag section."},
@@ -1609,15 +1634,20 @@ class RulesService:
 
     def _enforce_flag(
         self, state: dict[str, Any], flag: Mapping[str, Any], *, before: Mapping[str, Any],
+        from_result: bool = False, new_series: bool = False,
     ) -> dict[str, Any]:
         from penalty_service import PenaltyService
 
         enforcement = flag["enforcement"]
         spot = flag["spot"] if enforcement == "spot_of_foul" else str(state.get("ball_spot", "") or "")
+        unit = flag["unit"]
+        if from_result and unit in {"Offensive", "Defensive"}:
+            # The ball changed hands: offense/defense now follow the new possession.
+            unit = "Offensive" if flag["team"] == str(state.get("possession", "") or "") else "Defensive"
         result = PenaltyService.enforce(
             state,
             selected_team=flag["team"],
-            requested_unit=flag["unit"],
+            requested_unit=unit,
             name=flag["name"],
             yards=flag["yards"],
             outcome="accepted",
@@ -1628,11 +1658,12 @@ class RulesService:
             half_distance=flag["half_distance"],
             automatic_first_down=flag["automatic_first_down"],
             loss_of_down=flag["loss_of_down"],
-            series_before=None if enforcement == "after_play" else {
+            series_before=None if enforcement == "after_play" or from_result else {
                 "down": before.get("down"),
                 "distance": before.get("distance"),
                 "ball_spot": before.get("ball_spot"),
             },
+            new_series=new_series,
         )
         return {
             **dict(flag),
