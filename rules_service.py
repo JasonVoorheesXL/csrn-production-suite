@@ -462,6 +462,16 @@ class RulesService:
     DIRECTION_SUSPECT_TWO_PLAY_LOSS = 15
 
     @staticmethod
+    def _lateral2_fields(on: bool, numbers: Mapping[str, str], names: Mapping[str, str], spot: str, yards: int) -> dict[str, Any]:
+        """The second lateral of a play (empty when there was none)."""
+        return {
+            "lateral2_number": numbers["lateral2"] if on else "",
+            "lateral2_name": names["lateral2"] if on else "",
+            "lateral2_spot": spot if on else "",
+            "lateral2_yards": yards if on else 0,
+        }
+
+    @staticmethod
     def _kneel_like(kind: str, player_number: Any, yards: int) -> bool:
         """A TEAM run losing a yard or two: a victory-formation kneel entered
         without the Kneel box (that is how stat crews write it)."""
@@ -680,6 +690,8 @@ class RulesService:
                 "kicker",
                 "returner",
                 "recoverer",
+                "lateral2",
+                "kick_recoverer",
                 "tackler",
             )
         }
@@ -706,6 +718,26 @@ class RulesService:
             and numbers["recoverer"]
             and numbers["recoverer"] != handler_number
         )
+        # A lateral on a kick return splits the return the same way: the
+        # returner keeps the yards to the lateral spot, the teammate the rest.
+        kick_lateral = bool(
+            kind in {"kickoff", "punt"}
+            and bool(incoming.get("lateral"))
+            and numbers["recoverer"]
+            and numbers["recoverer"] != numbers["returner"]
+        )
+        # A second lateral (hook-and-ladder): the first teammate keeps the
+        # yards to it and the last player gets the rest (and any touchdown).
+        second_lateral = bool(
+            ((lateral and own_recovery) or kick_lateral)
+            and numbers["lateral2"]
+            and numbers["lateral2"] != numbers["recoverer"]
+        )
+        lateral2_yards = 0
+        lateral2_spot_text = ""
+        kick_recovery_yards = 0
+        kick_recovery_spot_text = ""
+        lateral_team = self.opposite(team) if kind in {"kickoff", "punt"} else team
         refs = {
             "player": self._resolve(state, team, numbers["player"]),
             "passer": self._resolve(state, team, numbers["passer"]),
@@ -721,7 +753,10 @@ class RulesService:
                 self.opposite(team),
                 numbers["returner"],
             ),
-            "recoverer": self._resolve(state, team, numbers["recoverer"]),
+            "recoverer": self._resolve(state, lateral_team, numbers["recoverer"]),
+            "lateral2": self._resolve(state, lateral_team, numbers["lateral2"]),
+            # Onside kick: the kicking-team player who recovered it.
+            "kick_recoverer": self._resolve(state, team, numbers["kick_recoverer"]),
             # The tackle is made by the defense on a scrimmage play, by the
             # kicking team on a return, and by the original offense after a
             # turnover.
@@ -962,6 +997,12 @@ class RulesService:
             turnover_team = team if muff_recovered_by_kicking_team else ""
             if muff_recovered_by_kicking_team:
                 state["possession"] = team
+            # Onside kick (or any free kick) recovered by the kicking team: it
+            # keeps the ball where it recovered it; nobody returns it.
+            kicking_team_recovered = kind == "kickoff" and bool(incoming.get("kicking_team_recovered"))
+            if kicking_team_recovered:
+                state["possession"] = team
+                numbers["returner"] = ""
             if touchback:
                 receiving_direction = self.team_direction(state, receiving)
                 # Touchback to the receiving team's own 20; mirrored to
@@ -977,6 +1018,22 @@ class RulesService:
             kick_distance = abs(landing - start)
             return_direction = self.team_direction(state, receiving)
             return_yards = max(0, (end - landing) * return_direction)
+            if kick_lateral and not (touchback or fair_catch or muff_recovered_by_kicking_team or kicking_team_recovered):
+                lateral_value = incoming.get("recovery_spot")
+                lateral_coord = self.spot_to_coord(
+                    lateral_value if lateral_value not in (None, "") else end, state)
+                kick_recovery_yards = (end - lateral_coord) * return_direction
+                kick_recovery_spot_text = self.coord_to_spot(lateral_coord, state)
+                if second_lateral:
+                    lateral2_value = incoming.get("lateral2_spot")
+                    lateral2_coord = self.spot_to_coord(
+                        lateral2_value if lateral2_value not in (None, "") else end, state)
+                    lateral2_yards = (end - lateral2_coord) * return_direction
+                    kick_recovery_yards = (lateral2_coord - lateral_coord) * return_direction
+                    lateral2_spot_text = self.coord_to_spot(lateral2_coord, state)
+            else:
+                kick_lateral = False
+                second_lateral = second_lateral and own_recovery
             turnover_spot = end
             return_end = end
             turnover_return_yards = 0
@@ -984,6 +1041,7 @@ class RulesService:
                 not touchback
                 and not fair_catch
                 and not muff_recovered_by_kicking_team
+                and not kicking_team_recovered
                 and numbers["returner"]
                 and (
                     (return_direction == 1 and end == length)
@@ -1005,7 +1063,13 @@ class RulesService:
                 f"{label} by {kicker_label} "
                 f"landed at {self.coord_to_spot(landing, state)}"
             )
-            if muffed_punt:
+            if kicking_team_recovered:
+                recovered_by = self._display(numbers["kick_recoverer"], names["kick_recoverer"]) if numbers["kick_recoverer"] else ""
+                description += (
+                    f", recovered by the kicking team{' (' + recovered_by + ')' if recovered_by else ''} "
+                    f"at {self.coord_to_spot(end, state)}"
+                )
+            elif muffed_punt:
                 description += ", muffed by the receiving team"
                 if muff_recovered_by_kicking_team:
                     description += (
@@ -1026,6 +1090,16 @@ class RulesService:
                     f", returned by {returner} for {return_yards} yards "
                     f"to {self.coord_to_spot(end, state)}"
                 )
+                if kick_lateral:
+                    description += (
+                        f", lateral to {self._display(numbers['recoverer'], names['recoverer'])}"
+                        f" at {kick_recovery_spot_text}"
+                    )
+                    if second_lateral:
+                        description += (
+                            f", lateral to {self._display(numbers['lateral2'], names['lateral2'])}"
+                            f" at {lateral2_spot_text}"
+                        )
                 if bool(incoming.get("return_out_of_bounds")) and not touchdown:
                     description += ", out of bounds"
             elif punt_downed:
@@ -1068,6 +1142,13 @@ class RulesService:
             # of the play; the carrier keeps (yards - recovery_yards).
             recovery_yards = (end - recovery_coord) * direction
             recovery_spot_text = self.coord_to_spot(recovery_coord, state)
+            if second_lateral:
+                lateral2_value = incoming.get("lateral2_spot")
+                lateral2_coord = self.spot_to_coord(
+                    lateral2_value if lateral2_value not in (None, "") else end, state)
+                lateral2_yards = (end - lateral2_coord) * direction
+                recovery_yards = (lateral2_coord - recovery_coord) * direction
+                lateral2_spot_text = self.coord_to_spot(lateral2_coord, state)
         else:
             own_recovery = False
 
@@ -1270,6 +1351,11 @@ class RulesService:
                 f", lateral to {self._display(numbers['recoverer'], names['recoverer'])}"
                 f" at {recovery_spot_text}"
             )
+            if second_lateral:
+                description += (
+                    f", lateral to {self._display(numbers['lateral2'], names['lateral2'])}"
+                    f" at {lateral2_spot_text}"
+                )
         if bool(incoming.get("fumble")):
             description += ", fumble" + (
                 " lost" if bool(incoming.get("fumble_lost")) else " recovered"
@@ -1384,11 +1470,12 @@ class RulesService:
                 ),
                 "muffed_punt": muffed_punt,
                 "downed": punt_downed,
-                "recoverer_number": numbers["recoverer"] if own_recovery else "",
-                "recoverer_name": names["recoverer"] if own_recovery else "",
-                "recovery_spot": recovery_spot_text,
-                "recovery_yards": recovery_yards if own_recovery else 0,
-            "lateral": bool(lateral and own_recovery),
+                "recoverer_number": numbers["recoverer"] if own_recovery or kick_lateral else "",
+                "recoverer_name": names["recoverer"] if own_recovery or kick_lateral else "",
+                "recovery_spot": kick_recovery_spot_text if kick_lateral else recovery_spot_text,
+                "recovery_yards": kick_recovery_yards if kick_lateral else recovery_yards if own_recovery else 0,
+            "lateral": bool(lateral and own_recovery) or kick_lateral,
+            **self._lateral2_fields(second_lateral, numbers, names, lateral2_spot_text, lateral2_yards),
                 "touchdown": touchdown,
                 "safety": safety,
                 "player_name": (
@@ -1471,11 +1558,15 @@ class RulesService:
             "safety": safety,
             "muffed_punt": muffed_punt,
             "downed": punt_downed,
-            "recoverer_number": numbers["recoverer"] if own_recovery else "",
-            "recoverer_name": names["recoverer"] if own_recovery else "",
-            "recovery_spot": recovery_spot_text,
-            "recovery_yards": recovery_yards if own_recovery else 0,
-            "lateral": bool(lateral and own_recovery),
+            "recoverer_number": numbers["recoverer"] if own_recovery or kick_lateral else "",
+            "recoverer_name": names["recoverer"] if own_recovery or kick_lateral else "",
+            "recovery_spot": kick_recovery_spot_text if kick_lateral else recovery_spot_text,
+            "recovery_yards": kick_recovery_yards if kick_lateral else recovery_yards if own_recovery else 0,
+            "lateral": bool(lateral and own_recovery) or kick_lateral,
+            **self._lateral2_fields(second_lateral, numbers, names, lateral2_spot_text, lateral2_yards),
+            "kicking_team_recovered": bool(kind == "kickoff" and incoming.get("kicking_team_recovered")),
+            "kick_recoverer_number": numbers["kick_recoverer"] if kind == "kickoff" and incoming.get("kicking_team_recovered") else "",
+            "kick_recoverer_name": names["kick_recoverer"] if kind == "kickoff" and incoming.get("kicking_team_recovered") else "",
             "tackler_number": numbers["tackler"] if not touchdown else "",
             "tackler_name": names["tackler"] if not touchdown else "",
             "fumble_spot": (
@@ -1541,11 +1632,14 @@ class RulesService:
     # the result text and player credit all re-derive exactly as if the play had
     # been entered right the first time.
 
-    ENTRY_ROLES = ("player", "passer", "receiver", "sacker", "kicker", "returner", "recoverer", "tackler")
-    ENTRY_SPOTS = ("start_spot", "end_spot", "landing_spot", "turnover_spot", "return_end_spot", "recovery_spot", "fumble_spot")
+    ENTRY_ROLES = ("player", "passer", "receiver", "sacker", "kicker", "returner", "recoverer", "tackler",
+                   "lateral2", "kick_recoverer")
+    ENTRY_SPOTS = ("start_spot", "end_spot", "landing_spot", "turnover_spot", "return_end_spot", "recovery_spot",
+                   "fumble_spot", "lateral2_spot")
     ENTRY_FLAGS = (
         "kneel", "fumble", "fumble_lost", "muffed_punt", "downed", "out_of_bounds",
         "touchback", "fair_catch", "blocked", "kick_out_of_bounds", "lateral", "return_out_of_bounds",
+        "kicking_team_recovered",
     )
     ENTRY_TEXT = ("pass_outcome", "out_of_bounds_choice", "clock", "notes")
     # Where the game is (period, clock, ends, the on-air graphic) -- never

@@ -338,6 +338,10 @@ class BroadcastLifecycleService:
             "visitor_school_id": visitor_school_id,
             "home_team": item.get("home_team", "Home"),
             "visitor_team": item.get("visitor_team", "Visitor"),
+            # The school record wins over the identity saved with the broadcast,
+            # so an abbreviation added later still reaches the console.
+            "home_abbreviation": str((self._get_school(home_school_id) or {}).get("abbreviation", "") or ""),
+            "visitor_abbreviation": str((self._get_school(visitor_school_id) or {}).get("abbreviation", "") or ""),
             "home_identity": item.get("home_identity")
             or self._build_identity(self._get_school(home_school_id), sport),
             "visitor_identity": item.get("visitor_identity")

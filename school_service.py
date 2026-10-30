@@ -39,6 +39,7 @@ class SchoolService:
         "phone",
         "website",
         "preferred_scorebug_name",
+        "abbreviation",
         "pronunciation_guide",
         "venue_id",
         "csrn_id",
@@ -373,6 +374,8 @@ class SchoolService:
             "preferred_scorebug_name": str(
                 incoming.get("preferred_scorebug_name", broadcast_name)
             ).strip(),
+            # Short name for typed yard lines and the play register ("MP 23").
+            "abbreviation": self.normalize_abbreviation(incoming.get("abbreviation", "")),
             "pronunciation_guide": str(
                 incoming.get("pronunciation_guide", "")
             ).strip(),
@@ -428,8 +431,14 @@ class SchoolService:
         self._save_schools(schools)
         return SchoolResult("OK", {"school": school})
 
+    @staticmethod
+    def normalize_abbreviation(value: Any) -> str:
+        return "".join(ch for ch in str(value or "").upper() if ch.isalnum())[:6]
+
     def update(self, school_id: str, incoming: School) -> SchoolResult:
         incoming = copy.deepcopy(incoming)
+        if "abbreviation" in incoming:
+            incoming["abbreviation"] = self.normalize_abbreviation(incoming.get("abbreviation"))
         schools = self._load_schools()
         index = next(
             (
