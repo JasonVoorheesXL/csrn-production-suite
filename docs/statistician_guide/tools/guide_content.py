@@ -56,7 +56,7 @@ SECTIONS_INDEX = [
     ("7", "Halftime", ""),
     ("8", "The Second-Half Kickoff", ""),
     ("9", "4th Quarter & Overtime", ""),
-    ("10", "End of Game: Confirm Final", ""),
+    ("10", "End of Game: Final", ""),
     ("A", "Quick Reference Card", ""),
 ]
 
@@ -73,11 +73,14 @@ INTRO = [
      "play anyway, jot down the play number, and tell your producer at the next break.<br>"
      "<b>3. Mistake? Use Undo.</b> If you notice a wrong entry right away, " + ui("Undo Last Event", "gold") +
      " removes it cleanly. Then enter it again correctly."),
-    ("h2", "Field-spot language: LEFT and RIGHT, not team names"),
-    ("p", "The screen describes the field as you see it from the press box: the <b>LEFT GOAL</b> line, the "
-          "<b>50</b>, and the <b>RIGHT GOAL</b> line. A spot such as <code>LEFT 30</code> means &ldquo;the 30-yard "
+    ("h2", "Field-spot language: the field as you see it"),
+    ("p", "The sliders show the field as you see it from the press box: the <b>LEFT GOAL</b> line, the "
+          "<b>50</b>, and the <b>RIGHT GOAL</b> line. A slider spot such as <code>LEFT 30</code> means &ldquo;the 30-yard "
           "line on the left half of the field.&rdquo; Arrows such as <b>R &larr;</b> or <b>N &rarr;</b> show which way "
           "a team is driving. Teams switch ends every quarter; the screen flips the arrows for you."),
+    ("p", "You don't have to think in LEFT and RIGHT, though. Every spot can also be <b>typed the way the PA says it</b>: "
+          "<code>NOR 36</code> (Northgate's 36), <code>RIV 20</code>, <code>own 30</code>, <code>opp 15</code> or <code>50</code>. "
+          "The Play Register writes spots the same way: <i>Northgate 36</i>, <i>Riverside goal line</i>."),
     ("h2", "What you'll need"),
     ("bullets", [
         "The 6-digit <b>operator PIN</b> &mdash; your producer gives it to you.",
@@ -97,11 +100,11 @@ BODY = [
           + ui("ACTIVE") + " and &ldquo;Statistician Console is the authoritative game-data source.&rdquo; If it "
           "ever says DISABLED instead, stop and tell your producer &mdash; your entries would be blocked."),
     ("h2", "Every play is a movement on the field"),
-    ("p", "For runs, passes, punts and kicks you set where the ball <b>ended</b> on a slider. The start "
-          "spot is already filled in from the previous play. The system subtracts the two to get yards, then "
-          "applies the football rules: reach the line to gain and it's a first down; reach the end zone "
-          "you're attacking and it's a touchdown; get pushed back into your own end zone and it's a safety. "
-          "You never type yards and you never press a &ldquo;first down&rdquo; button for normal plays."),
+    ("p", "For runs, passes, punts and kicks you say where the ball <b>ended</b>: drag the slider, type the yard line, "
+          "or type the gain in the <b>Gain / loss</b> box. The start spot is already filled in from the previous play. The "
+          "system works out the yards, then applies the football rules: reach the line to gain and it's a first down; reach "
+          "the end zone you're attacking and it's a touchdown; get pushed back into your own end zone and it's a safety. "
+          "You never press a &ldquo;first down&rdquo; button for normal plays."),
     ("h2", "The screen guides you through special moments"),
     ("p", "After a touchdown the screen shows a <b>TRY REQUIRED</b> panel; after a score or at the start of a "
           "half it shows <b>KICKOFF REQUIRED</b>. While one of those is showing, the normal Run/Pass "
@@ -154,7 +157,8 @@ BODY = [
         ("Scoreboard", "Home score, down &amp; distance and quarter, visitor score. Updated by the system &mdash; you never type scores."),
         ("Team cards", "One per team. Play buttons live here: " + ui("Run") + " " + ui("Pass") + " " + ui("Punt") + " "
                        + ui("TD") + " " + ui("FG") + " " + ui("1st Down") + " " + ui("Penalty") + " on the offense; "
-                       + ui("Turnover") + " " + ui("Penalty") + " on the defense. Buttons change as possession changes."),
+                       + ui("Turnover") + " " + ui("Penalty") + " on the defense; " + ui("Timeout (3 left)") + " on both. "
+                       "Buttons change as possession changes."),
         ("Game Clock", "Start/Stop and adjust the clock (Phase 3)."),
         ("Action bar", ui("Undo Last Event", "gold") + " " + ui("Restore Last Undone") + " " + ui("Quick Edit Last Play", "red") + " "
                        + ui("Record Ejection") + " " + ui("Play Commercial", "green") + "."),
@@ -177,6 +181,10 @@ BODY = [
             ("Opening receiving team", "Leave on <i>Auto from election</i>; it's worked out from the choice above."),
             ("Opening receiver drives", "Which end zone the receiving team attacks first, as seen from your seat: "
                                         "<b>RIGHT &rarr;</b> or <b>&larr; LEFT</b>."),
+            ("The LEFT / RIGHT end of the screen is the&hellip;", "Optional names for the two ends, such as <i>Scoreboard "
+                                        "end</i> and <i>Field house end</i>. Once named, the arrows say "
+                                        "&ldquo;toward the Scoreboard end&rdquo;, which is easier to check against the field. "
+                                        "The console remembers them for this stadium."),
             ("Second-half receiving team", "Leave on <i>Auto</i>. It's used automatically at halftime."),
         ]),
         ("p", "The grey summary under the fields restates the result in plain English &mdash; read it before saving. "
@@ -199,12 +207,17 @@ BODY = [
             ("Drive badge <b>&larr; R</b>", "Riverside is driving toward the LEFT goal."),
             ("Start Spot", "Where the ball was kicked from. Filled in and locked. Use " + ui("Correct Start Spot") +
                            " only if it's genuinely wrong (e.g. after a kickoff penalty)."),
-            ("Landed / Caught Spot", "Where the kick was caught or first touched. Drag the slider."),
-            ("End Spot", "Where the return ended (ball dead). Drag the slider; " + ui("End &minus;1") + " / " +
-                         ui("End +1") + " fine-tune one yard at a time."),
+            ("Landed / Caught Spot", "Where the kick was caught or first touched. Drag the slider or type the yard line in "
+                                     "the box beside it."),
+            ("End Spot", "Where the return ended (ball dead). Drag, type the yard line, or use the yard buttons "
+                         "(" + ui("&minus;10") + " &hellip; " + ui("+10") + ") and the <b>Gain / loss</b> box to fine-tune."),
             ("Kicker / Punter Jersey", "Kicking team's jersey number."),
             ("Returner Jersey", "Receiving team's jersey number."),
-            ("Checkboxes", "<b>Fumble</b>, <b>Fumble lost</b>, <b>Out of bounds</b>, <b>Touchback</b>. Tick only what happened."),
+            ("Tackled By (optional)", "The kicking-team player who made the tackle. Credited with a tackle in the stats."),
+            ("Game Clock", "Filled in from the running clock. Correct it if the stadium clock says otherwise."),
+            ("Checkboxes", "<b>Fumble</b>, <b>Fumble lost</b>, <b>Out of bounds</b>, <b>Touchback</b>, <b>Fair catch</b>. "
+                           "Tick only what happened. A kick out of bounds asks for the <b>receiving team's choice</b>: "
+                           "ball at its 35, a re-kick, or the out-of-bounds spot + 5."),
             ("Notes", "Optional free text."),
             ("Preview line", "Live calculation, e.g. <i>Kick distance: 55 yards &middot; Return: 25 yards.</i>"),
         ]),
@@ -234,28 +247,38 @@ BODY = [
           "outline, OFFENSE). The one exception is " + ui("Penalty") + ": use it on the card of the team that "
           "<b>committed</b> the foul. The defense card only offers " + ui("Turnover") + " and " + ui("Penalty") + "."),
     ("h2", "Run"),
-    ("side", "run_form", "Run &mdash; Northgate. #22 resolves to Devin Okafor; End Spot dragged to LEFT 36.", [
+    ("side", "run_form", "Run &mdash; Northgate. #22 resolves to Devin Okafor; the end spot is typed as NOR 36; "
+     "Riverside #24 made the tackle.", [
         ("steps", [
             "On the offense card press " + ui("Run") + ".",
             "Type the ball carrier in <b>Ball Carrier Jersey</b>. Look for the green name.",
-            "Drag <b>End Spot</b> to where the runner was downed. The preview says <i>Calculated result: 6 yards.</i>",
+            "Set the <b>End Spot</b> where the runner was downed. Any of these works: drag the slider; type the yard line "
+            "(<code>NOR 36</code>) in the box beside it; press the yard buttons; or type <b>6</b> in <b>Gain / loss</b>. "
+            "The preview says <i>Calculated result: 6 yards.</i>",
+            "Optional: type the defender in <b>Tackled By</b>. It feeds the tackle column of the box score.",
             "Tick <b>Out of bounds</b> if he went out (it stops the clock), <b>Kneel</b> for a victory-formation kneel, "
             "or <b>Fumble</b>/<b>Fumble lost</b> if the ball came out (shown later in this phase).",
             "Press " + ui("Record Play", "red") + ".",
         ]),
-        ("p", "The form closes and the screen shows <b>Play recorded.</b> The down, distance and ball spot update on their own."),
+        ("p", "The form closes and the screen shows <b>Play recorded.</b> The down, distance and ball spot update on their own. "
+              "<b>Game Clock</b> is filled in from the clock; fix it only if it's wrong."),
     ]),
     ("fig", "after_run", "After a 6-yard run: 2nd &amp; 4 at LEFT 36. You didn't type the down or the distance &mdash; the system did."),
+    ("callout", "tip", "NO JERSEY? THE SCREEN ASKS",
+     "If you press " + ui("Record Play", "red") + " on a run with no ball carrier (or a pass with no passer), the console "
+     "asks whether to record it as a <b>TEAM</b> play &mdash; a botched snap, say &mdash; or go back and type the number. "
+     "Inside the opponent's 10, the distance shows as <b>&amp; Goal</b>."),
     ("fig", "register_after_run", "The Play Register at the bottom of the console lists each play, newest first. "
      "Tap a play to see its full record on the right; Edit is for corrections later.", "narrow"),
     ("h2", "Fixing a mistake right away: Undo Last Event"),
     ("pair", ("mistake_recorded", "Oops &mdash; the end spot was dragged too far, giving a bogus first down."),
              ("after_undo", "After " + "Undo Last Event" + ": the play is removed and the down, distance and spot are restored.")),
     ("p", ui("Undo Last Event", "gold") + " reverses the most recent play or event completely, including any score or "
-          "possession change it caused. Your browser first asks <i>&ldquo;Undo this: &hellip;?&rdquo;</i> naming the play "
-          "&mdash; check it's the right one and press <b>OK</b>. Then simply enter the play again. " + ui("Restore Last Undone") + " brings back "
+          "possession change it caused. The console first asks <i>&ldquo;Undo the last event?&rdquo;</i> and names the play "
+          "&mdash; check it's the right one and press " + ui("Undo it", "gold") + ". Then simply enter the play again. " + ui("Restore Last Undone") + " brings back "
           "something you undid by accident. " + ui("Quick Edit Last Play", "red") + " opens the last play's correction form "
           "&mdash; see <b>Ball in the wrong place?</b> at the end of this phase."),
+    ("fig", "undo_dialog", "The Undo question names the play it will remove. " + ui("Keep it") + " backs out.", "small"),
     ("callout", "warn", "UNDO ONLY THE MOST RECENT PLAY",
      "Undo always removes the <i>latest</i> event. If the mistake was several plays ago, don't undo a string of good "
      "plays to reach it. Use that play's " + ui("Edit") + " button in the Play Register instead (see <b>Ball in the wrong "
@@ -285,7 +308,9 @@ BODY = [
         ("p", "Set <b>Pass Result</b> to <b>Sack</b>. Type the defender who made the sack in <b>Sack By &mdash; Defender "
               "Jersey</b> (it resolves against the <i>defense's</i> roster: #99 Hunter Graves). Drag End Spot back to where "
               "the QB went down (LEFT 42), then " + ui("Record Play", "red") + "."),
-        ("p", "Result: 3rd &amp; 16 at LEFT 42 (a 6-yard loss). The sack is credited to #99 and counted as a sack, not a pass attempt."),
+        ("p", "Result: 3rd &amp; 16 at LEFT 42 (a 6-yard loss). The sack is credited to #99; as in the official box score, the "
+              "lost yards count against the passer's rushing, not as a pass attempt."),
+        ("p", "If the End Spot you set is <i>past</i> the line of scrimmage, the console asks you to check it: a sack is a loss."),
     ]),
     ("fig", "after_sack", "3rd &amp; 16 after the sack.", "narrow"),
     ("h2", "Penalty"),
@@ -297,14 +322,38 @@ BODY = [
             ("Ruling", "<b>Accepted / Enforced</b>, <b>Declined</b>, <b>Offsetting Penalties</b>, or <b>Flag Picked Up</b>."),
             ("Enforcement Spot", "Leave blank to enforce from the current ball spot."),
             ("Checkboxes", "<b>Half the distance</b>, <b>Automatic first down</b>, <b>Loss of down</b>, <b>Retry down</b>, "
-                           "<b>Untimed down</b>. Common ones tick themselves (e.g. automatic first down for defensive holding)."),
+                           "<b>New series</b>, <b>Untimed down</b>. The ones the rule book requires tick themselves (an "
+                           "automatic first down for roughing the passer, loss of down for intentional grounding)."),
+            ("Half the distance", "Automatic: when the yardage is more than half the way to the goal, the system walks "
+                                  "off half the distance (rounding the half yard up, as the officials do)."),
+            ("New series", "A dead-ball foul after the offense had already earned a first down: 1st &amp; 10 after enforcement."),
         ]),
         ("p", "Press " + ui("Record Penalty", "red") + ". The ball moves and the down/distance updates."),
     ]),
     ("fig", "after_penalty", "Riverside offside: 3rd &amp; 16 becomes 3rd &amp; 11 at LEFT 47.", "narrow"),
+    ("callout", "tip", "PENALTY BUTTON OR FLAG ON THE PLAY?",
+     "Use the " + ui("Penalty") + " button for a foul with <b>no play</b>: a false start, offside before the snap, a "
+     "dead-ball foul. A flag thrown <b>during</b> a run or pass goes in that play's form instead (<b>Flag on the play</b>, "
+     "below), so the play and the penalty are recorded together."),
+    ("h2", "Flag on the play"),
+    ("side", "flag_on_play_form", "A Northgate run to its 32 with holding by Northgate at its 26, enforced from the spot of the foul.", [
+        ("p", "In the " + ui("Run") + " or " + ui("Pass") + " form, tick <b>Flag on the play</b> and fill in the flag:"),
+        ("fields", [
+            ("Flag on", "The team that fouled: offense or defense."),
+            ("Penalty / Yards", "The foul; its standard yardage fills in."),
+            ("Ruling", "<b>Accepted</b>, <b>Declined</b> (the play stands), or <b>Offsetting</b> (no play)."),
+            ("Enforced from", "<b>End of the play</b> or <b>Spot of the foul</b> (the play counts and the down is replayed), "
+                              "<b>After the play</b> (a dead-ball foul: the down counts), or <b>No play</b> (back to the previous "
+                              "spot; the play is wiped out). Spot of the foul adds a slider for where it happened."),
+        ]),
+        ("p", "Enter the play itself exactly as it happened, then " + ui("Record Play", "red") + ". The runner keeps his yards "
+              "to the spot of the foul; the system walks off the penalty and sets the down."),
+    ]),
+    ("fig", "after_flag_on_play", "After the flagged run: 10 yards from the spot of the foul puts the ball at Northgate's 16, and "
+     "the down is replayed: 1st &amp; 14."),
     ("h2", "The game clock &mdash; and timeouts"),
     ("pair", ("clock_running", "Start runs the clock (shows RUNNING)."),
-             ("clock_stopped", "Stop freezes it (shows STOPPED).")),
+             ("clock_stopped", "A timeout stopped it (shows STOPPED).")),
     ("fields", [
         (ui("Start", "green") + " / " + ui("Stop", "red"), "Run and stop the game clock to match the stadium clock."),
         (ui("&minus;10") + " " + ui("&minus;1") + " " + ui("+1") + " " + ui("+10"), "Nudge the clock by seconds to match the stadium clock."),
@@ -312,10 +361,13 @@ BODY = [
         (ui("Reset 12:00"), "Back to a full 12-minute quarter."),
         (ui("Show / Hide"), "Shows or hides the clock on the broadcast graphic."),
     ]),
-    ("callout", "warn", "THERE IS NO TIMEOUT BUTTON",
-     "This version of the Statistician Console does not record timeouts. When a team calls timeout, press "
-     + ui("Stop", "red") + " so the clock matches the stadium, then carry on. If your producer wants timeouts noted, "
-     "type <i>&ldquo;Timeout Riverside&rdquo;</i> in the <b>Notes</b> box of the next play."),
+    ("h3", "Timeouts"),
+    ("pair", ("timeout_dialog", "Timeout on the Riverside card: the console confirms the clock time and how many will be left."),
+             ("after_timeout", "Riverside's button now reads Timeout (2 left).")),
+    ("p", "When a team calls timeout, press " + ui("Timeout") + " on that team's card and " + ui("Charge timeout", "red") +
+          ". The clock stops, and the timeout is saved with the game clock time. Each team gets <b>three per half</b> and "
+          "<b>one per overtime period</b>; the button shows how many are left. Charged the wrong team? " +
+          ui("Undo Last Event", "gold") + " takes it back."),
     ("h2", "Interception"),
     ("side", "pass_interception_form", "Interception: picked at RIGHT 40 by #24, returned to RIGHT 45.", [
         ("p", "Set <b>Pass Result</b> to <b>Interception</b>. Two new things appear: an "
@@ -331,12 +383,14 @@ BODY = [
     ("fig", "after_interception", "After the interception: Riverside is now on offense (green card), 1st &amp; 10 at RIGHT 45, "
      "driving &larr;. The cards swapped their buttons automatically."),
     ("h2", "Fumble"),
-    ("side", "fumble_lost_form", "Riverside run, fumble lost: Northgate #52 recovers at the 50 and returns to RIGHT 47.", [
+    ("side", "fumble_lost_form", "Riverside run, fumble lost: the ball comes loose at LEFT 49, Northgate #52 recovers at the 50 "
+     "and returns to RIGHT 47.", [
         ("p", "Fumbles are entered on the play they happened on (here a " + ui("Run") + " by Riverside #5)."),
         ("fields", [
             ("Fumble", "The ball came out, but the <i>same</i> team kept it. A <b>Fumble Recovered By &mdash; Teammate</b> "
                        "box appears if someone else on offense recovered."),
             ("Fumble lost", "The <i>other</i> team recovered. Ticking it also ticks Fumble."),
+            ("Fumbled At", "Where the ball came loose. The runner is credited with the yards to <i>this</i> spot (here 6)."),
             ("Interception / Recovery Spot", "Where the defense recovered (<code>50</code>)."),
             ("Returner Jersey", "The defender who recovered (<b>52</b>)."),
             ("End Spot", "Where the recovery return ended (<code>RIGHT 47</code>)."),
@@ -344,6 +398,16 @@ BODY = [
         ("p", "Result: possession flips to Northgate, 1st &amp; 10 at RIGHT 47."),
     ]),
     ("fig", "after_fumble", "After the lost fumble: Northgate's ball again."),
+    ("h2", "Lateral"),
+    ("side", "lateral_form", "A completion to #17, who laterals to #22 at the Riverside 40; #22 is downed at the 15 (from the 3rd quarter).", [
+        ("p", "A backward pass to a teammate during a run or after a catch: tick <b>Lateral to a teammate</b>. Two things appear:"),
+        ("fields", [
+            ("Lateral To &mdash; Teammate Jersey", "Who caught the lateral."),
+            ("Lateral Spot", "Where it was pitched."),
+        ]),
+        ("p", "Set the End Spot where the play ended. The first player gets the yards to the lateral spot; the teammate gets "
+              "the rest (and the touchdown, if he scores). The preview shows the split."),
+    ]),
     ("h2", "Punt"),
     ("p", "Press " + ui("Punt") + " on the kicking team's card. It's the same form as a kickoff (punter, Landed / Caught "
           "Spot, returner, End Spot), plus punt-only result boxes. Tick the one that describes how the punt ended, or none "
@@ -369,16 +433,16 @@ BODY = [
         ]),
     ]),
     ("fig", "after_punt", "After the downed punt: Riverside ball, 1st &amp; 10 at RIGHT 15. The register reads "
-     "<i>&ldquo;Punt by #3 landed at RIGHT 15, downed by the kicking team.&rdquo;</i>"),
+     "<i>&ldquo;Punt by #3 Eli Sanderson landed at Riverside 15, downed by the kicking team.&rdquo;</i>"),
     ("h3", "Punt with a return"),
     ("side", "punt_return_form", "A returned punt (from the 4th quarter): lands at Northgate's 15, #21 returns it to the 50.", [
         ("p", "Leave all the result boxes unticked. Enter the returner's jersey and drag <b>End Spot</b> to where the return "
               "ended. The preview shows the kick distance and the return yards separately."),
     ]),
     ("h2", "Reading the Play Register"),
-    ("fig", "register_q1", "The 1st-quarter register, newest first. Each row has the play type on the left and a plain-English "
-     "description: <i>pass incomplete, intended for #11</i>; <i>sacked by #99 Hunter Graves</i>; <i>pass intercepted by #24 "
-     "Trent Vaughn</i>; <i>fumble lost, recovered by #52</i>; <i>downed by the kicking team</i>."),
+    ("fig", "register_q1", "The 1st-quarter register, newest first. Each row has the play type on the left and a description "
+     "that reads like a stat sheet: team yard lines, <i>1 yard</i>, <i>no gain</i>, <i>a loss of 6 yards</i>, the tackler and the "
+     "kicker by name."),
     ("callout", "tip", "USE THE REGISTER AS YOUR CHECK",
      "Glance at the newest row after each play. If the description doesn't match what happened on the field, fix it right "
      "away with " + ui("Undo Last Event", "gold") + " or " + ui("Quick Edit Last Play", "red") + "."),
@@ -519,7 +583,8 @@ BODY = [
     ("side", "two_point_run_form", "2PT GOOD: scorer #5, Play Type Rush.", [
         ("p", "Press " + ui("2PT GOOD", "green") + ". The <b>Try</b> pop-up opens with <b>Try Outcome: Good</b> already set."),
         ("fields", [
-            ("Scorer Jersey #", "Pick the runner (or receiver) from the list. Roster players show with names."),
+            ("Scorer Jersey #", "Type the runner (or receiver). The roster list drops down as you type; the name shows "
+                                "underneath when the number is found."),
             ("Play Type", "<b>Rush</b> for a run, <b>Reception</b> for a pass (then a <b>QB / Passer</b> box appears)."),
             ("Try Outcome", "Good / Failed / Blocked / Retry. Pre-set by the button you pressed."),
             ("Statistician Mode", "Optional: tick to add yardage detail. Not needed for tries."),
@@ -529,7 +594,7 @@ BODY = [
     ]),
     ("fig", "after_two_point_run", "Riverside 8, Northgate 0. The panel now reads KICKOFF REQUIRED &mdash; RIVERSIDE."),
     ("h2", "Kickoff with a touchback"),
-    ("side", "kickoff_touchback_form", "Kickoff into the end zone: Landed dragged to RIGHT GOAL, Touchback ticked.", [
+    ("side", "kickoff_touchback_form", "Kickoff into the end zone: Landed dragged to LEFT GOAL, Touchback ticked.", [
         ("p", "After every score the kickoff is required next. Press " + ui("Open Detailed Kickoff", "red") +
               ", enter the kicker, drag <b>Landed</b> into the end zone and tick <b>Touchback</b>. No returner needed."),
     ]),
@@ -539,31 +604,32 @@ BODY = [
         ("p", "A touchdown pass is a complete " + ui("Pass") + " whose End Spot is in the end zone."),
     ]),
     ("fig", "td_pass_try_pending", "Northgate 6, Riverside 8 &mdash; TRY REQUIRED &mdash; NORTHGATE.", "narrow"),
-    ("side", "xp_good_form", "XP GOOD: pick the kicker (#3 Eli Sanderson), Outcome: Good.", [
-        ("p", "Press " + ui("XP GOOD", "green") + ". Choose the kicker from <b>Kicker Jersey #</b>; <b>Outcome</b> is already "
+    ("side", "xp_good_form", "XP GOOD: kicker #3 (Eli Sanderson), Outcome: Good.", [
+        ("p", "Press " + ui("XP GOOD", "green") + ". Type the kicker in <b>Kicker Jersey #</b>; <b>Outcome</b> is already "
               "<i>Good</i>. " + ui("Confirm Event", "red") + "."),
     ]),
     ("fig", "after_xp_good", "Northgate 7, Riverside 8 &mdash; and the kickoff is required again."),
     ("h2", "PAT kick no good"),
     ("side", "xp_no_good_form", "XP NO GOOD in the 4th quarter: Outcome &ldquo;Missed / No Good&rdquo;.", [
         ("p", "Same pop-up; " + ui("XP NO GOOD", "gold") + " sets <b>Outcome</b> to <i>Missed / No Good</i>. You can "
-              "change it to <i>Blocked</i> if it was blocked. Still pick the kicker."),
+              "change it to <i>Blocked</i> if it was blocked. Still enter the kicker."),
     ]),
     ("fig", "after_xp_no_good_tied", "No points added: Northgate 16, Riverside 16.", "narrow"),
     ("h2", "PAT by pass &mdash; 2-point conversion failed"),
     ("side", "two_point_pass_failed_form", "2PT FAILED: Play Type Reception, intended receiver #85, passer #12.", [
         ("p", ui("2PT FAILED", "gold") + " sets <b>Try Outcome</b> to <i>Failed</i>. Choose <b>Reception</b> as the Play Type, "
-              "pick the intended receiver as Scorer and the QB as Passer, then " + ui("Confirm Event", "red") + "."),
+              "enter the intended receiver as Scorer and the QB as Passer, then " + ui("Confirm Event", "red") + "."),
     ]),
     ("fig", "after_two_point_failed", "Riverside 16 (no points added for the failed try), kickoff required.", "narrow"),
     ("h2", "Field goal"),
-    ("side", "fg_good_form", "FG on the Northgate card: kicker #3, Outcome Made, Distance 32.", [
+    ("side", "fg_good_form", "FG on the Northgate card: kicker #3, Outcome Made, Distance 32 (filled in).", [
         ("p", "Press " + ui("FG") + " on the kicking team's card."),
         ("fields", [
             ("Kicker Jersey #", "The kicker."),
             ("Outcome", "<b>Made</b>, <b>Missed / No Good</b>, or <b>Blocked</b>."),
-            ("Distance (yds)", "Optional, but fill it in: line of scrimmage + 17 (e.g. ball at the 15 = 32 yards)."),
-            ("Miss/Block Result Spot", "Appears for a miss: where the defense takes over (optional)."),
+            ("Distance (yds)", "Filled in for you: yards to the goal + 17 (ball at the 15 = 32 yards). Change it only "
+                               "if the snap was somewhere else."),
+            ("Miss/Block Result Spot", "Appears for a miss: where the defense takes over. It starts on <b>Touchback</b>."),
         ]),
         ("p", ui("Confirm Event", "red") + ". A made field goal adds <b>3 points</b> and sets up the kickoff."),
     ]),
@@ -626,9 +692,8 @@ BODY = [
     ("fields", [
         ("Second-half receiving team", "Filled in automatically from the coin toss (Riverside deferred, so Riverside receives). "
                                        "Change only if the officials tell you otherwise."),
-        ("Second-half receiving team drives", "<i>Mirror first half (default)</i> is right in most games. If the receiving "
-                                              "team chooses a different end, set it here before starting the second half. "
-                                              "Missed it? See &ldquo;Direction looks wrong after halftime?&rdquo; in Phase 8."),
+        ("Second-half receiving team drives", "Leave it empty: " + ui("Start Second Half") + " asks you (Phase 8). Set it "
+                                              "here only if you already know which end each team takes."),
     ]),
     ("callout", "tip", "DURING THE BREAK",
      "Use halftime to tell your producer about any amber/unresolved plays you noted in the first half."),
@@ -637,47 +702,63 @@ BODY = [
     ("section", "8", "The Second-Half Kickoff",
      "One button starts the 3rd quarter and sets up the kickoff; then it's the same kickoff form as Phase 2."),
     ("steps", [
-        "When the teams line up for the second-half kickoff, press " + ui("Start Second Half") + " (" + ui("End Halftime", "gold") +
-        " at the top of the card does the same thing).",
+        "When the teams line up for the second-half kickoff, <b>look at the field</b>: which end is each team defending?",
+        "Press " + ui("Start Second Half") + " (" + ui("End Halftime", "gold") + " at the top of the card does the same thing). "
+        "The console asks which way each team drives: <b>the same ends as the 2nd quarter</b> (the most common) or "
+        "<b>switch ends</b>. Each choice spells out the arrows. Pick what you see.",
         "The quarter becomes <b>Q3</b> and a <b>KICKOFF REQUIRED &mdash; NORTHGATE</b> panel appears (Northgate kicks, because Riverside receives).",
         "Press " + ui("Open Detailed Kickoff", "red") + " and enter the kick, the returner and the spots.",
     ]),
+    ("fig", "second_half_direction_prompt", "The second-half question. On the field Northgate kicks toward the LEFT goal "
+     "&mdash; the first choice &mdash; but in this example <i>Switch ends</i> gets picked by mistake.", "narrow"),
     ("fig", "second_half_kickoff_pending", "Q3, KICKOFF REQUIRED &mdash; NORTHGATE."),
     ("h2", "Direction looks wrong after halftime?"),
-    ("p", "By default the screen assumes the teams simply swap ends from the first half. Sometimes they don't. For "
-          "example, the receiving team chooses the other goal, or the halftime dropdown was left on <i>Mirror first half</i>. "
-          "<b>Check the arrow before you enter the second-half kickoff.</b> In this example Northgate is actually kicking "
-          "toward the LEFT goal, but the screen still has it driving &rarr;."),
+    ("p", "Picked the wrong answer, or the teams changed ends after you'd answered? <b>Check the arrow before you enter the "
+          "second-half kickoff.</b> In this example Northgate is actually kicking toward the LEFT goal, but the screen has it "
+          "driving &rarr;."),
     ("side", "direction_wrong_kickoff_form", "The tell: the kickoff form's badge reads N &rarr; and the kick starts at LEFT 40, "
      "but on the field Northgate is kicking toward the LEFT goal.", [
         ("h3", "Fixing it at the kickoff (the common case)"),
         ("steps", [
             "Press " + ui("Cancel") + " to close the kickoff form without recording.",
-            "Scroll to <b>Field Position</b> and press the correct " + ui("&larr; Drive") + " or " + ui("Drive &rarr;") +
-            " button. The big arrows in the <b>Drive Direction</b> card do the same thing. Either one sets the team shown in the "
-            "POSSESSION strip, and the other team automatically switches to the opposite direction.",
+            "Scroll to the <b>Drive Direction</b> card and press the correct big arrow. It sets the team shown in the "
+            "POSSESSION strip; the other team automatically switches to the opposite direction.",
+            "The console asks <b>where the ball is</b> (below). For a kickoff, keep the kicker's own 40.",
             "Press " + ui("Open Detailed Kickoff", "red") + " again. The badge now reads <b>&larr; N</b> and the kick starts from "
             "Northgate's own 40 (RIGHT 40). Enter the kickoff as normal.",
         ]),
-        ("p", "That's all a kickoff needs, because the kickoff form re-places the kicker at their own 40 based on direction."),
+    ]),
+    ("side", "direction_flip_dialog", "Flipping the arrow asks where the ball is.", [
+        ("p", "When you flip the arrow, the same spot on the screen would mean the other team's yard line. So the console asks:"),
+        ("fields", [
+            ("Leave it at LEFT 40", "You placed the ball where it really is on the field; only the arrow was wrong."),
+            ("Keep the Northgate 40 &mdash; move it", "The yard line was right (the PA said &ldquo;Northgate 40&rdquo;); the ball "
+                                                     "moves to the matching spot on the other side."),
+        ]),
+        ("p", "Mid-drive, pick whichever matches the field and check that <b>Game Context</b> shows the right "
+              "&ldquo;yards to goal&rdquo;."),
     ]),
     ("pair", ("direction_before_fix", "Before: Drive &rarr; is lit; Game Context says <i>LEFT 40 &middot; Northgate &middot; 60 to goal</i>."),
-             ("direction_after_fix", "After pressing &larr; Drive: the ball has <b>not</b> moved, so the same LEFT 40 now reads "
-                                     "<i>40 to goal</i>, and the Ball label changes to <i>Riverside 40</i>.")),
-    ("callout", "stop", "IF YOU NOTICE IN THE MIDDLE OF A DRIVE",
-     "Changing the direction does <b>not</b> move the ball. The spot stays on the same side of the field (here LEFT 40), "
-     "so its meaning flips: what was the team's own 40 becomes the opponent's 40. Mid-drive, after pressing the correct "
-     "Drive button you must also drag the <b>Field Position</b> ball to where the ball really is. Then check that "
-     "<b>Game Context</b> shows the right &ldquo;yards to goal.&rdquo; Otherwise the next plays will count yards, first downs "
-     "and touchdowns toward the wrong goal. Plays already entered while the direction was wrong may have wrong yardage. "
-     "Don't undo the drive; note the play numbers for your producer."),
+             ("direction_after_fix", "After the flip, keeping the yard line: the ball is at RIGHT 40, still Northgate's 40.")),
+    ("callout", "warn", "&ldquo;IS NORTHGATE REALLY DRIVING &rarr;?&rdquo;",
+     "If a play looks as if it was entered against a backwards arrow (three losses in a row, two that add up to 15 yards, "
+     "or a kick that lands behind the kicker), " + ui("Record Play", "red") + " stops and asks. " + ui("Flip arrow and save") +
+     " fixes the arrow and saves the play as the gain it really was; " + ui("Save as entered") + " keeps it; the third button "
+     "goes back to the form."),
+    ("side", "direction_repair_dialog", "Fix Plays Entered the Wrong Way: the first and last play numbers from the register.", [
+        ("p", "Found out several plays later? Note the play numbers from the register and press " +
+              ui("Fix Plays Entered the Wrong Way&hellip;") + " under the Drive Direction arrows. Enter the first and last "
+              "play entered the wrong way and " + ui("Flip and Re-run", "green") + ". Those plays are re-run with the arrow "
+              "flipped: losses become gains, and downs, possession and scoring recalculate. If you're not sure, leave it for "
+              "your producer after the game."),
+    ]),
     ("callout", "tip", "READING THE &ldquo;BALL:&rdquo; LABEL",
      "The <b>Ball:</b> label above the green field names the team whose end of the field the ball is in, based on the "
      "current directions. Before the fix it read <i>Northgate 40</i>; after it, <i>Riverside 40</i>. If that label names "
      "the wrong team's end, the direction is wrong."),
     ("callout", "tip", "PREVENT IT AT HALFTIME",
-     "If you know the receiving team picked a different end, set <b>Second-half receiving team drives</b> in Period "
-     "Administration <i>before</i> pressing Start Second Half."),
+     "Answer the Start Second Half question from what you <i>see</i> on the field, not from habit. The coin toss end names "
+     "(<i>toward the Scoreboard end</i>) make it easier."),
     ("h2", "Entering the second-half kickoff"),
     ("side", "second_half_kickoff_form", "Second-half kickoff after the fix: &larr; N, from RIGHT 40. Northgate #3 to Riverside #1.", [
         ("p", "Same form as the opening kickoff: kicker, Landed / Caught Spot, returner, End Spot, " + ui("Record Play", "red") + "."),
@@ -720,8 +801,8 @@ BODY = [
     ("side", "ot_fg_missed_form", "Riverside FG attempt from the 10: Outcome &ldquo;Missed / No Good&rdquo;, 27 yards.", [
         ("p", "Enter overtime plays exactly as in regulation. Here Riverside's possession ends with a missed field goal."),
     ]),
-    ("fig", "after_ot_fg_missed", "After the miss, possession switched to Northgate &mdash; but the ball is still at LEFT 10, "
-     "Riverside's attacking spot. Northgate's possession must start at the other 10."),
+    ("fig", "after_ot_fg_missed", "After the miss, possession switched to Northgate and the ball went to the 20, as for a missed "
+     "field goal in regulation. In overtime Northgate's possession must start at the other 10 instead."),
     ("h2", "Second overtime possession: place the ball yourself"),
     ("p", "The system hands the ball to the other team but does <b>not</b> move it to their overtime starting spot. "
           "This is the one time you'll use the manual controls:"),
@@ -747,7 +828,7 @@ BODY = [
     ("fig", "period_card_overtime_complete", "OVERTIME COMPLETE: ready for Confirm Final.", "small"),
 
     # ------------------------------------------------------------------ 10
-    ("section", "10", "End of Game: Confirm Final",
+    ("section", "10", "End of Game: Final",
      "Final is the only end state you touch. It locks the result, archives every play into the game record "
      "and tells the rest of the system the game is over."),
     ("h2", "Before you confirm"),
@@ -777,10 +858,12 @@ BODY = [
     ("fig", "register_before_final", "The register just before Final, newest play first.", "narrow"),
     ("h2", "Confirming"),
     ("steps", [
-        "In Period Administration press " + ui("Confirm Final", "red") + ". It only works after <b>Q4 COMPLETE</b> or "
-        "<b>OVERTIME COMPLETE</b>; if the quarter hasn't been ended, you'll get a message saying so.",
-        "Your browser asks <i>&ldquo;Confirm the game is FINAL?&rdquo;</i> Press <b>OK</b>.",
+        "In Period Administration press " + ui("Confirm Final", "red") + ". After the last play of the 4th quarter or "
+        "overtime the button reads " + ui("End Game (Final)", "red") + " instead: it ends the period and the game in one go "
+        "(if the score is tied it ends the period and stops, so you can set up overtime).",
+        "The console shows the final score and asks you to confirm. Press " + ui("Make it final", "red") + ".",
     ]),
+    ("fig", "final_dialog", "The final question shows the score you're making official.", "small"),
     ("h2", "How you know the game is correctly closed out"),
     ("fig", "final_page_header", "The header badge changes from LIVE to FINAL.", "full"),
     ("pair", ("period_card_final", "Period Administration status: FINAL."),
@@ -790,7 +873,7 @@ BODY = [
         ["Period status <b>FINAL &middot; QOT</b>", "The game clock is stopped for good; no more periods."],
         ["Play Register says <i>No plays recorded.</i>", "<b>Expected.</b> On Final the system moves every play into the "
                                                         "game's permanent archive and clears the live list. Nothing is lost: "
-                                                        "in this demo all 36 plays and the full box score were saved."],
+                                                        "in this demo all 38 plays and the full box score were saved."],
     ]),
     ("fig", "register_final", "After Final the live Play Register is empty because the plays have been archived.", "narrow"),
     ("callout", "rule", "YOU'RE DONE",
@@ -804,15 +887,17 @@ BODY = [
     ("table", ["Situation", "Press", "Fill in", "Watch for"], [
         ["Opening coin toss", ui("Enter Coin Toss", "red"), "Winner, election, drive direction", "Summary line, then " + ui("Save Coin Toss", "red")],
         ["Kickoff / free kick", ui("Open Detailed Kickoff", "red"), "Kicker, returner, Landed, End", "Touchback box for end-zone kicks"],
-        ["Run", ui("Run") + " (offense)", "Ball carrier, End", "Kneel, Out of bounds, Fumble / Fumble lost"],
+        ["Run", ui("Run") + " (offense)", "Ball carrier, End (drag, type <code>NOR 36</code>, or Gain), tackler", "Kneel, Out of bounds, Fumble / Fumble lost"],
         ["Complete pass", ui("Pass") + " &rarr; Complete", "Passer, receiver, End", "End = where he was downed"],
         ["Incomplete pass", ui("Pass") + " &rarr; Incomplete", "Passer, intended receiver", "End locks automatically"],
         ["Sack", ui("Pass") + " &rarr; Sack", "Passer, sacker, End", "Sacker = defense jersey"],
         ["Interception", ui("Pass") + " &rarr; Interception", "Passer, pick spot, returner, End", "Possession flips"],
-        ["Fumble lost", ui("Run") + "/" + ui("Pass") + " + Fumble lost", "Recovery spot, recoverer, End", "Possession flips"],
+        ["Fumble lost", ui("Run") + "/" + ui("Pass") + " + Fumble lost", "Fumbled at, recovery spot, recoverer, End", "Possession flips"],
+        ["Lateral", ui("Run") + "/" + ui("Pass") + " + Lateral", "Teammate, lateral spot, End", "Yards split at the lateral"],
         ["Punt", ui("Punt"), "Punter, returner, Landed, End", "Downed, Fair catch, Touchback, Muffed, Blocked"],
-        ["Penalty", ui("Penalty") + " on the <b>fouling</b> team", "Unit, penalty, ruling", "Auto first down / loss of down boxes"],
-        ["Timeout", ui("Stop", "red") + " the clock", "&mdash;", "No timeout button; optional note"],
+        ["Penalty, no play", ui("Penalty") + " on the <b>fouling</b> team", "Unit, penalty, ruling", "Half the distance is automatic"],
+        ["Flag during a play", "<b>Flag on the play</b> in the Run/Pass form", "Team, penalty, ruling, enforced from", "Enter the play as it happened"],
+        ["Timeout", ui("Timeout") + " on that team's card", ui("Charge timeout", "red"), "Clock stops; 3 per half"],
         ["Touchdown", ui("Run") + "/" + ui("Pass") + ", End in end zone", "As normal", "TRY REQUIRED panel"],
         ["Extra point", ui("XP GOOD", "green") + " / " + ui("XP NO GOOD", "gold"), "Kicker", ui("Confirm Event", "red")],
         ["2-point try", ui("2PT GOOD", "green") + " / " + ui("2PT FAILED", "gold"), "Scorer, Rush/Reception, passer", ui("Confirm Event", "red")],
@@ -825,9 +910,10 @@ BODY = [
         ["Officials re-spot the ball", "Field Position slider", "Drag the ball, then distance", "Ball: label, Game Context"],
         ["End of quarter", ui("End Quarter", "gold"), "&mdash;", "Ends switch; spot label flips"],
         ["Halftime", ui("End Quarter", "gold") + " after Q2", "&mdash;", "HALFTIME &middot; Q2"],
-        ["Second half", ui("Start Second Half"), "Then the kickoff", "Q3 KICKOFF REQUIRED"],
-        ["Direction wrong", ui("&larr; Drive") + " / " + ui("Drive &rarr;"), "Mid-drive: also move the ball", "Game Context yards-to-goal"],
+        ["Second half", ui("Start Second Half"), "Answer: same ends or switch", "Q3 KICKOFF REQUIRED"],
+        ["Direction wrong", "Drive Direction arrow", "Answer: where is the ball?", "Game Context yards-to-goal"],
+        ["Plays entered the wrong way", ui("Fix Plays Entered the Wrong Way&hellip;"), "First and last play #", "Losses become gains"],
         ["Overtime", ui("Start Overtime"), "Possession + spot", "Move ball yourself for 2nd possession"],
-        ["Game over", ui("Confirm Final", "red"), "OK the browser prompt", "FINAL badge; register archived"],
+        ["Game over", ui("Confirm Final", "red") + " / " + ui("End Game (Final)", "red"), ui("Make it final", "red"), "FINAL badge; register archived"],
     ]),
 ]
