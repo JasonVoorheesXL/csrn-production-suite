@@ -326,6 +326,12 @@ def create_live_game_blueprint(
         if result.code == "CONTROL_SOURCE_LOCKED":
             log_route(event_type="SERVER_MUTATION", route="/api/event-trigger", action=str(payload.get("event") or "event"), request_id=request_id, payload=payload, status=409, started=started, before=before, after=load_summary_safely(), result=result)
             return jsonify(result.data), 409
+        if result.code != "OK":
+            # A rejected event (no timeouts left, try already resolved, no
+            # kickoff pending...) changed nothing: never answer 200, or the
+            # console treats it as recorded.
+            log_route(event_type="SERVER_MUTATION", route="/api/event-trigger", action=str(payload.get("event") or "event"), request_id=request_id, payload=payload, status=409, started=started, before=before, after=load_summary_safely(), result=result)
+            return jsonify({"error": result.code, **dict(result.data or {})}), 409
         log_route(event_type="SERVER_MUTATION", route="/api/event-trigger", action=str(payload.get("event") or "event"), request_id=request_id, payload=payload, status=200, started=started, before=before, after=load_summary_safely(), result=result)
         return jsonify(result.data)
 

@@ -636,6 +636,11 @@ class RulesService:
                 or (gaining_direction == -1 and return_end == 0)
             )
             yards = 0 if outcome == "interception" else (turnover_spot - start) * direction
+            # "Fumbled at": the officials credit the gain to where the ball
+            # came loose; the recovery spot only starts the return.
+            fumble_value = incoming.get("fumble_spot")
+            if turnover_type == "fumble_recovery" and fumble_value not in (None, ""):
+                yards = (self.spot_to_coord(fumble_value, state) - start) * direction
             end = return_end
         touchdown = (not turnover) and ((direction == 1 and end == length) or (
             direction == -1 and end == 0
@@ -657,6 +662,7 @@ class RulesService:
                 "kicker",
                 "returner",
                 "recoverer",
+                "tackler",
             )
         }
         # A punt downed by the kicking team has no return: the returner
@@ -671,10 +677,13 @@ class RulesService:
         # carrier. Only meaningful on a live run/pass that ended in a
         # normal result; a lost fumble already has its own returner fields.
         handler_number = numbers["receiver"] if kind == "pass" else numbers["player"]
+        # A lateral (backward pass) to a teammate splits the yardage the same
+        # way: the handler keeps the yards to the lateral spot, the teammate
+        # gets the rest (and any touchdown).
+        lateral = kind in {"run", "pass"} and bool(incoming.get("lateral")) and not bool(incoming.get("fumble"))
         own_recovery = bool(
             kind in {"run", "pass"}
-            and bool(incoming.get("fumble"))
-            and not bool(incoming.get("fumble_lost"))
+            and ((bool(incoming.get("fumble")) and not bool(incoming.get("fumble_lost"))) or lateral)
             and outcome not in {"incomplete", "spike", "interception"}
             and numbers["recoverer"]
             and numbers["recoverer"] != handler_number
@@ -695,6 +704,14 @@ class RulesService:
                 numbers["returner"],
             ),
             "recoverer": self._resolve(state, team, numbers["recoverer"]),
+            # The tackle is made by the defense on a scrimmage play, by the
+            # kicking team on a return, and by the original offense after a
+            # turnover.
+            "tackler": self._resolve(
+                state,
+                team if kind in {"kickoff", "punt"} or turnover else self.opposite(team),
+                numbers["tackler"],
+            ),
         }
         # Server-side player/team validation is authoritative. A jersey sent
         # for an offensive/defensive role must resolve on the canonical team
@@ -770,6 +787,11 @@ class RulesService:
         if punt_downed:
             names["returner"] = ""
 
+        kicker_label = (
+            self._display(numbers["kicker"], names["kicker"])
+            if numbers["kicker"] or names["kicker"]
+            else self._team_fallback(state, team)
+        )
         landing = end
         kick_distance = 0
         return_yards = 0
@@ -862,7 +884,7 @@ class RulesService:
                 state["ball_spot"] = self.coord_to_spot(end, state)
                 label = "Kickoff Out of Bounds"
                 description = (
-                    f"Kickoff by #{numbers['kicker'] or '?'} out of bounds at "
+                    f"Kickoff by {kicker_label} out of bounds at "
                     f"{self.coord_to_spot(landing, state)} — {self._team_fallback(state, receiving)} "
                     f"choose a re-kick, 5-yard penalty from {self.coord_to_spot(start, state)}"
                 )
@@ -883,7 +905,7 @@ class RulesService:
                 state["distance"] = "10"
                 label = "Kickoff Out of Bounds"
                 description = (
-                    f"Kickoff by #{numbers['kicker'] or '?'} out of bounds at "
+                    f"Kickoff by {kicker_label} out of bounds at "
                     f"{self.coord_to_spot(landing, state)} — {enforcement_note}, "
                     f"ball at {self.coord_to_spot(end, state)}"
                 )
@@ -962,7 +984,7 @@ class RulesService:
             self._stop_clock(state)
             label = "Kickoff" if kind == "kickoff" else "Punt"
             description = (
-                f"{label} by #{numbers['kicker'] or '?'} "
+                f"{label} by {kicker_label} "
                 f"landed at {self.coord_to_spot(landing, state)}"
             )
             if muffed_punt:
@@ -1155,7 +1177,7 @@ class RulesService:
                     name=names["sacker"],
                     player_ref=refs["sacker"],
                     position="",
-                    detail=description,
+                    detail=self.register_text(description, state),
                     graphic_type="sack",
                     eyebrow="SACK",
                     defensive=True,
@@ -1210,6 +1232,11 @@ class RulesService:
             description += f" by {defender} at {self.coord_to_spot(turnover_spot, state)}"
             if turnover_return_yards:
                 description += f", returned {turnover_return_yards} yards to {self.coord_to_spot(return_end, state)}"
+        if lateral and own_recovery:
+            description += (
+                f", lateral to {self._display(numbers['recoverer'], names['recoverer'])}"
+                f" at {recovery_spot_text}"
+            )
         if bool(incoming.get("fumble")):
             description += ", fumble" + (
                 " lost" if bool(incoming.get("fumble_lost")) else " recovered"
@@ -1238,8 +1265,11 @@ class RulesService:
             label = "Touchdown Pass" if kind == "pass" else "Touchdown Run"
         elif first_down:
             description += ", first down"
+        if numbers["tackler"] and not touchdown:
+            description += f" (tackle {self._display(numbers['tackler'], names['tackler'])})"
         if flag_result is not None:
             description += self._flag_description(state, flag_result)
+        description = self.register_text(description, state)
 
         scoring_team = (
             turnover_team if turnover_touchdown
@@ -1323,6 +1353,7 @@ class RulesService:
                 "recoverer_name": names["recoverer"] if own_recovery else "",
                 "recovery_spot": recovery_spot_text,
                 "recovery_yards": recovery_yards if own_recovery else 0,
+            "lateral": bool(lateral and own_recovery),
                 "touchdown": touchdown,
                 "safety": safety,
                 "player_name": (
@@ -1409,6 +1440,14 @@ class RulesService:
             "recoverer_name": names["recoverer"] if own_recovery else "",
             "recovery_spot": recovery_spot_text,
             "recovery_yards": recovery_yards if own_recovery else 0,
+            "lateral": bool(lateral and own_recovery),
+            "tackler_number": numbers["tackler"] if not touchdown else "",
+            "tackler_name": names["tackler"] if not touchdown else "",
+            "fumble_spot": (
+                self.coord_to_spot(self.spot_to_coord(incoming.get("fumble_spot"), state), state)
+                if turnover_type == "fumble_recovery" and incoming.get("fumble_spot") not in (None, "")
+                else ""
+            ),
             "notes": str(incoming.get("notes", "")),
             "created_by": "statistician",
             "created_at": created_at,
@@ -1467,11 +1506,11 @@ class RulesService:
     # the result text and player credit all re-derive exactly as if the play had
     # been entered right the first time.
 
-    ENTRY_ROLES = ("player", "passer", "receiver", "sacker", "kicker", "returner", "recoverer")
-    ENTRY_SPOTS = ("start_spot", "end_spot", "landing_spot", "turnover_spot", "return_end_spot", "recovery_spot")
+    ENTRY_ROLES = ("player", "passer", "receiver", "sacker", "kicker", "returner", "recoverer", "tackler")
+    ENTRY_SPOTS = ("start_spot", "end_spot", "landing_spot", "turnover_spot", "return_end_spot", "recovery_spot", "fumble_spot")
     ENTRY_FLAGS = (
         "kneel", "fumble", "fumble_lost", "muffed_punt", "downed", "out_of_bounds",
-        "touchback", "fair_catch", "blocked", "kick_out_of_bounds",
+        "touchback", "fair_catch", "blocked", "kick_out_of_bounds", "lateral",
     )
     ENTRY_TEXT = ("pass_outcome", "out_of_bounds_choice", "clock", "notes")
     # Where the game is (period, clock, ends, the on-air graphic) -- never
@@ -2168,6 +2207,50 @@ class RulesService:
     def _resolve(self, state: dict[str, Any], team: str, number: str) -> dict[str, Any]:
         result = self._resolve_player(state, team, number)
         return copy.deepcopy(dict(result or {}))
+
+    _SCREEN_SPOT = re.compile(r"\b(LEFT|RIGHT) (GOAL|\d+)\b")
+    _FOR_YARDS = re.compile(r"\bfor (-?\d+) yards\b")
+    _ONE_YARDS = re.compile(r"(?<![\d-])1 yards\b")
+
+    @classmethod
+    def team_spot(cls, state: Mapping[str, Any], spot: str) -> str:
+        """A screen spot ("RIGHT 5") as the officials say it ("MT 5").
+
+        The left half of the field belongs to the team defending the left
+        goal, which is the team driving right.
+        """
+        match = cls._SCREEN_SPOT.fullmatch(str(spot or "").strip().upper())
+        if not match:
+            return str(spot or "")
+        left_team = "home" if cls.team_direction(state, "home") == 1 else "visitor"
+        team = left_team if match.group(1) == "LEFT" else cls.opposite(left_team)
+        name = (
+            str(state.get(f"{team}_abbreviation") or "").strip()
+            or str(state.get(f"{team}_team") or team.title()).strip()
+        )
+        return f"{name} goal line" if match.group(2) == "GOAL" else f"{name} {match.group(2)}"
+
+    @classmethod
+    def yards_phrase(cls, yards: int) -> str:
+        if yards == 0:
+            return "no gain"
+        if yards < 0:
+            return f"a loss of {-yards} yard{'' if yards == -1 else 's'}"
+        return f"{yards} yard{'' if yards == 1 else 's'}"
+
+    @classmethod
+    def register_text(cls, description: str, state: Mapping[str, Any]) -> str:
+        """Register wording: team yard lines, "1 yard", "a loss of 3 yards"."""
+        text = cls._SCREEN_SPOT.sub(lambda m: cls.team_spot(state, m.group(0)), str(description or ""))
+
+        def for_yards(match: re.Match[str]) -> str:
+            yards = int(match.group(1))
+            if " sacked " in f" {text} " and yards > 0:
+                return f"for a gain of {cls.yards_phrase(yards)}"
+            return f"for {cls.yards_phrase(yards)}"
+
+        text = cls._FOR_YARDS.sub(for_yards, text)
+        return cls._ONE_YARDS.sub("1 yard", text)
 
     @staticmethod
     def _display(number: str, name: str) -> str:

@@ -1061,3 +1061,19 @@ body.automation-modal-open{overflow:hidden!important}.automation-event-sheet{max
 }
 .play-flag{border:1px solid rgba(242,201,76,.45);border-radius:10px;padding:10px 12px;margin:12px 0}.play-flag-toggle{display:flex;align-items:center;gap:8px;font-weight:800}.play-flag .play-entry-grid{margin-top:10px}
 .play-flag .play-entry-grid label:last-child{grid-column:1/-1}.play-flag select,.play-flag input[type=number]{width:100%;min-width:0;box-sizing:border-box}
+
+/* Console usability round (2026-10-29) */
+.spot-typed{width:11em;max-width:100%;margin-top:4px;padding:6px 8px;font-size:14px}
+.yard-nudges{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.yard-nudges>span{font-size:13px;opacity:.8}
+.yard-nudges button{min-width:44px;min-height:40px;padding:6px 8px}
+.gain-box{display:flex;align-items:center;gap:6px;margin:0 0 0 8px;font-size:13px}.gain-box input{width:5.5em;min-height:40px}
+.timeout-button{border-color:#d9a400}
+button.on-air{background:#7a1018;border-color:#e0313d;color:#fff}
+.game-card-more{position:relative;display:inline-block}.game-card-more>summary{cursor:pointer;list-style:none;padding:8px 12px;border:1px solid #50545b;border-radius:8px}
+.game-card-more>summary::-webkit-details-marker{display:none}.game-card-more[open]>button{position:absolute;right:0;top:calc(100% + 4px);z-index:5;white-space:nowrap}
+#penaltyModal .check-row{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;align-self:auto;min-height:44px}
+#penaltyModal .check-row input{order:0;flex:0 0 auto;margin:0}
+#penaltyModal .automation-event-sheet{max-height:calc(100vh - 32px);overflow-y:auto}
+.play-option-grid label,.play-flag-toggle{flex-direction:row;align-items:center;justify-content:flex-start;margin-bottom:0}
+.play-option-grid label input[type=checkbox]{margin:0;width:auto;min-width:20px;min-height:20px}
+.play-flag-toggle{gap:10px}.play-flag-toggle input[type=checkbox]{width:auto;flex:0 0 auto;margin:0;min-width:20px;min-height:20px}

@@ -76,7 +76,7 @@ def test_spot_of_the_foul_enforcement() -> None:
     result = service.play(_run("LEFT 20", "LEFT 35", flag))
     assert result.code == "OK", result.data
     assert (current["ball_spot"], current["down"], current["distance"]) == ("LEFT 18", "1st", "12")
-    assert "from the spot of the foul (LEFT 28)" in result.data["play"]["result"]
+    assert "from the spot of the foul (Caledonia 28)" in result.data["play"]["result"]
 
 
 def test_defensive_foul_on_a_failed_fourth_down_keeps_the_ball_with_the_offense() -> None:

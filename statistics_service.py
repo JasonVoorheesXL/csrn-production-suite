@@ -203,6 +203,8 @@ class StatisticsService:
             "muff_recoveries": 0,
             "turnover_return_yards": 0,
             "sacks": 0,
+            "tackles": 0,
+            "tackles_for_loss": 0,
         }
 
     @staticmethod
@@ -436,6 +438,21 @@ class StatisticsService:
             # below reads this instead of the raw play.get("touchdown").
             play_touchdown = bool(play.get("touchdown")) and not self._recorded_during_special_phase(linked)
 
+            # Optional tackler: the defense on a scrimmage play, the kicking
+            # team on a return (a kick's "offense" is the receiving team), the
+            # original offense after a turnover.
+            tackler_number = str(play.get("tackler_number", "") or "").strip()
+            if tackler_number and offense in teams:
+                kick_play = kind in {"kickoff", "punt"}
+                scrimmage_turnover = not kick_play and play.get("turnover") and play.get("turnover_type") != "downs"
+                tackling_team = offense if scrimmage_turnover else defense
+                tackler = player_row(tackling_team, play.get("tackler_name", ""), tackler_number)
+                if tackler is not None:
+                    tackler["tackles"] += 1
+                    lost_yards = kind == "run" or (kind == "pass" and str(play.get("pass_outcome", "")).lower() == "sack")
+                    if lost_yards and yards < 0 and not play.get("turnover"):
+                        tackler["tackles_for_loss"] += 1
+
             if kind in {"run", "pass"} and offense in teams:
                 teams[offense]["total_plays"] += 1
                 teams[offense]["total_yards"] += yards
@@ -463,14 +480,14 @@ class StatisticsService:
                 recoverer = None
                 recovery_yards = 0
                 if (
-                    play.get("fumble")
-                    and not play.get("fumble_lost")
+                    ((play.get("fumble") and not play.get("fumble_lost")) or play.get("lateral"))
                     and (play.get("recoverer_number") or play.get("recoverer_name"))
                 ):
                     recoverer = player_row(offense, play.get("recoverer_name", ""), play.get("recoverer_number", ""))
                     if recoverer is not None:
                         recovery_yards = self._safe_int(play.get("recovery_yards", 0))
-                        recoverer["own_fumble_recoveries"] += 1
+                        if not play.get("lateral"):
+                            recoverer["own_fumble_recoveries"] += 1
                 carrier_yards = yards - recovery_yards
 
                 if kind == "run":

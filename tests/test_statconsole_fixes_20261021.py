@@ -113,12 +113,12 @@ def _js_function(name: str) -> str:
     "payload,outcome,expected",
     [
         ({"pass_outcome": "sack", "sacker_number": "99", "end_spot": "LEFT 24"}, "sack",
-         "#7 Marcus Hale sacked by #99 Hunter Graves for -6 yards"),
+         "#7 Marcus Hale sacked by #99 Hunter Graves for a loss of 6 yards"),
         ({"pass_outcome": "incomplete", "receiver_number": "11"}, "incomplete",
          "#7 Marcus Hale pass incomplete, intended for #11 Wide Out"),
         ({"pass_outcome": "interception", "returner_number": "35", "end_spot": "LEFT 45",
           "turnover_spot": "LEFT 45", "return_end_spot": "LEFT 40"}, "interception",
-         "#7 Marcus Hale pass intercepted by #35 Jackson Bell at LEFT 45"),
+         "#7 Marcus Hale pass intercepted by #35 Jackson Bell at Pine Valley 45"),
         ({"pass_outcome": "complete", "receiver_number": "11", "end_spot": "LEFT 38"}, "complete",
          "#7 Marcus Hale complete to #11 Wide Out for 8 yards"),
     ],
@@ -280,7 +280,7 @@ def test_downed_punt_ends_at_the_landing_spot_with_no_return() -> None:
     # A returner jersey and a stray end spot are ignored: nobody returned it.
     state = _punt(downed=True, returner_number="35", end_spot="RIGHT 30")
     play = state["plays"][-1]
-    assert play["result"] == "Punt by #3 landed at RIGHT 12, downed by the kicking team"
+    assert play["result"] == "Punt by #3 Punter landed at Northwood 12, downed by the kicking team"
     assert play["downed"] is True
     assert (play["returner_number"], play["returner_name"], play["return_yards"]) == ("", "", 0)
     assert play["end_spot"] == "RIGHT 12"
@@ -292,7 +292,7 @@ def test_downed_punt_ends_at_the_landing_spot_with_no_return() -> None:
 def test_downed_overrides_fair_catch_touchback_and_muff() -> None:
     state = _punt(downed=True, fair_catch=True, touchback=True, muffed_punt=True, fumble_lost=True)
     play = state["plays"][-1]
-    assert play["result"] == "Punt by #3 landed at RIGHT 12, downed by the kicking team"
+    assert play["result"] == "Punt by #3 Punter landed at Northwood 12, downed by the kicking team"
     assert play["muffed_punt"] is False and play["turnover"] is False
     assert (state["possession"], state["ball_spot"]) == ("visitor", "RIGHT 12")
 

@@ -48,7 +48,11 @@ class EventService:
         "EJECTION",
         "PLAY",
         "KICKOFF",
+        "TIMEOUT",
     }
+    # NFHS: three charged timeouts per half, one per overtime period.
+    TIMEOUTS_PER_HALF = 3
+    TIMEOUTS_PER_OVERTIME = 1
     VALID_AUTHORITIES = {"broadcaster", "statistician"}
     VALID_DOWNS = {"1st", "2nd", "3rd", "4th", "Off"}
 
@@ -222,7 +226,7 @@ class EventService:
             if event_code == "KICKOFF" and phase not in {"kickoff", "free_kick"}:
                 return EventResult("KICKOFF_NOT_PENDING", {"phase": phase})
 
-            if phase == "pending_try" and event_code not in {"XP", "2PT", "PENALTY", "EJECTION"}:
+            if phase == "pending_try" and event_code not in {"XP", "2PT", "PENALTY", "EJECTION", "TIMEOUT"}:
                 return EventResult(
                     "SPECIAL_PHASE_REQUIRES_TRY",
                     {
@@ -232,7 +236,7 @@ class EventService:
                 )
             if (
                 phase in {"kickoff", "free_kick"}
-                and event_code not in {"KICKOFF", "PENALTY", "EJECTION"}
+                and event_code not in {"KICKOFF", "PENALTY", "EJECTION", "TIMEOUT"}
             ):
                 return EventResult(
                     "SPECIAL_PHASE_REQUIRES_KICK",
@@ -262,6 +266,18 @@ class EventService:
                         "defense": roles.defense,
                     },
                 )
+            if event_code == "TIMEOUT":
+                remaining = self.timeouts_remaining(state, team)
+                if remaining <= 0:
+                    return EventResult(
+                        "NO_TIMEOUTS_LEFT",
+                        {
+                            "team": team,
+                            "message": f"{state.get(f'{team}_team') or team.title()} has no timeouts left in this "
+                            + ("overtime period." if self._timeout_period(state.get("quarter")).startswith("OT") else "half."),
+                        },
+                    )
+                incoming["timeouts_left"] = remaining - 1
             if event_code == "TURNOVER":
                 current_possession = str(state.get("possession", "home") or "home").lower()
                 if team == current_possession:
@@ -402,6 +418,9 @@ class EventService:
             if event_code == "FIRST_DOWN":
                 state["down"] = "1st"
                 state["distance"] = "10"
+            if event_code == "TIMEOUT":
+                state["clock_running"] = False
+                state["clock_started_at"] = 0
 
             if event_code == "TD" or (event_code == "TURNOVER" and return_td):
                 CanonicalStateFoundation.enter_pending_try(state, team)
@@ -1366,6 +1385,13 @@ class EventService:
                 description += f" ({category})"
             return "Penalty", description
 
+        if event_code == "TIMEOUT":
+            left = int(incoming.get("timeouts_left", 0) or 0)
+            clock = str(incoming.get("clock", "") or "").strip()
+            description = f"Timeout {team_name}" + (f" at {clock}" if clock else "")
+            description += f" ({left} left)"
+            return "Timeout", description
+
         if event_code == "EJECTION":
             person_type = str(
                 incoming.get("ejection_person_type", "Player") or "Player"
@@ -1408,6 +1434,33 @@ class EventService:
         if conversion_outcome == "no_good":
             return "Extra Point No Good", f"Extra point no good for {team_name}"
         return "Extra Point", f"Extra point good by {scorer_name or team_name}"
+
+    @staticmethod
+    def _timeout_period(quarter: Any) -> str:
+        q = str(quarter or "1").strip().upper()
+        if q in {"1", "2"}:
+            return "H1"
+        if q in {"3", "4"}:
+            return "H2"
+        return f"OT{q}"
+
+    @classmethod
+    def timeouts_remaining(cls, state: Mapping[str, Any], team: str) -> int:
+        """Charged timeouts ``team`` has left in the current half (or OT period)."""
+        period = cls._timeout_period(state.get("quarter"))
+        allowance = cls.TIMEOUTS_PER_OVERTIME if period.startswith("OT") else cls.TIMEOUTS_PER_HALF
+        broadcast_id = state.get("broadcast_id", "")
+        used = sum(
+            1
+            for event in state.get("events") or []
+            if isinstance(event, Mapping)
+            and not event.get("undone")
+            and str(event.get("event", "")).upper() == "TIMEOUT"
+            and event.get("team") == team
+            and event.get("broadcast_id", broadcast_id) == broadcast_id
+            and cls._timeout_period(event.get("quarter")) == period
+        )
+        return max(0, allowance - used)
 
     def _event_payload(self, **values: Any) -> dict[str, Any]:
         state = values["state"]
