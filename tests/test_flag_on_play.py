@@ -130,11 +130,16 @@ def test_a_touchdown_wiped_out_by_a_flag_must_be_a_no_play() -> None:
     assert saved == [] and current["home_score"] == 0
 
 
-def test_flags_are_only_attached_to_runs_and_passes() -> None:
+def test_a_punt_flag_is_enforced_from_the_end_of_the_kick() -> None:
+    # Kick flags arrived with the 2026-10-30 simulation fixes: holding on the
+    # receiving team at the end of a fair-caught punt costs it 10 yards.
     service, current, *_ = build_service(_state("LEFT 20", "4th", "10"))
     result = service.play({"team": "home", "play_type": "punt", "start_spot": "LEFT 20", "landing_spot": "RIGHT 40",
-                           "end_spot": "RIGHT 40", "kicker_number": "9", "flag": _flag("visitor", "Special Teams", "Holding", 10)})
-    assert result.code == "FLAG_NOT_SUPPORTED"
+                           "end_spot": "RIGHT 40", "kicker_number": "9", "fair_catch": True,
+                           "flag": _flag("visitor", "Special Teams", "Holding", 10)})
+    assert result.code == "OK"
+    assert (current["possession"], current["ball_spot"], current["down"], current["distance"]) == \
+        ("visitor", "RIGHT 30", "1st", "10")
 
 
 def test_spot_of_foul_needs_a_spot() -> None:
