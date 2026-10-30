@@ -143,7 +143,7 @@ def test_console_markup_for_the_fixes() -> None:
         "const PRE_SNAP_FOULS=['False Start'", "function newSeriesPending()",
         "document.getElementById('penaltyNewSeries').checked=newSeriesPending()&&!PRE_SNAP_FOULS.includes(name)",
         "show('playFlagWrap',['run','pass','kickoff','punt'].includes(kind))", "function playFlagIsKick()",
-        "'kicking team':'offense'", "['Face Mask',15],['Unsportsmanlike Conduct',15]],",
+        "'kicking team':'offense'", "['Face Mask',15],['Unsportsmanlike Conduct',15],",
         'id="playReturnOob"', "return_out_of_bounds:", "'Kick out of bounds':'Out of bounds'",
         "document.getElementById('playTouchbackWrap').classList.toggle('hidden',!turnover)",
         "end_of_play:'End of the return (or of the kick)'",

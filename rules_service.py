@@ -461,6 +461,12 @@ class RulesService:
     DIRECTION_SUSPECT_STREAK = 3
     DIRECTION_SUSPECT_TWO_PLAY_LOSS = 15
 
+    @staticmethod
+    def _kneel_like(kind: str, player_number: Any, yards: int) -> bool:
+        """A TEAM run losing a yard or two: a victory-formation kneel entered
+        without the Kneel box (that is how stat crews write it)."""
+        return kind == "run" and not str(player_number or "").strip() and -2 <= yards < 0
+
     def direction_warning(
         self,
         state: Mapping[str, Any],
@@ -519,6 +525,8 @@ class RulesService:
         yards = (end - start) * direction
         if yards >= 0:
             return None
+        if self._kneel_like(kind, incoming.get("player_number"), yards):
+            return None
         losses = [yards]
         quarter = str(state.get("quarter", "") or "")
         for prior in reversed(list(state.get("plays") or [])):
@@ -532,6 +540,12 @@ class RulesService:
             ):
                 break
             if str(prior.get("label", "") or "").lower() == "sack" or prior.get("kneel"):
+                continue
+            try:
+                kneel_yards = int(prior.get("yards") or 0)
+            except (TypeError, ValueError):
+                kneel_yards = 0
+            if self._kneel_like(str(prior.get("play_type", "")).lower(), prior.get("player_number"), kneel_yards):
                 continue
             try:
                 prior_yards = int(prior.get("yards") or 0)
