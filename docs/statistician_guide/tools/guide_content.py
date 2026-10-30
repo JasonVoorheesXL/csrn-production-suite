@@ -109,6 +109,8 @@ BODY = [
     ("p", "After a touchdown the screen shows a <b>TRY REQUIRED</b> panel; after a score or at the start of a "
           "half it shows <b>KICKOFF REQUIRED</b>. While one of those is showing, the normal Run/Pass "
           "buttons are hidden or blocked, so you can't accidentally skip the try or the kickoff. "
+          + ui("Penalty") + " and " + ui("Timeout") + " stay on both cards, because a foul or a timeout can come "
+          "before a kickoff or during a try. "
           "Follow the panel at the top and you will always be on the right next step."),
     ("table", ["Color on screen", "What it means"], [
         ["<b style='color:#157347'>Green</b> jersey name under a number", "Jersey found on that team's roster &mdash; player resolved."],
@@ -215,9 +217,11 @@ BODY = [
             ("Returner Jersey", "Receiving team's jersey number."),
             ("Tackled By (optional)", "The kicking-team player who made the tackle. Credited with a tackle in the stats."),
             ("Game Clock", "Filled in from the running clock. Correct it if the stadium clock says otherwise."),
-            ("Checkboxes", "<b>Fumble</b>, <b>Fumble lost</b>, <b>Out of bounds</b>, <b>Touchback</b>, <b>Fair catch</b>. "
-                           "Tick only what happened. A kick out of bounds asks for the <b>receiving team's choice</b>: "
-                           "ball at its 35, a re-kick, or the out-of-bounds spot + 5."),
+            ("Checkboxes", "<b>Fumble</b>, <b>Fumble lost</b>, <b>Kick out of bounds</b>, <b>Returner out of bounds</b>, "
+                           "<b>Touchback</b>, <b>Fair catch</b>. Tick only what happened. <b>Kick out of bounds</b> means the "
+                           "kick itself went out: it asks for the <b>receiving team's choice</b> (ball at its 35, a re-kick, "
+                           "or the out-of-bounds spot + 5). A returner who ran out of bounds is <b>Returner out of bounds</b>; "
+                           "the ball stays where he went out."),
             ("Notes", "Optional free text."),
             ("Preview line", "Live calculation, e.g. <i>Kick distance: 55 yards &middot; Return: 25 yards.</i>"),
         ]),
@@ -326,15 +330,18 @@ BODY = [
                            "automatic first down for roughing the passer, loss of down for intentional grounding)."),
             ("Half the distance", "Automatic: when the yardage is more than half the way to the goal, the system walks "
                                   "off half the distance (rounding the half yard up, as the officials do)."),
-            ("New series", "A dead-ball foul after the offense had already earned a first down: 1st &amp; 10 after enforcement."),
+            ("New series", "Ticks itself when the last play earned a first down (or changed possession) and the foul "
+                           "came <i>after</i> that play, like a personal foul: the officials enforce it and then start the "
+                           "new series, 1st &amp; 10. It stays clear for a pre-snap foul such as a false start, offside or "
+                           "delay of game, because that happens on the new series (1st &amp; 15, 1st &amp; 5)."),
         ]),
         ("p", "Press " + ui("Record Penalty", "red") + ". The ball moves and the down/distance updates."),
     ]),
     ("fig", "after_penalty", "Riverside offside: 3rd &amp; 16 becomes 3rd &amp; 11 at LEFT 47.", "narrow"),
     ("callout", "tip", "PENALTY BUTTON OR FLAG ON THE PLAY?",
      "Use the " + ui("Penalty") + " button for a foul with <b>no play</b>: a false start, offside before the snap, a "
-     "dead-ball foul. A flag thrown <b>during</b> a run or pass goes in that play's form instead (<b>Flag on the play</b>, "
-     "below), so the play and the penalty are recorded together."),
+     "dead-ball foul, a foul before a kickoff or during a try. A flag thrown <b>during</b> a run, pass, kickoff or punt goes "
+     "in that play's form instead (<b>Flag on the play</b>, below), so the play and the penalty are recorded together."),
     ("h2", "Flag on the play"),
     ("side", "flag_on_play_form", "A Northgate run to its 32 with holding by Northgate at its 26, enforced from the spot of the foul.", [
         ("p", "In the " + ui("Run") + " or " + ui("Pass") + " form, tick <b>Flag on the play</b> and fill in the flag:"),
@@ -344,13 +351,33 @@ BODY = [
             ("Ruling", "<b>Accepted</b>, <b>Declined</b> (the play stands), or <b>Offsetting</b> (no play)."),
             ("Enforced from", "<b>End of the play</b> or <b>Spot of the foul</b> (the play counts and the down is replayed), "
                               "<b>After the play</b> (a dead-ball foul: the down counts), or <b>No play</b> (back to the previous "
-                              "spot; the play is wiped out). Spot of the foul adds a slider for where it happened."),
+                              "spot; the play is wiped out). Spot of the foul adds a slider for where it happened. A foul "
+                              "<i>after</i> a play that made a first down starts the new series automatically."),
         ]),
         ("p", "Enter the play itself exactly as it happened, then " + ui("Record Play", "red") + ". The runner keeps his yards "
               "to the spot of the foul; the system walks off the penalty and sets the down."),
     ]),
     ("fig", "after_flag_on_play", "After the flagged run: 10 yards from the spot of the foul puts the ball at Northgate's 16, and "
      "the down is replayed: 1st &amp; 14."),
+    ("h3", "A flag on a kickoff or punt"),
+    ("side", "kick_flag_form", "Flag on the play in the kickoff form: the teams are labelled kicking and receiving.", [
+        ("p", "Kickoffs and punts have the same <b>Flag on the play</b> section. Enter the kick and the return as they happened, "
+              "then the foul: a face mask or late hit by the kicking team, an illegal block or holding by the returning team."),
+        ("bullets", [
+            "<b>Flag on</b> names the <i>kicking team</i> or the <i>receiving team</i>; the penalty list is the special-teams list.",
+            "<b>Enforced from</b>: <b>End of the return</b> (most fouls) or <b>Spot of the foul</b> (a block in the back behind "
+            "the returner). The kick always counts, so there is no <i>No play</i> choice here.",
+            "After enforcement the team with the ball has a new series, 1st &amp; 10.",
+        ]),
+        ("p", "A foul <b>before</b> the kick (offside, illegal procedure) has no kick to attach to: use the " + ui("Penalty") +
+              " button while KICKOFF REQUIRED is showing. It moves the kick spot."),
+    ]),
+    ("fig", "cards_kickoff_pending", "While KICKOFF REQUIRED is showing, the cards keep only Penalty and Timeout.", "narrow"),
+    ("callout", "tip", "A FOUL BY THE TEAM THAT INTERCEPTED (OR RECOVERED)",
+     "If the team that just took the ball away fouls during its return (holding, an illegal block), the turnover still "
+     "stands. Enter the interception or fumble as it happened and add the flag on that team with <b>End of the play</b> "
+     "(or Spot of the foul). The penalty comes off the return and the new offense starts 1st &amp; 10. A foul by the team "
+     "that <i>lost</i> the ball, before the turnover, is a <b>No play</b>."),
     ("h2", "The game clock &mdash; and timeouts"),
     ("pair", ("clock_running", "Start runs the clock (shows RUNNING)."),
              ("clock_stopped", "A timeout stopped it (shows STOPPED).")),
@@ -366,8 +393,8 @@ BODY = [
              ("after_timeout", "Riverside's button now reads Timeout (2 left).")),
     ("p", "When a team calls timeout, press " + ui("Timeout") + " on that team's card and " + ui("Charge timeout", "red") +
           ". The clock stops, and the timeout is saved with the game clock time. Each team gets <b>three per half</b> and "
-          "<b>one per overtime period</b>; the button shows how many are left. Charged the wrong team? " +
-          ui("Undo Last Event", "gold") + " takes it back."),
+          "<b>one per overtime period</b>; the button shows how many are left. It works before a kickoff and during a "
+          "try too. Charged the wrong team? " + ui("Undo Last Event", "gold") + " takes it back."),
     ("h2", "Interception"),
     ("side", "pass_interception_form", "Interception: picked at RIGHT 40 by #24, returned to RIGHT 45.", [
         ("p", "Set <b>Pass Result</b> to <b>Interception</b>. Two new things appear: an "
@@ -382,6 +409,9 @@ BODY = [
     ]),
     ("fig", "after_interception", "After the interception: Riverside is now on offense (green card), 1st &amp; 10 at RIGHT 45, "
      "driving &larr;. The cards swapped their buttons automatically."),
+    ("callout", "tip", "INTERCEPTED IN THE END ZONE?",
+     "If the defender catches it in his own end zone and goes down there, tick <b>Touchback</b> (it appears for an "
+     "interception or a lost fumble). The ball goes to his team's 20, 1st &amp; 10, with no return yards."),
     ("h2", "Fumble"),
     ("side", "fumble_lost_form", "Riverside run, fumble lost: the ball comes loose at LEFT 49, Northgate #52 recovers at the 50 "
      "and returns to RIGHT 47.", [
@@ -886,12 +916,14 @@ BODY = [
      "Tear-off summary: what to press for every situation on the Statistician Console."),
     ("table", ["Situation", "Press", "Fill in", "Watch for"], [
         ["Opening coin toss", ui("Enter Coin Toss", "red"), "Winner, election, drive direction", "Summary line, then " + ui("Save Coin Toss", "red")],
-        ["Kickoff / free kick", ui("Open Detailed Kickoff", "red"), "Kicker, returner, Landed, End", "Touchback box for end-zone kicks"],
+        ["Kickoff / free kick", ui("Open Detailed Kickoff", "red"), "Kicker, returner, Landed, End", "Touchback; Kick vs Returner out of bounds"],
+        ["Foul before a kickoff", ui("Penalty") + " (while KICKOFF REQUIRED shows)", "Special Teams foul", "Moves the kick spot"],
+        ["Foul during a kick", "<b>Flag on the play</b> in the kick form", "Kicking or receiving team", "New series for the team with the ball"],
         ["Run", ui("Run") + " (offense)", "Ball carrier, End (drag, type <code>NOR 36</code>, or Gain), tackler", "Kneel, Out of bounds, Fumble / Fumble lost"],
         ["Complete pass", ui("Pass") + " &rarr; Complete", "Passer, receiver, End", "End = where he was downed"],
         ["Incomplete pass", ui("Pass") + " &rarr; Incomplete", "Passer, intended receiver", "End locks automatically"],
         ["Sack", ui("Pass") + " &rarr; Sack", "Passer, sacker, End", "Sacker = defense jersey"],
-        ["Interception", ui("Pass") + " &rarr; Interception", "Passer, pick spot, returner, End", "Possession flips"],
+        ["Interception", ui("Pass") + " &rarr; Interception", "Passer, pick spot, returner, End", "Possession flips; Touchback if downed in the end zone"],
         ["Fumble lost", ui("Run") + "/" + ui("Pass") + " + Fumble lost", "Fumbled at, recovery spot, recoverer, End", "Possession flips"],
         ["Lateral", ui("Run") + "/" + ui("Pass") + " + Lateral", "Teammate, lateral spot, End", "Yards split at the lateral"],
         ["Punt", ui("Punt"), "Punter, returner, Landed, End", "Downed, Fair catch, Touchback, Muffed, Blocked"],
