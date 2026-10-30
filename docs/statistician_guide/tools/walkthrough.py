@@ -53,6 +53,8 @@ CLOCK = "#statisticianModule .statistician-clock-pinned"
 REGISTER = "#statisticianModule .statistician-register"
 PERIOD = "#periodAdministrationCard"
 STATE_BUTTONS_FROM = "#statPossessionButtons"
+CHOICE = "#directionChoiceDialog"
+CARDS = "#statisticianControls"
 
 
 class Walk:
@@ -134,6 +136,12 @@ class Walk:
         self.page.type(f"#{element_id}", number, delay=60)
         self.page.wait_for_timeout(250)
 
+    def typed_spot(self, element_id: str, text: str) -> None:
+        # Typing a yard line ("NOR 36") and leaving the box moves the slider.
+        self.page.fill(f"#{element_id}", text)
+        self.page.dispatch_event(f"#{element_id}", "change")
+        self.page.wait_for_timeout(250)
+
     def check(self, element_id: str) -> None:
         self.page.locator(f"#{element_id}").check()
         self.page.wait_for_timeout(200)
@@ -148,8 +156,18 @@ class Walk:
             message = self.page.locator("#playEntryMessage").inner_text()
             raise RuntimeError(f"Play not recorded: {message}")
 
-    def period(self, label: str, wait: int = 2200) -> None:
-        self.click(f"#periodAdministrationCard button:text-is('{label}')", wait)
+    def choose(self, value: str, shot: str | None = None, wait: int = 2200) -> None:
+        """Answer the console's in-page question dialog (Undo, timeout, final, direction)."""
+        self.page.wait_for_selector(f"{CHOICE}[open]")
+        self.page.wait_for_timeout(300)
+        if shot:
+            self.shot(shot, CHOICE)
+        self.click(f"{CHOICE} button[value='{value}']", wait)
+
+    def period(self, label: str, wait: int = 2200, choice: str = "", choice_shot: str | None = None) -> None:
+        self.click(f"#periodAdministrationCard button:text-is('{label}')", 600 if choice else wait)
+        if choice:
+            self.choose(choice, choice_shot, wait)
         if self.page.is_visible("#eventConfirmModal"):
             self.shot(f"confirm_{label.lower().replace(' ', '_')}", "#eventConfirmModal .event-confirm-sheet")
             self.click("#eventConfirmAccept", wait)
@@ -158,18 +176,25 @@ class Walk:
 # ---- play helpers ---------------------------------------------------------
 
 def run_play(w: Walk, team: str, carrier: str, end: int, *, shot: str | None = None,
-             fumble_lost: bool = False, turnover_at: int | None = None,
-             recovered_by: str = "", kneel: bool = False) -> None:
+             fumble_lost: bool = False, turnover_at: int | None = None, fumbled_at: int | None = None,
+             recovered_by: str = "", kneel: bool = False, tackler: str = "", typed_end: str = "") -> None:
     w.team_button(team, "Run")
     w.jersey("playBallCarrier", carrier)
     if kneel:
         w.check("playKneel")
-    w.slider("playEndCoord", end)
+    if typed_end:
+        w.typed_spot("playEndTyped", typed_end)
+    else:
+        w.slider("playEndCoord", end)
     if fumble_lost:
         w.check("playFumbleLost")
+        if fumbled_at is not None:
+            w.slider("playFumbleCoord", fumbled_at)
         w.slider("playTurnoverCoord", turnover_at)
         w.jersey("playReturner", recovered_by)
         w.slider("playEndCoord", end)
+    if tackler:
+        w.jersey("playTackler", tackler)
     if shot:
         w.shot(shot, PLAY_SHEET)
     w.record_play()
@@ -177,7 +202,8 @@ def run_play(w: Walk, team: str, carrier: str, end: int, *, shot: str | None = N
 
 def pass_play(w: Walk, team: str, passer: str, outcome: str, end: int | None = None, *,
               receiver: str = "", sacker: str = "", picked_at: int | None = None,
-              returner: str = "", shot: str | None = None) -> None:
+              returner: str = "", lateral_to: str = "", lateral_at: int | None = None,
+              tackler: str = "", shot: str | None = None) -> None:
     w.team_button(team, "Pass")
     w.jersey("playPasser", passer)
     w.select("playPassOutcome", outcome)
@@ -188,8 +214,14 @@ def pass_play(w: Walk, team: str, passer: str, outcome: str, end: int | None = N
     if picked_at is not None:
         w.slider("playTurnoverCoord", picked_at)
         w.jersey("playReturner", returner)
+    if lateral_to:
+        w.check("playLateral")
+        w.jersey("playRecoverer", lateral_to)
+        w.slider("playTurnoverCoord", lateral_at)
     if end is not None:
         w.slider("playEndCoord", end)
+    if tackler:
+        w.jersey("playTackler", tackler)
     if shot:
         w.shot(shot, PLAY_SHEET)
     w.record_play()
@@ -235,22 +267,22 @@ def automation(w: Walk, *, selects: list[tuple[str, str]] = (), inputs: list[tup
 
 def try_kick(w: Walk, outcome_button: str, kicker: str, shot: str) -> None:
     w.click(f"#statisticianTryActions button:text-is('{outcome_button}')", 1500)
-    automation(w, selects=[("automationKickerNumber", kicker)], shot=shot)
+    automation(w, inputs=[("automationKickerNumber", kicker)], shot=shot)
 
 
 def try_two_point(w: Walk, outcome_button: str, scorer: str, play_type: str, shot: str,
                   passer: str = "") -> None:
     w.click(f"#statisticianTryActions button:text-is('{outcome_button}')", 1500)
-    selects = [("automationPlayType", play_type), ("automationScorerNumber", scorer)]
+    inputs = [("automationScorerNumber", scorer)]
     if passer:
-        selects.append(("automationPasserNumber", passer))
-    automation(w, selects=selects, shot=shot)
+        inputs.append(("automationPasserNumber", passer))
+    automation(w, selects=[("automationPlayType", play_type)], inputs=inputs, shot=shot)
 
 
-def field_goal(w: Walk, team: str, kicker: str, outcome: str, distance: str, shot: str) -> None:
+def field_goal(w: Walk, team: str, kicker: str, outcome: str, shot: str) -> None:
+    # The distance fills itself in (yards to the goal + 17).
     w.team_button(team, "FG")
-    automation(w, selects=[("automationKickerNumber", kicker), ("automationKickOutcome", outcome)],
-               inputs=[("automationFgDistance", distance)], shot=shot)
+    automation(w, selects=[("automationKickOutcome", outcome)], inputs=[("automationKickerNumber", kicker)], shot=shot)
 
 
 # ---- phases ---------------------------------------------------------------
@@ -269,6 +301,8 @@ def phase_pregame(w: Walk, pin: str) -> None:
     w.click("#statisticianCoinTossButton", 1000)
     w.select("coinTossWinner", "visitor")
     w.select("coinTossElection", "defer")
+    w.page.fill("#coinTossLeftEndName", "Scoreboard end")
+    w.page.fill("#coinTossRightEndName", "Field house end")
     w.shot("coin_toss_form", "#coinTossModal .event-confirm-sheet")
     w.click("#coinTossModal button.primary", 2000)
     w.top_half("coin_toss_saved")
@@ -289,13 +323,15 @@ def phase_opening_kickoff(w: Walk) -> None:
 
 def phase_q1_plays(w: Walk) -> None:
     # Northgate ball at LEFT 30, driving right. 1st & 10.
-    run_play(w, "home", "22", 36, shot="run_form")
+    # The end spot is typed as a yard line; Riverside #24 makes the tackle.
+    run_play(w, "home", "22", 36, typed_end="NOR 36", tackler="24", shot="run_form")
     w.top_half("after_run")
     w.shot("register_after_run", REGISTER)
     # A mis-keyed play (wrong end spot), then Undo Last Event.
     run_play(w, "home", "22", 52)
     w.region("mistake_recorded", SCOREBOARD, ".statistician-action-bar")
-    w.click("#statisticianModule .statistician-action-bar button:text-is('Undo Last Event')", 2200)
+    w.click("#statisticianModule .statistician-action-bar button:text-is('Undo Last Event')", 600)
+    w.choose("yes", "undo_dialog")
     w.region("after_undo", SCOREBOARD, ".statistician-action-bar")
     pass_play(w, "home", "7", "complete", 48, receiver="4", shot="pass_complete_form")
     w.shot("after_pass_complete", SCOREBOARD)
@@ -311,17 +347,20 @@ def phase_q1_plays(w: Walk) -> None:
     w.shot("penalty_form", PENALTY_SHEET)
     w.click("#penaltyModal button.primary", 2200)
     w.shot("after_penalty", SCOREBOARD)
-    # Clock: there is no timeout button -- stop the clock.
+    # Clock, then a Riverside timeout (which stops it).
     w.click(f"{CLOCK} button:text-is('Start')", 2600)
     w.shot("clock_running", CLOCK)
-    w.click(f"{CLOCK} button:text-is('Stop')", 1000)
+    w.click("#statVisitorTimeout", 600)
+    w.choose("yes", "timeout_dialog")
+    w.shot("after_timeout", CARDS)
     w.shot("clock_stopped", CLOCK)
     # Interception: picked at RIGHT 40 by Riverside #24, returned to RIGHT 45.
     pass_play(w, "home", "7", "interception", 55, picked_at=60, returner="24",
               shot="pass_interception_form")
     w.top_half("after_interception")
     # Riverside run to the 50, fumble lost; Northgate #52 recovers and returns to RIGHT 47.
-    run_play(w, "visitor", "5", 53, fumble_lost=True, turnover_at=50, recovered_by="52",
+    # It came loose at Northgate's 49 (LEFT 49: a 6-yard gain for #5).
+    run_play(w, "visitor", "5", 53, fumble_lost=True, fumbled_at=49, turnover_at=50, recovered_by="52",
              shot="fumble_lost_form")
     w.top_half("after_fumble")
     # Northgate punts from RIGHT 47; it bounces dead at RIGHT 15 and Northgate downs it.
@@ -393,7 +432,7 @@ def phase_scoring_first_half(w: Walk) -> None:
     w.top_half("td_try_pending")
     try_two_point(w, "2PT GOOD", "5", "rush", "two_point_run_form")
     w.top_half("after_two_point_run")
-    kick_play(w, "visitor", "kickoff", "15", 100, touchback=True, shot="kickoff_touchback_form")
+    kick_play(w, "visitor", "kickoff", "15", 0, touchback=True, shot="kickoff_touchback_form")
     w.top_half("after_touchback")
 
 
@@ -442,19 +481,25 @@ def phase_halftime(w: Walk) -> None:
 
 
 def phase_second_half_kickoff(w: Walk) -> None:
-    w.period("Start Second Half")
+    # Start Second Half asks which way the teams drive. On the field Northgate kicks toward
+    # the LEFT goal (the same ends as the 2nd quarter), but "Switch ends" gets picked.
+    w.period("Start Second Half", choice="swap", choice_shot="second_half_direction_prompt")
     w.top_half("second_half_kickoff_pending")
-    # Scenario: the teams did NOT simply mirror the first half -- on the field Northgate
-    # is kicking the other way. Spot it in the kickoff form, close it, flip the direction.
+    # Spot it in the kickoff form, close it, flip the direction.
     w.click("#statisticianKickoffActions button", 1500)
     w.shot("direction_wrong_kickoff_form", PLAY_SHEET)
     w.click("#playEntryModal button:text-is('Cancel')", 800)
     w.region("direction_before_fix", "#statisticianFieldPosition", "#statisticianModule .rules-card:has(#driveDirLeft)")
     current = w.page.evaluate("currentState[currentState.possession + '_direction']")
     flip = "Left" if current == "right" else "Right"
-    w.click(f"#statisticianDrive{flip}", 2200)
+    w.click(f"#driveDir{flip}", 600)
+    # The kicker's own 40 is the right yard line: keep it and move the ball to the other side.
+    w.choose("yard_line", "direction_flip_dialog")
     w.region("direction_after_fix", "#statisticianFieldPosition", "#statisticianModule .rules-card:has(#driveDirLeft)")
     w.top_half("direction_fixed_kickoff_pending")
+    w.click("#statisticianModule button:text-is('Fix Plays Entered the Wrong Way…')", 800)
+    w.shot("direction_repair_dialog", "#directionRepairDialog")
+    w.click("#directionRepairDialog button:text-is('Cancel')", 600)
     kick_play(w, "home", "kickoff", "3", own(w, "visitor", 8), own(w, "visitor", 32),
               returner="1", shot="second_half_kickoff_form")
     w.top_half("after_second_half_kickoff")
@@ -466,10 +511,27 @@ def phase_q3_q4(w: Walk) -> None:
     w.top_half("q3_td_pass_try_pending")
     try_two_point(w, "2PT FAILED", "85", "reception", "two_point_pass_failed_form", passer="12")
     w.top_half("after_two_point_failed")
-    kick_play(w, "visitor", "kickoff", "15", own(w, "home", 100), touchback=True)
-    # Northgate drives to the Riverside 15 and kicks a 32-yard field goal.
-    pass_play(w, "home", "7", "complete", own(w, "home", 85), receiver="17")
-    field_goal(w, "home", "3", "made", "32", "fg_good_form")
+    kick_play(w, "visitor", "kickoff", "15", own(w, "home", 0), touchback=True)
+    # Northgate runs to its 32, but holding at its 26 brings it back (spot of the foul).
+    w.team_button("home", "Run")
+    w.jersey("playBallCarrier", "22")
+    w.slider("playEndCoord", own(w, "home", 32))
+    w.check("playFlagEnabled")
+    w.page.evaluate("""() => { const sel = document.getElementById('playFlagName');
+        const opt = [...sel.options].find(o => /^holding/i.test(o.value));
+        if (opt) { sel.value = opt.value; playFlagNameChanged(); } }""")
+    w.select("playFlagEnforcement", "spot_of_foul")
+    w.page.evaluate("playFlagChanged()")
+    w.slider("playFlagSpotCoord", own(w, "home", 26))
+    w.page.locator("#playFlagHint").scroll_into_view_if_needed()
+    w.shot("flag_on_play_form", PLAY_SHEET)
+    w.record_play()
+    w.top_half("after_flag_on_play")
+    # A completion to #17, who laterals to #22 at the Riverside 40; #22 is downed at the 15.
+    pass_play(w, "home", "7", "complete", own(w, "home", 85), receiver="17",
+              lateral_to="22", lateral_at=own(w, "home", 60), shot="lateral_form")
+    w.top_half("after_lateral")
+    field_goal(w, "home", "3", "made", "fg_good_form")
     w.top_half("after_fg_good")
     kick_play(w, "home", "kickoff", "3", own(w, "visitor", 0), touchback=True)
     w.shot("period_card_end_q3", PERIOD)
@@ -499,7 +561,7 @@ def phase_overtime(w: Walk) -> None:
     w.shot("period_card_overtime_setup", PERIOD)
     w.period("Start Overtime")
     w.top_half("overtime_started")
-    field_goal(w, "visitor", "15", "no_good", "27", "ot_fg_missed_form")
+    field_goal(w, "visitor", "15", "no_good", "ot_fg_missed_form")
     w.top_half("after_ot_fg_missed")
     # Northgate's overtime possession: put the ball at Riverside's 10, 1st & 10.
     if w.state()["possession"] != "home":
@@ -508,7 +570,7 @@ def phase_overtime(w: Walk) -> None:
     w.page.wait_for_timeout(1500)
     w.click("#statDownButtons button[data-value='1st']", 1200)
     w.region("ot_second_possession_setup", STATE_BUTTONS_FROM, "#statisticianFieldPosition")
-    field_goal(w, "home", "3", "made", "27", "ot_fg_good_form")
+    field_goal(w, "home", "3", "made", "ot_fg_good_form")
     w.top_half("after_ot_fg_good")
     w.period("End Quarter")
     w.top_half("overtime_period_complete")
@@ -532,7 +594,7 @@ def phase_final(w: Walk) -> None:
     w.shot("amber_row_after_fix", REGISTER)
     w.region("score_after_amber_fix", SCOREBOARD, SCOREBOARD)
     w.shot("register_before_final", REGISTER)
-    w.period("Confirm Final", 3000)
+    w.period("Confirm Final", 3000, choice="yes", choice_shot="final_dialog")
     w.shot("final_page_header", "header, .suite-header, .app-header")
     w.top_half("final_console")
     w.shot("period_card_final", PERIOD)
