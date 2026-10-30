@@ -726,8 +726,8 @@ def test_play_form_exposes_the_recovered_by_field() -> None:
     submit = _js_function(html, "submitPlayEntry") if "function submitPlayEntry(" in html else html[
         html.index("async function submitPlayEntry") :
     ]
-    assert "recoverer_number:ownFumbleRecovery()" in submit
-    assert "recovery_spot:ownFumbleRecovery()" in submit
+    assert "recoverer_number:lateralShare()" in submit
+    assert "recovery_spot:lateralShare()" in submit
     helper = _js_function(html, "ownFumbleRecovery")
     # shown for Fumble checked and Fumble lost NOT checked, on run/pass only
     assert "playFumble').checked&&!document.getElementById('playFumbleLost').checked" in helper

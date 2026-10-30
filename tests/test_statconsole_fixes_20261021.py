@@ -327,7 +327,7 @@ def test_punt_form_offers_downed_and_sends_it() -> None:
     assert "'playMuffedPunt','playDowned','playOutOfBounds'" in HTML
     submit = _js_function("submitPlayEntry")
     assert "downed:puntDowned()," in submit
-    assert "returner_number:puntDowned()?'':document.getElementById('playReturner').value," in submit
+    assert "returner_number:puntDowned()||kickTeamRecovered()?'':document.getElementById('playReturner').value," in submit
 
 
 def test_downed_is_exclusive_and_locks_the_end_spot_to_the_landing_spot() -> None:

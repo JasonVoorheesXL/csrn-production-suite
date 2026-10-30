@@ -440,6 +440,26 @@ class EventService:
                         state["ball_spot"] = CanonicalStateFoundation._team_own_yard_spot(state, receiving, 20)
                     elif str(incoming.get("kick_result_spot", "") or "").strip():
                         state["ball_spot"] = self._coord_to_spot(self._spot_to_coord(incoming.get("kick_result_spot"), state), state)
+                        # A blocked (or short) kick picked up and run back by the
+                        # defense: the result spot is where the return ended.
+                        returner = str(incoming.get("kick_returner_number", "") or "").strip()
+                        if returner:
+                            end_coord = self._spot_to_coord(incoming.get("kick_result_spot"), state)
+                            length = CanonicalStateFoundation._field_length(state)
+                            sign = 1 if str(state.get(f"{receiving}_direction", "right") or "right").lower() == "right" else -1
+                            recovery_value = str(incoming.get("kick_recovery_spot", "") or "").strip()
+                            start_coord = self._spot_to_coord(recovery_value, state) if recovery_value else end_coord
+                            return_td = end_coord == (length if sign == 1 else 0)
+                            incoming["_kick_return"] = {
+                                "number": returner,
+                                "name": str(incoming.get("kick_returner_name", "") or "").strip(),
+                                "yards": max(0, (end_coord - start_coord) * sign),
+                                "end": self._coord_to_spot(end_coord, state),
+                                "touchdown": return_td,
+                            }
+                            if return_td:
+                                state[f"{receiving}_score"] = int(state.get(f"{receiving}_score", 0) or 0) + 6
+                                CanonicalStateFoundation.enter_pending_try(state, receiving)
                     state["clock_running"] = False
                     state["clock_started_at"] = 0
             elif event_code == "SINGLE":
@@ -1413,9 +1433,15 @@ class EventService:
             base = f"{fg_distance}-yard field goal by {scorer_name or team_name}" if fg_distance else f"{scorer_name or team_name} field goal"
             if kick_outcome == "made":
                 return "Field Goal", base + " good"
+            ret = incoming.get("_kick_return") or {}
+            returned = ""
+            if ret:
+                who = f"#{ret['number']}" + (f" {ret['name']}" if ret.get("name") else "")
+                returned = (f", returned {ret['yards']} yards by {who} for a touchdown" if ret.get("touchdown")
+                            else f", returned {ret['yards']} yards by {who} to {ret['end']}")
             if kick_outcome == "blocked":
-                return "Field Goal Blocked", base + " blocked"
-            return "Field Goal No Good", base + " no good"
+                return ("Blocked Field Goal Return Touchdown" if ret.get("touchdown") else "Field Goal Blocked"), base + " blocked" + returned
+            return "Field Goal No Good", base + " no good" + returned
 
         if event_code == "SINGLE":
             return "Single (Rouge)", f"Single point (rouge) for {team_name}"
@@ -1486,6 +1512,7 @@ class EventService:
             ),
             "kick_outcome": str(incoming.get("kick_outcome", "made") or "made").lower() if event_code == "FG" else "",
             "fg_distance": str(incoming.get("fg_distance", "") or "").strip() if event_code == "FG" else "",
+            "kick_return": dict(incoming.get("_kick_return") or {}) if event_code == "FG" else {},
             "created_at": values["created_at"],
             "quarter": str(state.get("quarter", "1") or "1"),
             "broadcast_id": state.get("broadcast_id", ""),

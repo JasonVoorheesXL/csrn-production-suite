@@ -488,7 +488,15 @@ class StatisticsService:
                         recovery_yards = self._safe_int(play.get("recovery_yards", 0))
                         if not play.get("lateral"):
                             recoverer["own_fumble_recoveries"] += 1
-                carrier_yards = yards - recovery_yards
+                # A second lateral: the last player gets the yards from it on.
+                lateral2 = None
+                lateral2_yards = 0
+                if play.get("lateral2_number") or play.get("lateral2_name"):
+                    lateral2 = player_row(offense, play.get("lateral2_name", ""), play.get("lateral2_number", ""))
+                    if lateral2 is not None:
+                        lateral2_yards = self._safe_int(play.get("lateral2_yards", 0))
+                carrier_yards = yards - recovery_yards - lateral2_yards
+                last_runner = lateral2 if lateral2 is not None else recoverer
 
                 if kind == "run":
                     teams[offense]["rushing_attempts"] += 1
@@ -496,12 +504,14 @@ class StatisticsService:
                     if ball_carrier is not None:
                         ball_carrier["rushing_attempts"] += 1
                         ball_carrier["rushing_yards"] += carrier_yards
-                        if play_touchdown and recoverer is None:
+                        if play_touchdown and last_runner is None:
                             ball_carrier["rushing_touchdowns"] += 1
                     if recoverer is not None:
                         recoverer["rushing_yards"] += recovery_yards
-                        if play_touchdown:
-                            recoverer["rushing_touchdowns"] += 1
+                    if lateral2 is not None:
+                        lateral2["rushing_yards"] += lateral2_yards
+                    if play_touchdown and last_runner is not None:
+                        last_runner["rushing_touchdowns"] += 1
                 else:
                     outcome = str(play.get("pass_outcome") or linked_automation.get("pass_outcome") or "complete").lower()
                     if outcome == "complete":
@@ -538,12 +548,14 @@ class StatisticsService:
                         if receiver is not None:
                             receiver["receptions"] += 1
                             receiver["receiving_yards"] += carrier_yards
-                            if play_touchdown and recoverer is None:
+                            if play_touchdown and last_runner is None:
                                 receiver["receiving_touchdowns"] += 1
                         if recoverer is not None:
                             recoverer["receiving_yards"] += recovery_yards
-                            if play_touchdown:
-                                recoverer["receiving_touchdowns"] += 1
+                        if lateral2 is not None:
+                            lateral2["receiving_yards"] += lateral2_yards
+                        if play_touchdown and last_runner is not None:
+                            last_runner["receiving_touchdowns"] += 1
                         # No touchdown pass when a teammate recovered the fumble and scored.
                         if play_touchdown and passer is not None and recoverer is None:
                             passer["passing_touchdowns"] += 1
@@ -584,7 +596,7 @@ class StatisticsService:
                 play_id = str(play.get("play_id", "") or "")
                 if play_touchdown and play_id not in touchdown_play_ids:
                     teams[offense]["touchdowns"] += 1
-                    td_player = recoverer if recoverer is not None else (
+                    td_player = last_runner if last_runner is not None else (
                         receiver if kind == "pass" else ball_carrier
                     )
                     if td_player is not None:
@@ -608,13 +620,25 @@ class StatisticsService:
                     teams[receiving][key] += 1
                     teams[receiving][yards_key] += return_yards
                     returner = player_row(receiving, play.get("returner_name", ""), play.get("returner_number", ""))
+                    # Laterals on the return: each teammate keeps his share of
+                    # the yards; the last one to carry gets any touchdown.
+                    shares = []
+                    if play.get("lateral"):
+                        for role, yards_field in (("recoverer", "recovery_yards"), ("lateral2", "lateral2_yards")):
+                            if play.get(f"{role}_number") or play.get(f"{role}_name"):
+                                mate = player_row(receiving, play.get(f"{role}_name", ""), play.get(f"{role}_number", ""))
+                                if mate is not None:
+                                    shares.append((mate, self._safe_int(play.get(yards_field, 0))))
+                    scorer = shares[-1][0] if shares else returner
                     if returner is not None:
                         returner[key] += 1
-                        returner[yards_key] += return_yards
-                        if play_touchdown:
-                            returner["return_touchdowns"] += 1
-                            if str(play.get("play_id", "")) not in touchdown_play_ids:
-                                returner["touchdowns"] += 1
+                        returner[yards_key] += return_yards - sum(y for _, y in shares)
+                    for mate, mate_yards in shares:
+                        mate[yards_key] += mate_yards
+                    if scorer is not None and play_touchdown:
+                        scorer["return_touchdowns"] += 1
+                        if str(play.get("play_id", "")) not in touchdown_play_ids:
+                            scorer["touchdowns"] += 1
                 kick_turnover = str(play.get("turnover_type", "") or "").lower() in {
                     "muff_recovery", "kicking_team_recovery", "fumble_recovery",
                 }
