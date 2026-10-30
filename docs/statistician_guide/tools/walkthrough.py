@@ -432,6 +432,14 @@ def phase_scoring_first_half(w: Walk) -> None:
     w.top_half("td_try_pending")
     try_two_point(w, "2PT GOOD", "5", "rush", "two_point_run_form")
     w.top_half("after_two_point_run")
+    # While the kickoff is pending the cards keep Penalty and Timeout.
+    w.shot("cards_kickoff_pending", CARDS)
+    # A flag on a kick: opened and shown, then cancelled (nothing recorded).
+    w.click("#statisticianKickoffActions button", 1500)
+    w.check("playFlagEnabled")
+    w.page.locator("#playFlagHint").scroll_into_view_if_needed()
+    w.shot("kick_flag_form", PLAY_SHEET)
+    w.click("#playEntryModal button:text-is('Cancel')", 800)
     kick_play(w, "visitor", "kickoff", "15", 0, touchback=True, shot="kickoff_touchback_form")
     w.top_half("after_touchback")
 

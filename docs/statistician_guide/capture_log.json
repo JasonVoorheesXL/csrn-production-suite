@@ -898,7 +898,7 @@
     "plays": 7,
     "last_play": {
       "type": "timeout",
-      "result": "Timeout Riverside at 11:56 (2 left)",
+      "result": "Timeout Riverside at 11:55 (2 left)",
       "description": null,
       "unresolved": null,
       "mismatch": null,
@@ -933,7 +933,7 @@
     "plays": 7,
     "last_play": {
       "type": "timeout",
-      "result": "Timeout Riverside at 11:56 (2 left)",
+      "result": "Timeout Riverside at 11:55 (2 left)",
       "description": null,
       "unresolved": null,
       "mismatch": null,
@@ -968,7 +968,7 @@
     "plays": 7,
     "last_play": {
       "type": "timeout",
-      "result": "Timeout Riverside at 11:56 (2 left)",
+      "result": "Timeout Riverside at 11:55 (2 left)",
       "description": null,
       "unresolved": null,
       "mismatch": null,
@@ -1846,7 +1846,42 @@
     }
   },
   {
-    "file": "53_kickoff_touchback_form.png",
+    "file": "53_cards_kickoff_pending.png",
+    "score": "Northgate 0 - Riverside 8",
+    "quarter": "1",
+    "down": "Off",
+    "distance": "Off",
+    "ball_spot": "RIGHT 40",
+    "possession": "visitor",
+    "phase": "kickoff",
+    "kicking": "visitor",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "COMMITTED \u00b7 2PT \u00b7 rev 22",
+    "period_text": "QUARTER \u00b7 Q1 \u00b7 KICKOFF",
+    "plays": 15,
+    "last_play": {
+      "type": "rush",
+      "result": "Jordan Reyes two-point conversion run",
+      "description": null,
+      "unresolved": null,
+      "mismatch": null,
+      "touchdown": false,
+      "safety": false,
+      "yards": "",
+      "down": null,
+      "distance": null
+    }
+  },
+  {
+    "file": "54_kick_flag_form.png",
     "score": "Northgate 0 - Riverside 8",
     "quarter": "1",
     "down": "Off",
@@ -1881,7 +1916,42 @@
     }
   },
   {
-    "file": "54_after_touchback.png",
+    "file": "55_kickoff_touchback_form.png",
+    "score": "Northgate 0 - Riverside 8",
+    "quarter": "1",
+    "down": "Off",
+    "distance": "Off",
+    "ball_spot": "RIGHT 40",
+    "possession": "visitor",
+    "phase": "kickoff",
+    "kicking": "visitor",
+    "halftime": null,
+    "status": "live",
+    "game_status": "",
+    "final": null,
+    "period_state": "",
+    "clock": null,
+    "authority": "statistician",
+    "home_direction": "right",
+    "visitor_direction": "left",
+    "notice": "Riverside kickoff to Northgate \u2014 complete the detailed kickoff play.",
+    "period_text": "QUARTER \u00b7 Q1 \u00b7 KICKOFF",
+    "plays": 15,
+    "last_play": {
+      "type": "rush",
+      "result": "Jordan Reyes two-point conversion run",
+      "description": null,
+      "unresolved": null,
+      "mismatch": null,
+      "touchdown": false,
+      "safety": false,
+      "yards": "",
+      "down": null,
+      "distance": null
+    }
+  },
+  {
+    "file": "56_after_touchback.png",
     "score": "Northgate 0 - Riverside 8",
     "quarter": "1",
     "down": "1st",
@@ -1916,7 +1986,7 @@
     }
   },
   {
-    "file": "55_period_card_q1.png",
+    "file": "57_period_card_q1.png",
     "score": "Northgate 0 - Riverside 8",
     "quarter": "1",
     "down": "1st",
@@ -1951,7 +2021,7 @@
     }
   },
   {
-    "file": "56_after_end_q1.png",
+    "file": "58_after_end_q1.png",
     "score": "Northgate 0 - Riverside 8",
     "quarter": "2",
     "down": "1st",
@@ -1986,7 +2056,7 @@
     }
   },
   {
-    "file": "57_period_card_q2.png",
+    "file": "59_period_card_q2.png",
     "score": "Northgate 0 - Riverside 8",
     "quarter": "2",
     "down": "1st",
@@ -2021,7 +2091,7 @@
     }
   },
   {
-    "file": "58_td_pass_form.png",
+    "file": "60_td_pass_form.png",
     "score": "Northgate 0 - Riverside 8",
     "quarter": "2",
     "down": "1st",
@@ -2056,7 +2126,7 @@
     }
   },
   {
-    "file": "59_td_pass_try_pending.png",
+    "file": "61_td_pass_try_pending.png",
     "score": "Northgate 6 - Riverside 8",
     "quarter": "2",
     "down": "Off",
@@ -2091,7 +2161,7 @@
     }
   },
   {
-    "file": "60_xp_good_form.png",
+    "file": "62_xp_good_form.png",
     "score": "Northgate 6 - Riverside 8",
     "quarter": "2",
     "down": "Off",
@@ -2126,7 +2196,7 @@
     }
   },
   {
-    "file": "61_after_xp_good.png",
+    "file": "63_after_xp_good.png",
     "score": "Northgate 7 - Riverside 8",
     "quarter": "2",
     "down": "Off",
@@ -2161,7 +2231,7 @@
     }
   },
   {
-    "file": "62_kickoff_return_form.png",
+    "file": "64_kickoff_return_form.png",
     "score": "Northgate 7 - Riverside 8",
     "quarter": "2",
     "down": "Off",
@@ -2196,7 +2266,7 @@
     }
   },
   {
-    "file": "63_punt_fair_catch_form.png",
+    "file": "65_punt_fair_catch_form.png",
     "score": "Northgate 7 - Riverside 8",
     "quarter": "2",
     "down": "1st",
@@ -2231,7 +2301,7 @@
     }
   },
   {
-    "file": "64_after_fair_catch.png",
+    "file": "66_after_fair_catch.png",
     "score": "Northgate 7 - Riverside 8",
     "quarter": "2",
     "down": "1st",
@@ -2266,7 +2336,7 @@
     }
   },
   {
-    "file": "65_safety_run_form.png",
+    "file": "67_safety_run_form.png",
     "score": "Northgate 7 - Riverside 8",
     "quarter": "2",
     "down": "1st",
@@ -2301,7 +2371,7 @@
     }
   },
   {
-    "file": "66_after_safety_free_kick_pending.png",
+    "file": "68_after_safety_free_kick_pending.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "Off",
@@ -2336,7 +2406,7 @@
     }
   },
   {
-    "file": "67_free_kick_form.png",
+    "file": "69_free_kick_form.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "Off",
@@ -2371,7 +2441,7 @@
     }
   },
   {
-    "file": "68_after_free_kick.png",
+    "file": "70_after_free_kick.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "1st",
@@ -2406,7 +2476,7 @@
     }
   },
   {
-    "file": "69_kneel_form.png",
+    "file": "71_kneel_form.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "1st",
@@ -2441,7 +2511,7 @@
     }
   },
   {
-    "file": "70_register_q2.png",
+    "file": "72_register_q2.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "2nd",
@@ -2476,7 +2546,7 @@
     }
   },
   {
-    "file": "71_after_end_q2.png",
+    "file": "73_after_end_q2.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "2nd",
@@ -2511,7 +2581,7 @@
     }
   },
   {
-    "file": "72_period_card_end_q2.png",
+    "file": "74_period_card_end_q2.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "2nd",
@@ -2546,7 +2616,7 @@
     }
   },
   {
-    "file": "73_second_half_direction_prompt.png",
+    "file": "75_second_half_direction_prompt.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "2",
     "down": "2nd",
@@ -2581,7 +2651,7 @@
     }
   },
   {
-    "file": "74_second_half_kickoff_pending.png",
+    "file": "76_second_half_kickoff_pending.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "Off",
@@ -2616,7 +2686,7 @@
     }
   },
   {
-    "file": "75_direction_wrong_kickoff_form.png",
+    "file": "77_direction_wrong_kickoff_form.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "Off",
@@ -2651,7 +2721,7 @@
     }
   },
   {
-    "file": "76_direction_before_fix.png",
+    "file": "78_direction_before_fix.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "Off",
@@ -2686,7 +2756,7 @@
     }
   },
   {
-    "file": "77_direction_flip_dialog.png",
+    "file": "79_direction_flip_dialog.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "Off",
@@ -2721,7 +2791,7 @@
     }
   },
   {
-    "file": "78_direction_after_fix.png",
+    "file": "80_direction_after_fix.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "Off",
@@ -2756,7 +2826,7 @@
     }
   },
   {
-    "file": "79_direction_fixed_kickoff_pending.png",
+    "file": "81_direction_fixed_kickoff_pending.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "Off",
@@ -2791,7 +2861,7 @@
     }
   },
   {
-    "file": "80_direction_repair_dialog.png",
+    "file": "82_direction_repair_dialog.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "Off",
@@ -2826,7 +2896,7 @@
     }
   },
   {
-    "file": "81_second_half_kickoff_form.png",
+    "file": "83_second_half_kickoff_form.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "Off",
@@ -2861,7 +2931,7 @@
     }
   },
   {
-    "file": "82_after_second_half_kickoff.png",
+    "file": "84_after_second_half_kickoff.png",
     "score": "Northgate 7 - Riverside 10",
     "quarter": "3",
     "down": "1st",
@@ -2896,7 +2966,7 @@
     }
   },
   {
-    "file": "83_q3_td_pass_try_pending.png",
+    "file": "85_q3_td_pass_try_pending.png",
     "score": "Northgate 7 - Riverside 16",
     "quarter": "3",
     "down": "Off",
@@ -2931,7 +3001,7 @@
     }
   },
   {
-    "file": "84_two_point_pass_failed_form.png",
+    "file": "86_two_point_pass_failed_form.png",
     "score": "Northgate 7 - Riverside 16",
     "quarter": "3",
     "down": "Off",
@@ -2966,7 +3036,7 @@
     }
   },
   {
-    "file": "85_after_two_point_failed.png",
+    "file": "87_after_two_point_failed.png",
     "score": "Northgate 7 - Riverside 16",
     "quarter": "3",
     "down": "Off",
@@ -3001,7 +3071,7 @@
     }
   },
   {
-    "file": "86_flag_on_play_form.png",
+    "file": "88_flag_on_play_form.png",
     "score": "Northgate 7 - Riverside 16",
     "quarter": "3",
     "down": "1st",
@@ -3036,7 +3106,7 @@
     }
   },
   {
-    "file": "87_after_flag_on_play.png",
+    "file": "89_after_flag_on_play.png",
     "score": "Northgate 7 - Riverside 16",
     "quarter": "3",
     "down": "1st",
@@ -3071,7 +3141,7 @@
     }
   },
   {
-    "file": "88_lateral_form.png",
+    "file": "90_lateral_form.png",
     "score": "Northgate 7 - Riverside 16",
     "quarter": "3",
     "down": "1st",
@@ -3106,7 +3176,7 @@
     }
   },
   {
-    "file": "89_after_lateral.png",
+    "file": "91_after_lateral.png",
     "score": "Northgate 7 - Riverside 16",
     "quarter": "3",
     "down": "1st",
@@ -3141,7 +3211,7 @@
     }
   },
   {
-    "file": "90_fg_good_form.png",
+    "file": "92_fg_good_form.png",
     "score": "Northgate 7 - Riverside 16",
     "quarter": "3",
     "down": "1st",
@@ -3176,7 +3246,7 @@
     }
   },
   {
-    "file": "91_after_fg_good.png",
+    "file": "93_after_fg_good.png",
     "score": "Northgate 10 - Riverside 16",
     "quarter": "3",
     "down": "Off",
@@ -3211,7 +3281,7 @@
     }
   },
   {
-    "file": "92_period_card_end_q3.png",
+    "file": "94_period_card_end_q3.png",
     "score": "Northgate 10 - Riverside 16",
     "quarter": "3",
     "down": "1st",
@@ -3246,7 +3316,7 @@
     }
   },
   {
-    "file": "93_after_end_q3.png",
+    "file": "95_after_end_q3.png",
     "score": "Northgate 10 - Riverside 16",
     "quarter": "4",
     "down": "1st",
@@ -3281,7 +3351,7 @@
     }
   },
   {
-    "file": "94_punt_return_form.png",
+    "file": "96_punt_return_form.png",
     "score": "Northgate 10 - Riverside 16",
     "quarter": "4",
     "down": "1st",
@@ -3316,7 +3386,7 @@
     }
   },
   {
-    "file": "95_after_punt_return.png",
+    "file": "97_after_punt_return.png",
     "score": "Northgate 10 - Riverside 16",
     "quarter": "4",
     "down": "1st",
@@ -3351,7 +3421,7 @@
     }
   },
   {
-    "file": "96_q4_td_try_pending.png",
+    "file": "98_q4_td_try_pending.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "4",
     "down": "Off",
@@ -3386,7 +3456,7 @@
     }
   },
   {
-    "file": "97_xp_no_good_form.png",
+    "file": "99_xp_no_good_form.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "4",
     "down": "Off",
@@ -3421,7 +3491,7 @@
     }
   },
   {
-    "file": "98_after_xp_no_good_tied.png",
+    "file": "100_after_xp_no_good_tied.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "4",
     "down": "Off",
@@ -3456,7 +3526,7 @@
     }
   },
   {
-    "file": "99_register_q4.png",
+    "file": "101_register_q4.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "4",
     "down": "2nd",
@@ -3491,7 +3561,7 @@
     }
   },
   {
-    "file": "100_period_card_end_regulation.png",
+    "file": "102_period_card_end_regulation.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "4",
     "down": "2nd",
@@ -3526,7 +3596,7 @@
     }
   },
   {
-    "file": "101_after_end_regulation.png",
+    "file": "103_after_end_regulation.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "4",
     "down": "2nd",
@@ -3561,7 +3631,7 @@
     }
   },
   {
-    "file": "102_period_card_overtime_setup.png",
+    "file": "104_period_card_overtime_setup.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "4",
     "down": "2nd",
@@ -3596,7 +3666,7 @@
     }
   },
   {
-    "file": "103_overtime_started.png",
+    "file": "105_overtime_started.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "OT",
     "down": "1st",
@@ -3631,7 +3701,7 @@
     }
   },
   {
-    "file": "104_ot_fg_missed_form.png",
+    "file": "106_ot_fg_missed_form.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "OT",
     "down": "1st",
@@ -3666,7 +3736,7 @@
     }
   },
   {
-    "file": "105_after_ot_fg_missed.png",
+    "file": "107_after_ot_fg_missed.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "OT",
     "down": "1st",
@@ -3701,7 +3771,7 @@
     }
   },
   {
-    "file": "106_ot_second_possession_setup.png",
+    "file": "108_ot_second_possession_setup.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "OT",
     "down": "1st",
@@ -3736,7 +3806,7 @@
     }
   },
   {
-    "file": "107_ot_fg_good_form.png",
+    "file": "109_ot_fg_good_form.png",
     "score": "Northgate 16 - Riverside 16",
     "quarter": "OT",
     "down": "1st",
@@ -3771,7 +3841,7 @@
     }
   },
   {
-    "file": "108_after_ot_fg_good.png",
+    "file": "110_after_ot_fg_good.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -3806,7 +3876,7 @@
     }
   },
   {
-    "file": "109_overtime_period_complete.png",
+    "file": "111_overtime_period_complete.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -3841,7 +3911,7 @@
     }
   },
   {
-    "file": "110_period_card_overtime_complete.png",
+    "file": "112_period_card_overtime_complete.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -3876,7 +3946,7 @@
     }
   },
   {
-    "file": "111_amber_row_before_fix.png",
+    "file": "113_amber_row_before_fix.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -3911,7 +3981,7 @@
     }
   },
   {
-    "file": "112_amber_fix_form.png",
+    "file": "114_amber_fix_form.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -3946,7 +4016,7 @@
     }
   },
   {
-    "file": "113_amber_row_after_fix.png",
+    "file": "115_amber_row_after_fix.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -3981,7 +4051,7 @@
     }
   },
   {
-    "file": "114_score_after_amber_fix.png",
+    "file": "116_score_after_amber_fix.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -4016,7 +4086,7 @@
     }
   },
   {
-    "file": "115_register_before_final.png",
+    "file": "117_register_before_final.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -4051,7 +4121,7 @@
     }
   },
   {
-    "file": "116_final_dialog.png",
+    "file": "118_final_dialog.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -4086,7 +4156,7 @@
     }
   },
   {
-    "file": "117_final_page_header.png",
+    "file": "119_final_page_header.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -4121,7 +4191,7 @@
     }
   },
   {
-    "file": "118_final_console.png",
+    "file": "120_final_console.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -4156,7 +4226,7 @@
     }
   },
   {
-    "file": "119_period_card_final.png",
+    "file": "121_period_card_final.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
@@ -4191,7 +4261,7 @@
     }
   },
   {
-    "file": "120_register_final.png",
+    "file": "122_register_final.png",
     "score": "Northgate 19 - Riverside 16",
     "quarter": "OT",
     "down": "Off",
