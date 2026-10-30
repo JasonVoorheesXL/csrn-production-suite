@@ -40,6 +40,9 @@ def test_undo_shows_a_preview_before_committing() -> None:
     fn = html[html.index("async function undo() {"):]
     fn = fn[: fn.index("\nasync function restoreLastUndone", 1)]
     assert "describeUndoTarget()" in fn
-    assert "confirm(" in fn
+    # 2026-10-29 (step 7 C8): the preview is shown in the app's own styled
+    # dialog (askChoice), not the browser's native confirm() box.
+    assert "askChoice('Undo the last event?',preview" in fn
+    assert "confirm(" not in fn.replace("askChoice", "")
     # the coin-toss-undo path is untouched (it has its own dedicated flow)
     assert fn.index("coinTossUndoIsNext()") < fn.index("describeUndoTarget()")

@@ -553,7 +553,7 @@ def test_own_recovery_touchdown_is_credited_to_the_recoverer_without_a_turnover(
     assert play["yards"] == 70 and play["recovery_yards"] == 60
     # the ball carrier field is untouched -- it is still Lang's play
     assert (play["player_number"], play["player_name"]) == ("7", "Caleb Lang")
-    assert "fumble recovered by #22 Medcalf at LEFT 40" in play["result"]
+    assert "fumble recovered by #22 Medcalf at Home 40" in play["result"]
     assert play["result"].endswith("touchdown")
 
 

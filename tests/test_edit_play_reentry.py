@@ -363,7 +363,7 @@ def test_adding_a_lost_fumble_to_the_latest_play_turns_the_ball_over():
     assert s["possession"] == "visitor" and _down(s) == ("1st", "10", "LEFT 26")
     play = g.plays()[0]
     assert play["turnover_type"] == "fumble_recovery" and play["turnover_player_number"] == "8"
-    assert "fumble lost, recovered by #8 Visitor Eight at LEFT 30" in play["result"]
+    assert "fumble lost, recovered by #8 Visitor Eight at Home 30" in play["result"]
 
 
 def test_a_punt_edit_recomputes_the_return_and_the_next_series():
@@ -378,7 +378,7 @@ def test_a_punt_edit_recomputes_the_return_and_the_next_series():
 
     punt, run = g.plays()
     assert punt["return_yards"] == 15
-    assert punt["result"] == "Punt by #9 landed at RIGHT 30, returned by #4 Visitor Returner for 15 yards to RIGHT 45"
+    assert punt["result"] == "Punt by #9 Home Punter landed at Visitor 30, returned by #4 Visitor Returner for 15 yards to Visitor 45"
     assert (run["ball_spot"], run["yards"], run["down"]) == ("RIGHT 45", -5, "1st")
     assert _down(g.store) == ("2nd", "15", "RIGHT 40")
 

@@ -242,8 +242,13 @@ class PenaltyService:
         if move_sign:
             goal_coord = 0 if move_sign < 0 else length
             distance_to_goal = abs(goal_coord - start_coord)
-            if requested_half:
-                enforced = max(1, distance_to_goal // 2) if distance_to_goal > 1 and configured_yards else 0
+            # NFHS: a foul that would carry the ball more than half the
+            # distance to the goal is half the distance -- automatically, not
+            # only when the box is ticked. Officials walk off the half yard
+            # (11 to go -> 6), but never onto the goal line.
+            if configured_yards and (requested_half or configured_yards * 2 > distance_to_goal):
+                enforced = min((distance_to_goal + 1) // 2, distance_to_goal - 1) if distance_to_goal > 1 else 0
+                requested_half = True
             else:
                 enforced = min(configured_yards, distance_to_goal)
             target_coord = start_coord + (move_sign * enforced)
