@@ -368,12 +368,9 @@ class BroadcastService:
             "venue_id": venue_id,
             "venue": venue_name,
             "graphics_profile": "CSRN Default",
-            "obs_profile": config.get("obs", {}).get(
-                "profile",
-                "CSRN Production",
-            )
+            "obs_profile": config.get("obs", {}).get("profile", "")
             if isinstance(config.get("obs", {}), dict)
-            else "CSRN Production",
+            else "",
             "visual_mode": visual_mode,
             "crew": crew,
             "production_type": str(data.get("production_type", "game") or "game"),

@@ -903,8 +903,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "host": "127.0.0.1",
         "port": 4455,
         "password": "",
-        "scene_collection": "CSRN Master",
-        "profile": "CSRN Production",
+        # Blank = accept whatever profile / scene collection OBS has open; a
+        # station that wants the check names its own in Settings > OBS.
+        "scene_collection": "",
+        "profile": "",
         "required_scene": "10.01 - FOOTBALL SCOREBUG",
         "browser_source": "BRWSR - Football Scorebug",
         "program_visual_scene": "10.02 - PROGRAM VISUAL",
