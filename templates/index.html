@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="csrn-glass" data-logo-shape="circle">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -85,12 +85,18 @@
 .pregame-storyline-editor{display:grid;gap:8px;margin:8px 0 10px}.pregame-storyline-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:8px;align-items:center}.pregame-storyline-row span{font-weight:800;opacity:.72;text-align:center}.pregame-storyline-row input{width:100%}.pregame-storyline-row button{padding:7px 10px}.storyline-editor-actions{margin-bottom:18px}@media(max-width:720px){.pregame-storyline-row{grid-template-columns:28px minmax(0,1fr)}.pregame-storyline-row button{grid-column:2;justify-self:start}}
 </style><style id="csrn-organization-logo-config-r14-5">
 .organization-logo-config{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:12px;align-items:center}.organization-logo-fields{display:grid;gap:8px}.organization-logo-config img{width:96px;height:72px;object-fit:contain;border:1px solid rgba(255,255,255,.13);border-radius:8px;background:linear-gradient(135deg,#0d1117,#171d26);padding:5px}.organization-logo-config img.using-fallback{opacity:.72}@media(max-width:720px){.organization-logo-config{grid-template-columns:1fr}.organization-logo-config img{width:120px;height:90px}}
-</style></head>
+</style>
+<link rel="stylesheet" href="/static/csrn-console-glass.css">
+<script>
+// Settings > Appearance: paint with the last saved look before the page shows (applyConsoleAppearance refreshes it).
+(function(){try{var c=JSON.parse(localStorage.getItem('csrn.consoleAppearance.v1')||'null');if(!c)return;var r=document.documentElement;r.style.setProperty('--csrn-accent',c.accent);r.style.setProperty('--csrn-accent-button',c.button);r.style.setProperty('--csrn-glass-blur',c.blur+'px');r.classList.toggle('csrn-glass',!!c.glass);r.dataset.logoShape=c.shape}catch(e){}})();
+</script>
+</head>
 <body>
   <main class="shell">
     <header class="suite-header">
       <div class="brand-lockup">
-        <img class="header-logo" src="/static/csrn-logo.png" alt="Caledonia Sports Radio Network logo">
+        <span class="header-logo-frame"><img class="header-logo" src="/static/csrn-logo.png" alt="Organization logo"></span>
         <div class="brand-copy">
           <div class="product-name">CSRN PRODUCTION SUITE</div>
           <div class="module-name">COMMAND CENTER</div>
@@ -1589,6 +1595,61 @@
               <img id="cfgOrgLogoPreview" alt="Organization logo preview">
             </div>
           </label>
+        </div>
+
+        <h2>Appearance</h2>
+        <p class="section-note">How this console looks on every screen. Broadcast overlay colors are set in each overlay theme.</p>
+        <div class="appearance-settings">
+          <div style="display:grid;gap:12px">
+            <section class="appearance-group" aria-labelledby="appearanceColorHead">
+              <h3 id="appearanceColorHead">Brand color</h3>
+              <p class="section-note">Used for Record Play, the active choice in a group, and LIVE.</p>
+              <div id="appearanceSwatches" class="appearance-swatches"></div>
+              <div class="appearance-custom">
+                <label for="appearanceCustomColor">Custom</label>
+                <input id="appearanceCustomColor" type="color" oninput="setAppearanceAccent(this.value)">
+                <button type="button" onclick="setAppearanceAccent('')">Use organization color</button>
+                <span id="appearanceAccentLabel"></span>
+              </div>
+              <div id="appearanceAccentWarning" class="appearance-warning hidden" role="status"></div>
+            </section>
+            <section class="appearance-group" aria-labelledby="appearanceShapeHead">
+              <h3 id="appearanceShapeHead">Logo shape</h3>
+              <div id="appearanceShapes" class="appearance-shapes" role="radiogroup" aria-labelledby="appearanceShapeHead"></div>
+              <div class="button-row"><button type="button" onclick="cleanOrganizationLogo()">Clean Logo Background</button></div>
+              <small id="logoCleanStatus" class="section-note">Makes a plain background around the logo see-through, so it sits cleanly on every shape.</small>
+              <div id="logoCleanCompare" class="hidden">
+                <div class="logo-clean-compare">
+                  <figure><img id="logoCleanOriginal" alt="Original logo"><figcaption>Original</figcaption></figure>
+                  <figure><img id="logoCleanResult" alt="Cleaned logo"><figcaption>Cleaned</figcaption></figure>
+                </div>
+                <div class="button-row"><button type="button" class="primary" onclick="useCleanedLogo()">Use Cleaned Logo</button><button type="button" onclick="keepOriginalLogo()">Keep Original</button></div>
+              </div>
+            </section>
+            <section class="appearance-group" aria-labelledby="appearanceGlassHead">
+              <h3 id="appearanceGlassHead">Glass effect</h3>
+              <p class="section-note">Frosted header and pop-up sheets. Turn it off on slower laptops running OBS.</p>
+              <div class="appearance-glass-row">
+                <label><input id="appearanceGlass" type="checkbox" onchange="setAppearanceGlass(this.checked)"> Glass on</label>
+                <label for="appearanceBlur">Blur</label>
+                <input id="appearanceBlur" type="range" min="4" max="32" step="1" oninput="setAppearanceBlur(this.value)">
+                <span id="appearanceBlurLabel"></span>
+              </div>
+            </section>
+            <div class="button-row"><button type="button" class="primary" onclick="saveAppearance()">Save Appearance</button><button type="button" onclick="resetAppearance()">Reset to Defaults</button></div>
+            <small id="appearanceStatus" class="status"></small>
+          </div>
+          <div class="appearance-preview" aria-label="Appearance preview">
+            <div class="preview-bar">
+              <div style="display:flex;align-items:center;gap:10px"><span id="appearancePreviewLogo" class="appearance-shape-demo circle"><span><img alt="Logo preview"></span></span><div><strong id="appearancePreviewName">CSRN</strong><div class="section-note">Stat Console</div></div></div>
+              <span class="preview-live"><i></i>LIVE</span>
+            </div>
+            <div class="preview-sheet">
+              <strong>Pass — preview</strong>
+              <div class="button-row"><button type="button" class="active" tabindex="-1">← Drive</button><button type="button" tabindex="-1">Drive →</button></div>
+              <div class="preview-button">Record Play</div>
+            </div>
+          </div>
         </div>
 
         <h2>Default Broadcast Settings</h2>
@@ -5937,6 +5998,7 @@ async function uploadOrganizationLogo(input){
     updateOrganizationLogoPreview();
     configDirty=true;
     if(status)status.textContent='Logo uploaded. Click Save Configuration to make it authoritative.';
+    cleanOrganizationLogo({auto:true});
   }catch(error){
     if(status)status.textContent=error.message||'Logo upload failed.';
   }finally{
@@ -6029,6 +6091,50 @@ function updateOrganizationLogoPreview(){
   preview.classList.toggle('using-fallback',!value);
   preview.onerror=()=>{preview.onerror=null;preview.src='/static/csrn-logo.png';preview.classList.add('using-fallback')};
 }
+// --- Settings > Appearance ("Night Game Glass", 2026-10-31) ---
+// One brand color, the logo's frame shape and the glass effect, for this console only (overlays use their themes).
+const APPEARANCE_STORAGE_KEY='csrn.consoleAppearance.v1';
+const APPEARANCE_DEFAULTS={accent:'',logo_shape:'circle',glass:true,glass_blur:18};
+const APPEARANCE_PRESETS=[{hex:'#C9203B',name:'Scarlet'},{hex:'#2F6FEB',name:'Royal'},{hex:'#16824A',name:'Forest'},{hex:'#E3A92B',name:'Gold'},{hex:'#6D45D1',name:'Purple'},{hex:'#0E7C86',name:'Teal'}];
+const APPEARANCE_SHAPES=[{id:'circle',name:'Circle'},{id:'square',name:'Square'},{id:'diamond',name:'Diamond'},{id:'glass',name:'Glass'}];
+let appearanceServer=null,appearanceDraft={...APPEARANCE_DEFAULTS},appearanceLogo='',appearanceCleanResult=null;
+function appearanceLuminance(hex){const n=parseInt(String(hex).slice(1),16);return [(n>>16)&255,(n>>8)&255,n&255].map(v=>{const c=v/255;return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4)}).reduce((sum,c,i)=>sum+c*[0.2126,0.7152,0.0722][i],0)}
+function appearanceWhiteContrast(hex){return 1.05/(appearanceLuminance(hex)+0.05)}
+// Same rule as appearance_service.button_shade(): deepen just enough for white button text to read.
+function appearanceButtonShade(hex){let rgb=[0,2,4].map(i=>parseInt(hex.slice(1+i,3+i),16)),shade=hex.toUpperCase();for(let i=0;i<60&&appearanceWhiteContrast(shade)<4.5;i++){rgb=rgb.map(c=>Math.round(c*0.93));shade='#'+rgb.map(c=>c.toString(16).padStart(2,'0')).join('').toUpperCase()}return shade}
+function appearanceLogoUrl(path){const value=String(path||'').trim();if(!value)return '/static/csrn-logo.png';return /^(https?:|\/)/i.test(value)?value:'/'+value}
+function appearanceLogoCleaned(path){return /organization-logo-clean-/.test(String(path||''))}
+function resolvedAppearance(draft=appearanceDraft){const accent=(draft.accent||appearanceServer?.organization_primary||'#C9203B').toUpperCase();const button=appearanceButtonShade(accent);return {accent,button,adjusted:button!==accent,shape:draft.logo_shape,glass:!!draft.glass,blur:Number(draft.glass_blur)||18}}
+function applyConsoleAppearance(look,logo=appearanceLogo){const root=document.documentElement;root.style.setProperty('--csrn-accent',look.accent);root.style.setProperty('--csrn-accent-button',look.button);root.style.setProperty('--csrn-glass-blur',look.blur+'px');root.classList.toggle('csrn-glass',look.glass);root.dataset.logoShape=look.shape;const frame=document.querySelector('.header-logo-frame'),img=frame?.querySelector('img');if(img){const url=appearanceLogoUrl(logo);if(img.getAttribute('src')!==url)img.src=url;img.onerror=()=>{img.onerror=null;img.src='/static/csrn-logo.png'}}if(frame)frame.dataset.cleaned=String(appearanceLogoCleaned(logo))}
+function rememberConsoleAppearance(look){try{localStorage.setItem(APPEARANCE_STORAGE_KEY,JSON.stringify(look))}catch(_){}}
+function renderAppearanceSettings(){const look=resolvedAppearance();const swatches=document.getElementById('appearanceSwatches');if(!swatches)return;
+  swatches.innerHTML=APPEARANCE_PRESETS.map(p=>`<button type="button" aria-pressed="${p.hex===look.accent}" onclick="setAppearanceAccent('${p.hex}')"><span style="background:${p.hex}"></span>${p.name}</button>`).join('');
+  document.getElementById('appearanceCustomColor').value=look.accent.toLowerCase();
+  document.getElementById('appearanceAccentLabel').textContent=appearanceDraft.accent?look.accent:`${look.accent} (organization color)`;
+  const warning=document.getElementById('appearanceAccentWarning');warning.classList.toggle('hidden',!look.adjusted);warning.textContent=look.adjusted?`White text is hard to read on ${look.accent}, so buttons use a deeper shade, ${look.button}. Highlights keep your color.`:'';
+  const logo=appearanceLogoUrl(appearanceLogo),cleaned=appearanceLogoCleaned(appearanceLogo);
+  document.getElementById('appearanceShapes').innerHTML=APPEARANCE_SHAPES.map(s=>`<button type="button" role="radio" aria-checked="${s.id===look.shape}" onclick="setAppearanceShape('${s.id}')"><span class="appearance-shape-demo ${s.id}" data-cleaned="${cleaned}"><span><img src="${escapeHtml(logo)}" alt=""></span></span>${s.name}</button>`).join('');
+  const preview=document.getElementById('appearancePreviewLogo');preview.className=`appearance-shape-demo ${look.shape}`;preview.dataset.cleaned=String(cleaned);preview.querySelector('img').src=logo;
+  document.getElementById('appearancePreviewName').textContent=appearanceServer?.organization_name||'CSRN';
+  document.getElementById('appearanceGlass').checked=look.glass;document.getElementById('appearanceBlur').value=look.blur;document.getElementById('appearanceBlur').disabled=!look.glass;document.getElementById('appearanceBlurLabel').textContent=`${look.blur} px`}
+function appearanceDraftChanged(){applyConsoleAppearance(resolvedAppearance());renderAppearanceSettings();const status=document.getElementById('appearanceStatus');if(status){status.textContent='Previewing. Click Save Appearance to keep it.';status.className='status'}}
+function setAppearanceAccent(hex){appearanceDraft.accent=hex?String(hex).toUpperCase():'';appearanceDraftChanged()}
+function setAppearanceShape(shape){appearanceDraft.logo_shape=shape;appearanceDraftChanged()}
+function setAppearanceGlass(on){appearanceDraft.glass=!!on;appearanceDraftChanged()}
+function setAppearanceBlur(value){appearanceDraft.glass_blur=Number(value);appearanceDraftChanged()}
+function resetAppearance(){appearanceDraft={...APPEARANCE_DEFAULTS};appearanceDraftChanged()}
+function adoptAppearance(data){appearanceServer=data;appearanceDraft={...APPEARANCE_DEFAULTS,...(data.appearance||{})};appearanceLogo=data.logo||'';const look=resolvedAppearance();applyConsoleAppearance(look);rememberConsoleAppearance(look);renderAppearanceSettings()}
+async function loadAppearance(){try{adoptAppearance(await api('/api/appearance'))}catch(_){}}
+async function saveAppearance(){const status=document.getElementById('appearanceStatus');try{adoptAppearance(await api('/api/appearance',{...appearanceDraft}));if(status){status.textContent='Appearance saved.';status.className='status success'}}catch(e){if(status){status.textContent=e.data?.message||e.message||'Could not save appearance.';status.className='status error'}}}
+async function cleanOrganizationLogo(options={}){const status=document.getElementById('logoCleanStatus'),compare=document.getElementById('logoCleanCompare');const path=String(document.getElementById('cfgOrgLogo')?.value||'').trim()||appearanceLogo||'/static/csrn-logo.png';
+  if(status)status.textContent='Cleaning the logo background…';compare?.classList.add('hidden');appearanceCleanResult=null;
+  try{const result=await api('/api/appearance/clean-logo',{logo_path:path});if(result.code!=='CLEANED'){if(status)status.textContent=options.auto?'':(result.message||'This logo was left as it is.');return}
+    appearanceCleanResult=result;const stamp=Date.now();document.getElementById('logoCleanOriginal').src=appearanceLogoUrl(path)+(path.includes('?')?'&':'?')+'t='+stamp;document.getElementById('logoCleanResult').src=result.clean_path+'?t='+stamp;compare?.classList.remove('hidden');
+    if(status)status.textContent=`Found a plain ${result.background} background around the logo. The checkerboard shows what became see-through.`}
+  catch(e){if(status)status.textContent=e.data?.message||e.message||'Could not clean the logo.'}}
+function useCleanedLogo(){if(!appearanceCleanResult)return;const field=document.getElementById('cfgOrgLogo');if(field)field.value=appearanceCleanResult.clean_path;updateOrganizationLogoPreview();configDirty=true;appearanceLogo=appearanceCleanResult.clean_path;applyConsoleAppearance(resolvedAppearance());renderAppearanceSettings();document.getElementById('logoCleanCompare')?.classList.add('hidden');const status=document.getElementById('logoCleanStatus');if(status)status.textContent='Cleaned logo selected. Click Save Configuration to keep it.'}
+function keepOriginalLogo(){appearanceCleanResult=null;document.getElementById('logoCleanCompare')?.classList.add('hidden');const status=document.getElementById('logoCleanStatus');if(status)status.textContent='Keeping the original logo.'}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadAppearance);else loadAppearance();
 document.getElementById('cfgOrgLogo')?.addEventListener('input',updateOrganizationLogoPreview);
 
 // Broadcast-creation Rules / Jurisdiction picker. Options are grouped by

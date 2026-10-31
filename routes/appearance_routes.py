@@ -47,6 +47,9 @@ def create_appearance_blueprint(dependencies: AppearanceRoutesDependencies) -> B
             "appearance": appearance_service.normalize_appearance(profile.get("appearance")),
             "effective": appearance_service.effective_appearance(profile.get("appearance"), organization),
             "logo": dependencies.branding_logo(organization),
+            "organization_name": str(organization.get("short_name") or organization.get("name") or ""),
+            "organization_primary": appearance_service.normalize_hex(organization.get("primary_color"))
+            or appearance_service.FALLBACK_ACCENT,
             "logo_shapes": list(appearance_service.LOGO_SHAPES),
         }
 
