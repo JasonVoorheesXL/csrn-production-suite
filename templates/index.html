@@ -1676,6 +1676,11 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
 </div>
         </div>
 
+        <h2>Sports</h2>
+        <p class="section-note">Switch on the sports this station broadcasts. A switched-off sport leaves the login screen and the sport picker; its rosters, games and stats are kept.</p>
+        <div id="stationSportsList" class="station-sports-list"></div>
+        <div id="stationSportsStatus" class="status"></div>
+
         <h2>Retired Tools</h2>
         <label class="check-row retired-tools-row"><input id="showRetiredTools" type="checkbox" onchange="setShowRetiredTools(this.checked)"> Show retired tools</label>
         <p class="section-note">Live captions, Layout Builder, Game Recaps, Broadcast Packages and the Theme Manager went unused this season, so they are hidden from the menus and pages. Their data is kept; turn this on to bring them back on this computer.</p>
@@ -3227,7 +3232,8 @@ function selectedIsOtherSport() {
 }
 
 function renderLoginSportPickers(status) {
-  loginFamilySports = Array.isArray(status.family_sports) ? status.family_sports.slice() : [];
+  // Sports the station switched off in Settings > Sports leave the login screen.
+  loginFamilySports = Array.isArray(status.family_sports) ? status.family_sports.filter(f => !f.switched_off) : [];
   loginOtherSports = Array.isArray(status.other_sports) ? status.other_sports.slice() : [];
 
   // checkSecurity() re-runs every 15s; never clobber a selection the operator
@@ -3403,6 +3409,7 @@ async function switchSportContext(value) {
     if (sel) sel.value = sportContext;
     alert({
       SPORT_NOT_LICENSED: 'That sport is not part of this CSRN license.',
+      SPORT_SWITCHED_OFF: 'That sport is switched off in Settings > Sports.',
       SPORT_ENGINE_NOT_READY: 'That sport is licensed — its broadcast engine ships in a future CSRN update.',
       SPORT_COMING_SOON: 'That sport is coming soon.',
       SPORT_NOT_RECOGNIZED: 'Choose a specific sport.'
@@ -5991,7 +5998,7 @@ function showModule(module) {
   if (module === 'assets') loadAssets();
   if (module === 'sponsors') loadSponsors();
   if (module === 'obs') loadOBSStatus();
-  if (module === 'settings') loadConfig();
+  if (module === 'settings') { loadConfig(); loadStationSports(); }
   if (module === 'statistics') loadStatistics();
   if (module === 'statistician') { refreshPlayRegister('statistician-open',true); loadCorrections(); loadConnectionInfo(); }
   if (module === 'diagnostics') { loadDiagnostics(); loadReleaseReadiness(); }
@@ -6106,6 +6113,12 @@ function updateOrganizationLogoPreview(){
 }
 // --- Settings > Appearance ("Night Game Glass", 2026-10-31) ---
 // One brand color, the logo's frame shape and the glass effect, for this console only (overlays use their themes).
+// Settings > Sports (audit round 3).
+let stationSportsData=null;
+function setStationSportsStatus(text){const el=document.getElementById('stationSportsStatus');if(el)el.textContent=text||''}
+function renderStationSports(){const box=document.getElementById('stationSportsList');if(!box||!stationSportsData)return;const on=new Set(stationSportsData.on||[]);box.innerHTML=(stationSportsData.sports||[]).map(s=>`<label class="check-row"><input type="checkbox" data-sport="${escapeHtml(s.family)}"${on.has(s.family)?' checked':''}${s.licensed?'':' disabled'} onchange="setStationSport()"> ${escapeHtml(s.label)}${s.licensed?'':' <small>(not licensed)</small>'}</label>`).join('')}
+async function loadStationSports(){try{stationSportsData=await api('/api/station-sports');renderStationSports();setStationSportsStatus('')}catch(error){setStationSportsStatus(error.message||'Could not load sports.')}}
+async function setStationSport(){const on=[...document.querySelectorAll('#stationSportsList input[data-sport]:checked')].map(box=>box.dataset.sport);if(!on.length){renderStationSports();setStationSportsStatus('Keep at least one sport switched on.');return}try{stationSportsData=await api('/api/station-sports',{on});renderStationSports();setStationSportsStatus('Saved.');await loadSessionContext()}catch(error){renderStationSports();setStationSportsStatus(error.data?.message||error.message||'Could not save sports.')}}
 function setShowRetiredTools(show){window.CSRNNavigation?.setShowRetired(show);const box=document.getElementById('showRetiredTools');if(box)box.checked=Boolean(show)}
 document.addEventListener('DOMContentLoaded',()=>{const box=document.getElementById('showRetiredTools');if(box)box.checked=Boolean(window.CSRNNavigation?.showRetired())});
 const APPEARANCE_STORAGE_KEY='csrn.consoleAppearance.v1';

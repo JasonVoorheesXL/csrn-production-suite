@@ -215,6 +215,7 @@ def other_sport_options(
 
 def family_sport_options(
     licensed_families: Iterable[str],
+    switched_off: Iterable[str] = (),
 ) -> list[dict[str, object]]:
     """Per-family login-tile metadata.
 
@@ -229,11 +230,15 @@ def family_sport_options(
     """
 
     licensed = set(licensed_families)
+    off = set(switched_off)
     return [
         {
             "family": family,
             "label": LABELS.get(family, family),
             "licensed": family in licensed,
+            # Licensed but switched off by the station (audit round 3): the
+            # login screen hides the tile instead of showing a lock.
+            "switched_off": family in off,
             "engine_ready": family in ENGINE_READY,
             "available": family in ENGINE_READY and family in licensed,
         }
@@ -242,7 +247,9 @@ def family_sport_options(
 
 
 def sport_context_view(
-    sport_context: object, licensed_families: Iterable[str]
+    sport_context: object,
+    licensed_families: Iterable[str],
+    switched_off: Iterable[str] = (),
 ) -> Mapping[str, object]:
     """The block both /api/security-status and /api/session-context embed."""
 
@@ -251,11 +258,16 @@ def sport_context_view(
     # A stored context that is somehow the gateway or unknown reads as none.
     if resolved == GATEWAY:
         resolved = ""
+    off = list(switched_off)
+    # A sport the station has since switched off reads as none.
+    if resolved and base_family(resolved) in off:
+        resolved = ""
     return {
         "sport_context": resolved,
         "sport_scope": base_family(resolved) if resolved else "",
         "licensed_sports": licensed,
         "all_sports_licensed": licensed == list(SPORT_FAMILIES),
-        "family_sports": family_sport_options(licensed),
+        "family_sports": family_sport_options(licensed, off),
+        "switched_off_sports": off,
         "other_sports": other_sport_options(licensed),
     }

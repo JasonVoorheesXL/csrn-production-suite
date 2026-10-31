@@ -28,6 +28,7 @@ from typing import Any, Mapping
 
 import appearance_service
 import layout_builder_service
+import station_sports_service
 
 
 # --- Today's exact literals (moved verbatim out of app.py DEFAULT_CONFIG /
@@ -122,6 +123,7 @@ def _template(existing_install: bool) -> dict[str, Any]:
             "state_defaults": copy.deepcopy(LEGACY_STATE_DEFAULTS),
             "layouts": layout_builder_service.default_layouts_document(),
             "appearance": appearance_service.normalize_appearance(None),
+            "station_sports": station_sports_service.normalize_station_sports(None),
             "onboarding_complete": True,
         }
     return {
@@ -131,6 +133,7 @@ def _template(existing_install: bool) -> dict[str, Any]:
         "state_defaults": copy.deepcopy(BLANK_STATE_DEFAULTS),
         "layouts": layout_builder_service.default_layouts_document(),
         "appearance": appearance_service.normalize_appearance(None),
+        "station_sports": station_sports_service.normalize_station_sports(None),
         "onboarding_complete": False,
     }
 
@@ -171,6 +174,8 @@ def _normalize(raw: Mapping[str, Any] | None, existing_install: bool) -> dict[st
         base["layouts"] = layout_builder_service.normalize_layouts(raw.get("layouts"))
         # Console appearance (2026-10-31): validated as a unit, unknown keys dropped.
         base["appearance"] = appearance_service.normalize_appearance(raw.get("appearance"))
+        # Station sports (audit round 3): football alone until Settings switches more on.
+        base["station_sports"] = station_sports_service.normalize_station_sports(raw.get("station_sports"))
         for flag in _FLAG_DEFAULTS:
             if flag in raw:
                 base[flag] = bool(raw[flag])

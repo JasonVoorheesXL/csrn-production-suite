@@ -70,7 +70,7 @@ def test_family_sport_options_separates_licensed_not_ready_from_unlicensed() -> 
     # football: licensed + engine -> available
     assert opts["football"] == {
         "family": "football", "label": "Football",
-        "licensed": True, "engine_ready": True, "available": True,
+        "licensed": True, "switched_off": False, "engine_ready": True, "available": True,
     }
     # soccer: licensed, but no engine -> NOT available, and the reason is
     # "engine not ready", not "unlicensed"

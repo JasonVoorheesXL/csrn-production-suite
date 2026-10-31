@@ -262,6 +262,7 @@ CONFIG_FILE = DATA_DIR / "Settings" / "config.json"
 # auto-creates config.json -- the Identity Profile seeds itself from today's
 # exact Caledonia/CSRN literals for an existing install and blank for a new one.
 import identity_service
+import station_sports_service
 from identity_service import load_identity_profile, save_identity_profile
 
 _EXISTING_INSTALL = STATE_FILE.exists() or CONFIG_FILE.exists()
@@ -1282,6 +1283,21 @@ def save_layouts_document(document: Mapping[str, Any]) -> dict[str, Any]:
 
     invalidate_runtime_state_cache()
     return saved
+
+
+def save_station_sports_document(station_sports: Mapping[str, Any]) -> dict[str, Any]:
+    """Settings > Sports (audit round 3): read-modify-write of the identity
+    profile's `station_sports` section, like save_appearance_document."""
+    global IDENTITY_PROFILE, IDENTITY_PROFILE_ISSUE
+    with _LAYOUTS_WRITE_LOCK:
+        current = load_identity_profile(IDENTITY_FILE, existing_install=True)
+        current["station_sports"] = copy.deepcopy(dict(station_sports))
+        save_identity_profile(IDENTITY_FILE, current, existing_install=_EXISTING_INSTALL)
+        IDENTITY_PROFILE = load_identity_profile(
+            IDENTITY_FILE, existing_install=_EXISTING_INSTALL
+        )
+        IDENTITY_PROFILE_ISSUE = identity_service.load_issue(IDENTITY_FILE)
+        return copy.deepcopy(IDENTITY_PROFILE.get("station_sports") or {})
 
 
 def save_appearance_document(appearance: Mapping[str, Any]) -> dict[str, Any]:
@@ -3181,6 +3197,20 @@ def licensed_sport_families() -> list[str]:
         return []
 
 
+def station_sport_families() -> list[str]:
+    """Licensed families minus the ones switched off in Settings > Sports
+    (audit round 3). Login, the sport picker and sport-context checks use this."""
+    return station_sports_service.families_in_use(
+        licensed_sport_families(), IDENTITY_PROFILE.get("station_sports")
+    )
+
+
+def switched_off_sport_families() -> list[str]:
+    return station_sports_service.switched_off(
+        licensed_sport_families(), IDENTITY_PROFILE.get("station_sports")
+    )
+
+
 SECURITY_UPGRADE_ROUTES_BLUEPRINT = create_security_upgrade_blueprint(
     SecurityUpgradeRoutesDependencies(
         get_security_service=lambda: SECURITY_SERVICE,
@@ -3188,7 +3218,8 @@ SECURITY_UPGRADE_ROUTES_BLUEPRINT = create_security_upgrade_blueprint(
         authenticated=authenticated,
         clock=time.time,
         get_upgrade_service=get_upgrade_service,
-        licensed_sport_families=licensed_sport_families,
+        licensed_sport_families=station_sport_families,
+        switched_off_sport_families=switched_off_sport_families,
     )
 )
 APPLICATION_BLUEPRINTS.append(SECURITY_UPGRADE_ROUTES_BLUEPRINT)
@@ -3196,7 +3227,11 @@ APPLICATION_BLUEPRINTS.append(SECURITY_UPGRADE_ROUTES_BLUEPRINT)
 ACCESS_MODEL_ROUTES_BLUEPRINT = create_access_model_blueprint(
     AccessModelRoutesDependencies(
         require_auth=require_auth,
-        licensed_sport_families=licensed_sport_families,
+        licensed_sport_families=station_sport_families,
+        switched_off_sport_families=switched_off_sport_families,
+        all_licensed_sport_families=licensed_sport_families,
+        load_station_sports=lambda: IDENTITY_PROFILE.get("station_sports") or {},
+        save_station_sports=save_station_sports_document,
     )
 )
 APPLICATION_BLUEPRINTS.append(ACCESS_MODEL_ROUTES_BLUEPRINT)

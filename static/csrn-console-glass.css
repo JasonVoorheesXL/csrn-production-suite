@@ -261,3 +261,13 @@ html:not(.show-retired) .retired-tool {
   background: var(--csrn-accent-button);
   color: #fff;
 }
+
+/* Settings > Sports (audit round 3). */
+.station-sports-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+.station-sports-list small {
+  color: var(--csrn-muted);
+}
