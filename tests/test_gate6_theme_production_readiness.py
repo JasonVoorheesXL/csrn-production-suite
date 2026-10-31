@@ -102,7 +102,8 @@ def test_theme_manager_scorebug_preview_remains_horizontal_and_themes_are_distin
 def test_theme_navigation_and_live_overlay_refresh_contract() -> None:
     navigation = (ROOT / "static" / "csrn-navigation.js").read_text(encoding="utf-8")
     overlay = (ROOT / "templates" / "overlay.html").read_text(encoding="utf-8")
-    assert "['themes', 'Theme Manager', '/themes']" in navigation
+    # Retired from the menu in the 2026 audit; Settings > Retired Tools shows it.
+    assert "['themes', 'Theme Manager', '/themes', true]" in navigation
     assert 'id="csrnThemeCss"' in overlay
     assert "pollCsrnThemeRevision" in overlay
     assert "/api/themes/public-state" in overlay

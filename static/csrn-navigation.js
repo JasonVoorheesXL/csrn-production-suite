@@ -1,4 +1,39 @@
 (function () {
+  // Tools that went unused through the 2026 season. They stay installed and
+  // reachable by URL; Settings > Retired Tools brings them back on a machine.
+  const RETIRED_STORAGE_KEY = 'csrn.showRetiredTools.v1';
+  const RETIRED_STYLE_ID = 'csrn-retired-tools-style';
+
+  function showRetired() {
+    try {
+      return localStorage.getItem(RETIRED_STORAGE_KEY) === '1';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function applyRetired(show) {
+    document.documentElement.classList.toggle('show-retired', show);
+  }
+
+  function setShowRetired(show) {
+    try {
+      if (show) localStorage.setItem(RETIRED_STORAGE_KEY, '1');
+      else localStorage.removeItem(RETIRED_STORAGE_KEY);
+    } catch (error) {
+      // The switch still applies to this page.
+    }
+    applyRetired(Boolean(show));
+  }
+
+  if (!document.getElementById(RETIRED_STYLE_ID)) {
+    const style = document.createElement('style');
+    style.id = RETIRED_STYLE_ID;
+    style.textContent = 'html:not(.show-retired) .retired-tool { display: none !important; }';
+    document.head.appendChild(style);
+  }
+  applyRetired(showRetired());
+
   const groups = [
     ['Game Day', [
       ['pregame', 'Pre-Game Setup'],
@@ -15,15 +50,14 @@
     ]],
     ['Production', [
       ['graphics', 'Graphics'],
-
-      ['themes', 'Theme Manager', '/themes'],
+      ['themes', 'Theme Manager', '/themes', true],
       ['assets', 'Assets'],
       ['sponsors', 'Sponsors'],
-      ['packages', 'Broadcast Packages'],
+      ['packages', 'Broadcast Packages', null, true],
     ]],
     ['Publishing', [
       ['social', 'Social Publishing', '/social'],
-      ['recaps', 'Game Recaps', '/recaps'],
+      ['recaps', 'Game Recaps', '/recaps', true],
     ]],
     ['System', [
       ['settings', 'Settings'],
@@ -87,8 +121,9 @@
       const menu = document.createElement('div');
       menu.className = 'csrn-nav-menu';
 
-      items.forEach(([key, text, explicitUrl]) => {
+      items.forEach(([key, text, explicitUrl, retired]) => {
         const link = document.createElement('a');
+        if (retired) link.classList.add('retired-tool');
         link.href = explicitUrl || mainUrl(key);
         link.dataset.csrnKey = key;
         link.textContent = text;
@@ -139,5 +174,7 @@
   window.CSRNNavigation = {
     setActive: activate,
     close: closeMenus,
+    showRetired,
+    setShowRetired,
   };
 }());
