@@ -143,6 +143,30 @@ def onboarding_complete(profile: Mapping[str, Any] | None) -> bool:
     return bool(isinstance(profile, Mapping) and profile.get("onboarding_complete"))
 
 
+# Station branding (audit round 4): stand-in wherever no logo is set.
+PLACEHOLDER_LOGO = "/static/logo-placeholder.svg"
+
+
+def station_short_name(organization: Mapping[str, Any] | None) -> str:
+    if not isinstance(organization, Mapping):
+        return ""
+    return str(organization.get("short_name") or organization.get("name") or "").strip()
+
+
+def station_product_name(organization: Mapping[str, Any] | None) -> str:
+    """The product as this station sees it: "<short name> Production Suite"."""
+    short = station_short_name(organization)
+    return f"{short} Production Suite" if short else "Production Suite"
+
+
+def station_logo_url(organization: Mapping[str, Any] | None) -> str:
+    """The organization logo as a URL the browser can load, or the placeholder."""
+    path = branding_logo(organization)
+    if not path:
+        return PLACEHOLDER_LOGO
+    return path if path.startswith(("/", "http://", "https://")) else "/" + path
+
+
 def branding_logo(organization: Mapping[str, Any] | None) -> str:
     """The configured network/organization logo path, or "" -- never a
     hard-coded csrn-logo.png fallback. Accepts any of the historical key
