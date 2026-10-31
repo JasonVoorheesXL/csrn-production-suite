@@ -23,17 +23,23 @@ Two cases:
   B. Control case: a player resolved normally via player_id, to confirm
      the harness/gate isn't just broken for everyone.
 
-Run: python headshot_backfill_sim.py
+Run: python tools/headshot_backfill_sim.py
 """
 
 from __future__ import annotations
 
 import copy
 import sys
+from pathlib import Path
 from typing import Any
 
-import app as app_module
-from event_service import EventService
+# Run from anywhere: the app modules live in the project root.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import app as app_module  # noqa: E402
+from event_service import EventService  # noqa: E402
 
 # Real production shape, taken from Data/Rosters/rosters.json as of
 # 2026-08-25: Caledonia #79 Jaraylon Washington has a real headshot on

@@ -16,7 +16,7 @@ raw-upload habit shows up elsewhere.
 Originals are backed up before being overwritten (same filename, under a
 timestamped backup directory) so this is reversible.
 
-Run: python reprocess_oversized_headshots.py [--dry-run]
+Run: python tools/reprocess_oversized_headshots.py [--dry-run]
 """
 
 from __future__ import annotations
@@ -28,8 +28,13 @@ from pathlib import Path
 
 from PIL import Image
 
-import app as app_module
-from support_media_service import SupportMediaService
+# Run from anywhere: the app modules live in the project root.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import app as app_module  # noqa: E402
+from support_media_service import SupportMediaService  # noqa: E402
 
 HEADSHOTS_DIR = Path(app_module.HEADSHOTS_DIR)
 BACKUP_DIR = HEADSHOTS_DIR / f"_pre-reprocess-backup-{time.strftime('%Y%m%d-%H%M%S')}"
