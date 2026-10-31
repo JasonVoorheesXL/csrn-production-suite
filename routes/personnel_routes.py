@@ -16,6 +16,10 @@ class PersonnelRoutesDependencies:
     get_personnel_service: Callable[[], Any]
     get_headshots_dir: Callable[[], Path]
     normalize_personnel_id: Callable[[str], str]
+    # Audit round 4: shrink a camera original to headshot size before it is
+    # stored; None means the file isn't a readable image. Defaults to storing
+    # the upload as sent.
+    shrink_headshot: Callable[[bytes, str], bytes | None] = lambda payload, _extension: payload
 
 
 def create_personnel_blueprint(
@@ -86,12 +90,16 @@ def create_personnel_blueprint(
         if extension not in {".png", ".jpg", ".jpeg", ".webp"}:
             return jsonify({"error": "UNSUPPORTED_IMAGE"}), 400
 
+        payload = dependencies.shrink_headshot(upload.read(), extension)
+        if payload is None:
+            return jsonify({"error": "INVALID_IMAGE"}), 400
+
         headshots_dir = dependencies.get_headshots_dir()
         headshots_dir.mkdir(parents=True, exist_ok=True)
         target = headshots_dir / (
             f"{dependencies.normalize_personnel_id(personnel_id)}{extension}"
         )
-        upload.save(target)
+        target.write_bytes(payload)
         relative = "/personnel-headshots/" + target.name
         result = dependencies.get_personnel_service().attach_headshot(
             personnel_id,
