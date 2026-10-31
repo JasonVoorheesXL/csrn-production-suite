@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
+
+import roster_print_layout
 
 
 RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
@@ -32,6 +34,32 @@ def create_roster_blueprint(
     def list_rosters():
         return jsonify(
             dependencies.get_roster_service().list_rosters(dependencies.sport_scope())
+        )
+
+    @routes.get("/api/rosters/<roster_id>/print")
+    @dependencies.require_auth
+    def print_roster(roster_id: str):
+        """The Rosters page printout (2026-10-31): the same Press Coverage-style
+        pages as the Broadcaster Print Sheet, as a page the console prints."""
+        result = dependencies.get_roster_service().read(roster_id)
+        if result.code != "OK":
+            return jsonify({"error": result.code}), 404
+        roster = result.data["roster"]
+        team = str(roster.get("school_name") or "Roster")
+        details = " · ".join(
+            str(roster.get(key)).strip() for key in ("season", "level", "sport") if str(roster.get(key) or "").strip()
+        )
+        sections = roster_print_layout.roster_pages(
+            roster_print_layout.active_players(roster),
+            title=f"{team} roster",
+            subtitle=details,
+            team=team,
+            team_tag=details,
+            brand="Roster",
+        )
+        return Response(
+            roster_print_layout.roster_document(sections, title=f"{team} roster"),
+            mimetype="text/html",
         )
 
     @routes.post("/api/rosters")
