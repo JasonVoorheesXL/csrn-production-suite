@@ -120,11 +120,11 @@ def test_hidden_means_an_explicit_visible_false_override_only() -> None:
 
 def test_render_selected_masks_the_runtime_once_and_never_reads_the_raw_payload_again() -> None:
     body = _function(_read(RUNTIME), "renderSelected")
-    assert "const [rawRuntime, captionState] = await Promise.all([" in body
+    assert "const rawRuntime = await fetchJson(RUNTIME_STATE_URL);" in body
     assert "const runtime = layoutMaskedRuntimeR1(rawRuntime);" in body
     assert "syncLayoutSuppressionR1(rawRuntime);" in body
     # everything after the fetch reads `runtime` (the masked view)
-    assert body.count("rawRuntime") == 3  # the destructure, the mask, the suppression sync
+    assert body.count("rawRuntime") == 3  # the fetch, the mask, the suppression sync
     # mask is established before the mode, the pending flag and the signature are computed
     assert body.index("layoutMaskedRuntimeR1(rawRuntime)") < body.index("themeVideoModeFor(alias, runtime)")
     assert body.index("layoutMaskedRuntimeR1(rawRuntime)") < body.index("playerVisible(runtime) && themedIntegratedPlayerSupported(alias)")

@@ -309,18 +309,6 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
         </div>
         <div id="qlStatus" class="status ql-status"></div>
       </section>
-      <section class="panel compact live-operator-controls command-caption-panel retired-tool">
-        <div class="section-heading compact"><div><h3>Live Captions</h3><p class="section-note">Start or stop the active caption feed during the broadcast.</p></div><span id="commandCaptionStateBadge" class="phase-badge">OFF</span></div>
-        <div class="button-row">
-          <button id="commandCaptionLiveToggle" class="primary" onclick="toggleLiveCaptions()">Start Live Captions</button>
-          <button id="commandCaptionToggle" class="success" onclick="toggleCaptions()">Show Captions</button>
-          <button onclick="window.open('/captions','_blank')">Open Captions Preview</button>
-          <button onclick="showModule('pregame')">Caption Setup</button>
-        </div>
-        <div id="commandCaptionRuntimeStatus" class="status">Live captions are stopped.</div>
-        <div id="commandCaptionDiagnostics" class="caption-runtime-diagnostics"></div>
-        <div id="commandCaptionChannelMeter" class="caption-channel-meter"></div>
-      </section>
       <section class="panel compact authority-panel">
         <div class="section-heading compact"><div><h3>Game Data Control</h3><p class="section-note">Only one console may publish game data.</p></div><span id="authorityBadge" class="phase-badge">BROADCASTER</span></div>
         <div class="button-row"><button id="enableStatisticianButton" onclick="setControlSource('statistician')">Enable Statistician Console</button><button id="broadcasterTakeoverButton" class="warning hidden" onclick="setControlSource('broadcaster')">Broadcaster Takeover</button></div>
@@ -723,13 +711,11 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
           <label class="check-row"><input type="checkbox"> OBS receives overlay/program visual</label>
           <label class="check-row"><input type="checkbox"> Facebook stream key/session is ready</label>
           <label class="check-row"><input type="checkbox"> P4next input levels checked with headset monitoring</label>
-          <label class="check-row retired-tool"><input type="checkbox"> Captions source tested or intentionally off</label>
           <label class="check-row"><input type="checkbox"> Phone/tablet controller tested on current network</label>
           <label class="check-row"><input type="checkbox"> Local recording path and disk space confirmed</label>
         </div>
         <div class="button-row readiness-actions">
           <button onclick="window.open('/overlay','_blank')">Open Overlay Preview</button>
-          <button class="retired-tool" onclick="window.open('/captions','_blank')">Open Captions Preview</button>
           <button onclick="showModule('obs')">Open OBS Manager</button>
         </div>
       </section>
@@ -775,7 +761,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
         <div class="section-heading compact">
           <div>
             <h3>Broadcast Theme</h3>
-            <p class="section-note">Choose the production theme used by the main OBS overlay. Theme selection changes presentation only; game data, captions, ticker, highlights, spotlights, and other fixtures remain independent resources.</p>
+            <p class="section-note">Choose the production theme used by the main OBS overlay. Theme selection changes presentation only; game data, ticker, highlights, spotlights, and other fixtures remain independent resources.</p>
           </div>
           <span id="csrnPregameThemeBadge" class="phase-badge">LOADING</span>
         </div>
@@ -799,92 +785,6 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
         <div id="csrnPregameThemeMessage" class="status">Loading authoritative production theme…</div>
       </section>
 
-      <section class="panel compact live-operator-controls caption-control-panel retired-tool">
-        <div class="section-heading compact"><div><h3>Captions</h3><p class="section-note">Production themes render captions inside the main /overlay source. Use /captions only as a preview or fallback source.</p></div><span id="captionStateBadge" class="phase-badge">OFF</span></div>
-        <div class="button-row">
-          <button id="captionToggle" class="success" onclick="toggleCaptions()">Show Captions</button>
-          <button id="captionLiveToggle" class="primary" onclick="toggleLiveCaptions()">Start Live Captions</button>
-          <button onclick="window.open('/captions','_blank')">Open Captions Preview</button>
-          <button class="danger" onclick="clearCaptions()">Clear Captions</button>
-        </div>
-        <div class="setup-grid caption-source-grid">
-          <label>Caption Source
-            <select id="captionSourceType" onchange="captionSourceTypeChanged()">
-              <option value="manual">Manual captions only</option>
-              <option value="audio_device">Microphone / USB audio device</option>
-              <option value="system_mix" disabled>System audio mix (not yet available)</option>
-              <option value="obs_source" disabled>OBS audio source (not yet available)</option>
-            </select>
-          </label>
-          <label>Audio Device
-            <select id="captionAudioDevice" onchange="captionAudioDeviceChanged()"></select>
-          </label>
-          <label>Caption Mode
-            <select id="captionChannelMode">
-              <option value="speaker_labeled">Speaker-labeled channels</option>
-              <option value="mixed" disabled>Single mixed caption stream (not yet available)</option>
-            </select>
-          </label>
-          <label>Whisper Model
-            <select id="captionModel">
-              <option value="small.en">small.en - fast</option>
-              <option value="medium.en">medium.en - better English</option>
-              <option value="turbo">turbo - large-v3 speed</option>
-              <option value="large-v3">large-v3 - highest quality</option>
-            </select>
-          </label>
-          <button onclick="loadCaptionAudioDevices()">Refresh Devices</button>
-        </div>
-        <div class="setup-grid caption-source-grid">
-          <label class="span-2">Speech Sensitivity
-            <input id="captionSpeechThreshold" type="range" min="0.00005" max="0.002" step="0.00005" value="0.00075" oninput="captionSpeechThresholdChanged()">
-          </label>
-          <label>Threshold
-            <input id="captionSpeechThresholdValue" value="0.00075" oninput="captionSpeechThresholdValueChanged()">
-          </label>
-          <div class="caption-sensitivity-note">Lower values catch quieter speech. Raise it if room noise starts creating unwanted captions.</div>
-        </div>
-        <div id="captionDeviceStatus" class="status">Caption source not checked.</div>
-        <div class="setup-grid caption-input-grid">
-          <label class="check-row"><input id="captionInput1Enabled" type="checkbox" checked> Use Input 1</label>
-          <label>Input 1 Hardware Channel
-            <select id="captionInput1DeviceChannel"></select>
-          </label>
-          <label>Input 1 Person
-            <select id="captionInput1Person" onchange="captionInputPersonChanged(1)"></select>
-          </label>
-          <label>Input 1 Label
-            <input id="captionInput1Speaker" maxlength="60" value="Announcer 1">
-          </label>
-          <label class="check-row"><input id="captionInput2Enabled" type="checkbox"> Use Input 2</label>
-          <label>Input 2 Hardware Channel
-            <select id="captionInput2DeviceChannel"></select>
-          </label>
-          <label>Input 2 Person
-            <select id="captionInput2Person" onchange="captionInputPersonChanged(2)"></select>
-          </label>
-          <label>Input 2 Label
-            <input id="captionInput2Speaker" maxlength="60" value="Announcer 2">
-          </label>
-          <button class="primary" onclick="saveCaptionAssignments()">Save Inputs</button>
-        </div>
-        <div class="setup-grid caption-test-grid">
-          <label>Test Input
-            <select id="captionSpeakerChannel">
-              <option value="1">Input 1</option>
-              <option value="2">Input 2</option>
-            </select>
-          </label>
-          <label class="span-2">Test Caption
-            <input id="captionTestText" maxlength="180" value="Testing CSRN live captions.">
-          </label>
-          <button class="primary" onclick="sendTestCaption()">Send Test Caption</button>
-        </div>
-        <div id="captionStatus" class="status">Captions are off.</div>
-        <div id="captionRuntimeStatus" class="status">Live captions are stopped.</div>
-        <div id="captionRuntimeDiagnostics" class="caption-runtime-diagnostics"></div>
-        <div id="captionChannelMeter" class="caption-channel-meter"></div>
-      </section>
     </section>
 
     
@@ -1689,7 +1589,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
 
         <h2>Retired Tools</h2>
         <label class="check-row retired-tools-row"><input id="showRetiredTools" type="checkbox" onchange="setShowRetiredTools(this.checked)"> Show retired tools</label>
-        <p class="section-note">Live captions, Layout Builder, Game Recaps, Broadcast Packages and the Theme Manager went unused this season, so they are hidden from the menus and pages. Their data is kept; turn this on to bring them back on this computer.</p>
+        <p class="section-note">Layout Builder, Game Recaps, Broadcast Packages and the Theme Manager went unused this season, so they are hidden from the menus and pages. Their data is kept; turn this on to bring them back on this computer.</p>
 
         <h2>Folders</h2>
         <div class="setup-grid">
@@ -2190,11 +2090,6 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
 let currentState = null;
 let authenticated = false;
 let appInitialized = false;
-let captionProfile = null;
-let captionState = null;
-let captionAudioDevices = [];
-let captionRuntime = null;
-let captionRuntimePoll = null;
 
 
 function requestedModuleFromLocation() {
@@ -2224,7 +2119,6 @@ async function initializeAuthenticatedApp() {
   await loadSessionContext();
   await loadRulesetOptions();
   await loadBroadcasters();
-  await loadCaptionControls();
   await loadGameManager();
   await populatePlannedBroadcasts();
   moveSetupPanelToGameManager();
@@ -2629,540 +2523,6 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
-
-function captionPersonName(person) {
-  return (person?.preferred_name || person?.full_name || person?.name || '').trim();
-}
-
-function populateCaptionPersonSelect(selectId, selectedName) {
-  const select = document.getElementById(selectId);
-  if (!select) return;
-  const active = (broadcasters || []).filter(person => String(person.status || 'active').toLowerCase() !== 'inactive');
-  const options = ['<option value="">Manual Label</option>'].concat(active.map(person => {
-    const name = captionPersonName(person);
-    const role = person.role || person.primary_role || '';
-    return `<option value="${escapeHtml(name)}">${escapeHtml(name)}${role ? ` · ${escapeHtml(role)}` : ''}</option>`;
-  }));
-  select.innerHTML = options.join('');
-  if (selectedName && active.some(person => captionPersonName(person) === selectedName)) {
-    select.value = selectedName;
-  }
-}
-
-function captionChannel(channel) {
-  const channels = captionProfile?.channels || [];
-  return channels.find(item => Number(item.channel) === Number(channel)) || {};
-}
-
-function captionInputPersonChanged(channel) {
-  const person = document.getElementById(`captionInput${channel}Person`)?.value || '';
-  if (person) document.getElementById(`captionInput${channel}Speaker`).value = person;
-}
-
-function selectedCaptionAudioDevice() {
-  const select = document.getElementById('captionAudioDevice');
-  const option = select?.selectedOptions?.[0];
-  return {
-    id: select?.value || '',
-    name: option?.dataset.deviceName || option?.textContent || '',
-    hostApi: option?.dataset.hostApi || '',
-    channels: Number(option?.dataset.channels || 0)
-  };
-}
-
-function populateCaptionHardwareChannels() {
-  const device = selectedCaptionAudioDevice();
-  const maximum = Math.max(1, Number(device.channels || captionProfile?.audio_device_channels || 2));
-  for (const channel of [1, 2]) {
-    const select = document.getElementById(`captionInput${channel}DeviceChannel`);
-    if (!select) continue;
-    const item = captionChannel(channel);
-    const selected = Math.max(1, Number(item.device_channel || channel));
-    select.innerHTML = Array.from({length: maximum}, (_, index) => {
-      const hardwareChannel = index + 1;
-      return `<option value="${hardwareChannel}">IN${hardwareChannel}</option>`;
-    }).join('');
-    select.value = String(Math.min(maximum, selected));
-  }
-}
-
-function renderCaptionAudioDevices(message = '') {
-  const select = document.getElementById('captionAudioDevice');
-  if (!select) return;
-  const selected = captionProfile?.audio_device || '';
-  if (!captionAudioDevices.length) {
-    select.innerHTML = '<option value="">No local audio inputs detected</option>';
-    select.value = '';
-  } else {
-    select.innerHTML = '<option value="">Choose an audio input</option>' + captionAudioDevices.map(device =>
-      `<option value="${escapeHtml(device.id)}" data-device-name="${escapeHtml(device.name)}" data-host-api="${escapeHtml(device.host_api || '')}" data-channels="${Number(device.channels || 0)}">${escapeHtml(device.name)} · ${escapeHtml(device.host_api || 'PortAudio')} · device ${escapeHtml(device.index ?? device.id)} · ${Number(device.channels || 0)} input channel(s)</option>`
-    ).join('');
-    const exact = captionAudioDevices.find(device => String(device.id) === String(selected));
-    const profileName = String(captionProfile?.audio_device_name || '').toLowerCase();
-    const profileHostApi = String(captionProfile?.audio_device_host_api || '').toLowerCase();
-    const isCaptionBusDevice = device => /cable output|vb-audio virtual cable/i.test(device.name || '');
-    const bestNamed = captionAudioDevices
-      .filter(device => profileName && String(device.name || '').toLowerCase() === profileName)
-      .sort((a, b) => {
-        const hostScore = device => profileHostApi && String(device.host_api || '').toLowerCase() === profileHostApi ? 1 : 0;
-        return hostScore(b) - hostScore(a) || Number(b.channels || 0) - Number(a.channels || 0);
-      })[0];
-    const bestCaptionBus = captionAudioDevices
-      .filter(isCaptionBusDevice)
-      .sort((a, b) => Number(/wasapi/i.test(b.host_api || '')) - Number(/wasapi/i.test(a.host_api || '')) || Number(b.channels || 0) - Number(a.channels || 0))[0];
-    const exactIsUsable = exact && (!profileHostApi || String(exact.host_api || '').toLowerCase() === profileHostApi);
-    const preferred = exactIsUsable
-      ? exact
-      : (bestNamed || (!selected ? bestCaptionBus : null));
-    if (preferred) {
-      select.value = String(preferred.id);
-      captionProfile = {
-        ...(captionProfile || {}),
-        audio_device: String(preferred.id),
-        audio_device_name: preferred.name || '',
-        audio_device_host_api: preferred.host_api || '',
-        audio_device_channels: Number(preferred.channels || 0)
-      };
-    }
-  }
-  populateCaptionHardwareChannels();
-  const status = document.getElementById('captionDeviceStatus');
-  if (status && message) status.textContent = message;
-}
-
-function captionSourceTypeChanged() {
-  const source = document.getElementById('captionSourceType')?.value || 'manual';
-  const device = document.getElementById('captionAudioDevice');
-  if (device) device.disabled = source !== 'audio_device';
-}
-
-function captionAudioDeviceChanged() {
-  const picked = selectedCaptionAudioDevice();
-  captionProfile = {
-    ...(captionProfile || {}),
-    audio_device: picked.id,
-    audio_device_name: picked.name,
-    audio_device_host_api: picked.hostApi,
-    audio_device_channels: picked.channels
-  };
-  populateCaptionHardwareChannels();
-}
-
-function captionSpeechThreshold() {
-  const raw = document.getElementById('captionSpeechThresholdValue')?.value || captionProfile?.speech_threshold || 0.00025;
-  const value = Number(raw);
-  if (!Number.isFinite(value)) return 0.00025;
-  return Math.max(0.00005, Math.min(0.05, value));
-}
-
-function renderCaptionSpeechThreshold() {
-  const value = Number(captionProfile?.speech_threshold || 0.00025);
-  const slider = document.getElementById('captionSpeechThreshold');
-  const input = document.getElementById('captionSpeechThresholdValue');
-  const shown = Number.isFinite(value) ? value.toFixed(5) : '0.00025';
-  if (slider) slider.value = String(Math.max(Number(slider.min || 0.00005), Math.min(Number(slider.max || 0.002), Number(shown))));
-  if (input) input.value = shown;
-}
-
-function captionSpeechThresholdChanged() {
-  const value = Number(document.getElementById('captionSpeechThreshold')?.value || 0.00025);
-  const input = document.getElementById('captionSpeechThresholdValue');
-  if (input) input.value = value.toFixed(5);
-  captionProfile = {...(captionProfile || {}), speech_threshold: value};
-}
-
-function captionSpeechThresholdValueChanged() {
-  const value = captionSpeechThreshold();
-  const slider = document.getElementById('captionSpeechThreshold');
-  if (slider) slider.value = String(Math.max(Number(slider.min || 0.00005), Math.min(Number(slider.max || 0.002), value)));
-  captionProfile = {...(captionProfile || {}), speech_threshold: value};
-}
-
-function renderCaptionRuntimeStatus() {
-  const runtime = captionRuntime || {};
-  const running = Boolean(runtime.running);
-  for (const button of [
-    document.getElementById('captionLiveToggle'),
-    document.getElementById('commandCaptionLiveToggle')
-  ]) {
-    if (!button) continue;
-    button.textContent = running ? 'Stop Live Captions' : 'Start Live Captions';
-    button.className = running ? 'warning' : 'primary';
-  }
-  for (const status of [
-    document.getElementById('captionRuntimeStatus'),
-    document.getElementById('commandCaptionRuntimeStatus')
-  ]) {
-    if (!status) continue;
-    status.textContent = runtime.message || (running ? 'Live captions are running.' : 'Live captions are stopped.');
-    status.className = running ? 'status success' : (runtime.error ? 'status error' : 'status');
-  }
-  const audioLevel = Number(runtime.last_audio_level || 0);
-  const chunkLevel = Number(runtime.last_chunk_level || 0);
-  const captionText = runtime.last_caption_text || '';
-  const transcriptStatus = runtime.last_transcript_status || '';
-  const transcriptText = runtime.last_transcript_text || '';
-  const confidence = Number(runtime.last_transcript_confidence || 0);
-  const transcribeSeconds = Number(runtime.last_transcribe_seconds || 0);
-  const gain = Number(runtime.last_gain || 1);
-  const callbackCount = Number(runtime.callback_count || 0);
-  const callbackAge = runtime.last_callback_age_seconds;
-  const callbackAgeText = callbackAge === null || callbackAge === undefined
-    ? 'no callbacks yet'
-    : `${Number(callbackAge).toFixed(0)}s since callback`;
-  const callbackText = `Callbacks: ${callbackCount} (${callbackAgeText})`;
-  const capture = runtime.capture_channels
-    ? `${escapeHtml(runtime.capture_device || 'Audio device')} · ${escapeHtml(runtime.capture_host_api || 'PortAudio')} · ${Number(runtime.capture_channels)}ch${runtime.capture_dtype ? ` · ${escapeHtml(runtime.capture_dtype)}` : ''}`
-    : '';
-  const model = runtime.model_device
-    ? `${escapeHtml(runtime.model_device)} / ${escapeHtml(runtime.model_compute_type || '')}`
-    : '';
-  const diagnostic = running
-    ? `${capture ? `${capture} · ` : ''}${callbackText} · Audio ch ${runtime.last_audio_channel || '-'}: ${audioLevel.toFixed(5)} · Last chunk ch ${runtime.last_chunk_channel || '-'}: ${chunkLevel.toFixed(5)} · Gain ${gain.toFixed(1)}x${model ? ` · Model: ${model}` : ''}${runtime.audio_status ? ` · Audio: ${escapeHtml(runtime.audio_status)}` : ''}${transcriptStatus ? ` · Whisper: ${escapeHtml(transcriptStatus)}${transcribeSeconds ? ` in ${transcribeSeconds.toFixed(2)}s` : ''}` : ''}${confidence ? ` (${confidence.toFixed(2)})` : ''}${transcriptText ? ` · "${escapeHtml(transcriptText)}"` : ''}${captionText && captionText !== transcriptText ? ` · Last caption: ${escapeHtml(captionText)}` : ''}`
-    : (runtime.error ? `Last error: ${escapeHtml(runtime.error)}` : 'Start live captions to monitor audio levels.');
-  for (const node of [
-    document.getElementById('captionRuntimeDiagnostics'),
-    document.getElementById('commandCaptionDiagnostics')
-  ]) {
-    if (node) node.innerHTML = diagnostic;
-  }
-  renderCaptionChannelMeter();
-  syncCaptionRuntimePolling();
-}
-
-function captionChannelLevel(channel) {
-  const levels = captionRuntime?.channel_levels || {};
-  return Number(levels[String(channel)] || 0);
-}
-
-function renderCaptionChannelMeter() {
-  const running = Boolean(captionRuntime?.running);
-  const stale = Boolean(captionRuntime?.callback_stale) || !running;
-  const level1 = captionChannelLevel(1);
-  const level2 = captionChannelLevel(2);
-  const active = level1 >= level2 ? 1 : 2;
-  const threshold = captionSpeechThreshold();
-  const logicalHtml = [1, 2].map(channel => {
-    const level = channel === 1 ? level1 : level2;
-    const percent = Math.max(0, Math.min(100, level * 6000));
-    const aboveGate = running && !stale && level >= threshold;
-    const isActive = aboveGate && channel === active;
-    return `<div class="caption-channel-card ${isActive ? 'active' : ''}">
-      <strong>Input ${channel}</strong>
-      <span>${stale ? 'stale ' : ''}${level.toFixed(5)}${aboveGate ? ' ABOVE GATE' : ''}</span>
-      <div class="caption-channel-bar"><i style="width:${percent.toFixed(1)}%"></i></div>
-    </div>`;
-  }).join('');
-  const mappings = new Set((captionRuntime?.channel_mappings || []).map(item => Number(item.device_channel)));
-  const hardwareLevels = captionRuntime?.hardware_levels || {};
-  const hardwareHtml = Object.entries(hardwareLevels)
-    .map(([channel, raw]) => [Number(channel), Number(raw || 0)])
-    .filter(([channel, level]) => mappings.has(channel) || level > 0.00005)
-    .sort((a, b) => a[0] - b[0])
-    .map(([channel, level]) => {
-      const percent = Math.max(0, Math.min(100, level * 6000));
-      return `<div class="caption-channel-card ${running && !stale && level >= threshold ? 'active' : ''}">
-        <strong>Hardware IN${channel}</strong>
-        <span>${stale ? 'stale ' : ''}${level.toFixed(5)}</span>
-        <div class="caption-channel-bar"><i style="width:${percent.toFixed(1)}%"></i></div>
-      </div>`;
-    }).join('');
-  const html = logicalHtml + hardwareHtml;
-  for (const node of [
-    document.getElementById('captionChannelMeter'),
-    document.getElementById('commandCaptionChannelMeter')
-  ]) {
-    if (node) node.innerHTML = html;
-  }
-}
-
-function setCaptionRuntimeButtonsDisabled(disabled) {
-  for (const button of [
-    document.getElementById('captionLiveToggle'),
-    document.getElementById('commandCaptionLiveToggle')
-  ]) {
-    if (button) button.disabled = disabled;
-  }
-}
-
-function syncCaptionRuntimePolling() {
-  if (captionRuntime?.running && !captionRuntimePoll) {
-    captionRuntimePoll = setInterval(refreshCaptionRuntimeStatus, 1200);
-  } else if (!captionRuntime?.running && captionRuntimePoll) {
-    clearInterval(captionRuntimePoll);
-    captionRuntimePoll = null;
-  }
-}
-
-function captionProfilePayload(overrides = {}) {
-  const sourceType = document.getElementById('captionSourceType')?.value || captionProfile?.source_type || 'manual';
-  const device = selectedCaptionAudioDevice();
-  return {
-    channels: captionChannelsFromControls(),
-    enabled: Boolean(captionProfile?.enabled),
-    overlay_visible: Boolean(captionProfile?.overlay_visible),
-    source_type: sourceType,
-    audio_device: sourceType === 'audio_device' ? device.id : '',
-    audio_device_name: sourceType === 'audio_device' ? device.name : '',
-    audio_device_host_api: sourceType === 'audio_device' ? device.hostApi : '',
-    audio_device_channels: sourceType === 'audio_device' ? device.channels : 0,
-    caption_model: document.getElementById('captionModel')?.value || captionProfile?.caption_model || 'small.en',
-    channel_mode: document.getElementById('captionChannelMode')?.value || captionProfile?.channel_mode || 'speaker_labeled',
-    speech_threshold: captionSpeechThreshold(),
-    ...overrides
-  };
-}
-
-function renderCaptionControls() {
-  const profile = captionProfile || {};
-  const state = captionState || {};
-  const visible = Boolean(profile.enabled && profile.overlay_visible);
-  const sourceType = document.getElementById('captionSourceType');
-  if (sourceType) sourceType.value = profile.source_type || 'manual';
-  const channelMode = document.getElementById('captionChannelMode');
-  if (channelMode) channelMode.value = profile.channel_mode || 'speaker_labeled';
-  const captionModel = document.getElementById('captionModel');
-  if (captionModel) captionModel.value = profile.caption_model || 'small.en';
-  renderCaptionSpeechThreshold();
-  renderCaptionAudioDevices();
-  captionSourceTypeChanged();
-  const badge = document.getElementById('captionStateBadge');
-  if (badge) {
-    badge.textContent = visible ? 'ON' : 'OFF';
-    badge.className = `phase-badge ${visible ? 'phase-live' : ''}`;
-  }
-  const commandBadge = document.getElementById('commandCaptionStateBadge');
-  if (commandBadge) {
-    commandBadge.textContent = visible ? 'ON' : 'OFF';
-    commandBadge.className = `phase-badge ${visible ? 'phase-live' : ''}`;
-  }
-  for (const toggle of [
-    document.getElementById('captionToggle'),
-    document.getElementById('commandCaptionToggle')
-  ]) {
-    if (!toggle) continue;
-    toggle.textContent = visible ? 'Hide Captions' : 'Show Captions';
-    toggle.className = visible ? 'warning' : 'success';
-  }
-  const status = document.getElementById('captionStatus');
-  if (status) {
-    const count = Array.isArray(state.current) ? state.current.length : 0;
-      status.textContent = visible ? `Captions are on. ${count ? `${count} recent line(s) queued.` : 'Ready for caption lines.'}` : 'Captions are off.';
-      status.className = visible ? 'status success' : 'status';
-  }
-  renderCaptionRuntimeStatus();
-  for (const channel of [1, 2]) {
-    const item = captionChannel(channel);
-    const speaker = item.speaker || `Announcer ${channel}`;
-    const enabled = document.getElementById(`captionInput${channel}Enabled`);
-    if (enabled) enabled.checked = item.enabled !== false && channel === 1 ? true : Boolean(item.enabled);
-    const input = document.getElementById(`captionInput${channel}Speaker`);
-    if (input) input.value = speaker;
-    populateCaptionPersonSelect(`captionInput${channel}Person`, speaker);
-  }
-}
-
-function captionChannelsFromControls() {
-  const existing = Array.isArray(captionProfile?.channels) ? captionProfile.channels : [];
-  const byChannel = new Map(existing.map(item => [Number(item.channel), item]));
-  for (const channel of [1, 2]) {
-    const label = document.getElementById(`captionInput${channel}Speaker`)?.value.trim() || `Announcer ${channel}`;
-    const enabled = document.getElementById(`captionInput${channel}Enabled`)?.checked ?? channel === 1;
-    const deviceChannel = Number(document.getElementById(`captionInput${channel}DeviceChannel`)?.value || channel);
-    byChannel.set(channel, {...(byChannel.get(channel) || {}), channel, device_channel: deviceChannel, speaker: label, enabled});
-  }
-  return Array.from(byChannel.values()).sort((a, b) => Number(a.channel) - Number(b.channel));
-}
-
-async function loadCaptionControls() {
-  try {
-    const [data] = await Promise.all([
-      api('/api/captions/status'),
-      loadCaptionAudioDevices(false)
-    ]);
-    captionProfile = data.profile || {};
-    captionState = data.state || {};
-    captionRuntime = data.runtime || {};
-    renderCaptionControls();
-  } catch (error) {
-    const status = document.getElementById('captionStatus');
-    if (status) {
-      status.textContent = error.message || 'Caption controls unavailable.';
-      status.className = 'status error';
-    }
-  }
-}
-
-async function refreshCaptionRuntimeStatus() {
-  try {
-    const data = await api('/api/captions/status');
-    captionProfile = data.profile || captionProfile;
-    captionState = data.state || captionState;
-    captionRuntime = data.runtime || captionRuntime;
-    renderCaptionControls();
-  } catch (error) {
-    if (captionRuntimePoll) {
-      clearInterval(captionRuntimePoll);
-      captionRuntimePoll = null;
-    }
-  }
-}
-
-async function loadCaptionAudioDevices(updateStatus = true) {
-  const status = document.getElementById('captionStatus');
-  try {
-    const data = await api('/api/captions/audio-devices');
-    captionAudioDevices = Array.isArray(data.devices) ? data.devices : [];
-    renderCaptionAudioDevices(data.available === false ? (data.error || 'Audio device discovery unavailable.') : 'Audio devices refreshed.');
-    if (updateStatus && status) {
-      status.textContent = data.available === false ? (data.error || 'Audio device discovery unavailable.') : `Found ${captionAudioDevices.length} audio input device(s).`;
-      status.className = data.available === false ? 'status warning' : 'status success';
-    }
-    return data;
-  } catch (error) {
-    captionAudioDevices = [];
-    renderCaptionAudioDevices('Audio device discovery failed.');
-    if (updateStatus && status) {
-      status.textContent = error.message || 'Audio device discovery failed.';
-      status.className = 'status error';
-    }
-    return {available: false, devices: []};
-  }
-}
-
-async function saveCaptionAssignments() {
-  const status = document.getElementById('captionStatus');
-  try {
-    const data = await api('/api/captions/profile', captionProfilePayload(), 'PUT');
-    captionProfile = data.profile || {};
-    captionState = data.state || {};
-    renderCaptionControls();
-    if (status) {
-      status.textContent = 'Caption input assignments saved.';
-      status.className = 'status success';
-    }
-  } catch (error) {
-    if (status) {
-      status.textContent = error.data?.message || error.message || 'Unable to save caption inputs.';
-      status.className = 'status error';
-    }
-  }
-}
-
-async function startLiveCaptions() {
-  const status = document.getElementById('captionRuntimeStatus');
-  try {
-    setCaptionRuntimeButtonsDisabled(true);
-    await saveCaptionAssignments();
-    const data = await api('/api/captions/live/start', {});
-    captionRuntime = data.runtime || {};
-    await loadCaptionControls();
-  } catch (error) {
-    if (status) {
-      status.textContent = error.data?.message || error.message || 'Unable to start live captions.';
-      status.className = 'status error';
-    }
-  } finally {
-    setCaptionRuntimeButtonsDisabled(false);
-    renderCaptionRuntimeStatus();
-  }
-}
-
-async function stopLiveCaptions() {
-  const status = document.getElementById('captionRuntimeStatus');
-  try {
-    setCaptionRuntimeButtonsDisabled(true);
-    const data = await api('/api/captions/live/stop', {});
-    captionRuntime = data.runtime || {};
-    renderCaptionRuntimeStatus();
-  } catch (error) {
-    if (status) {
-      status.textContent = error.data?.message || error.message || 'Unable to stop live captions.';
-      status.className = 'status error';
-    }
-  } finally {
-    setCaptionRuntimeButtonsDisabled(false);
-  }
-}
-
-async function toggleLiveCaptions() {
-  if (captionRuntime?.running) await stopLiveCaptions();
-  else await startLiveCaptions();
-}
-
-async function setCaptionsEnabled(enabled) {
-  const data = await api('/api/captions/profile', captionProfilePayload({enabled, overlay_visible: enabled}), 'PUT');
-  captionProfile = data.profile || {};
-  captionState = data.state || {};
-  renderCaptionControls();
-}
-
-async function toggleCaptions() {
-  const enabled = !(captionProfile?.enabled && captionProfile?.overlay_visible);
-  try {
-    await setCaptionsEnabled(enabled);
-  } catch (error) {
-    const status = document.getElementById('captionStatus');
-    if (status) {
-      status.textContent = error.data?.message || error.message || 'Unable to change captions.';
-      status.className = 'status error';
-    }
-  }
-}
-
-async function clearCaptions() {
-  try {
-    const data = await api('/api/captions/clear', {});
-    captionState = data.state || {};
-    renderCaptionControls();
-  } catch (error) {
-    const status = document.getElementById('captionStatus');
-    if (status) {
-      status.textContent = error.message || 'Unable to clear captions.';
-      status.className = 'status error';
-    }
-  }
-}
-
-async function sendTestCaption() {
-  const status = document.getElementById('captionStatus');
-  const text = document.getElementById('captionTestText')?.value.trim() || '';
-  if (!text) {
-    if (status) {
-      status.textContent = 'Enter test caption text first.';
-      status.className = 'status error';
-    }
-    return;
-  }
-  try {
-    if (!(captionProfile?.enabled && captionProfile?.overlay_visible)) {
-      await setCaptionsEnabled(true);
-    } else {
-      await saveCaptionAssignments();
-    }
-    const channel = Number(document.getElementById('captionSpeakerChannel')?.value || 1);
-    const now = Date.now();
-    const response = await api('/api/captions/segments', {
-      channel,
-      text,
-      confidence: 1,
-      broadcast_id: currentState?.broadcast_id || 'manual-test',
-      start_ms: now,
-      end_ms: now + 3500
-    });
-    captionState = response.state || captionState;
-    renderCaptionControls();
-    if (status) {
-      status.textContent = 'Test caption sent to /captions.';
-      status.className = 'status success';
-    }
-  } catch (error) {
-    if (status) {
-      status.textContent = error.data?.message || error.message || 'Unable to send test caption.';
-      status.className = 'status error';
-    }
-  }
 }
 
 function onlyDigits(input) {
@@ -6003,7 +5363,7 @@ function showModule(module) {
   if (window.CSRNNavigation) window.CSRNNavigation.setActive(MODULE_MENU_PARENT[module] || module);
   if (module === 'packages') loadPackages();
   if (module === 'games') { moveSetupPanelToGameManager(); loadGameManager(); }
-  if (module === 'pregame') { document.getElementById('setupPanel').classList.add('hidden'); populatePlannedBroadcasts(); loadBroadcastConnectionInfo(); loadCaptionControls(); if(currentState&&currentState.broadcast_id) refreshReadiness(); else renderNeutralReadiness(); }
+  if (module === 'pregame') { document.getElementById('setupPanel').classList.add('hidden'); populatePlannedBroadcasts(); loadBroadcastConnectionInfo(); if(currentState&&currentState.broadcast_id) refreshReadiness(); else renderNeutralReadiness(); }
   if (module === 'command') { document.getElementById('setupPanel').classList.add('hidden'); populatePlannedBroadcasts(); }
   if (module === 'schools') loadSchools();
   if (module === 'rosters') loadRosters();
@@ -7742,7 +7102,6 @@ async function loadBroadcasters() {
   broadcasters = await api('/api/broadcasters');
   renderBroadcasterList();
   populateCrewDropdowns();
-  renderCaptionControls();
   if (!selectedBroadcaster && broadcasters.length) {
     editBroadcaster(broadcasters[0].id);
   }

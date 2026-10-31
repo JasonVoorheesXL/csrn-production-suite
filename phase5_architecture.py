@@ -19,7 +19,6 @@ EXPECTED_BLUEPRINTS = {
     "broadcast_lifecycle_routes",
     "broadcast_package_routes",
     "broadcast_routes",
-    "caption_routes",
     "coin_toss_routes",
     "commissioning_routes",
     "deployment_routes",
@@ -78,8 +77,6 @@ PUBLIC_ENDPOINTS = {
     # Sponsor ad video served to the overlay's own OBS browser source, same
     # public-media pattern as asset_file/sponsor_logo_file/roster_headshot_file.
     "asset_routes.sponsor_ad_file",
-    "caption_routes.caption_overlay",
-    "caption_routes.caption_overlay_state",
     # The baseball/softball OBS overlay has no operator login session,
     # exactly like live_game_routes.statistics_overlay_state below.
     "diamond_game_routes.diamond_overlay_state",
