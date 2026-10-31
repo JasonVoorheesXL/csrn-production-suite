@@ -1572,6 +1572,10 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
         <p class="section-note">Changes are saved to <strong>Data/Settings/config.json</strong>.</p>
         <p class="section-note" id="licenseBadge" hidden>Licensed to: <strong id="licenseBadgeOrg"></strong><span id="licenseBadgeState"></span></p>
 
+        <h2>Guides</h2>
+        <p class="section-note">Step-by-step guides for this station. Statistician guides follow the sports switched on under Sports.</p>
+        <div id="settingsGuideList" class="settings-guide-list"></div>
+
         <h2>Organization</h2>
         <div class="setup-grid">
           <label>Organization Name<input id="cfgOrgName"></label>
@@ -1594,7 +1598,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
                   <button type="button" onclick="document.getElementById('cfgOrgLogoFile').click()">Upload Logo</button>
                   <button type="button" onclick="useBuiltInOrganizationLogo()">Use Placeholder Logo</button>
                 </div>
-                <small id="cfgOrgLogoStatus" class="section-note">The built-in Command Center logo is used when no custom organization logo is configured.</small>
+                <small id="cfgOrgLogoStatus" class="section-note">A neutral placeholder mark is used until a logo is set.</small>
               </div>
               <img id="cfgOrgLogoPreview" alt="Organization logo preview">
             </div>
@@ -5998,7 +6002,7 @@ function showModule(module) {
   if (module === 'assets') loadAssets();
   if (module === 'sponsors') loadSponsors();
   if (module === 'obs') loadOBSStatus();
-  if (module === 'settings') { loadConfig(); loadStationSports(); }
+  if (module === 'settings') { loadConfig(); loadStationSports(); loadGuides(); }
   if (module === 'statistics') loadStatistics();
   if (module === 'statistician') { refreshPlayRegister('statistician-open',true); loadCorrections(); loadConnectionInfo(); }
   if (module === 'diagnostics') { loadDiagnostics(); loadReleaseReadiness(); }
@@ -6116,12 +6120,15 @@ function updateOrganizationLogoPreview(){
 // Station branding (audit round 4), from Settings > Organization.
 const STATION_SHORT_NAME={{ (station_short_name or '')|tojson }};
 
+// Settings > Guides (2026-10-31): the station guide plus one statistician guide per switched-on sport.
+async function loadGuides(){const box=document.getElementById('settingsGuideList');if(!box)return;let guides=[];try{guides=(await api('/api/guides')).guides||[]}catch(_){}box.innerHTML=guides.length?guides.map(g=>`<div class="settings-guide-row${g.available?'':' soon'}"><div><strong>${escapeHtml(g.title)}</strong><p>${escapeHtml(g.summary||'')}</p></div>${g.available?`<button type="button" onclick="openPdfInApp(${escapeHtml(JSON.stringify(g.url))},${escapeHtml(JSON.stringify(g.title))})">Open Guide</button>`:'<small>Coming soon</small>'}</div>`).join(''):'<p class="section-note">No guides are installed.</p>'}
+
 // Settings > Sports (audit round 3).
 let stationSportsData=null;
 function setStationSportsStatus(text){const el=document.getElementById('stationSportsStatus');if(el)el.textContent=text||''}
 function renderStationSports(){const box=document.getElementById('stationSportsList');if(!box||!stationSportsData)return;const on=new Set(stationSportsData.on||[]);box.innerHTML=(stationSportsData.sports||[]).map(s=>`<label class="check-row"><input type="checkbox" data-sport="${escapeHtml(s.family)}"${on.has(s.family)?' checked':''}${s.licensed?'':' disabled'} onchange="setStationSport()"> ${escapeHtml(s.label)}${s.licensed?'':' <small>(not licensed)</small>'}</label>`).join('')}
 async function loadStationSports(){try{stationSportsData=await api('/api/station-sports');renderStationSports();setStationSportsStatus('')}catch(error){setStationSportsStatus(error.message||'Could not load sports.')}}
-async function setStationSport(){const on=[...document.querySelectorAll('#stationSportsList input[data-sport]:checked')].map(box=>box.dataset.sport);if(!on.length){renderStationSports();setStationSportsStatus('Keep at least one sport switched on.');return}try{stationSportsData=await api('/api/station-sports',{on});renderStationSports();setStationSportsStatus('Saved.');await loadSessionContext()}catch(error){renderStationSports();setStationSportsStatus(error.data?.message||error.message||'Could not save sports.')}}
+async function setStationSport(){const on=[...document.querySelectorAll('#stationSportsList input[data-sport]:checked')].map(box=>box.dataset.sport);if(!on.length){renderStationSports();setStationSportsStatus('Keep at least one sport switched on.');return}try{stationSportsData=await api('/api/station-sports',{on});renderStationSports();setStationSportsStatus('Saved.');await loadSessionContext();loadGuides()}catch(error){renderStationSports();setStationSportsStatus(error.data?.message||error.message||'Could not save sports.')}}
 function setShowRetiredTools(show){window.CSRNNavigation?.setShowRetired(show);const box=document.getElementById('showRetiredTools');if(box)box.checked=Boolean(show)}
 document.addEventListener('DOMContentLoaded',()=>{const box=document.getElementById('showRetiredTools');if(box)box.checked=Boolean(window.CSRNNavigation?.showRetired())});
 const APPEARANCE_STORAGE_KEY='csrn.consoleAppearance.v1';

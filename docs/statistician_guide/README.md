@@ -1,6 +1,6 @@
 # Statistician Screen walkthrough (football)
 
-`CSRN_Statistician_Guide_Football.pdf` is a CSRN-branded how-to for a first-time volunteer
+`static/guides/statistician-guide-football.pdf` (shipped with the app and opened from Settings > Guides) is a CSRN-branded how-to for a first-time volunteer
 statistician. It covers the Statistician Console only, phase by phase, from pregame through Final.
 
 Every screenshot in `screenshots/` was captured by Playwright driving the real console against a

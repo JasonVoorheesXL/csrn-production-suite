@@ -4,7 +4,7 @@ Builds self-contained HTML and prints it with Playwright's Chromium (already a
 project dependency), then joins the footer-less cover to the body with pypdf
 (also already installed) -- no new PDF toolchain.
 
-Output: docs/statistician_guide/CSRN_Statistician_Guide_Football.pdf
+Output: static/guides/statistician-guide-football.pdf (shipped with the app; listed in guides_catalog.py)
         docs/statistician_guide/build/guide.html (the intermediate body HTML)
 """
 
@@ -22,7 +22,7 @@ TOOLS = Path(__file__).resolve().parent
 GUIDE = TOOLS.parent
 REPO = GUIDE.parents[1]
 SHOTS = GUIDE / "screenshots"
-OUT_PDF = GUIDE / "CSRN_Statistician_Guide_Football.pdf"
+OUT_PDF = REPO / "static" / "guides" / "statistician-guide-football.pdf"
 OUT_HTML = GUIDE / "build" / "guide.html"
 
 sys.path.insert(0, str(TOOLS))

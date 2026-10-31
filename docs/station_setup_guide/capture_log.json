@@ -1,0 +1,97 @@
+{
+  "shots": [
+    {
+      "file": "01_wizard-blank.png",
+      "note": "First launch: the setup wizard"
+    },
+    {
+      "file": "02_wizard-filled.png",
+      "note": "Wizard filled in"
+    },
+    {
+      "file": "03_wizard-guides.png",
+      "note": "Finish: the guides step"
+    },
+    {
+      "file": "04_create-pin.png",
+      "note": "Create the operator PIN"
+    },
+    {
+      "file": "05_command-center.png",
+      "note": "Command Center on a new install"
+    },
+    {
+      "file": "06_settings-guides.png",
+      "note": "Settings: Guides and Organization"
+    },
+    {
+      "file": "07_settings-organization.png",
+      "note": "Settings: Organization"
+    },
+    {
+      "file": "08_settings-appearance.png",
+      "note": "Settings: Appearance"
+    },
+    {
+      "file": "09_settings-sports.png",
+      "note": "Settings: Sports and Retired Tools"
+    },
+    {
+      "file": "10_settings-obs.png",
+      "note": "Settings: OBS"
+    },
+    {
+      "file": "11_settings-quick-launch.png",
+      "note": "Settings: Quick Launch and Station Social Media"
+    },
+    {
+      "file": "12_schools.png",
+      "note": "School Database"
+    },
+    {
+      "file": "13_rosters.png",
+      "note": "Rosters"
+    },
+    {
+      "file": "14_personnel.png",
+      "note": "Personnel"
+    },
+    {
+      "file": "15_sponsors.png",
+      "note": "Sponsors"
+    },
+    {
+      "file": "16_media-library.png",
+      "note": "Media Library tab"
+    },
+    {
+      "file": "17_graphics.png",
+      "note": "Graphics: player graphic"
+    },
+    {
+      "file": "18_obs-manager.png",
+      "note": "OBS Manager"
+    },
+    {
+      "file": "19_obs-browser-source.png",
+      "note": "OBS Manager: Browser Source Setup"
+    },
+    {
+      "file": "20_game-manager.png",
+      "note": "Game Manager"
+    },
+    {
+      "file": "21_pregame.png",
+      "note": "Pre-Game Setup"
+    },
+    {
+      "file": "22_connection.png",
+      "note": "Statistician: Mobile / USB Connection"
+    },
+    {
+      "file": "23_system-check.png",
+      "note": "System Check"
+    }
+  ],
+  "page_errors": []
+}

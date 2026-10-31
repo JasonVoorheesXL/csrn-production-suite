@@ -101,6 +101,8 @@ PUBLIC_ENDPOINTS = {
     "onboarding_routes.onboarding_complete",
     "onboarding_routes.onboarding_context",
     "onboarding_routes.onboarding_logo",
+    # Operator guide list: the wizard shows it before any PIN exists.
+    "onboarding_routes.list_guides",
     "page_routes.control_panel",
     "page_routes.overlay",
     "personnel_routes.personnel_headshot_file",

@@ -21,6 +21,9 @@ class OnboardingRoutesDependencies:
     default_sport: Callable[[], str]
     complete_onboarding: Callable[[dict[str, Any]], tuple[bool, str, str]]
     save_logo: Callable[[Any], tuple[int, dict[str, Any]]]
+    # Operator guides (2026-10-31): public like the rest of the wizard, which
+    # ends by pointing a new station at them; Settings > Guides lists them too.
+    list_guides: Callable[[], list[dict[str, Any]]] = lambda: []
 
 
 def create_onboarding_blueprint(dependencies: OnboardingRoutesDependencies) -> Blueprint:
@@ -35,6 +38,10 @@ def create_onboarding_blueprint(dependencies: OnboardingRoutesDependencies) -> B
                 "onboarding_complete": not dependencies.onboarding_incomplete(),
             }
         )
+
+    @routes.get("/api/guides")
+    def list_guides():
+        return jsonify({"guides": dependencies.list_guides()})
 
     @routes.post("/api/onboarding/logo")
     def onboarding_logo():

@@ -271,3 +271,26 @@ html:not(.show-retired) .retired-tool {
 .station-sports-list small {
   color: var(--csrn-muted);
 }
+
+/* Settings > Guides (2026-10-31). */
+.settings-guide-list {
+  display: grid;
+  gap: 10px;
+}
+.settings-guide-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: var(--csrn-field);
+}
+.settings-guide-row p {
+  margin: 2px 0 0;
+  color: var(--csrn-muted);
+}
+.settings-guide-row.soon {
+  opacity: 0.65;
+}
