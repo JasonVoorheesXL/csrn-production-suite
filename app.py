@@ -107,6 +107,10 @@ from routes.onboarding_routes import (
     OnboardingRoutesDependencies,
     create_onboarding_blueprint,
 )
+from routes.appearance_routes import (
+    AppearanceRoutesDependencies,
+    create_appearance_blueprint,
+)
 from routes.association_routes import (
     AssociationRoutesDependencies,
     create_association_blueprint,
@@ -1278,6 +1282,40 @@ def save_layouts_document(document: Mapping[str, Any]) -> dict[str, Any]:
 
     invalidate_runtime_state_cache()
     return saved
+
+
+def save_appearance_document(appearance: Mapping[str, Any]) -> dict[str, Any]:
+    """Console appearance (2026-10-31): read-modify-write of the identity
+    profile's `appearance` section, every other section preserved, then
+    rebind IDENTITY_PROFILE so GET /api/appearance serves it at once."""
+    global IDENTITY_PROFILE, IDENTITY_PROFILE_ISSUE
+    with _LAYOUTS_WRITE_LOCK:
+        current = load_identity_profile(IDENTITY_FILE, existing_install=True)
+        current["appearance"] = copy.deepcopy(dict(appearance))
+        save_identity_profile(IDENTITY_FILE, current, existing_install=_EXISTING_INSTALL)
+        IDENTITY_PROFILE = load_identity_profile(
+            IDENTITY_FILE, existing_install=_EXISTING_INSTALL
+        )
+        IDENTITY_PROFILE_ISSUE = identity_service.load_issue(IDENTITY_FILE)
+        return copy.deepcopy(IDENTITY_PROFILE.get("appearance") or {})
+
+
+_APPEARANCE_LOGO_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+
+
+def _resolve_local_logo(logo_path: str) -> Path | None:
+    """A "/static/..." logo path as a file under this app's static folder, or
+    None (remote URLs, anything outside static/, missing or non-image files)."""
+    text = str(logo_path or "").split("?", 1)[0].strip().replace("\\", "/").lstrip("/")
+    if not text.startswith("static/"):
+        return None
+    static_root = (BASE_DIR / "static").resolve()
+    candidate = (BASE_DIR / text).resolve()
+    if static_root not in candidate.parents or not candidate.is_file():
+        return None
+    if candidate.suffix.lower() not in _APPEARANCE_LOGO_SUFFIXES:
+        return None
+    return candidate
 
 
 def update_config_values(
@@ -3037,6 +3075,19 @@ ONBOARDING_ROUTES_BLUEPRINT = create_onboarding_blueprint(
     )
 )
 APPLICATION_BLUEPRINTS.append(ONBOARDING_ROUTES_BLUEPRINT)
+
+APPEARANCE_ROUTES_BLUEPRINT = create_appearance_blueprint(
+    AppearanceRoutesDependencies(
+        require_auth=require_auth,
+        load_profile=lambda: IDENTITY_PROFILE,
+        save_appearance=save_appearance_document,
+        branding_logo=identity_service.branding_logo,
+        resolve_logo=_resolve_local_logo,
+        clean_logo_dir=BASE_DIR / "static" / "organization",
+        clean_logo_url_prefix="/static/organization",
+    )
+)
+APPLICATION_BLUEPRINTS.append(APPEARANCE_ROUTES_BLUEPRINT)
 
 ASSOCIATION_ROUTES_BLUEPRINT = create_association_blueprint(
     AssociationRoutesDependencies(

@@ -58,6 +58,9 @@ EXPECTED_BLUEPRINTS = {
     # Round 27 access model: GET /api/session-context + POST /api/sport-context
     # -- the operator's switchable sport context (both @require_auth).
     "access_model_routes",
+    # Settings > Appearance (2026-10-31): the console's brand color, logo
+    # shape and glass effect; saving and logo cleaning are @require_auth.
+    "appearance_routes",
     "social_routes",
     "sponsor_routes",
     "support_routes",
@@ -68,6 +71,9 @@ EXPECTED_BLUEPRINTS = {
 }
 
 PUBLIC_ENDPOINTS = {
+    # Console appearance (colors, logo shape, logo path; nothing private) so
+    # the console can paint its look before the operator signs in.
+    "appearance_routes.read_appearance",
     "asset_routes.asset_file",
     # Sponsor ad video served to the overlay's own OBS browser source, same
     # public-media pattern as asset_file/sponsor_logo_file/roster_headshot_file.
