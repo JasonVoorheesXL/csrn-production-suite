@@ -1,0 +1,17 @@
+{
+  "shots": [
+    {
+      "file": "01_obs-manager-top.png",
+      "note": "OBS Manager before OBS is connected"
+    },
+    {
+      "file": "02_obs-manager-download.png",
+      "note": "OBS Manager: download the scene collection"
+    },
+    {
+      "file": "03_settings-obs.png",
+      "note": "Settings > OBS"
+    }
+  ],
+  "page_errors": []
+}

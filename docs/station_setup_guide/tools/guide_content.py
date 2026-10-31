@@ -197,8 +197,13 @@ BODY = [
     ("section", "5", "Connecting OBS",
      "OBS shows the app's scoreboard and screens as web pages layered over your video. Set it up once; "
      "the app can then check it before every game."),
-    ("h2", "Add the browser sources"),
-    ("fig", "obs-browser-source", f"{menu('Game Day', 'OBS Manager')} shows the exact names and address to use"),
+    ("h2", "Quickest: import the ready-made scene collection"),
+    ("fig", "obs-browser-source", f"{menu('Game Day', 'OBS Manager')}: download the scene collection or open the OBS Setup Guide"),
+    ("p", f"Click {ui('Download OBS Scene Collection', 'primary')}, then in OBS choose <b>Scene Collection &rsaquo; "
+          "Import</b> and pick the file. It adds every scene and source the app expects, already named and pointed "
+          "at the app, without touching your other OBS scenes. The <b>OBS Setup Guide</b> (Settings &rsaquo; Guides) "
+          "walks through the import, your background, camera and sound, and the connection, step by step."),
+    ("h2", "Or add the browser sources yourself"),
     ("steps", [
         "In OBS, create the scene named in the OBS Manager (for football, <b>10.01 - FOOTBALL SCOREBUG</b>).",
         "Add a <b>Browser Source</b> to it with the name shown, URL <b>http://127.0.0.1:5050/overlay</b>, "
@@ -208,14 +213,13 @@ BODY = [
     ]),
     ("callout", "warn", "THE NAMES MUST MATCH",
      "The OBS Manager can only check a scene or source whose name matches Settings exactly, capital letters "
-     "and spaces included. The names shown are for football; if your station uses its own names, change "
-     "them in Settings &rsaquo; OBS instead."),
+     "and spaces included. If your station uses its own names, change them in Settings &rsaquo; OBS instead."),
     ("h2", "Let the app talk to OBS"),
     ("fig", "settings-obs", f"{menu('System', 'Settings')} &rsaquo; OBS"),
     ("steps", [
         f"In OBS, open <b>Tools &rsaquo; WebSocket Server Settings</b>, turn the server on and note its port and password.",
         f"In Settings &rsaquo; OBS, set {ui('WebSocket Enabled')} to <b>Yes</b> and enter the port and password.",
-        "Enter the names of your OBS <b>Profile</b> and <b>Scene Collection</b> exactly as OBS shows them, "
+        "Leave <b>Scene Collection</b> and <b>Profile</b> blank to accept whatever OBS has open, "
         f"then click {ui('Save Configuration', 'primary')}.",
         f"Open {menu('Game Day', 'OBS Manager')} and click {ui('Test OBS Connection')}. Each line should turn green.",
     ]),
