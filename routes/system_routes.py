@@ -8,6 +8,7 @@ from typing import Any, Callable, Mapping
 
 from flask import Blueprint, jsonify, request
 
+from configuration_service import ConfigurationService
 from live_command_service import current_revision
 from runtime_diagnostics_service import get_runtime_diagnostics, latest_id, new_request_id, safe_count
 
@@ -102,6 +103,18 @@ def create_system_blueprint(
                 }
             ), 400
         return jsonify(result.data["config"])
+
+    @routes.post("/api/validate-social")
+    @dependencies.require_auth
+    def validate_social():
+        """Settings > Station Social Media checks each link as it is typed
+        (moved here from the removed Personnel routes, 2026-10-31)."""
+        incoming = request.get_json(force=True) or {}
+        normalized, valid, message = ConfigurationService.normalize_social_url(
+            str(incoming.get("platform", "")),
+            str(incoming.get("value", "")),
+        )
+        return jsonify({"normalized": normalized, "valid": valid, "message": message})
 
     @routes.get("/api/diagnostics")
     @dependencies.require_auth

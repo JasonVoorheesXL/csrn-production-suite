@@ -21,27 +21,21 @@ def test_menu_marks_theme_manager_packages_and_recaps_retired() -> None:
     for key in ("themes", "packages", "recaps"):
         assert entries[key].rstrip().endswith("true"), key
     for key in ("pregame", "command", "statistician", "obs", "games", "schools",
-                "rosters", "broadcasters", "graphics", "sponsors", "social", "settings",
+                "rosters", "graphics", "sponsors", "social", "settings",
                 "diagnostics"):
         assert not entries[key].rstrip().endswith("true"), key
     assert "if (retired) link.classList.add('retired-tool');" in NAV
 
 
-def test_caption_and_builder_entry_points_are_tagged() -> None:
+def test_builder_and_theme_entry_points_are_tagged() -> None:
+    # Live captions were removed outright on 2026-10-31 (see test_captions_removed.py).
     for needle in (
-        'command-caption-panel retired-tool"',
-        'caption-control-panel retired-tool"',
-        '<label class="check-row retired-tool"><input type="checkbox"> Captions source tested',
-        '<button class="retired-tool" onclick="window.open(\'/captions\',\'_blank\')">',
         '<div class="editor-actions retired-tool"><a class="button primary" href="/themes">',
         '<div class="editor-actions retired-tool"><a class="button" href="/layouts">',
         # The Theme Manager's own value; the theme on air is picked in Pre-Game Setup.
         '<label class="retired-tool">Active Graphics Theme<input id="cfgTheme"',
     ):
         assert needle in HTML, needle
-    # Every remaining Open Captions Preview button lives inside a retired panel.
-    command = HTML[HTML.index('command-caption-panel retired-tool'):]
-    assert "window.open('/captions'" in command[: command.index("</section>")]
 
 
 def test_hidden_by_default_and_one_switch_shows_them() -> None:
@@ -54,7 +48,7 @@ def test_hidden_by_default_and_one_switch_shows_them() -> None:
 
 def test_retired_code_is_kept() -> None:
     for needle in ('<section id="packagesModule"', "async function loadPackages()",
-                   "async function startLiveCaptions()", "'packages'"):
+                   "'packages'"):
         assert needle in HTML, needle
     for template in ("theme_manager.html", "layout_builder.html", "recap_manager.html"):
         assert (ROOT / "templates" / template).exists(), template

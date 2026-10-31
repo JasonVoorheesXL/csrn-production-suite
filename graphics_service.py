@@ -48,25 +48,18 @@ class GraphicsService:
         default_state: StateFactory,
         load_rosters: RecordLoader,
         load_schools: RecordLoader,
-        load_personnel: RecordLoader,
         build_identity: IdentityBuilder,
         apply_sponsor: SponsorApplier,
         load_assets: RecordLoader | None = None,
         clock: Clock | None = None,
-        organization_logo: Callable[[], str] | None = None,
     ) -> None:
         self._default_state = default_state
         self._load_rosters = load_rosters
         self._load_schools = load_schools
-        self._load_personnel = load_personnel
         self._build_identity = build_identity
         self._apply_sponsor = apply_sponsor
         self._load_assets = load_assets or (lambda: [])
         self._clock = clock or time.time
-        # Fallback logo for a personnel graphic with no school assigned:
-        # the configured network/organization logo, or "" -- never a
-        # hard-coded csrn-logo.png (Round 13 Task A).
-        self._organization_logo = organization_logo or (lambda: "")
 
     def _graphic_default(self, key: str) -> Record:
         defaults = self._default_state()
@@ -277,9 +270,6 @@ class GraphicsService:
 
     def _school(self, school_id: Any) -> Record | None:
         return self._find(self._load_schools(), str(school_id or ""))
-
-    def _person(self, personnel_id: str) -> Record | None:
-        return self._find(self._load_personnel(), personnel_id)
 
     def update_player(self, state: State, incoming: Record) -> GraphicsResult:
         updated = copy.deepcopy(state)
@@ -653,90 +643,6 @@ class GraphicsService:
             },
         )
 
-    def update_personnel(self, state: State, incoming: Record) -> GraphicsResult:
-        updated = copy.deepcopy(state)
-        data = copy.deepcopy(incoming or {})
-        action = str(data.get("action", "update")).lower()
-        graphic = self._graphic_default("personnel_graphic")
-        graphic.update(updated.get("personnel_graphic") or {})
-        sponsor_warning = ""
-
-        if action == "clear":
-            graphic = self._graphic_default("personnel_graphic")
-        else:
-            personnel_id = str(
-                data.get("personnel_id", graphic.get("personnel_id", ""))
-            ).strip()
-            person = self._person(personnel_id)
-            if person:
-                school = self._school(person.get("school_id"))
-                identity = (
-                    self._build_identity(school, "Football") if school else {}
-                )
-                full_name = str(
-                    person.get("full_name") or person.get("name") or ""
-                ).strip()
-                display_name = (
-                    str(person.get("preferred_name", "")).strip() or full_name
-                )
-                graphic.update(
-                    {
-                        "personnel_id": personnel_id,
-                        "full_name": full_name,
-                        "display_name": display_name,
-                        "title": str(
-                            person.get("title") or person.get("role") or ""
-                        ),
-                        "role": str(person.get("role", "")),
-                        "organization": str(
-                            person.get("organization")
-                            or (school or {}).get("broadcast_name")
-                            or (school or {}).get("official_name")
-                            or ""
-                        ),
-                        "headshot": str(person.get("headshot", "")),
-                        "logo": str(
-                            identity.get("logo") or self._organization_logo()
-                        ),
-                        "accent": str(
-                            identity.get("primary_color") or "#C9203B"
-                        ),
-                    }
-                )
-
-            for key in ("graphic_type", "eyebrow"):
-                if key in data:
-                    graphic[key] = str(data.get(key, ""))[:240]
-
-            sponsor_warning = self._apply_sponsor(graphic, data)
-            graphic["duration"] = self._duration(
-                data.get("duration"),
-                graphic.get("duration", 0),
-            )
-            if action == "hide":
-                graphic["visible"] = False
-                graphic["expires_at"] = 0
-            elif action in {"show", "update"}:
-                if not graphic.get("personnel_id"):
-                    return GraphicsResult("PERSONNEL_REQUIRED")
-                updated = self.activate_primary(updated, "personnel")
-                graphic["visible"] = True
-                graphic["expires_at"] = (
-                    int(self._clock()) + graphic["duration"]
-                    if graphic["duration"]
-                    else 0
-                )
-            graphic["updated_at"] = int(self._clock())
-
-        updated["personnel_graphic"] = graphic
-        return GraphicsResult(
-            "OK",
-            {
-                "state": updated,
-                "graphic": copy.deepcopy(graphic),
-                "sponsor_warning": sponsor_warning,
-            },
-        )
 
     def show_automation_player(
         self,

@@ -36,7 +36,7 @@ def test_completed_phase5_architecture_remains_clean() -> None:
 
 
 def test_all_live_overlay_templates_load_shared_theme_css() -> None:
-    for name in ("overlay.html", "captions.html", "weather.html"):
+    for name in ("overlay.html", "weather.html"):
         source = (ROOT / "templates" / name).read_text(encoding="utf-8")
         assert source.count('/themes/current.css') == 1
 

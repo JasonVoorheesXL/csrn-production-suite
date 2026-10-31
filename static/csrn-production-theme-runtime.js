@@ -27,7 +27,6 @@
 
 const PUBLIC_STATE_URL = "/api/themes/public-state";
 const RUNTIME_STATE_URL = "/api/runtime-state";
-const CAPTION_STATE_URL = "/api/captions/overlay-state";
 const STATISTICS_URL = "/api/statistics/overlay-state";
 const HOOPS_PANEL_URL = "/api/hoops/panel-state";
 const CAPTION_STICKY_MS = 2800;
@@ -3861,10 +3860,10 @@ async function renderSelected() {
       document.documentElement.classList.add(PLAYER_PENDING_CLASS);
     }
 
-    const [rawRuntime, captionState] = await Promise.all([
-      fetchJson(RUNTIME_STATE_URL),
-      fetchJson(CAPTION_STATE_URL).catch(() => ({visible:false, segments:[]}))
-    ]);
+    // Live captions were removed (2026-10-31); the caption layers stay empty
+    // until the theme rework retires them.
+    const rawRuntime = await fetchJson(RUNTIME_STATE_URL);
+    const captionState = {visible:false, segments:[]};
     // Layout Builder P1: from here on `runtime` is the layout-masked view
     // (hidden triggers inert); the raw payload is not read again.
     const runtime = layoutMaskedRuntimeR1(rawRuntime);

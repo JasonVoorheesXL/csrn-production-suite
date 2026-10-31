@@ -38,7 +38,6 @@ class DiagnosticsService:
         data_dir: Path,
         config_file: Path,
         schools_file: Path,
-        broadcasters_file: Path,
         rosters_file: Path,
         venues_file: Path,
         logos_file: Path,
@@ -59,7 +58,6 @@ class DiagnosticsService:
         self._data_dir = Path(data_dir)
         self._config_file = Path(config_file)
         self._schools_file = Path(schools_file)
-        self._broadcasters_file = Path(broadcasters_file)
         self._rosters_file = Path(rosters_file)
         self._venues_file = Path(venues_file)
         self._logos_file = Path(logos_file)
@@ -111,7 +109,6 @@ class DiagnosticsService:
             # install with no branding yet should not fail this check.
             **({"Logo file": self._base_dir / logo_path} if logo_path else {}),
             "School database": self._schools_file,
-            "Broadcaster profiles": self._broadcasters_file,
             "Roster database": self._rosters_file,
             "Venue database": self._venues_file,
             "Logo database": self._logos_file,
@@ -142,14 +139,6 @@ class DiagnosticsService:
                     "version": "v1.1",
                     "status": (
                         "Healthy" if self._rosters_file.exists()
-                        else "Needs Attention"
-                    ),
-                },
-                {
-                    "name": "Personnel Engine",
-                    "version": "v1.0",
-                    "status": (
-                        "Healthy" if self._broadcasters_file.exists()
                         else "Needs Attention"
                     ),
                 },

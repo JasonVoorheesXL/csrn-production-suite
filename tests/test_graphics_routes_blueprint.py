@@ -99,7 +99,8 @@ def test_graphics_blueprint_registers_preserved_urls(graphics_client) -> None:
     }
     assert ("/api/graphics/lower-third", ("POST",)) in rules
     assert ("/api/graphics/player", ("POST",)) in rules
-    assert ("/api/graphics/personnel", ("POST",)) in rules
+    # Personnel (and its ID graphic) was removed on 2026-10-31.
+    assert ("/api/graphics/personnel", ("POST",)) not in rules
     assert ("/api/graphics/sponsor-spotlight", ("POST",)) in rules
     assert ("/api/graphics/player-highlight", ("POST",)) in rules
     assert ("/api/graphics/queue", ("POST",)) in rules
@@ -163,40 +164,3 @@ def test_player_route_preserves_sponsor_warning(graphics_client) -> None:
         "sponsor_warning": "Sponsor asset is inactive.",
     }
     assert saved == [{"marker": "player", "private": "hidden"}]
-
-
-def test_personnel_route_maps_required_personnel(graphics_client) -> None:
-    client, _, service, saved = graphics_client
-    service.personnel_result = StubResult("PERSONNEL_REQUIRED")
-    response = client.post(
-        "/api/graphics/personnel",
-        json={"action": "show"},
-        headers=auth_headers(),
-    )
-    assert response.status_code == 400
-    assert response.get_json() == {"error": "PERSONNEL_REQUIRED"}
-    assert saved == []
-
-
-def test_personnel_route_preserves_sponsor_warning(graphics_client) -> None:
-    client, _, service, saved = graphics_client
-    service.personnel_result = StubResult(
-        "OK",
-        {
-            "state": {"marker": "personnel", "private": "hidden"},
-            "sponsor_warning": "Sponsor logo is missing.",
-        },
-    )
-    response = client.post(
-        "/api/graphics/personnel",
-        json={"action": "show", "personnel_id": "person-1"},
-        headers=auth_headers(),
-    )
-    assert response.status_code == 200
-    assert response.get_json() == {
-        "marker": "personnel",
-        "sponsor_warning": "Sponsor logo is missing.",
-    }
-    assert saved == [{"marker": "personnel", "private": "hidden"}]
-
-

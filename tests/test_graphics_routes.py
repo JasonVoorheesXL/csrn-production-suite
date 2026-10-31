@@ -192,40 +192,6 @@ def test_player_route_omits_empty_sponsor_warning(graphics_client) -> None:
     assert service.calls[-1][0] == "update_player"
 
 
-def test_personnel_route_preserves_required_personnel_contract(graphics_client) -> None:
-    client, service, _source_state, saved = graphics_client
-    service.personnel_result = GraphicsResult("PERSONNEL_REQUIRED")
-    response = client.post(
-        "/api/graphics/personnel",
-        json={"action": "show"},
-    )
-    assert response.status_code == 400
-    assert response.get_json() == {"error": "PERSONNEL_REQUIRED"}
-    assert saved == []
-
-
-def test_personnel_route_saves_and_returns_warning(graphics_client) -> None:
-    client, service, _source_state, saved = graphics_client
-    service.personnel_result = GraphicsResult(
-        "OK",
-        {
-            "state": {"channel": "personnel"},
-            "graphic": {"visible": True},
-            "sponsor_warning": "SPONSOR_INACTIVE",
-        },
-    )
-    response = client.post(
-        "/api/graphics/personnel",
-        json={"action": "show", "personnel_id": "jordan"},
-    )
-    assert response.status_code == 200
-    assert response.get_json() == {
-        "channel": "personnel",
-        "sponsor_warning": "SPONSOR_INACTIVE",
-    }
-    assert saved == [{"channel": "personnel"}]
-
-
 def test_sponsor_spotlight_and_queue_routes_delegate_and_save(graphics_client) -> None:
     client, service, source_state, saved = graphics_client
     spotlight_payload = {
@@ -287,5 +253,3 @@ def test_player_highlight_route_delegates_and_enforces_media_contract(
     assert rejected.get_json() == {
         "error": "PLAYER_HIGHLIGHT_MEDIA_NOT_APPROVED"
     }
-
-

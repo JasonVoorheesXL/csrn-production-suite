@@ -224,7 +224,7 @@ def _service(issue) -> DiagnosticsService:
 
     return DiagnosticsService(
         base_dir=Path("."), data_dir=Path("data"),
-        config_file=path("config.json"), schools_file=path("s"), broadcasters_file=path("b"),
+        config_file=path("config.json"), schools_file=path("s"),
         rosters_file=path("r"), venues_file=path("v"), logos_file=path("l"), packages_file=path("p"),
         assets_file=path("a"), sponsors_file=path("sp"),
         load_config=lambda: {}, load_state=lambda: {}, public_state=lambda s: {},

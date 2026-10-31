@@ -7,11 +7,9 @@ import app as app_module
 
 
 ROOT = Path(__file__).resolve().parents[1]
+# Personnel's routes were removed on 2026-10-31; /api/validate-social (the
+# Settings social-link check) moved to the system routes.
 MIGRATED_PATHS = {
-    "/api/broadcasters",
-    "/api/broadcasters/<broadcaster_id>",
-    "/personnel-headshots/<filename>",
-    "/api/personnel/<personnel_id>/headshot",
     "/api/validate-social",
     "/api/rosters",
     "/api/rosters/<roster_id>",
@@ -31,11 +29,7 @@ def test_migrated_routes_are_registered_through_expected_blueprints() -> None:
     }
     assert set(endpoints) == MIGRATED_PATHS
     expected_prefixes = {
-        "/api/broadcasters": "personnel_routes.",
-        "/api/broadcasters/<broadcaster_id>": "personnel_routes.",
-        "/personnel-headshots/<filename>": "personnel_routes.",
-        "/api/personnel/<personnel_id>/headshot": "personnel_routes.",
-        "/api/validate-social": "personnel_routes.",
+        "/api/validate-social": "system_routes.",
         "/api/rosters": "roster_routes.",
         "/api/rosters/<roster_id>": "roster_routes.",
         "/api/rosters/<roster_id>/players": "roster_routes.",
@@ -53,7 +47,6 @@ def test_migrated_routes_are_registered_through_expected_blueprints() -> None:
 def test_app_collects_each_phase_5_4_blueprint_once() -> None:
     source = (ROOT / "app.py").read_text(encoding="utf-8")
     for name in (
-        "PERSONNEL_ROUTES_BLUEPRINT",
         "ROSTER_ROUTES_BLUEPRINT",
         "VENUE_ROUTES_BLUEPRINT",
     ):
@@ -78,7 +71,6 @@ def test_migrated_route_decorators_are_removed_from_app() -> None:
 
 def test_phase_5_4_route_modules_do_not_import_application_root() -> None:
     for filename in (
-        "personnel_routes.py",
         "roster_routes.py",
         "venue_routes.py",
     ):

@@ -47,7 +47,6 @@ from broadcaster_print_service import BroadcasterPrintService
 from social_media_preview_service import SocialMediaPreviewService
 from maxpreps_export_service import MaxPrepsExportService
 from pregame_presentation import _presentation_settings as _pregame_presentation_settings
-from personnel_service import PersonnelService
 from asset_service import AssetService
 from graphics_service import GraphicsService
 from logo_service import LogoService
@@ -68,8 +67,6 @@ from support_media_service import SupportMediaService
 from game_day_safety_service import GameDaySafetyService
 from recovery_service import RecoveryService
 from commissioning_service import HardwareOBSCommissioningService
-from caption_service import CaptionService
-from caption_worker import CaptionRuntime
 from weather_service import VenueWeatherService
 from operational_rehearsal_service import OperationalRehearsalService
 from product_paths import PRODUCT_NAME, PRODUCT_VENDOR, resolve_product_paths
@@ -116,10 +113,6 @@ from routes.association_routes import (
     create_association_blueprint,
 )
 from routes.mhsaa_division_routes import create_mhsaa_division_blueprint
-from routes.personnel_routes import (
-    PersonnelRoutesDependencies,
-    create_personnel_blueprint,
-)
 from routes.roster_routes import (
     RosterRoutesDependencies,
     create_roster_blueprint,
@@ -192,10 +185,6 @@ from routes.recovery_routes import (
 from routes.commissioning_routes import (
     CommissioningRoutesDependencies,
     create_commissioning_blueprint,
-)
-from routes.caption_routes import (
-    CaptionRoutesDependencies,
-    create_caption_blueprint,
 )
 from routes.weather_routes import (
     WeatherRoutesDependencies,
@@ -575,10 +564,8 @@ def _install_onboarding_gate(flask_app: Any) -> None:
 
     flask_app.before_request(_gate)
 SCHOOLS_FILE = DATA_DIR / "Schools" / "schools.json"
-BROADCASTERS_FILE = DATA_DIR / "Settings" / "broadcasters.json"
 ROSTERS_FILE = DATA_DIR / "Rosters" / "rosters.json"
 HEADSHOTS_DIR = DATA_DIR / "Rosters" / "Headshots"
-PERSONNEL_HEADSHOTS_DIR = DATA_DIR / "Personnel" / "Headshots"
 ASSETS_FILE = DATA_DIR / "Assets" / "assets.json"
 ASSET_UPLOAD_DIR = DATA_DIR / "Assets" / "Files"
 SPONSORS_FILE = DATA_DIR / "Sponsors" / "sponsors.json"
@@ -627,9 +614,6 @@ def _game_day_backup_root() -> Path:
 GAME_DAY_BACKUP_DIR = _game_day_backup_root()
 GAME_DAY_RECOVERY_DIR = DATA_DIR / "Backups" / "Recovery"
 COMMISSIONING_FILE = DATA_DIR / "Settings" / "hardware_commissioning.json"
-CAPTION_PROFILE_FILE = DATA_DIR / "Settings" / "caption_profile.json"
-CAPTION_STATE_FILE = DATA_DIR / "Captions" / "caption_state.json"
-CAPTION_TRANSCRIPTS_DIR = DATA_DIR / "Captions" / "Transcripts"
 WEATHER_STATE_FILE = DATA_DIR / "Weather" / "weather_state.json"
 REHEARSAL_STATE_FILE = DATA_DIR / "Rehearsals" / "rehearsals.json"
 RELEASE_MANIFEST_FILE = DATA_DIR / "Releases" / "game_day_release_manifest.json"
@@ -977,11 +961,10 @@ LOCKOUT_SECONDS = 60
 
 
 def ensure_data_architecture() -> None:
-    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings", "Rehearsals", "Releases", "Themes", "Social", "Recaps"):
+    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings", "Rehearsals", "Releases", "Themes", "Social", "Recaps"):
         (DATA_DIR / name).mkdir(parents=True, exist_ok=True)
     ASSOCIATION_PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
-    PERSONNEL_HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     ASSET_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     SPONSOR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     SOCIAL_CARDS_DIR.mkdir(parents=True, exist_ok=True)
@@ -1435,7 +1418,8 @@ def get_broadcast_package_service() -> BroadcastPackageService:
             save_packages=save_packages,
             load_broadcasts=load_broadcasts,
             load_rosters=load_rosters,
-            load_personnel=load_broadcasters,
+            # Personnel was removed (2026-10-31); packages are retired too.
+            load_personnel=lambda: [],
             load_sponsors=load_sponsors,
             load_config=load_config,
             sponsor_contract_state=sponsor_contract_state,
@@ -1468,7 +1452,6 @@ def get_diagnostics_service() -> DiagnosticsService:
             data_dir=DATA_DIR,
             config_file=CONFIG_FILE,
             schools_file=SCHOOLS_FILE,
-            broadcasters_file=BROADCASTERS_FILE,
             rosters_file=ROSTERS_FILE,
             venues_file=VENUES_FILE,
             logos_file=LOGOS_FILE,
@@ -2191,7 +2174,6 @@ def get_broadcaster_print_service() -> BroadcasterPrintService:
             load_rosters=load_rosters,
             load_packages=load_packages,
             get_school_logo_file=lambda school_id, filename: DATA_DIR / "Logos" / normalize_school_id(school_id) / filename,
-            load_personnel=load_broadcasters,
         )
 
     return BROADCASTER_PRINT_SERVICE
@@ -2562,68 +2544,6 @@ def broadcast_identity(school: dict[str, Any] | None, sport: str) -> dict[str, A
 
 
 
-PERSONNEL_CATEGORIES = ("Coach", "Broadcast Talent", "Administrator", "Official", "Interview Guest", "Production Staff", "Other")
-STAFF_ROLES = (
-    "Head Coach", "Assistant Coach", "Offensive Coordinator", "Defensive Coordinator", "Special Teams Coordinator",
-    "Play-by-Play", "Color Analyst", "Sideline Reporter", "Statistician", "Studio Host",
-    "Athletic Director", "Principal", "Superintendent", "Official", "Interview Guest",
-    "Camera Operator", "Technical Director", "Audio Engineer", "Graphics Operator", "Producer", "Other",
-)
-
-def normalize_staff_id(value: str) -> str:
-    cleaned = "".join(ch.lower() if ch.isalnum() else "-" for ch in value.strip())
-    while "--" in cleaned:
-        cleaned = cleaned.replace("--", "-")
-    return cleaned.strip("-") or "staff-member"
-
-def normalize_personnel_headshot_url(value: str) -> str:
-    raw = str(value or "").strip().replace("\\", "/")
-    if not raw:
-        return ""
-    filename = Path(raw).name
-    if raw.startswith("/data/Personnel/Headshots/") or raw.startswith("data/Personnel/Headshots/"):
-        return f"/personnel-headshots/{filename}"
-    return raw
-
-def migrate_broadcaster_record(item: dict[str, Any]) -> dict[str, Any]:
-    full_name = str(item.get("full_name") or item.get("name") or "").strip()
-    role = str(item.get("role") or item.get("primary_role") or "Other")
-    if role not in STAFF_ROLES:
-        role = "Other"
-    category = str(item.get("category") or ("Broadcast Talent" if role in {"Play-by-Play","Color Analyst","Sideline Reporter","Studio Host","Statistician"} else "Production Staff"))
-    if category not in PERSONNEL_CATEGORIES:
-        category = "Other"
-    return {
-        "id": item.get("id") or normalize_staff_id(full_name or "personnel-member"),
-        "full_name": full_name, "name": full_name, "preferred_name": str(item.get("preferred_name", "")).strip(),
-        "pronunciation": str(item.get("pronunciation", "")).strip(), "pronunciation_verified": bool(item.get("pronunciation_verified", False)),
-        "category": category, "role": role, "primary_role": role, "title": str(item.get("title") or role).strip(),
-        "organization": str(item.get("organization", "")).strip(), "school_id": str(item.get("school_id", "")).strip(),
-        "bio": str(item.get("bio", "")).strip(), "headshot": normalize_personnel_headshot_url(item.get("headshot", "")),
-        "status": "inactive" if str(item.get("status", "active")).lower()=="inactive" else "active",
-        "producer": bool(item.get("producer", False)),
-        "social": item.get("social") or {"facebook":"","x":"","instagram":"","youtube":"","website":""},
-    }
-
-
-def load_broadcasters() -> list[dict[str, Any]]:
-    ensure_data_architecture()
-    if not BROADCASTERS_FILE.exists():
-        BROADCASTERS_FILE.write_text(json.dumps([], indent=2), encoding="utf-8")
-    try:
-        data = json.loads(BROADCASTERS_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        data = []
-    items = data if isinstance(data, list) else []
-    migrated = [migrate_broadcaster_record(item) for item in items]
-    if migrated != items:
-        save_broadcasters(migrated)
-    return migrated
-
-def save_broadcasters(items: list[dict[str, Any]]) -> None:
-    ensure_data_architecture()
-    BROADCASTERS_FILE.write_text(json.dumps(items, indent=2), encoding="utf-8")
-
 def normalize_social_url(
     platform: str,
     value: str,
@@ -2637,19 +2557,6 @@ def normalize_social_block(
     return ConfigurationService.normalize_social_block(block)
 
 
-PERSONNEL_SERVICE: PersonnelService | None = None
-
-
-def get_personnel_service() -> PersonnelService:
-    global PERSONNEL_SERVICE
-
-    if PERSONNEL_SERVICE is None:
-        PERSONNEL_SERVICE = PersonnelService(
-            load_personnel=load_broadcasters,
-            save_personnel=save_broadcasters,
-        )
-
-    return PERSONNEL_SERVICE
 
 
 GRAPHICS_SERVICE: GraphicsService | None = None
@@ -2663,13 +2570,9 @@ def get_graphics_service() -> GraphicsService:
             default_state=lambda: copy.deepcopy(DEFAULT_STATE),
             load_rosters=load_rosters,
             load_schools=load_schools,
-            load_personnel=load_broadcasters,
             build_identity=broadcast_identity,
             apply_sponsor=apply_sponsor_to_graphic,
             load_assets=load_assets,
-            organization_logo=lambda: identity_service.branding_logo(
-                load_config().get("organization", {})
-            ),
         )
 
     return GRAPHICS_SERVICE
@@ -3073,16 +2976,6 @@ ASSET_ROUTES_BLUEPRINT = create_asset_blueprint(
 APPLICATION_BLUEPRINTS.append(ASSET_ROUTES_BLUEPRINT)
 
 
-PERSONNEL_ROUTES_BLUEPRINT = create_personnel_blueprint(
-    PersonnelRoutesDependencies(
-        require_auth=require_auth,
-        get_personnel_service=get_personnel_service,
-        get_headshots_dir=lambda: PERSONNEL_HEADSHOTS_DIR,
-        normalize_personnel_id=PersonnelService.normalize_id,
-        shrink_headshot=SupportMediaService.shrink_headshot_bytes,
-    )
-)
-APPLICATION_BLUEPRINTS.append(PERSONNEL_ROUTES_BLUEPRINT)
 
 ROSTER_ROUTES_BLUEPRINT = create_roster_blueprint(
     RosterRoutesDependencies(
@@ -3737,173 +3630,6 @@ COMMISSIONING_ROUTES_BLUEPRINT = create_commissioning_blueprint(
 APPLICATION_BLUEPRINTS.append(COMMISSIONING_ROUTES_BLUEPRINT)
 
 
-CAPTION_SERVICE: CaptionService | None = None
-CAPTION_RUNTIME: CaptionRuntime | None = None
-
-
-def get_caption_service() -> CaptionService:
-    global CAPTION_SERVICE
-    if CAPTION_SERVICE is None:
-        CAPTION_SERVICE = CaptionService(
-            profile_file=CAPTION_PROFILE_FILE,
-            state_file=CAPTION_STATE_FILE,
-            transcripts_dir=CAPTION_TRANSCRIPTS_DIR,
-            clock=time.time,
-        )
-    return CAPTION_SERVICE
-
-
-def current_caption_broadcast_id() -> str:
-    return str(load_state().get("broadcast_id") or "unscheduled")
-
-
-def _caption_active_rosters(state: dict[str, Any]) -> list[dict[str, Any]]:
-    sport = str(state.get("sport") or "Football").strip().casefold()
-    level = str(state.get("level") or "Varsity").strip().casefold()
-    linked_ids = {str(value) for value in (state.get("package_roster_ids") or []) if str(value).strip()}
-    school_ids = {
-        str(state.get("home_school_id") or "").strip(),
-        str(state.get("visitor_school_id") or "").strip(),
-    }
-    school_ids.discard("")
-    team_names = {
-        str(state.get("home_team") or "").strip().casefold(),
-        str(state.get("visitor_team") or "").strip().casefold(),
-    }
-    team_names.discard("")
-
-    def roster_school_name(roster: dict[str, Any]) -> str:
-        school = get_school(str(roster.get("school_id", "") or ""))
-        return str(
-            (school or {}).get("broadcast_name")
-            or (school or {}).get("official_name")
-            or roster.get("school_id", "")
-        ).strip().casefold()
-
-    def is_candidate(roster: dict[str, Any]) -> bool:
-        roster_id = str(roster.get("id", "") or "")
-        if linked_ids and roster_id in linked_ids:
-            return True
-        roster_school_id = str(roster.get("school_id", "") or "").strip()
-        school_match = roster_school_id in school_ids or roster_school_name(roster) in team_names
-        sport_match = not roster.get("sport") or str(roster.get("sport", "")).strip().casefold() == sport
-        return school_match and sport_match
-
-    rosters = [roster for roster in load_rosters() if isinstance(roster, dict) and is_candidate(roster)]
-    preferred = [
-        roster
-        for roster in rosters
-        if str(roster.get("level", "") or "").strip().casefold() in {"", level, "varsity"}
-    ]
-    return preferred or rosters
-
-
-def _caption_name_terms_from_rosters(state: dict[str, Any]) -> list[str]:
-    terms: list[str] = []
-    for roster in _caption_active_rosters(state):
-        for player in roster.get("players", []) if isinstance(roster.get("players"), list) else []:
-            if not isinstance(player, dict):
-                continue
-            if str(player.get("status", "active") or "active").strip().casefold() == "inactive":
-                continue
-            first = str(player.get("first_name") or "").strip()
-            last = str(player.get("last_name") or "").strip()
-            preferred = str(player.get("preferred_name") or "").strip()
-            pronunciation = str(player.get("pronunciation") or "").strip()
-            number = str(player.get("number") or "").strip()
-            full_name = " ".join(part for part in (first, last) if part)
-            display_name = " ".join(part for part in (preferred or first, last) if part)
-            for value in (full_name, display_name, preferred, last, pronunciation):
-                if value:
-                    terms.append(value)
-            if number and full_name:
-                terms.append(f"number {number} {full_name}")
-            if number and display_name and display_name != full_name:
-                terms.append(f"number {number} {display_name}")
-    return terms
-
-
-def _caption_name_terms_from_personnel(state: dict[str, Any]) -> list[str]:
-    school_ids = {
-        str(state.get("home_school_id") or "").strip(),
-        str(state.get("visitor_school_id") or "").strip(),
-        "",
-    }
-    terms: list[str] = []
-    for person in load_broadcasters():
-        if not isinstance(person, dict):
-            continue
-        if str(person.get("status", "active") or "active").strip().casefold() == "inactive":
-            continue
-        school_id = str(person.get("school_id") or "").strip()
-        category = str(person.get("category") or "").strip().casefold()
-        role = str(person.get("role") or person.get("primary_role") or person.get("title") or "").strip().casefold()
-        if school_id and school_id not in school_ids:
-            continue
-        if school_id or category in {"coach", "broadcast talent"} or "coach" in role or "play-by-play" in role or "analyst" in role:
-            for key in ("full_name", "name", "preferred_name", "pronunciation"):
-                value = str(person.get(key) or "").strip()
-                if value:
-                    terms.append(value)
-            title = str(person.get("title") or person.get("role") or "").strip()
-            name = str(person.get("full_name") or person.get("name") or "").strip()
-            if title and name:
-                terms.append(f"{title} {name}")
-    return terms
-
-
-def current_caption_prompt_terms() -> list[str]:
-    state = load_state()
-    terms: list[str] = []
-    for side in ("home", "visitor"):
-        terms.extend(
-            [
-                state.get(f"{side}_team", ""),
-                state.get(f"{side}_identity", {}).get("broadcast_name", ""),
-                state.get(f"{side}_identity", {}).get("official_name", ""),
-                state.get(f"{side}_identity", {}).get("preferred_scorebug_name", ""),
-                state.get(f"{side}_identity", {}).get("mascot", ""),
-            ]
-        )
-    # Generic football vocabulary only -- the actual team names / mascots come
-    # from the loaded game state above, not a hard-coded "Cavaliers" seed
-    # (Round 13 Task B).
-    terms.extend(["first and ten", "yard line"])
-    terms.extend(_caption_name_terms_from_rosters(state))
-    terms.extend(_caption_name_terms_from_personnel(state))
-    seen: set[str] = set()
-    cleaned: list[str] = []
-    for term in terms:
-        value = " ".join(str(term or "").split())
-        key = value.casefold()
-        if value and key not in seen:
-            seen.add(key)
-            cleaned.append(value)
-    return cleaned
-
-
-def get_caption_runtime() -> CaptionRuntime:
-    global CAPTION_RUNTIME
-    if CAPTION_RUNTIME is None:
-        CAPTION_RUNTIME = CaptionRuntime(
-            caption_service=get_caption_service(),
-            load_broadcast_id=current_caption_broadcast_id,
-            build_prompt_terms=current_caption_prompt_terms,
-            clock=time.time,
-        )
-    return CAPTION_RUNTIME
-
-
-CAPTION_ROUTES_BLUEPRINT = create_caption_blueprint(
-    CaptionRoutesDependencies(
-        require_auth=require_auth,
-        get_caption_service=lambda: get_caption_service(),
-        get_caption_runtime=lambda: get_caption_runtime(),
-    )
-)
-APPLICATION_BLUEPRINTS.append(CAPTION_ROUTES_BLUEPRINT)
-
-
 WEATHER_SERVICE: VenueWeatherService | None = None
 
 
@@ -3935,23 +3661,7 @@ def rehearsal_system_gates() -> dict[str, Any]:
     preflight = get_game_day_safety_service().preflight().data.get("preflight", {})
     commissioning = get_commissioning_service().report().data.get("report", {})
     recovery = get_recovery_service().status().data.get("recovery", {})
-    caption = get_caption_service().status().data
     weather = get_weather_service().status().data.get("weather", {})
-
-    channels = [
-        item
-        for item in caption.get("profile", {}).get("channels", [])
-        if item.get("enabled")
-    ]
-    names = [str(item.get("speaker", "")).strip() for item in channels]
-    placeholders = {
-        f"Announcer {index}" for index in range(1, 13)
-    }
-    captions_ready = (
-        len(names) >= 2
-        and len({name.casefold() for name in names if name}) == len(names)
-        and all(name and name not in placeholders for name in names)
-    )
 
     venue = weather.get("venue", {}) if isinstance(weather, dict) else {}
     latitude = venue.get("latitude") if isinstance(venue, dict) else None
@@ -3989,13 +3699,6 @@ def rehearsal_system_gates() -> dict[str, Any]:
             "note": "No unclean shutdown is unresolved and no broadcast is live."
             if recovery_ready
             else "Resolve the unclean-shutdown marker or stop the live broadcast.",
-        },
-        "caption_assignments": {
-            "label": "Customer-assigned caption channels",
-            "ready": captions_ready,
-            "note": "At least two unique customer-assigned speakers are configured."
-            if captions_ready
-            else "Assign at least two unique speaker names; neutral Announcer placeholders do not satisfy release readiness.",
         },
         "weather_monitoring": {
             "label": "Venue weather monitoring",

@@ -1,4 +1,5 @@
-"""Audit round 2 (2026-10-31): 13 menu items in the same five groups.
+"""Audit round 2 (2026-10-31): 13 menu items in the same five groups; 12 since
+Personnel was removed later the same day.
 Statistics becomes the Box Score tab of Statistician, Assets the Media Library
 tab of Sponsors, Graphics keeps the automatic player graphic, and Release
 Readiness becomes System Check.
@@ -20,12 +21,12 @@ def _module(module_id: str) -> str:
     return HTML[start: min(end for end in ends if end != -1)]
 
 
-def test_menu_has_thirteen_items_besides_retired_ones() -> None:
+def test_menu_has_twelve_items_besides_retired_ones() -> None:
     entries = re.findall(r"\['(\w+)', ('[^']*'[^\]]*)\]", NAV)
     shown = [key for key, rest in entries if not rest.rstrip().endswith("true")]
     assert shown == [
         "pregame", "command", "statistician", "obs",
-        "games", "schools", "rosters", "broadcasters",
+        "games", "schools", "rosters",
         "graphics", "sponsors",
         "social",
         "settings", "diagnostics",
