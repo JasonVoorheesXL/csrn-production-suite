@@ -39,7 +39,6 @@
       ['pregame', 'Pre-Game Setup'],
       ['command', 'Command Center'],
       ['statistician', 'Statistician'],
-      ['statistics', 'Statistics'],
       ['obs', 'OBS Manager'],
     ]],
     ['Setup', [
@@ -51,7 +50,6 @@
     ['Production', [
       ['graphics', 'Graphics'],
       ['themes', 'Theme Manager', '/themes', true],
-      ['assets', 'Assets'],
       ['sponsors', 'Sponsors'],
       ['packages', 'Broadcast Packages', null, true],
     ]],
@@ -61,7 +59,7 @@
     ]],
     ['System', [
       ['settings', 'Settings'],
-      ['diagnostics', 'Release Readiness'],
+      ['diagnostics', 'System Check'],
     ]],
   ];
 

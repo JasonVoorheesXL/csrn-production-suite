@@ -1307,12 +1307,12 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
         <div class="section-heading-row graphics-library-header">
           <div>
             <h1>Graphics Library</h1>
-            <p>Find, open, and operate reusable CSRN graphics from one organized workspace.</p>
+            <p>The player graphic runs automatically on touchdowns; set its look and sponsor here.</p>
           </div>
           <button onclick="window.open('/overlay','_blank')">Open Overlay Preview</button>
         </div>
 
-        <div class="graphics-library-toolbar">
+        <div class="graphics-library-toolbar retired-tool">
           <label class="graphics-search-label">Search Graphics
             <input id="graphicsLibrarySearch" type="search" placeholder="Search lower third, player, coach, sponsor..." oninput="filterGraphicsLibrary()">
           </label>
@@ -1324,7 +1324,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
             <span><strong>People</strong><small>Identification and interview graphics</small></span><b>−</b>
           </button>
           <div class="graphics-category-body">
-            <article class="graphics-library-item is-available" data-graphic-search="lower third identification guest coach sponsor">
+            <article class="graphics-library-item is-available retired-tool" data-graphic-search="lower third identification guest coach sponsor">
               <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Lower Third Master</h2><p>Names, interviews, guests, roles, and sponsor-supported identification.</p></div><button onclick="openGraphicsAsset('lowerThirdAsset', this)">Open</button></div>
               <div id="lowerThirdAsset" class="graphics-asset-panel hidden">
                 <div class="graphics-workspace">
@@ -1366,7 +1366,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
               </div>
             </article>
 
-            <article class="graphics-library-item is-available" data-graphic-search="personnel coach interview official administrator broadcast talent on the call">
+            <article class="graphics-library-item is-available retired-tool" data-graphic-search="personnel coach interview official administrator broadcast talent on the call">
               <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Personnel Identification Master</h2><p>Coaches, talent, administrators, officials, and interview guests.</p></div><button onclick="openGraphicsAsset('personnelAsset', this)">Open</button></div>
               <div id="personnelAsset" class="graphics-asset-panel hidden">
                 <div class="graphics-workspace player-graphics-workspace">
@@ -1382,32 +1382,32 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
               </div>
             </article>
 
-            <article class="graphics-library-item is-planned" data-graphic-search="interview guest dedicated layout coaches corner"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Interview Layout</h2><p>Dedicated non-game and Coach's Corner interview presentation.</p></div></div></article>
+            <article class="graphics-library-item is-planned retired-tool" data-graphic-search="interview guest dedicated layout coaches corner"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Interview Layout</h2><p>Dedicated non-game and Coach's Corner interview presentation.</p></div></div></article>
           </div>
         </div>
 
-        <div class="graphics-category collapsed" data-category="teams">
+        <div class="graphics-category collapsed retired-tool" data-category="teams">
           <button class="graphics-category-header" type="button" onclick="toggleGraphicsCategory(this)"><span><strong>Teams</strong><small>Lineups and team comparisons</small></span><b>+</b></button>
           <div class="graphics-category-body">
-            <article class="graphics-library-item is-planned" data-graphic-search="starting lineup starters offense defense"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Starting Lineup</h2><p>Roster-driven sequential or full-screen lineup presentation.</p></div></div></article>
-            <article class="graphics-library-item is-planned" data-graphic-search="team comparison matchup"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Team Comparison</h2><p>Side-by-side team information and future statistics.</p></div></div></article>
+            <article class="graphics-library-item is-planned retired-tool" data-graphic-search="starting lineup starters offense defense"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Starting Lineup</h2><p>Roster-driven sequential or full-screen lineup presentation.</p></div></div></article>
+            <article class="graphics-library-item is-planned retired-tool" data-graphic-search="team comparison matchup"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Team Comparison</h2><p>Side-by-side team information and future statistics.</p></div></div></article>
           </div>
         </div>
 
-        <div class="graphics-category collapsed" data-category="game">
+        <div class="graphics-category collapsed retired-tool" data-category="game">
           <button class="graphics-category-header" type="button" onclick="toggleGraphicsCategory(this)"><span><strong>Game</strong><small>Live game and event graphics</small></span><b>+</b></button>
           <div class="graphics-category-body">
-            <article class="graphics-library-item is-planned" data-graphic-search="drive summary"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Drive Summary</h2><p>Drive result, plays, yards, time, and scoring outcome.</p></div></div></article>
-            <article class="graphics-library-item is-planned" data-graphic-search="scoring summary"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Scoring Summary</h2><p>Chronological scoring events from the Event Engine.</p></div></div></article>
-            <article class="graphics-library-item is-planned" data-graphic-search="stat leaders statistics"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Stat Leaders</h2><p>Future team and player statistics presentation.</p></div></div></article>
+            <article class="graphics-library-item is-planned retired-tool" data-graphic-search="drive summary"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Drive Summary</h2><p>Drive result, plays, yards, time, and scoring outcome.</p></div></div></article>
+            <article class="graphics-library-item is-planned retired-tool" data-graphic-search="scoring summary"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Scoring Summary</h2><p>Chronological scoring events from the Event Engine.</p></div></div></article>
+            <article class="graphics-library-item is-planned retired-tool" data-graphic-search="stat leaders statistics"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Stat Leaders</h2><p>Future team and player statistics presentation.</p></div></div></article>
           </div>
         </div>
 
-        <div class="graphics-category collapsed" data-category="information">
+        <div class="graphics-category collapsed retired-tool" data-category="information">
           <button class="graphics-category-header" type="button" onclick="toggleGraphicsCategory(this)"><span><strong>Information</strong><small>Sponsors and full-screen messages</small></span><b>+</b></button>
           <div class="graphics-category-body">
-            <article class="graphics-library-item is-planned" data-graphic-search="sponsor spotlight commercial"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Sponsor Spotlight</h2><p>Reusable sponsor profile and recognition graphic.</p></div></div></article>
-            <article class="graphics-library-item is-planned" data-graphic-search="full screen information breaking news"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Full-Screen Information</h2><p>Announcements, schedules, weather, and general information.</p></div></div></article>
+            <article class="graphics-library-item is-planned retired-tool" data-graphic-search="sponsor spotlight commercial"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Sponsor Spotlight</h2><p>Reusable sponsor profile and recognition graphic.</p></div></div></article>
+            <article class="graphics-library-item is-planned retired-tool" data-graphic-search="full screen information breaking news"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Full-Screen Information</h2><p>Announcements, schedules, weather, and general information.</p></div></div></article>
           </div>
         </div>
 
@@ -1416,7 +1416,8 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
     </section>
 
     <section id="assetsModule" class="panel hidden">
-      <div class="section-heading"><div><h1>Asset Manager</h1><p>Central library for logos, headshots, sponsor artwork, backgrounds, audio, video, and documents.</p></div><button class="primary" onclick="newAsset()">Add Asset</button></div>
+      <div class="module-tabs" role="tablist" aria-label="Sponsors"><button type="button" role="tab" aria-selected="false" onclick="showModule('sponsors')">Sponsors</button><button type="button" role="tab" aria-selected="true" class="active" onclick="showModule('assets')">Media Library</button></div>
+      <div class="section-heading"><div><h1>Media Library</h1><p>Sponsor logos and commercials, player headshots and highlights, backgrounds and other files used on air.</p></div><button class="primary" onclick="newAsset()">Add Asset</button></div>
       <div class="asset-summary"><div><strong id="assetTotal">0</strong><span>Total Assets</span></div><div><strong id="assetVerified">0</strong><span>Rights Verified</span></div><div><strong id="assetNeedsReview">0</strong><span>Needs Review</span></div><div><strong id="assetStorage">0 B</strong><span id="assetStorageDetail">Managed Media</span></div></div>
       <div class="asset-toolbar"><input id="assetSearch" type="search" placeholder="Search assets..." oninput="renderAssets()"><select id="assetCategoryFilter" onchange="renderAssets()"><option value="">All Categories</option><option>School Branding</option><option>Sponsor</option><option>Player</option><option>Personnel</option><option>Broadcast</option><option>Audio</option><option>Video</option><option>Document</option><option>Other</option></select></div>
       <div class="asset-workspace"><div><div id="assetList" class="asset-list"></div><div id="assetEmpty" class="empty-state hidden">No assets match this view.</div></div>
@@ -1425,6 +1426,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
 
 
     <section id="sponsorsModule" class="panel hidden">
+      <div class="module-tabs" role="tablist" aria-label="Sponsors"><button type="button" role="tab" aria-selected="true" class="active" onclick="showModule('sponsors')">Sponsors</button><button type="button" role="tab" aria-selected="false" onclick="showModule('assets')">Media Library</button></div>
       <div class="section-heading"><div><h1>Sponsor Engine</h1><p>Manage sponsor profiles, agreements, approved logos, lead-ins, and package assignments.</p></div><button class="primary" onclick="newSponsor()">Add Sponsor</button></div>
       <div class="sponsor-summary"><div><strong id="sponsorTotal">0</strong><span>Total</span></div><div><strong id="sponsorActive">0</strong><span>Active</span></div><div><strong id="sponsorExpiring">0</strong><span>Expiring Soon</span></div></div>
       <div class="asset-toolbar"><input id="sponsorSearch" type="search" placeholder="Search sponsors..." oninput="renderSponsors()"><select id="sponsorStatusFilter" onchange="renderSponsors()"><option value="">All Statuses</option><option>Prospect</option><option>Active</option><option>Expired</option><option>Inactive</option></select></div>
@@ -1785,6 +1787,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
 
     <section id="statisticianModule" class="hidden">
       <section class="panel statistician-console">
+        <div class="module-tabs" role="tablist" aria-label="Statistician"><button type="button" role="tab" aria-selected="true" class="active" onclick="showModule('statistician')">Live Entry</button><button type="button" role="tab" aria-selected="false" onclick="showModule('statistics')">Box Score</button></div>
         <div class="section-heading-row"><div><h1>Statistician Console</h1><p class="section-note">Authoritative game-data entry when enabled.</p></div><span id="statisticianAuthorityBadge" class="phase-badge">DISABLED</span></div>
         <div id="statisticianStatus" class="status">Enable the Statistician Console from Command Center.</div>
         <div id="statisticianActionNotice" class="status operator-action-notice hidden" aria-live="assertive"></div>
@@ -1841,8 +1844,9 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
 
     <section id="statisticsModule" class="hidden">
       <section class="panel statistics-panel">
+        <div class="module-tabs" role="tablist" aria-label="Statistician"><button type="button" role="tab" aria-selected="false" onclick="showModule('statistician')">Live Entry</button><button type="button" role="tab" aria-selected="true" class="active" onclick="showModule('statistics')">Box Score</button></div>
         <div class="section-heading-row">
-          <div><h1>Statistics Engine</h1><p class="section-note">Canonical team and individual production with live reconciliation to the Play Register.</p></div>
+          <div><h1>Box Score</h1><p class="section-note">Team and individual stats from the Play Register, ready to print after the game.</p></div>
           <div class="button-row"><button onclick="loadStatistics()">Refresh</button><button class="primary" onclick="printStatisticsReport()">Print / Save PDF</button></div>
         </div>
         <div id="statisticsStatus" class="status">Load a broadcast to generate statistics.</div>
@@ -1865,10 +1869,10 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
 
     <section id="diagnosticsModule" class="hidden">
       <section class="panel settings-panel">
-        <div class="section-heading-row"><div><h1>Football Release Readiness</h1><p class="section-note">Run this before a rehearsal or live broadcast. Failures require correction; warnings require an operator decision.</p></div><span id="releaseGateBadge" class="phase-badge phase-pregame">NOT RUN</span></div>
+        <div class="section-heading-row"><div><h1>System Check</h1><p class="section-note">Run this before a broadcast. Failures require correction; warnings require an operator decision.</p></div><span id="releaseGateBadge" class="phase-badge phase-pregame">NOT RUN</span></div>
         <div id="releaseReadinessSummary" class="diagnostic-summary"></div>
         <div id="releaseReadinessChecks"></div>
-        <div class="row"><button class="primary" onclick="loadReleaseReadiness()">Run Release Preflight</button><button onclick="exportReleaseReport()">Export Rehearsal Report</button><button onclick="showModule('games')">Open Game Manager</button></div>
+        <div class="row"><button class="primary" onclick="loadReleaseReadiness()">Check System</button><button class="retired-tool" onclick="exportReleaseReport()">Export Rehearsal Report</button><button onclick="showModule('games')">Open Game Manager</button></div>
         <h2>Technical Diagnostics</h2>
         <div id="diagnosticSummary" class="diagnostic-summary"></div>
         <div id="diagnosticChecks"></div><h2>Engine Status</h2><div id="diagnosticEngines" class="engine-status-grid"></div>
@@ -5953,9 +5957,12 @@ function closeSponsorEditor(){document.getElementById('sponsorEditor').classList
 function populateSponsorGraphicSelectors(){const active=sponsorRecords.filter(s=>(s.effective_status||s.status)==='Active'&&s.active!==false);document.querySelectorAll('.sponsor-profile-select').forEach(sel=>{const stateId=sel.id==='pgSponsorProfile'?(currentState.player_graphic?.sponsor_id||''):(currentState.personnel_graphic?.sponsor_id||'');const desired=sel.value||stateId;sel.innerHTML='<option value="">Manual / None</option>'+active.map(s=>`<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('');const valid=active.some(s=>s.id===desired);sel.value=valid?desired:'';if(desired&&!valid){if(sel.id==='pgSponsorProfile'){document.getElementById('pgSponsorName').value='';document.getElementById('pgSponsorLogo').value='';document.getElementById('pgSponsorLead').value='';renderPlayerGraphicPreview()}else{document.getElementById('personnelSponsorName').value='';document.getElementById('personnelSponsorLogo').value='';document.getElementById('personnelSponsorLead').value='';renderPersonnelGraphicPreview()}}});}
 function applySponsorProfile(selectId,nameId,logoId,leadId){const id=document.getElementById(selectId)?.value;const s=sponsorRecords.find(x=>x.id===id);if(!s){document.getElementById(nameId).value='';document.getElementById(logoId).value='';document.getElementById(leadId).value='';if(selectId==='pgSponsorProfile')renderPlayerGraphicPreview();else renderPersonnelGraphicPreview();return}document.getElementById(nameId).value=s.name||'';document.getElementById(logoId).value=s.logo_url||'';const lead=(s.lead_ins||[])[0]||'Presented by:';document.getElementById(leadId).value=lead;if(selectId==='pgSponsorProfile')renderPlayerGraphicPreview();else renderPersonnelGraphicPreview()}
 
+// Pages reached by a tab light the menu item of the page that holds the tab.
+const MODULE_MENU_PARENT = {statistics: 'statistician', assets: 'sponsors'};
+
 function showModule(module) {
   currentModule = module;
-  window.CSRNNavigation?.setActive(module);
+  window.CSRNNavigation?.setActive(MODULE_MENU_PARENT[module] || module);
   document.getElementById('commandModule').classList.toggle('hidden', module !== 'command');
   document.getElementById('pregameModule').classList.toggle('hidden', module !== 'pregame');
   document.getElementById('packagesModule').classList.toggle('hidden', module !== 'packages');
@@ -5972,7 +5979,7 @@ function showModule(module) {
   document.getElementById('statisticianModule').classList.toggle('hidden', module !== 'statistician');
   document.getElementById('statisticsModule').classList.toggle('hidden', module !== 'statistics');
   document.getElementById('diagnosticsModule').classList.toggle('hidden', module !== 'diagnostics');
-  if (window.CSRNNavigation) window.CSRNNavigation.setActive(module);
+  if (window.CSRNNavigation) window.CSRNNavigation.setActive(MODULE_MENU_PARENT[module] || module);
   if (module === 'packages') loadPackages();
   if (module === 'games') { moveSetupPanelToGameManager(); loadGameManager(); }
   if (module === 'pregame') { document.getElementById('setupPanel').classList.add('hidden'); populatePlannedBroadcasts(); loadBroadcastConnectionInfo(); loadCaptionControls(); if(currentState&&currentState.broadcast_id) refreshReadiness(); else renderNeutralReadiness(); }
@@ -6434,7 +6441,7 @@ function releaseCheck(label,status,note){return {label,status,note}}
 async function loadReleaseReadiness(){
   const badge=document.getElementById('releaseGateBadge'),box=document.getElementById('releaseReadinessChecks'),summary=document.getElementById('releaseReadinessSummary');
   badge.textContent='RUNNING';badge.className='phase-badge phase-halftime';box.innerHTML='<p class="section-note">Checking the active football broadcast and supporting services…</p>';
-  const [ready,diag,state,social,recaps]=await Promise.all([optionalApi('/api/readiness'),optionalApi('/api/diagnostics'),optionalApi('/api/state'),optionalApi('/api/social/status'),optionalApi('/api/recaps/status')]);
+  const [ready,diag,state,social]=await Promise.all([optionalApi('/api/readiness'),optionalApi('/api/diagnostics'),optionalApi('/api/state'),optionalApi('/api/social/status')]);
   const checks=[];const st=state.data||{},d=diag.data||{},r=ready.data||{};
   checks.push(releaseCheck('Active broadcast',st.broadcast_id?'pass':'fail',st.broadcast_id?`${st.home_team||'Home'} vs ${st.visitor_team||'Visitor'}`:'Create or load a game before broadcast.'));
   checks.push(releaseCheck('Football mode',String(st.sport||'').toLowerCase()==='football'?'pass':'warning',st.sport?`Configured sport: ${st.sport}`:'No sport is loaded.'));
@@ -6445,7 +6452,6 @@ async function loadReleaseReadiness(){
   const obs=d.obs||{};checks.push(releaseCheck('OBS connection',obs.reachable&&obs.authenticated?'pass':'fail',obs.reachable?(obs.authenticated?'OBS is connected and authenticated.':'OBS authentication failed.'):'OBS is not reachable.'));
   checks.push(releaseCheck('Required OBS output',obs.required_scene_exists&&obs.browser_source_exists?'pass':'fail','Verify the scorebug scene and browser source.'));
   checks.push(releaseCheck('Social Publishing',social.ok?'pass':'warning',social.ok?'Social Publishing service responded.':`Social Publishing unavailable: ${social.error}`));
-  checks.push(releaseCheck('Game Recaps',recaps.ok?'pass':'warning',recaps.ok?'Recap service responded.':`Game Recaps unavailable: ${recaps.error}`));
   const native=(r.checks||[]);native.forEach(c=>{if(!checks.some(x=>x.label===c.label))checks.push(releaseCheck(c.label,c.ok?'pass':'fail',c.note||c.action||''))});
   const fails=checks.filter(x=>x.status==='fail').length,warns=checks.filter(x=>x.status==='warning').length;
   const gate=fails?'BLOCKED':warns?'REVIEW':'READY';badge.textContent=gate;badge.className=`phase-badge ${fails?'phase-final':warns?'phase-halftime':'phase-live'}`;

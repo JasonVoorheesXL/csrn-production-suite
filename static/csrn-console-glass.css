@@ -239,3 +239,25 @@ html.csrn-glass .appearance-preview .preview-bar, html.csrn-glass .appearance-pr
 html:not(.show-retired) .retired-tool {
   display: none !important;
 }
+
+/* Tabs joining a page with its neighbour (Statistician / Box Score, Sponsors / Media Library). */
+.module-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 4px;
+  width: fit-content;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: var(--csrn-field);
+}
+.module-tabs button {
+  min-height: 34px;
+  padding: 6px 16px;
+  border-color: transparent;
+  background: transparent;
+}
+.module-tabs button.active {
+  background: var(--csrn-accent-button);
+  color: #fff;
+}
