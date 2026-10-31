@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>CSRN Production Suite — Social Publishing</title>
-  <link rel="icon" type="image/png" href="/static/csrn-logo.png">
+  <title>{{ station_product }} — Social Publishing</title>
+  <link rel="icon" href="{{ station_logo }}">
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/csrn-navigation.css">
   <script defer src="/static/csrn-navigation.js"></script>
@@ -16,8 +16,8 @@
 <main class="shell">
   <header class="suite-header">
     <div class="brand-lockup">
-      <img class="header-logo" src="/static/csrn-logo.png" alt="Caledonia Sports Radio Network logo">
-      <div class="brand-copy"><div class="product-name">CSRN PRODUCTION SUITE</div><div class="module-name">SOCIAL PUBLISHING</div></div>
+      <img class="header-logo" src="{{ station_logo }}" alt="Station logo">
+      <div class="brand-copy"><div class="product-name">{{ station_product|upper }}</div><div class="module-name">SOCIAL PUBLISHING</div></div>
     </div>
     <div class="broadcast-context">
       <div class="subhead" id="matchup">No broadcast loaded</div>
@@ -32,7 +32,7 @@
       <div><h1>Social Publishing</h1><p>Turn recorded game events into reviewed Facebook posts and assisted-manual X packages. Drafts never change the authoritative game record.</p></div>
       <div class="quick-steps"><span><strong>1.</strong> Create</span><span><strong>2.</strong> Review</span><span><strong>3.</strong> Approve</span><span><strong>4.</strong> Publish</span></div>
     </section>
-    <div class="policy"><strong>X remains manual:</strong> CSRN prepares the text and graphic. You attach the image and publish in X yourself. It does not use an X account connection, developer access, API credits, automatic posting, or an automatic queue.</div>
+    <div class="policy"><strong>X remains manual:</strong> The app prepares the text and graphic. You attach the image and publish in X yourself. It does not use an X account connection, developer access, API credits, automatic posting, or an automatic queue.</div>
     <div id="message" class="page-message"></div>
 
     <div class="grid-3">
@@ -47,7 +47,7 @@
         </div>
         <div id="accountSummary" class="muted" style="margin-top:12px"></div>
         <div id="pageSelection" class="selection-panel hidden-field" style="margin-top:14px">
-          <h3>Select the Page CSRN should publish to</h3>
+          <h3>Select the Page to publish to</h3>
           <p class="muted">Only Pages returned by Facebook for the signed-in account are shown.</p>
           <select id="pageChoice"></select>
           <button id="selectPage" type="button" style="width:100%;margin-top:10px">Use selected Facebook Page</button>
@@ -64,7 +64,7 @@
         <details class="advanced" style="margin-top:10px">
           <summary>One-time Meta test-app setup</summary>
           <div class="advanced-body stack">
-            <div class="notice"><strong>Development connection test.</strong><br>For today’s test, CSRN uses your own Meta app. The App Secret and Page token are encrypted with Windows DPAPI for this Windows user and are never displayed after saving. A commercial release will use a PossumFrog-hosted connection broker so customers will not enter an App Secret.</div>
+            <div class="notice"><strong>Development connection test.</strong><br>For today’s test, the app uses your own Meta app. The App Secret and Page token are encrypted with Windows DPAPI for this Windows user and are never displayed after saving. A commercial release will use a PossumFrog-hosted connection broker so customers will not enter an App Secret.</div>
             <label><span class="field-label">Meta App ID</span><input id="metaAppId" inputmode="numeric" placeholder="Numeric App ID"></label>
             <label><span class="field-label">Meta App Secret</span><input id="metaAppSecret" type="password" autocomplete="new-password" placeholder="Enter to save or replace"></label>
             <label><span class="field-label">Graph API version</span><input id="metaApiVersion" value="v25.0"></label>
@@ -84,8 +84,8 @@
           <label><span class="field-label">Player name on public posts</span><select id="playerNamePolicy"><option value="preferred_first_last">Preferred first name + roster last name</option><option value="roster_full_name">Official roster first + last name</option><option value="preferred_display_exact">Exact preferred display name</option></select></label>
           <p class="muted">The first option keeps nicknames while retaining the player’s last name. Leave Preferred Display Name blank in Rosters to use the official name.</p>
           <label><span class="field-label">X workflow</span><select id="xManualEnabled"><option value="true">Create assisted-manual X packages</option><option value="false">Disable X packages</option></select></label>
-          <label><span class="field-label">X username</span><input id="xUsername" placeholder="@CaledoniaSRN"></label>
-          <label><span class="field-label">Default hashtags</span><input id="hashtags" placeholder="#CaledoniaFootball, #HighSchoolFootball"></label>
+          <label><span class="field-label">X username</span><input id="xUsername" placeholder="@YourStation"></label>
+          <label><span class="field-label">Default hashtags</span><input id="hashtags" placeholder="#YourTeamFootball, #HighSchoolFootball"></label>
           <button id="saveSettings">Save publishing preferences</button>
         </div>
       </section>
@@ -165,7 +165,7 @@ function bindDraftActions(){document.querySelectorAll('[data-draft]').forEach(ca
 function showManual(pkg){currentManual=pkg||{};const dialog=byId('manualPackage');byId('manualText').value=currentManual.text||'';byId('downloadManual').href=currentManual.download_url||'#';byId('downloadManual').setAttribute('download',currentManual.filename||'csrn-x-graphic.png');byId('manualPackageStatus').textContent='Package ready. Copy the text and download the graphic before opening X.';try{if(dialog.open)dialog.close();if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','open')}catch(error){dialog.setAttribute('open','open');dialog.scrollIntoView({behavior:'smooth',block:'center'})}message('X package prepared. Use the open package dialog to copy the text and download the graphic.')}
 byId('connectFacebook').onclick=()=>{window.location.href='/api/social/facebook/start'};
 byId('testFacebook').onclick=async()=>{try{await api('/api/social/facebook/test',{method:'POST',body:'{}'});message('Facebook connection test passed.');load()}catch(error){message(error.message,false)}};
-byId('disconnectFacebook').onclick=async()=>{if(!confirm('Disconnect the Facebook Page from CSRN?'))return;try{await api('/api/social/facebook/disconnect',{method:'POST',body:JSON.stringify({confirmation:'DISCONNECT FACEBOOK PAGE'})});message('Facebook Page disconnected.');load()}catch(error){message(error.message,false)}};
+byId('disconnectFacebook').onclick=async()=>{if(!confirm('Disconnect the Facebook Page from this app?'))return;try{await api('/api/social/facebook/disconnect',{method:'POST',body:JSON.stringify({confirmation:'DISCONNECT FACEBOOK PAGE'})});message('Facebook Page disconnected.');load()}catch(error){message(error.message,false)}};
 byId('selectPage').onclick=async()=>{try{if(!facebookSelectionId)throw new Error('Facebook Page-selection session is missing. Connect Facebook again.');await api('/api/social/facebook/select',{method:'POST',body:JSON.stringify({selection_id:facebookSelectionId,page_id:byId('pageChoice').value})});facebookSelectionId='';byId('pageSelection').classList.add('hidden-field');message('Facebook Page connected. Run Test connection before publishing.');load()}catch(error){message(error.message,false)}};
 byId('saveMetaApp').onclick=async()=>{try{await api('/api/social/facebook/app',{method:'POST',body:JSON.stringify({app_id:byId('metaAppId').value,app_secret:byId('metaAppSecret').value,api_version:byId('metaApiVersion').value,redirect_uri:byId('metaRedirectUri').value})});message('Meta test app saved securely. Add the redirect URI in Meta, then click Connect Facebook Page.');load()}catch(error){message(error.message,false)}};
 byId('copyRedirectUri').onclick=async()=>{try{await navigator.clipboard.writeText(byId('metaRedirectUri').value);message('OAuth redirect URI copied.')}catch(_){byId('metaRedirectUri').select();document.execCommand('copy');message('OAuth redirect URI copied.')}};

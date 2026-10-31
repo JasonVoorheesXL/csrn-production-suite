@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="No logo set">
+  <!-- Neutral stand-in wherever a station, team or sponsor has no logo yet. -->
+  <circle cx="128" cy="128" r="124" fill="#1B2430"/>
+  <circle cx="128" cy="128" r="112" fill="none" stroke="#9AA7B6" stroke-width="6" opacity="0.55"/>
+  <rect x="106" y="62" width="44" height="78" rx="22" fill="#E8EDF3"/>
+  <path d="M84 118v6a44 44 0 0 0 88 0v-6" fill="none" stroke="#E8EDF3" stroke-width="10" stroke-linecap="round"/>
+  <path d="M128 168v24M100 194h56" fill="none" stroke="#E8EDF3" stroke-width="10" stroke-linecap="round"/>
+</svg>

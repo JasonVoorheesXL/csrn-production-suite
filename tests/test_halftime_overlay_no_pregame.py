@@ -46,7 +46,8 @@ def test_halftime_empty_state_is_not_worded_pregame() -> None:
 
 
 def test_footer_fallback_is_halftime_aware() -> None:
-    assert "(halftime?'CSRN Halftime':delayed?'CSRN':'CSRN Pregame')" in HTML
+    # Audit round 4: the station's own short name, never a hard-coded "CSRN".
+    assert "[stationShortName(),halftime?'Halftime':delayed?'':'Pregame'].filter(Boolean).join(' ')" in HTML
 
 
 def test_title_is_not_pregame_branded() -> None:
@@ -99,7 +100,7 @@ def test_no_visible_pregame_text_in_the_halftime_render_path() -> None:
     hero_eyebrow = "Halftime" if halftime else "Tonight's Matchup"
     count_label = "Score at the Half" if halftime else "Kickoff In"
     empty_state = "Halftime coverage is loading." if halftime else "Pregame information is loading."
-    footer_fallback = "CSRN Halftime" if halftime else "CSRN Pregame"
+    footer_fallback = "Halftime" if halftime else "Pregame"
 
     for value in (state_word, hero_eyebrow, count_label, empty_state, footer_fallback):
         assert "pregame" not in value.lower()

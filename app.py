@@ -1244,7 +1244,14 @@ def _persist_identity_sections(config: Mapping[str, Any]) -> None:
             }
         save_identity_profile(IDENTITY_FILE, current, existing_install=True)
     except Exception:
-        pass
+        return
+    # Rebind the in-memory profile (as save_appearance_document does) so a
+    # renamed station or new logo reaches /api/appearance and the overlays
+    # without a restart (audit round 4).
+    global IDENTITY_PROFILE, IDENTITY_PROFILE_ISSUE
+    with _LAYOUTS_WRITE_LOCK:
+        IDENTITY_PROFILE = load_identity_profile(IDENTITY_FILE, existing_install=_EXISTING_INSTALL)
+        IDENTITY_PROFILE_ISSUE = identity_service.load_issue(IDENTITY_FILE)
 
 
 def save_config(config: dict[str, Any]) -> None:
@@ -4596,13 +4603,33 @@ def create_app(
     """Build a configured CSRN application from the consolidated Blueprints."""
 
     security = load_security()
-    return create_application(
+    application = create_application(
         __name__,
         blueprints=tuple(APPLICATION_BLUEPRINTS),
         secret_key=str(security["secret_key"]),
         session_seconds=SESSION_SECONDS,
         config_overrides=config_overrides,
     )
+    application.context_processor(_station_branding_context)
+    return application
+
+
+def _station_branding_context() -> dict[str, str]:
+    """Station branding (audit round 4): every page names the product after
+    the station and shows its logo (or the neutral placeholder). Read from the
+    configuration, like the pregame overlay, so a Settings save shows on the
+    next page load without a restart."""
+    try:
+        organization = load_config().get("organization")
+    except Exception:
+        organization = None
+    if not isinstance(organization, Mapping):
+        organization = IDENTITY_PROFILE.get("organization") or {}
+    return {
+        "station_short_name": identity_service.station_short_name(organization),
+        "station_product": identity_service.station_product_name(organization),
+        "station_logo": identity_service.station_logo_url(organization),
+    }
 
 
 app = create_app()
