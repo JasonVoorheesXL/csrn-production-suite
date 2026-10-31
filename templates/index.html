@@ -124,10 +124,10 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
       <h1>Create Operator PIN</h1>
       <p>Create a 6-digit PIN for authorized operators.</p>
       <label>New PIN
-        <input id="newPin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password">
+        <input id="newPin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('confirmPin').focus()}">
       </label>
       <label>Confirm PIN
-        <input id="confirmPin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password">
+        <input id="confirmPin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" onkeydown="if(event.key==='Enter'){event.preventDefault();setupPin()}">
       </label>
       <div class="sport-picker" id="setupSportPicker" data-login-sport-picker aria-label="Sport"></div>
       <div class="sport-others hidden" id="setupOtherSports" data-login-other-list></div>
@@ -143,7 +143,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
       <h1>Operator Login</h1>
       <p>Enter the 6-digit operator PIN.</p>
       <label>PIN
-        <input id="loginPin" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password">
+        <input id="loginPin" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();login()}">
       </label>
       <div class="sport-picker" id="loginSportPicker" data-login-sport-picker aria-label="Sport"></div>
       <div class="sport-others hidden" id="loginOtherSports" data-login-other-list></div>
@@ -2245,7 +2245,10 @@ async function api(path, body = null, method = null) {
   if (response.status === 401) {
     authenticated = false;
     showSecurityState();
-    throw new Error('Authentication required');
+    // A wrong PIN is a 401 too; keep its code so login() can say "Incorrect PIN".
+    const err = new Error(data.error === 'INVALID_PIN' ? 'INVALID_PIN' : 'Authentication required');
+    err.data = data;
+    throw err;
   }
   if (!response.ok) {
     const err = new Error(data.error || 'Request failed');
