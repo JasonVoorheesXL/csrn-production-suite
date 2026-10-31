@@ -26,6 +26,7 @@ import time
 from pathlib import Path
 from typing import Any, Mapping
 
+import appearance_service
 import layout_builder_service
 
 
@@ -120,6 +121,7 @@ def _template(existing_install: bool) -> dict[str, Any]:
             "streaming": copy.deepcopy(LEGACY_STREAMING),
             "state_defaults": copy.deepcopy(LEGACY_STATE_DEFAULTS),
             "layouts": layout_builder_service.default_layouts_document(),
+            "appearance": appearance_service.normalize_appearance(None),
             "onboarding_complete": True,
         }
     return {
@@ -128,6 +130,7 @@ def _template(existing_install: bool) -> dict[str, Any]:
         "streaming": copy.deepcopy(BLANK_STREAMING),
         "state_defaults": copy.deepcopy(BLANK_STATE_DEFAULTS),
         "layouts": layout_builder_service.default_layouts_document(),
+        "appearance": appearance_service.normalize_appearance(None),
         "onboarding_complete": False,
     }
 
@@ -166,6 +169,8 @@ def _normalize(raw: Mapping[str, Any] | None, existing_install: bool) -> dict[st
         # shallow merge above (which would silently drop everything below
         # the first level).
         base["layouts"] = layout_builder_service.normalize_layouts(raw.get("layouts"))
+        # Console appearance (2026-10-31): validated as a unit, unknown keys dropped.
+        base["appearance"] = appearance_service.normalize_appearance(raw.get("appearance"))
         for flag in _FLAG_DEFAULTS:
             if flag in raw:
                 base[flag] = bool(raw[flag])
