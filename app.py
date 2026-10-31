@@ -261,7 +261,9 @@ CONFIG_FILE = DATA_DIR / "Settings" / "config.json"
 # Evaluate "is this an existing install?" now, BEFORE any repository
 # auto-creates config.json -- the Identity Profile seeds itself from today's
 # exact Caledonia/CSRN literals for an existing install and blank for a new one.
+import guides_catalog
 import identity_service
+import sport_families
 import station_sports_service
 from identity_service import load_identity_profile, save_identity_profile
 
@@ -428,6 +430,7 @@ def _install_license_gate(flask_app: Any) -> None:
 _ONBOARDING_GATE_EXEMPT_EXACT = frozenset({"/api/health"})
 _ONBOARDING_GATE_EXEMPT_PREFIXES = (
     "/static/",
+    "/api/guides",
     "/api/onboarding",
     "/api/licensing",
     "/api/diagnostics",
@@ -492,7 +495,11 @@ def _complete_onboarding(payload: Mapping[str, Any]) -> tuple[bool, str, str]:
 
     if org_name:
         organization["name"] = org_name[:240]
-        if not str(organization.get("short_name") or "").strip():
+        # The short name names the product ("<short> Production Suite").
+        short_name = str(payload.get("short_name") or "").strip()
+        if short_name:
+            organization["short_name"] = short_name[:40]
+        elif not str(organization.get("short_name") or "").strip():
             organization["short_name"] = org_name[:40]
 
     logo_path = str(payload.get("logo_path") or "").strip()
@@ -502,6 +509,11 @@ def _complete_onboarding(payload: Mapping[str, Any]) -> tuple[bool, str, str]:
     sport = str(payload.get("sport") or "").strip()
     if sport:
         broadcast_defaults["sport"] = sport.title()
+        # Switch on the sport the station chose (Settings > Sports starts with
+        # football alone, which would hide a basketball station's own sport).
+        family = sport_families.base_family(sport_families.normalize_sport(sport) or "")
+        if family in station_sports_service.SWITCHABLE:
+            profile["station_sports"] = station_sports_service.normalize_station_sports({"on": [family]})
 
     school_name = str(payload.get("school_name") or "").strip()
     if school_name:
@@ -524,6 +536,13 @@ def _complete_onboarding(payload: Mapping[str, Any]) -> tuple[bool, str, str]:
     profile["broadcast_defaults"] = broadcast_defaults
     profile["onboarding_complete"] = True
     save_identity_profile(IDENTITY_FILE, profile, existing_install=_EXISTING_INSTALL)
+    # Settings, the overlays and the product name read the configuration, which
+    # was created (blank) before the wizard ran; without this the wizard's
+    # answers never showed there and the first Settings save wiped them.
+    config = load_config()
+    config["organization"] = {**(config.get("organization") or {}), **organization}
+    config["broadcast_defaults"] = {**(config.get("broadcast_defaults") or {}), **broadcast_defaults}
+    CONFIG_REPOSITORY.save(config)
 
     global IDENTITY_PROFILE, IDENTITY_PROFILE_ISSUE
     IDENTITY_PROFILE = load_identity_profile(
@@ -3096,6 +3115,10 @@ ONBOARDING_ROUTES_BLUEPRINT = create_onboarding_blueprint(
         default_sport=_default_onboarding_sport,
         complete_onboarding=_complete_onboarding,
         save_logo=_onboarding_save_logo,
+        list_guides=lambda: guides_catalog.guides_for(
+            station_sports_service.normalize_station_sports(IDENTITY_PROFILE.get("station_sports"))["on"],
+            BASE_DIR / "static" / "guides",
+        ),
     )
 )
 APPLICATION_BLUEPRINTS.append(ONBOARDING_ROUTES_BLUEPRINT)
@@ -4624,7 +4647,7 @@ def _station_branding_context() -> dict[str, str]:
         organization = load_config().get("organization")
     except Exception:
         organization = None
-    if not isinstance(organization, Mapping):
+    if not isinstance(organization, Mapping) or not identity_service.station_short_name(organization):
         organization = IDENTITY_PROFILE.get("organization") or {}
     return {
         "station_short_name": identity_service.station_short_name(organization),

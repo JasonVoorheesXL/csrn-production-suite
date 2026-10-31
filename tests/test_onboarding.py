@@ -81,14 +81,14 @@ def test_seeded_profile_serves_the_normal_control_panel(client, monkeypatch) -> 
     monkeypatch.setattr(app_module, "_onboarding_incomplete", lambda: False)
     r = client.get("/")
     assert r.status_code == 200
-    assert b"Welcome to CSRN Production Suite" not in r.data  # not the wizard
+    assert b"Let&rsquo;s set up your station" not in r.data  # not the wizard
 
 
 def test_blank_profile_routes_to_the_wizard(client, monkeypatch) -> None:
     monkeypatch.setattr(app_module, "_onboarding_incomplete", lambda: True)
     r = client.get("/")
     assert r.status_code == 200
-    assert b"Welcome to CSRN Production Suite" in r.data
+    assert b"Let&rsquo;s set up your station" in r.data
     assert b'href="/static/style.css"' in r.data  # reuses the app CSS
 
 
@@ -172,8 +172,18 @@ def wiring(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(app_module, "get_school_service", lambda: school_service)
 
+    # The wizard also writes its answers into the configuration (2026-10-31);
+    # keep that in memory so the tests never touch Data/Settings/config.json.
+    config_store: dict = {"organization": {"name": "", "short_name": ""}, "broadcast_defaults": {}}
+    monkeypatch.setattr(app_module, "load_config", lambda: copy.deepcopy(config_store))
+    monkeypatch.setattr(
+        app_module,
+        "CONFIG_REPOSITORY",
+        type("MemConfig", (), {"save": staticmethod(lambda config: config_store.update(copy.deepcopy(config)))})(),
+    )
+
     original_profile = app_module.IDENTITY_PROFILE
-    yield {"identity_file": ident, "store": store, "school_service": school_service}
+    yield {"identity_file": ident, "store": store, "school_service": school_service, "config": config_store}
     app_module.IDENTITY_PROFILE = original_profile
 
 
@@ -361,3 +371,35 @@ def test_gate_upload_rejects_a_license_signed_by_the_wrong_key(gate_client, monk
     assert response.status_code == 409
     assert response.get_json()["status"] == "SIGNATURE_INVALID"
     assert gate_client.get("/api/state").status_code == 402
+
+
+# --------------------------------------------------------------------------
+# 2026-10-31: short name, the chosen sport switched on, answers in the config
+# --------------------------------------------------------------------------
+
+
+def test_wizard_sets_short_name_and_writes_its_answers_into_the_config(wiring) -> None:
+    ok, code, message = app_module._complete_onboarding(
+        {"org_name": "Westside Sports Network", "short_name": "WSN", "logo_path": "/static/organization/x.png"}
+    )
+    assert ok, (code, message)
+    assert _profile(wiring)["organization"]["short_name"] == "WSN"
+    organization = wiring["config"]["organization"]
+    assert organization["name"] == "Westside Sports Network"
+    assert organization["short_name"] == "WSN"
+    assert organization["logo_path"] == "/static/organization/x.png"
+
+
+def test_wizard_switches_on_the_sport_it_chose(wiring) -> None:
+    ok, _, _ = app_module._complete_onboarding({"org_name": "Hoops Net", "sport": "basketball"})
+    assert ok
+    assert _profile(wiring)["station_sports"] == {"on": ["basketball"]}
+
+
+def test_wizard_ends_on_the_guides_step() -> None:
+    html = (ROOT / "templates" / "onboarding.html").read_text(encoding="utf-8")
+    assert 'id="shortName"' in html and "short_name: $(\"shortName\").value.trim()," in html
+    assert "await showGuides();" in html
+    assert 'fetch("/api/guides"' in html
+    assert '<section id="guidesStep" hidden>' in html
+    assert "CSRN" not in html

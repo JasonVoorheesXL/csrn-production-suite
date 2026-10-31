@@ -130,5 +130,5 @@ def test_console_hides_switched_off_tiles_and_has_the_settings_section() -> None
     assert "SPORT_SWITCHED_OFF: 'That sport is switched off in Settings > Sports.'" in HTML
     assert '<div id="stationSportsList" class="station-sports-list"></div>' in HTML
     assert HTML.index("<h2>Sports</h2>") < HTML.index("<h2>Retired Tools</h2>")
-    assert "if (module === 'settings') { loadConfig(); loadStationSports(); }" in HTML
+    assert "if (module === 'settings') { loadConfig(); loadStationSports(); loadGuides(); }" in HTML
     assert "api('/api/station-sports',{on})" in HTML

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Welcome &mdash; CSRN Production Suite</title>
+  <title>Welcome &mdash; Set Up Your Station</title>
   <link rel="stylesheet" href="/static/style.css">
   <style>
     /* Layout-only additions; all colours/controls come from style.css. */
@@ -20,19 +20,35 @@
     .onboarding-actions button { flex:1; }
     #onboardingError { color:#ff8f8f; font-weight:700; margin:12px 0 0; min-height:1.2em; }
     .req { color:var(--accent2); }
+    .guide-list { display:grid; gap:10px; margin:6px 0 18px; }
+    .guide-row { display:flex; gap:14px; align-items:center; justify-content:space-between;
+      border:1px solid #444b56; border-radius:10px; padding:12px 14px; }
+    .guide-row p { margin:2px 0 0; color:var(--muted); font-size:.92em; }
+    .guide-row.soon { opacity:.65; }
+    .guide-row button { flex:none; white-space:nowrap; }
+    .guide-viewer { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.75); display:flex; flex-direction:column; padding:20px; }
+    .guide-viewer[hidden] { display:none; }
+    .guide-viewer-bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; color:#fff; }
+    .guide-viewer iframe { flex:1; width:100%; border:0; border-radius:8px; background:#fff; }
   </style>
 </head>
 <body>
   <main class="panel onboarding-card">
-    <h1>Welcome to CSRN Production Suite</h1>
+  <section id="setupStep">
+    <h1>Welcome! Let&rsquo;s set up your station</h1>
     <p class="lede">
       A few basics to get started. Only the organization / team name is
-      required &mdash; everything else can be set later from Configuration.
+      required &mdash; everything else can be set later from Settings.
     </p>
 
     <label>
       Organization / team name <span class="req">*</span>
-      <input id="orgName" class="wide" autocomplete="off" placeholder="e.g. TruHous Media">
+      <input id="orgName" class="wide" autocomplete="off" placeholder="e.g. Westside Sports Network">
+    </label>
+
+    <label>
+      Short name
+      <input id="shortName" class="wide" autocomplete="off" maxlength="40" placeholder="e.g. WSN (names the app: &ldquo;WSN Production Suite&rdquo;)">
     </label>
 
     <div class="setup-grid">
@@ -64,7 +80,27 @@
       <button type="button" id="skipBtn">Skip for now</button>
       <button type="button" id="finishBtn" class="primary">Finish</button>
     </div>
+  </section>
+
+  <section id="guidesStep" hidden>
+    <h1>You&rsquo;re set up</h1>
+    <p class="lede">
+      Before your first broadcast, read the Station Setup Guide: it walks
+      through your station&rsquo;s details, schools and rosters, OBS and your
+      first game. Hand the statistician guide to whoever keeps stats. Both stay
+      under Settings &rsaquo; Guides.
+    </p>
+    <div id="guideList" class="guide-list"></div>
+    <div class="onboarding-actions">
+      <button type="button" id="openConsoleBtn" class="primary">Open the console</button>
+    </div>
+  </section>
   </main>
+
+  <div id="guideViewer" class="guide-viewer" hidden>
+    <div class="guide-viewer-bar"><strong id="guideViewerTitle"></strong><button type="button" id="guideViewerClose">Close</button></div>
+    <iframe id="guideViewerFrame" title="Guide"></iframe>
+  </div>
 
   <script>
     (function () {
@@ -117,18 +153,69 @@
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) { err.textContent = data.message || "Could not finish setup."; setBusy(false); return; }
-          window.location.href = "/";
+          await showGuides();
         } catch (_) {
           err.textContent = "Could not reach the server.";
           setBusy(false);
         }
       }
 
+      // A new station is sent to the guides before the console (2026-10-31).
+      async function showGuides() {
+        const list = $("guideList");
+        list.innerHTML = "";
+        let guides = [];
+        try {
+          const res = await fetch("/api/guides", { credentials: "same-origin" });
+          guides = (await res.json()).guides || [];
+        } catch (_) {}
+        if (!guides.length) { window.location.href = "/"; return; }
+        guides.forEach((g) => {
+          const row = document.createElement("div");
+          row.className = "guide-row" + (g.available ? "" : " soon");
+          const text = document.createElement("div");
+          const title = document.createElement("strong");
+          title.textContent = g.title;
+          const summary = document.createElement("p");
+          summary.textContent = g.summary || "";
+          text.append(title, summary);
+          row.appendChild(text);
+          if (g.available) {
+            const open = document.createElement("button");
+            open.type = "button";
+            open.textContent = "Open guide";
+            open.addEventListener("click", () => openGuide(g.url, g.title));
+            row.appendChild(open);
+          } else {
+            const soon = document.createElement("small");
+            soon.textContent = "Coming soon";
+            row.appendChild(soon);
+          }
+          list.appendChild(row);
+        });
+        $("setupStep").hidden = true;
+        $("guidesStep").hidden = false;
+      }
+      $("openConsoleBtn").addEventListener("click", () => { window.location.href = "/"; });
+
+      // In-page viewer, like the console's openPdfInApp(): the desktop window
+      // can't be relied on to open a new one.
+      function openGuide(url, title) {
+        $("guideViewerTitle").textContent = title || "";
+        $("guideViewerFrame").src = url;
+        $("guideViewer").hidden = false;
+      }
+      $("guideViewerClose").addEventListener("click", () => {
+        $("guideViewer").hidden = true;
+        $("guideViewerFrame").src = "about:blank";
+      });
+
       $("finishBtn").addEventListener("click", () => {
         const org = $("orgName").value.trim();
         if (!org) { err.textContent = "Organization / team name is required."; $("orgName").focus(); return; }
         complete({
           org_name: org,
+          short_name: $("shortName").value.trim(),
           sport: $("sport").value || "",
           school_name: $("schoolName").value.trim(),
           logo_path: $("logoPath").value || "",
