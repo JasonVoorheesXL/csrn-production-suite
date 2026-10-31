@@ -145,14 +145,15 @@ class SupportMediaService:
             },
         )
 
+    @classmethod
     def _downscale_for_storage(
-        self, image: Image.Image, extension: str, original_payload: bytes
+        cls, image: Image.Image, extension: str, original_payload: bytes
     ) -> bytes:
         """Re-encode an oversized upload at MAX_HEADSHOT_DIMENSION; pass
         through untouched (byte-for-byte) when it's already within bounds."""
         if (
-            image.width <= self.MAX_HEADSHOT_DIMENSION
-            and image.height <= self.MAX_HEADSHOT_DIMENSION
+            image.width <= cls.MAX_HEADSHOT_DIMENSION
+            and image.height <= cls.MAX_HEADSHOT_DIMENSION
         ):
             return original_payload
 
@@ -162,7 +163,7 @@ class SupportMediaService:
         oriented = ImageOps.exif_transpose(image) or image
         resized = oriented.copy()
         resized.thumbnail(
-            (self.MAX_HEADSHOT_DIMENSION, self.MAX_HEADSHOT_DIMENSION),
+            (cls.MAX_HEADSHOT_DIMENSION, cls.MAX_HEADSHOT_DIMENSION),
             Image.Resampling.LANCZOS,
         )
 
@@ -176,11 +177,22 @@ class SupportMediaService:
         if save_format == "JPEG":
             if resized.mode not in ("RGB", "L"):
                 resized = resized.convert("RGB")
-            save_kwargs = {"quality": self.HEADSHOT_JPEG_QUALITY, "optimize": True}
+            save_kwargs = {"quality": cls.HEADSHOT_JPEG_QUALITY, "optimize": True}
 
         buffer = io.BytesIO()
         resized.save(buffer, format=save_format, **save_kwargs)
         return buffer.getvalue()
+
+    @classmethod
+    def shrink_headshot_bytes(cls, payload: bytes, extension: str) -> bytes | None:
+        """The roster-headshot downscale for any other headshot upload
+        (personnel, audit round 4). None when the bytes aren't an image."""
+        try:
+            image = Image.open(io.BytesIO(payload))
+            image.load()
+        except Exception:
+            return None
+        return cls._downscale_for_storage(image, extension, payload)
 
     def upload_headshot(
         self,

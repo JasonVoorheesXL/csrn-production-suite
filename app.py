@@ -3058,6 +3058,7 @@ PERSONNEL_ROUTES_BLUEPRINT = create_personnel_blueprint(
         get_personnel_service=get_personnel_service,
         get_headshots_dir=lambda: PERSONNEL_HEADSHOTS_DIR,
         normalize_personnel_id=PersonnelService.normalize_id,
+        shrink_headshot=SupportMediaService.shrink_headshot_bytes,
     )
 )
 APPLICATION_BLUEPRINTS.append(PERSONNEL_ROUTES_BLUEPRINT)

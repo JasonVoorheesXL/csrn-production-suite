@@ -4,9 +4,20 @@ import io
 from typing import Any
 
 import pytest
+from PIL import Image
 
 import app as app_module
 from personnel_service import PersonnelResult
+
+
+def _png() -> bytes:
+    # Uploads must be real images now (audit round 4 shrinks them on upload).
+    buffer = io.BytesIO()
+    Image.new("RGB", (40, 40), (10, 20, 30)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+PORTRAIT = _png()
 
 
 if not hasattr(app_module, "get_personnel_service"):
@@ -193,12 +204,12 @@ def test_headshot_upload_links_saved_file_through_service(personnel_client) -> N
     client, service, directory = personnel_client
     response = client.post(
         f"/api/personnel/{PERSONNEL_ID}/headshot",
-        data={"file": (io.BytesIO(b"image-data"), "portrait.png")},
+        data={"file": (io.BytesIO(PORTRAIT), "portrait.png")},
         content_type="multipart/form-data",
     )
     assert response.status_code == 200
     assert response.get_json() == {"path": "/personnel-headshots/jason.png"}
-    assert (directory / "jason.png").read_bytes() == b"image-data"
+    assert (directory / "jason.png").read_bytes() == PORTRAIT
     assert service.calls == [
         (
             "attach_headshot",
@@ -229,7 +240,7 @@ def test_headshot_upload_preserves_validation_and_missing_contracts(
     service.attach_result = PersonnelResult("PERSONNEL_NOT_FOUND")
     not_found = client.post(
         "/api/personnel/missing/headshot",
-        data={"file": (io.BytesIO(b"image"), "portrait.jpg")},
+        data={"file": (io.BytesIO(PORTRAIT), "portrait.jpg")},
         content_type="multipart/form-data",
     )
     assert not_found.status_code == 404
