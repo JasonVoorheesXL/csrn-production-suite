@@ -1818,8 +1818,7 @@
         <div class="section-heading-row"><div><h2 id="playEntryTitle">Record Play</h2><p id="playEntryContext" class="section-note"></p></div><button onclick="closePlayEntry()">Close</button></div>
         <input id="playEntryTeam" type="hidden"><input id="playEntryType" type="hidden">
         <section class="field-spotter" aria-label="Ball spot selector">
-          <div id="playDriveIndicator" class="drive-indicator">TEAM →</div>
-          <div class="field-axis"><span>LEFT GOAL</span><span>50</span><span>RIGHT GOAL</span></div>
+          <div class="field-axis"><span>LEFT GOAL</span><div id="playDriveIndicator" class="drive-indicator">TEAM →</div><span>RIGHT GOAL</span></div>
           <div class="spot-control start-spot-control"><div><strong>Start Spot</strong><span id="playStartSpotLabel">50</span></div><div id="playStartDirectionBadge" class="slider-direction-badge">TEAM →</div><input id="playStartCoord" type="range" min="0" max="100" step="1" value="50" disabled><input id="playStartTyped" class="spot-typed" placeholder="Yard line, e.g. MT 23" aria-label="Start spot yard line" onchange="typedSpot('start',this)"><button id="unlockStartSpot" type="button" onclick="toggleStartSpotCorrection()">Correct Start Spot</button></div>
           <div id="playLandingSpotWrap" class="spot-control hidden"><div><strong>Landed / Caught Spot</strong><span id="playLandingSpotLabel">50</span></div><div id="playLandingDirectionBadge" class="slider-direction-badge">TEAM →</div><input id="playLandingCoord" type="range" min="0" max="100" step="1" value="50"><input id="playLandingTyped" class="spot-typed" placeholder="Yard line, e.g. MT 23" aria-label="Landed spot yard line" onchange="typedSpot('landing',this)"></div>
           <div id="playTurnoverSpotWrap" class="spot-control hidden"><div><strong id="playTurnoverSpotTitle">Interception / Recovery Spot</strong><span id="playTurnoverSpotLabel">50</span></div><div class="slider-direction-badge">TURNOVER</div><input id="playTurnoverCoord" type="range" min="0" max="100" step="1" value="50"><input id="playTurnoverTyped" class="spot-typed" placeholder="Yard line, e.g. MT 23" aria-label="Recovery spot yard line" onchange="typedSpot('turnover',this)"></div>
@@ -1843,6 +1842,7 @@
           <label id="playEntryClockWrap">Game Clock<input id="playEntryClock" inputmode="numeric" placeholder="mm:ss" pattern="[0-9]{1,2}:[0-9]{2}"></label>
         </div>
         <div class="play-option-grid">
+          <label id="playTouchbackWrap"><input id="playTouchback" type="checkbox" onchange="puntResultChanged(this.id)"> Touchback</label>
           <label id="playKneelWrap"><input id="playKneel" type="checkbox"> Kneel</label>
           <label id="playFumbleWrap"><input id="playFumble" type="checkbox" onchange="turnoverEntryChanged()"> Fumble</label>
           <label id="playFumbleLostWrap"><input id="playFumbleLost" type="checkbox" onchange="turnoverEntryChanged()"> Fumble lost</label>
@@ -1854,7 +1854,6 @@
           <label><input id="playOutOfBounds" type="checkbox" onchange="kickOutOfBoundsChanged()"> <span id="playOutOfBoundsLabel">Out of bounds</span></label>
           <label id="playReturnOobWrap" class="hidden"><input id="playReturnOob" type="checkbox"> Returner out of bounds</label>
           <label id="playKickOobChoiceWrap" class="hidden">Receiving team's choice<select id="playKickOobChoice"><option value="25_yard_line">Ball 25 yards beyond the kick spot (receiving 35)</option><option value="rekick">Re-kick 5 yards back</option><option value="spot_plus_5">Ball at the out-of-bounds spot + 5 yards</option></select></label>
-          <label id="playTouchbackWrap"><input id="playTouchback" type="checkbox" onchange="puntResultChanged(this.id)"> Touchback</label>
           <label id="playFairCatchWrap"><input id="playFairCatch" type="checkbox" onchange="puntResultChanged(this.id)"> Fair catch</label>
           <label id="playBlockedWrap"><input id="playBlocked" type="checkbox"> Blocked</label>
         </div>
@@ -2034,6 +2033,21 @@
     <p id="typedConfirmMessage"></p>
     <label><span>Type <b id="typedConfirmWord">DELETE</b> to confirm</span><input id="typedConfirmInput" autocomplete="off" oninput="document.getElementById('typedConfirmAccept').disabled=this.value.trim().toUpperCase()!==document.getElementById('typedConfirmWord').textContent"></label>
     <div class="duplicate-actions"><button value="cancel">Cancel</button><button id="typedConfirmAccept" value="confirm" class="danger" disabled>Delete</button></div>
+  </form>
+</dialog>
+<dialog id="clockSetDialog" class="duplicate-dialog clock-set-dialog">
+  <form method="dialog" onsubmit="event.preventDefault()">
+    <h2>Set Game Clock</h2>
+    <p>Type 4 digits, minutes then seconds: 0 8 3 0 is 8:30. The clock sets on the 4th digit.</p>
+    <div id="clockSetDisplay" class="clock-set-display" aria-live="polite"><span>&nbsp;</span><span>&nbsp;</span><b>:</b><span>&nbsp;</span><span>&nbsp;</span></div>
+    <p id="clockSetMessage" class="status"></p>
+    <div class="clock-set-keypad">
+      <button type="button" onclick="clockSetDigit(1)">1</button><button type="button" onclick="clockSetDigit(2)">2</button><button type="button" onclick="clockSetDigit(3)">3</button>
+      <button type="button" onclick="clockSetDigit(4)">4</button><button type="button" onclick="clockSetDigit(5)">5</button><button type="button" onclick="clockSetDigit(6)">6</button>
+      <button type="button" onclick="clockSetDigit(7)">7</button><button type="button" onclick="clockSetDigit(8)">8</button><button type="button" onclick="clockSetDigit(9)">9</button>
+      <button type="button" class="clock-set-aux" onclick="clockSetBack()">⌫</button><button type="button" onclick="clockSetDigit(0)">0</button><button type="button" class="clock-set-aux" onclick="clockSetClear()">Clear</button>
+    </div>
+    <div class="duplicate-actions"><button type="button" class="danger" onclick="document.getElementById('clockSetDialog').close()">Cancel</button></div>
   </form>
 </dialog>
 <dialog id="directionChoiceDialog" class="duplicate-dialog">
@@ -3792,7 +3806,14 @@ async function submitDirectionRepair(){const msg=document.getElementById('direct
 async function setFieldDirection(home_direction){return setDriveDirection(home_direction)}
 async function clockAction(action,extra={}){try{await GameStateManager.mutate('/api/clock-control',{action,...extra})}catch(e){alert(e.data?.message||e.message)}}
 async function adjustClock(delta){return clockAction('adjust',{delta})}
-async function setClockDialog(){const current=Number(currentState.clock_seconds??720),m=Math.floor(current/60),s=current%60;const raw=prompt('Set game clock (MM:SS)',`${m}:${String(s).padStart(2,'0')}`);if(raw===null)return;const parts=raw.split(':').map(Number);if(parts.length!==2||parts.some(Number.isNaN)){alert('Use MM:SS.');return}await clockAction('set',{seconds:Math.max(0,parts[0]*60+parts[1])})}
+// Set Clock keypad: 4 digits fill M M : S S left to right and the 4th digit sets the clock -- no OK button to find mid-game.
+let clockSetDigits=[],clockSetBusy=false;
+function renderClockSet(){const cells=document.querySelectorAll('#clockSetDisplay span');cells.forEach((c,i)=>{c.textContent=i<clockSetDigits.length?String(clockSetDigits[i]):' ';c.classList.toggle('filled',i<clockSetDigits.length);c.classList.toggle('next',i===clockSetDigits.length)})}
+function setClockDialog(){clockSetDigits=[];clockSetBusy=false;document.getElementById('clockSetMessage').textContent='';renderClockSet();document.getElementById('clockSetDialog').showModal()}
+function clockSetClear(){if(clockSetBusy)return;clockSetDigits=[];document.getElementById('clockSetMessage').textContent='';renderClockSet()}
+function clockSetBack(){if(clockSetBusy)return;clockSetDigits.pop();renderClockSet()}
+async function clockSetDigit(d){if(clockSetBusy||clockSetDigits.length>=4)return;const msg=document.getElementById('clockSetMessage');msg.textContent='';clockSetDigits.push(d);renderClockSet();if(clockSetDigits.length<4)return;const [m1,m2,s1,s2]=clockSetDigits;if(s1>5){msg.textContent=`Seconds can't be ${s1}${s2}. Type the 4 digits again.`;clockSetDigits=[];setTimeout(renderClockSet,600);return}clockSetBusy=true;try{await GameStateManager.mutate('/api/clock-control',{action:'set',seconds:(m1*10+m2)*60+s1*10+s2});document.getElementById('clockSetDialog').close()}catch(e){msg.textContent=e.data?.message||e.message;clockSetDigits=[];renderClockSet()}finally{clockSetBusy=false}}
+document.addEventListener('keydown',e=>{const dlg=document.getElementById('clockSetDialog');if(!dlg?.open)return;if(/^[0-9]$/.test(e.key)){e.preventDefault();clockSetDigit(Number(e.key))}else if(e.key==='Backspace'){e.preventDefault();clockSetBack()}else if(e.key==='Delete'){e.preventDefault();clockSetClear()}})
 async function toggleClockVisibility(){try{await GameStateManager.mutate('/api/clock-control',{action:'set',seconds:Number(currentState.clock_seconds??720),visible:!Boolean(currentState.clock_visible)})}catch(e){alert(e.data?.message||e.message)}}
 
 async function openAutomationEventFromStatistician(team,event){

@@ -1077,3 +1077,58 @@ button.on-air{background:#7a1018;border-color:#e0313d;color:#fff}
 .play-option-grid label,.play-flag-toggle{flex-direction:row;align-items:center;justify-content:flex-start;margin-bottom:0}
 .play-option-grid label input[type=checkbox]{margin:0;width:auto;min-width:20px;min-height:20px}
 .play-flag-toggle{gap:10px}.play-flag-toggle input[type=checkbox]{width:auto;flex:0 0 auto;margin:0;min-width:20px;min-height:20px}
+
+/* Play form fits one screen (2026-10-31): the slider's direction badge gets
+   its own lane between the label row and the slider, so it no longer sits on
+   top of the "CAL 44 (left side)" label; typed yard line and Correct Start
+   Spot share the label row; on wide screens the field sits beside the
+   jerseys instead of above them. */
+#playEntryModal{padding:10px}
+#playEntryModal .play-entry-sheet{width:min(1180px,98vw);max-height:calc(100vh - 20px);padding:14px 18px;box-sizing:border-box}
+#playEntryModal .section-heading-row{margin-bottom:6px;align-items:center}
+#playEntryModal .section-heading-row h2{margin:0;font-size:1.25rem}
+#playEntryModal .section-heading-row .section-note{margin:2px 0 0}
+#playEntryModal .field-spotter{margin:0 0 10px;padding:10px 12px}
+#playEntryModal .field-axis{align-items:center;margin-bottom:2px}
+#playEntryModal .drive-indicator{margin:0;padding:.2rem .6rem;font-size:.95rem;min-width:5.5rem}
+#playEntryModal .spot-control{display:grid;grid-template-columns:auto auto auto 1fr;grid-template-areas:"title typed btn label" "lane lane lane lane" "range range range range";align-items:center;gap:0 10px;padding-top:0;margin:8px 0 4px}
+#playEntryModal .spot-control>div:first-child{display:contents}
+#playEntryModal .spot-control strong{grid-area:title;white-space:nowrap}
+#playEntryModal .spot-control>div:first-child>span{grid-area:label;justify-self:end;text-align:right}
+#playEntryModal .spot-control .spot-typed{grid-area:typed;margin:0;width:12em;max-width:100%;padding:4px 8px;min-height:0}
+#playEntryModal .spot-control button{grid-area:btn;justify-self:start;padding:4px 10px;min-height:0;font-size:.8rem}
+#playEntryModal .slider-direction-badge{grid-area:lane;position:relative;top:auto;left:clamp(36px,var(--spot-pct),calc(100% - 36px));transform:translateX(-50%);justify-self:start;margin-top:6px;min-width:60px;padding:3px 9px;font-size:.85rem;box-shadow:none}
+#playEntryModal .spot-control input[type=range]{grid-area:range;margin:4px 0 0}
+#playEntryModal .yard-nudges{justify-content:flex-start;gap:5px;margin-top:6px}
+#playEntryModal .yard-nudges button{min-width:40px;min-height:34px;padding:4px 6px}
+#playEntryModal .gain-box{flex-direction:row;margin:0 0 0 auto}
+#playEntryModal .gain-box input{width:4.5em;min-height:34px;padding:4px 8px}
+#playEntryModal .play-entry-grid{gap:6px 12px}
+#playEntryModal .play-entry-sheet label{margin-bottom:0}
+#playEntryModal .play-entry-sheet label>input:not([type=checkbox]),#playEntryModal .play-entry-sheet label>select{min-height:0;padding:6px 10px;margin-top:3px}
+#playEntryModal .jersey-resolution{min-height:1em;margin-top:1px}
+#playEntryModal .play-option-grid{gap:8px 14px;margin:8px 0}
+#playEntryModal .play-flag{margin:8px 0;padding:6px 10px}
+#playEntryModal #playEntryPreview{margin:8px 0}
+#playEntryModal .play-entry-sheet>.button-row{margin-top:6px}
+@media (min-width:1000px){
+  #playEntryModal .play-entry-sheet{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);column-gap:18px;align-content:start}
+  #playEntryModal .play-entry-sheet>*{grid-column:2}
+  #playEntryModal .play-entry-sheet>.section-heading-row{grid-column:1/-1}
+  #playEntryModal .play-entry-sheet>.field-spotter{grid-column:1;grid-row:2/span 12;align-self:start}
+}
+
+/* Set Clock keypad (2026-10-31): big digits, filled left to right */
+.clock-set-dialog{width:min(94vw,440px)}
+.clock-set-dialog form{padding:20px 22px}
+.clock-set-dialog p{margin:0 0 10px}
+.clock-set-display{display:flex;justify-content:center;align-items:center;gap:6px;margin:6px 0 4px;font-size:4.5rem;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+.clock-set-display span{display:inline-block;width:.8em;padding:6px 0;text-align:center;border-bottom:4px solid #46505d;color:#5d6673}
+.clock-set-display span.filled{color:#fff;border-bottom-color:#d4203f}
+.clock-set-display span.next{border-bottom-color:#f2c94c}
+.clock-set-display b{color:#9aa4b2}
+.clock-set-dialog #clockSetMessage{min-height:1.3em;text-align:center;color:#f3b34c;font-weight:700}
+.clock-set-keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.clock-set-keypad button{min-height:64px;font-size:2rem;font-weight:900}
+.clock-set-keypad .clock-set-aux{font-size:1.1rem}
+.clock-set-dialog .duplicate-actions{grid-template-columns:1fr;margin-top:12px}
