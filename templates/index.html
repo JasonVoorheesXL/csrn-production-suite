@@ -1871,6 +1871,8 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
         </div>
         <h2>Team Scoring Summary</h2>
         <div id="statisticsTeamTotals" class="statistics-team-totals"></div>
+        <h2>Top Performers</h2>
+        <div id="statisticsTopPerformers" class="statistics-top-performers"></div>
         <h2>Individual Production</h2>
         <div id="statisticsReconciliation" class="status"></div>
         <div class="table-scroll"><table class="statistics-table statistics-production-table"><thead><tr><th>Team</th><th>#</th><th>Player</th><th>Rush</th><th>Pass</th><th>Receiving</th><th>Returns</th><th>Kicking</th><th>Defense</th><th>Scoring</th></tr></thead><tbody id="statisticsPlayers"></tbody></table></div>
@@ -8354,6 +8356,52 @@ async function startBroadcast(selectId='commandBroadcastSelect'){
 
 
 let statisticsData=null;
+
+// Top performers (2026-10-31): a quick broadcast read beside the team stats.
+// Up to three players per team per category, and only players who recorded
+// that stat; a category nobody has recorded yet is left out. No tackles: they
+// are rarely tracked live, so a leader there would mislead.
+const TOP_PERFORMER_CATEGORIES=[
+  {label:'Passing',rank:p=>p.passing_yards,has:p=>p.pass_attempts>0,tie:p=>p.completions,
+   line:p=>`${statNum(p.completions)}/${statNum(p.pass_attempts)}, ${statNum(p.passing_yards)} yds`+topPerformerExtra([[p.passing_touchdowns,'TD'],[p.interceptions_thrown,'INT']])},
+  {label:'Rushing',rank:p=>p.rushing_yards,has:p=>p.rushing_attempts>0,tie:p=>p.rushing_attempts,
+   line:p=>`${statNum(p.rushing_attempts)} car, ${statNum(p.rushing_yards)} yds`+topPerformerExtra([[p.rushing_touchdowns,'TD']])},
+  {label:'Receiving',rank:p=>p.receiving_yards,has:p=>p.receptions>0,tie:p=>p.receptions,
+   line:p=>`${statNum(p.receptions)} rec, ${statNum(p.receiving_yards)} yds`+topPerformerExtra([[p.receiving_touchdowns,'TD']])},
+  {label:'Scoring',rank:p=>p.points,has:p=>p.points>0,tie:p=>p.touchdowns,
+   line:p=>`${statNum(p.points)} pts`+topPerformerExtra([[p.touchdowns,'TD'],[p.field_goals,'FG']])},
+  {label:'Sacks',rank:p=>p.sacks,has:p=>p.sacks>0,tie:p=>p.tackles,
+   line:p=>`${statNum(p.sacks)} sack${Number(p.sacks)===1?'':'s'}`},
+  {label:'Interceptions',rank:p=>p.interceptions,has:p=>p.interceptions>0,tie:p=>p.turnover_return_yards,
+   line:p=>`${statNum(p.interceptions)} INT`+(Number(p.turnover_return_yards)?`, ${statNum(p.turnover_return_yards)} ret yds`:'')},
+  {label:'Returns',rank:p=>(p.kickoff_return_yards||0)+(p.punt_return_yards||0),has:p=>(p.kickoff_returns||0)+(p.punt_returns||0)>0,tie:p=>p.return_touchdowns,
+   line:p=>`${statNum((p.kickoff_returns||0)+(p.punt_returns||0))} ret, ${statNum((p.kickoff_return_yards||0)+(p.punt_return_yards||0))} yds`+topPerformerExtra([[p.return_touchdowns,'TD']])},
+  {label:'Kicking',rank:p=>(p.field_goals||0)*3+(p.extra_points||0),has:p=>(p.field_goal_attempts||0)+(p.extra_point_attempts||0)>0,tie:p=>p.field_goal_attempts,
+   line:p=>[p.field_goal_attempts?`${statNum(p.field_goals)}/${statNum(p.field_goal_attempts)} FG`:'',p.extra_point_attempts?`${statNum(p.extra_points)}/${statNum(p.extra_point_attempts)} XP`:''].filter(Boolean).join(', ')},
+];
+function topPerformerExtra(pairs){return pairs.filter(([n])=>Number(n)>0).map(([n,label])=>`, ${statNum(n)} ${label}`).join('')}
+function topPerformersFor(players,team,category){
+  return players.filter(p=>p.team===team&&category.has(p))
+    .sort((a,b)=>(Number(category.rank(b))||0)-(Number(category.rank(a))||0)||(Number(category.tie(b))||0)-(Number(category.tie(a))||0)||String(a.name).localeCompare(String(b.name)))
+    .slice(0,3);
+}
+function renderTopPerformers(){
+  const box=document.getElementById('statisticsTopPerformers');
+  if(!box)return;
+  const players=statisticsData?.players||[];
+  const teams=['home','visitor'];
+  const cards=TOP_PERFORMER_CATEGORIES.map(category=>{
+    const columns=teams.map(team=>topPerformersFor(players,team,category));
+    if(!columns.some(rows=>rows.length))return '';
+    const halves=columns.map((rows,i)=>{
+      const name=statisticsData.teams?.[teams[i]]?.name||(teams[i]==='home'?'Home':'Visitor');
+      const list=rows.length?rows.map(p=>`<li><b>${escapeHtml(p.number?`#${p.number}`:'')}</b> <strong>${escapeHtml(p.name)}</strong><span>${escapeHtml(category.line(p))}</span></li>`).join(''):'<li class="none">None yet</li>';
+      return `<div><h4>${escapeHtml(name)}</h4><ol>${list}</ol></div>`;
+    }).join('');
+    return `<article><h3>${escapeHtml(category.label)}</h3><div class="top-performer-teams">${halves}</div></article>`;
+  }).join('');
+  box.innerHTML=cards||'<p class="section-note">Top performers appear once plays are recorded.</p>';
+}
 function statNum(value){return Number(value||0).toLocaleString()}
 async function loadStatistics(){
   const status=document.getElementById('statisticsStatus');
@@ -8368,6 +8416,7 @@ async function loadStatistics(){
     document.getElementById('statisticsTeamTotals').innerHTML=['home','visitor'].map(key=>{const t=statisticsData.teams?.[key]||{};return `<article><h3>${escapeHtml(t.name||key)}</h3><dl><div><dt>Touchdowns</dt><dd>${statNum(t.touchdowns)}</dd></div><div><dt>Field Goals</dt><dd>${statNum(t.field_goals)}/${statNum(t.field_goal_attempts)}</dd></div><div><dt>Extra Points</dt><dd>${statNum(t.extra_points)}/${statNum(t.extra_point_attempts)}</dd></div><div><dt>2PT</dt><dd>${statNum(t.two_point_conversions)}/${statNum(t.two_point_attempts)}</dd></div><div><dt>Turnovers Gained</dt><dd>${statNum(t.turnovers_gained)} · INT ${statNum(t.interceptions_gained)} · FR ${statNum(t.fumble_recoveries)}</dd></div><div><dt>Sacks</dt><dd>${statNum(t.sacks)}</dd></div><div><dt>Rush</dt><dd>${statNum(t.rushing_attempts)}–${statNum(t.rushing_yards)} yds</dd></div><div><dt>Pass</dt><dd>${statNum(t.completions)}/${statNum(t.pass_attempts)}–${statNum(t.passing_yards)} yds</dd></div><div><dt>Returns</dt><dd>KO ${statNum(t.kickoff_returns)}–${statNum(t.kickoff_return_yards)} · P ${statNum(t.punt_returns)}–${statNum(t.punt_return_yards)}</dd></div><div><dt>Total Offense</dt><dd>${statNum(t.total_yards)} yds</dd></div><div><dt>Yards / Play</dt><dd>${t.yards_per_play||0}</dd></div></dl></article>`}).join('');
     document.getElementById('statisticsPlayers').innerHTML=(statisticsData.players||[]).map(p=>`<tr><td>${escapeHtml(p.team_name)}</td><td>${escapeHtml(p.number||'—')}</td><td><strong>${escapeHtml(p.name)}</strong></td><td>${statNum(p.rushing_attempts)} att · ${statNum(p.rushing_yards)} yds · ${statNum(p.rushing_touchdowns)} TD</td><td>${statNum(p.completions)}/${statNum(p.pass_attempts)} · ${statNum(p.passing_yards)} yds · ${statNum(p.passing_touchdowns)} TD · ${statNum(p.interceptions_thrown)} INT</td><td>${statNum(p.receptions)}/${statNum(p.targets)} · ${statNum(p.receiving_yards)} yds · ${statNum(p.receiving_touchdowns)} TD</td><td>KO ${statNum(p.kickoff_returns)}–${statNum(p.kickoff_return_yards)} · P ${statNum(p.punt_returns)}–${statNum(p.punt_return_yards)} · ${statNum(p.return_touchdowns)} TD</td><td>FG ${statNum(p.field_goals)}/${statNum(p.field_goal_attempts)} · XP ${statNum(p.extra_points)}/${statNum(p.extra_point_attempts)} · KO ${statNum(p.kickoffs)} · P ${statNum(p.punts)}</td><td>${statNum(p.sacks)} sack · ${statNum(p.interceptions)} INT · ${statNum(p.fumble_recoveries)} FR</td><td>${statNum(p.touchdowns)} TD · ${statNum(p.two_point_conversions)} 2PT · <strong>${statNum(p.points)} pts</strong></td></tr>`).join('')||'<tr><td colspan="10">No individual production has been recorded.</td></tr>';const rec=statisticsData.reconciliation||{};const recEl=document.getElementById('statisticsReconciliation');if(recEl){recEl.textContent=rec.all_reconciled?'Canonical reconciliation: PASS':'Canonical reconciliation: REVIEW REQUIRED';recEl.className='status '+(rec.all_reconciled?'success':'warning');}
     document.getElementById('statisticsScoringPlays').innerHTML=(statisticsData.scoring_summary||[]).map(play=>`<article><span>Q${escapeHtml(play.quarter||'—')}</span><div><strong>${escapeHtml(play.team_name)} · ${escapeHtml(play.label)}</strong><p>${escapeHtml(play.description)}</p></div><b>${statNum(play.home_score)}–${statNum(play.visitor_score)}</b></article>`).join('')||'<div class="section-note">No scoring plays recorded.</div>';
+    renderTopPerformers();
     document.getElementById('statisticsNote').textContent=statisticsData.note||'';
   }catch(error){status.textContent=error.message||'Unable to load statistics.';status.className='status error'}
 }

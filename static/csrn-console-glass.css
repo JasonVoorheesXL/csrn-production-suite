@@ -302,3 +302,60 @@ html:not(.show-retired) .retired-tool {
   gap: 10px;
   margin: 4px 0 14px;
 }
+
+/* Box Score > Top Performers (2026-10-31). */
+.statistics-top-performers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.statistics-top-performers article {
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: var(--csrn-field);
+}
+.statistics-top-performers h3 {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--csrn-muted);
+}
+.top-performer-teams {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.top-performer-teams h4 {
+  margin: 0 0 4px;
+  font-size: 0.8rem;
+}
+.top-performer-teams ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+.top-performer-teams li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 6px;
+  line-height: 1.25;
+}
+.top-performer-teams li b {
+  font-family: Bahnschrift, "Segoe UI", sans-serif;
+  color: var(--csrn-muted);
+}
+.top-performer-teams li span {
+  grid-column: 2;
+  color: var(--csrn-muted);
+  font-size: 0.85rem;
+}
+.top-performer-teams li.none {
+  display: block;
+  color: var(--csrn-muted);
+  font-style: italic;
+}
