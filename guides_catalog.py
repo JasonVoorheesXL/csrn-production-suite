@@ -25,6 +25,14 @@ GUIDES: tuple[dict[str, str], ...] = (
         "crew, sponsors, OBS and your first game.",
     },
     {
+        "id": "obs-setup",
+        "title": "OBS Setup Guide",
+        "sport": "",
+        "file": "obs-setup-guide.pdf",
+        "summary": "Import the ready-made scene collection, add your camera, background and sound, "
+        "and connect OBS to the app.",
+    },
+    {
         "id": "statistician-football",
         "title": "Statistician Guide: Football",
         "sport": "football",

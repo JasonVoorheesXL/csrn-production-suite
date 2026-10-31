@@ -294,3 +294,11 @@ html:not(.show-retired) .retired-tool {
 .settings-guide-row.soon {
   opacity: 0.65;
 }
+
+/* OBS Manager and Settings > OBS: the scene collection download (2026-10-31). */
+.obs-starter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 4px 0 14px;
+}

@@ -23,12 +23,13 @@ def test_shipped_guides_exist_where_the_installer_packs_them() -> None:
 
 def test_station_guide_plus_one_entry_per_switched_on_sport() -> None:
     rows = guides_catalog.guides_for(["football", "basketball"], GUIDES_DIR)
-    assert [row["id"] for row in rows] == ["station-setup", "statistician-football", "statistician-basketball"]
+    assert [row["id"] for row in rows] == ["station-setup", "obs-setup", "statistician-football", "statistician-basketball"]
     assert rows[0]["url"] == "/static/guides/station-setup-guide.pdf" and rows[0]["available"]
-    assert rows[1]["url"] == "/static/guides/statistician-guide-football.pdf"
+    assert rows[1]["url"] == "/static/guides/obs-setup-guide.pdf"
+    assert rows[2]["url"] == "/static/guides/statistician-guide-football.pdf"
     # Never another sport's guide: basketball has none yet.
-    assert rows[2]["available"] is False and rows[2]["url"] == ""
-    assert "coming" in rows[2]["summary"]
+    assert rows[3]["available"] is False and rows[3]["url"] == ""
+    assert "coming" in rows[3]["summary"]
 
 
 def test_a_sport_switched_off_gets_no_guide() -> None:
@@ -55,7 +56,7 @@ def test_api_guides_is_public_and_follows_the_sports(client) -> None:
     response = client.get("/api/guides")
     assert response.status_code == 200
     ids = [row["id"] for row in response.get_json()["guides"]]
-    assert ids == ["station-setup", "statistician-football", "statistician-softball"]
+    assert ids == ["station-setup", "obs-setup", "statistician-football", "statistician-softball"]
 
 
 def test_settings_lists_the_guides_and_opens_them_in_the_app() -> None:
