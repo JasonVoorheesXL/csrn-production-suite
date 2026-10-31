@@ -90,6 +90,8 @@
 <script>
 // Settings > Appearance: paint with the last saved look before the page shows (applyConsoleAppearance refreshes it).
 (function(){try{var c=JSON.parse(localStorage.getItem('csrn.consoleAppearance.v1')||'null');if(!c)return;var r=document.documentElement;r.style.setProperty('--csrn-accent',c.accent);r.style.setProperty('--csrn-accent-button',c.button);r.style.setProperty('--csrn-glass-blur',c.blur+'px');r.classList.toggle('csrn-glass',!!c.glass);r.dataset.logoShape=c.shape}catch(e){}})();
+// Settings > Retired Tools.
+try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentElement.classList.add('show-retired')}catch(e){}
 </script>
 </head>
 <body>
@@ -307,7 +309,7 @@
         </div>
         <div id="qlStatus" class="status ql-status"></div>
       </section>
-      <section class="panel compact live-operator-controls command-caption-panel">
+      <section class="panel compact live-operator-controls command-caption-panel retired-tool">
         <div class="section-heading compact"><div><h3>Live Captions</h3><p class="section-note">Start or stop the active caption feed during the broadcast.</p></div><span id="commandCaptionStateBadge" class="phase-badge">OFF</span></div>
         <div class="button-row">
           <button id="commandCaptionLiveToggle" class="primary" onclick="toggleLiveCaptions()">Start Live Captions</button>
@@ -700,7 +702,7 @@
 
     <section id="pregameModule" class="hidden">
       <section class="panel pregame-setup-header">
-        <div class="section-heading"><div><h1>Pre-Game Setup</h1><p class="section-note">Load the broadcast, verify OBS, connect devices, assign caption inputs, and choose the program visual before kickoff.</p></div><button class="primary" onclick="showModule('command')">Open Command Center</button></div>
+        <div class="section-heading"><div><h1>Pre-Game Setup</h1><p class="section-note">Load the broadcast, verify OBS, connect devices, and choose the program visual before kickoff.</p></div><button class="primary" onclick="showModule('command')">Open Command Center</button></div>
       </section>
 
       <section class="panel compact live-operator-controls command-quick-launch">
@@ -721,13 +723,13 @@
           <label class="check-row"><input type="checkbox"> OBS receives overlay/program visual</label>
           <label class="check-row"><input type="checkbox"> Facebook stream key/session is ready</label>
           <label class="check-row"><input type="checkbox"> P4next input levels checked with headset monitoring</label>
-          <label class="check-row"><input type="checkbox"> Captions source tested or intentionally off</label>
+          <label class="check-row retired-tool"><input type="checkbox"> Captions source tested or intentionally off</label>
           <label class="check-row"><input type="checkbox"> Phone/tablet controller tested on current network</label>
           <label class="check-row"><input type="checkbox"> Local recording path and disk space confirmed</label>
         </div>
         <div class="button-row readiness-actions">
           <button onclick="window.open('/overlay','_blank')">Open Overlay Preview</button>
-          <button onclick="window.open('/captions','_blank')">Open Captions Preview</button>
+          <button class="retired-tool" onclick="window.open('/captions','_blank')">Open Captions Preview</button>
           <button onclick="showModule('obs')">Open OBS Manager</button>
         </div>
       </section>
@@ -797,7 +799,7 @@
         <div id="csrnPregameThemeMessage" class="status">Loading authoritative production theme…</div>
       </section>
 
-      <section class="panel compact live-operator-controls caption-control-panel">
+      <section class="panel compact live-operator-controls caption-control-panel retired-tool">
         <div class="section-heading compact"><div><h3>Captions</h3><p class="section-note">Production themes render captions inside the main /overlay source. Use /captions only as a preview or fallback source.</p></div><span id="captionStateBadge" class="phase-badge">OFF</span></div>
         <div class="button-row">
           <button id="captionToggle" class="success" onclick="toggleCaptions()">Show Captions</button>
@@ -1664,13 +1666,17 @@
           </label>
           <label>Time Zone<input id="cfgTimezone"></label>
           <div class="theme-settings-card">
-  <label>Active Graphics Theme<input id="cfgTheme" readonly aria-readonly="true"></label>
-  <div class="editor-actions"><a class="button primary" href="/themes">Open Theme Catalog</a></div>
-  <p class="section-note">Theme selection, preview, activation, variants, and season locking are managed in the Theme Catalog.</p>
-  <div class="editor-actions"><a class="button" href="/layouts">Open Layout Builder</a></div>
-  <p class="section-note">Choose what shows on the production, pregame and halftime graphics, and where, with saved presets. Changes apply live.</p>
+  <label class="retired-tool">Active Graphics Theme<input id="cfgTheme" readonly aria-readonly="true"></label>
+  <div class="editor-actions retired-tool"><a class="button primary" href="/themes">Open Theme Catalog</a></div>
+  <p class="section-note retired-tool">Theme selection, preview, activation, variants, and season locking are managed in the Theme Catalog.</p>
+  <div class="editor-actions retired-tool"><a class="button" href="/layouts">Open Layout Builder</a></div>
+  <p class="section-note retired-tool">Choose what shows on the production, pregame and halftime graphics, and where, with saved presets. Changes apply live.</p>
 </div>
         </div>
+
+        <h2>Retired Tools</h2>
+        <label class="check-row retired-tools-row"><input id="showRetiredTools" type="checkbox" onchange="setShowRetiredTools(this.checked)"> Show retired tools</label>
+        <p class="section-note">Live captions, Layout Builder, Game Recaps, Broadcast Packages and the Theme Manager went unused this season, so they are hidden from the menus and pages. Their data is kept; turn this on to bring them back on this computer.</p>
 
         <h2>Folders</h2>
         <div class="setup-grid">
@@ -6093,6 +6099,8 @@ function updateOrganizationLogoPreview(){
 }
 // --- Settings > Appearance ("Night Game Glass", 2026-10-31) ---
 // One brand color, the logo's frame shape and the glass effect, for this console only (overlays use their themes).
+function setShowRetiredTools(show){window.CSRNNavigation?.setShowRetired(show);const box=document.getElementById('showRetiredTools');if(box)box.checked=Boolean(show)}
+document.addEventListener('DOMContentLoaded',()=>{const box=document.getElementById('showRetiredTools');if(box)box.checked=Boolean(window.CSRNNavigation?.showRetired())});
 const APPEARANCE_STORAGE_KEY='csrn.consoleAppearance.v1';
 const APPEARANCE_DEFAULTS={accent:'',logo_shape:'circle',glass:true,glass_blur:18};
 const APPEARANCE_PRESETS=[{hex:'#C9203B',name:'Scarlet'},{hex:'#2F6FEB',name:'Royal'},{hex:'#16824A',name:'Forest'},{hex:'#E3A92B',name:'Gold'},{hex:'#6D45D1',name:'Purple'},{hex:'#0E7C86',name:'Teal'}];
