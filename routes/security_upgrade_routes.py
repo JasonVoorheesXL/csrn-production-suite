@@ -26,6 +26,9 @@ class SecurityUpgradeRoutesDependencies:
     # chosen sport can be stamped onto the session at login. Defaults to "no
     # sports" so older call sites / tests that do not wire it keep working.
     licensed_sport_families: Callable[[], list[str]] = _no_licensed_sports
+    # Audit round 3: licensed families the station switched off in Settings,
+    # so the login screen hides their tiles rather than locking them.
+    switched_off_sport_families: Callable[[], list[str]] = _no_licensed_sports
 
 
 def create_security_upgrade_blueprint(
@@ -67,7 +70,9 @@ def create_security_upgrade_blueprint(
                 "authenticated": dependencies.authenticated(),
                 "locked_seconds": remaining,
                 **sport_families.sport_context_view(
-                    session.get("sport_context", ""), licensed
+                    session.get("sport_context", ""),
+                    licensed,
+                    dependencies.switched_off_sport_families(),
                 ),
             }
         )
