@@ -2996,31 +2996,57 @@ async function fetchJson(url) {
   return response.json();
 }
 
+// The last good statistics for the current broadcast, kept in localStorage so
+// an overlay page that OBS reloads mid-game (a scene switch at halftime, say)
+// shows its player leaders at once instead of "Awaiting Stats" until the
+// first fetch lands. The operator can't refresh a browser source on air.
+const COLLEGIATE_STATISTICS_STORAGE_KEY = "csrn.collegiateStatistics.v1";
+
+function storedCollegiateStatistics(broadcastId) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(COLLEGIATE_STATISTICS_STORAGE_KEY) || "null");
+    return saved && saved.broadcastId === broadcastId && saved.data ? saved.data : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function storeCollegiateStatistics(broadcastId, data) {
+  try {
+    localStorage.setItem(COLLEGIATE_STATISTICS_STORAGE_KEY, JSON.stringify({broadcastId, data}));
+  } catch (_) {}
+}
+
 async function fetchCollegiateStatistics(runtime, alias) {
   if (!isCollegiateFamily(alias)) return null;
   const broadcastId = textValue(runtime?.broadcast_id, "");
   if (!broadcastId) return null;
-  const now = Date.now();
-  if (
-    collegiateStatisticsCache.data &&
-    collegiateStatisticsCache.broadcastId === broadcastId &&
-    now - collegiateStatisticsCache.fetchedAt < 5000
-  ) {
+  if (collegiateStatisticsCache.broadcastId !== broadcastId) {
+    collegiateStatisticsCache.broadcastId = broadcastId;
+    collegiateStatisticsCache.fetchedAt = 0;
+    collegiateStatisticsCache.data = storedCollegiateStatistics(broadcastId);
+  }
+  if (collegiateStatisticsCache.data && Date.now() - collegiateStatisticsCache.fetchedAt < 5000) {
     return collegiateStatisticsCache.data;
   }
-  if (collegiateStatisticsCache.promise) return collegiateStatisticsCache.promise;
-  collegiateStatisticsCache.promise = fetchJson(STATISTICS_URL)
-    .then(data => {
-      collegiateStatisticsCache.broadcastId = broadcastId;
-      collegiateStatisticsCache.fetchedAt = Date.now();
-      collegiateStatisticsCache.data = data;
-      return data;
-    })
-    .catch(() => collegiateStatisticsCache.data)
-    .finally(() => {
-      collegiateStatisticsCache.promise = null;
-    });
-  return collegiateStatisticsCache.promise;
+  if (!collegiateStatisticsCache.promise) {
+    collegiateStatisticsCache.promise = fetchJson(STATISTICS_URL)
+      .then(data => {
+        if (collegiateStatisticsCache.broadcastId !== broadcastId) return collegiateStatisticsCache.data;
+        collegiateStatisticsCache.fetchedAt = Date.now();
+        collegiateStatisticsCache.data = data;
+        storeCollegiateStatistics(broadcastId, data);
+        return data;
+      })
+      .catch(() => collegiateStatisticsCache.data)
+      .finally(() => {
+        collegiateStatisticsCache.promise = null;
+      });
+  }
+  // Already holding this game's stats (stale or restored)? Render with them now
+  // and let the refresh land on a later pass; a slow server no longer holds up
+  // the whole overlay render.
+  return collegiateStatisticsCache.data || collegiateStatisticsCache.promise;
 }
 
 function statDisplay(value) {
