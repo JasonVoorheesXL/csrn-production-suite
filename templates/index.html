@@ -115,7 +115,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
       </div>
     </header>
 
-    <nav id="moduleNav" class="hidden" data-csrn-navigation data-active="command" aria-label="CSRN modules"></nav>
+    <nav id="moduleNav" class="hidden" data-csrn-navigation data-active="command" aria-label="Main menu"></nav>
 
     <section id="setupPinPanel" class="panel auth-panel hidden">
       <img class="auth-logo" src="{{ station_logo }}" alt="Station logo">
@@ -667,7 +667,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
       </section>
 
       <section class="panel compact utility-row live-operator-controls">
-        <div class="section-heading compact"><div><h3>Video Mode</h3><p class="section-note">CSRN never ingests video -- a composited camera feed in OBS shows through a transparent window this theme's video-board region opens. Live-togglable at any point in the broadcast. Same switch as Program Visual: Video Mode On = Camera, Off = Graphic. Currently built for Collegiate Tech only; other themes report the toggle as inert until they add their own video-window geometry.</p></div></div>
+        <div class="section-heading compact"><div><h3>Video Mode</h3><p class="section-note">The app never ingests video -- a composited camera feed in OBS shows through a transparent window this theme's video-board region opens. Live-togglable at any point in the broadcast. Same switch as Program Visual: Video Mode On = Camera, Off = Graphic. Currently built for Collegiate Tech only; other themes report the toggle as inert until they add their own video-window geometry.</p></div></div>
         <button id="videoModeToggle" onclick="changeProgramVisual(currentState.video_mode?'graphic':'camera')">Video Mode: <span id="videoModeToggleState">Off</span></button>
         <button id="sidebarsHiddenToggle" onclick="setState('sidebars_hidden',!Boolean(currentState.sidebars_hidden))">Hide Sidebars: <span id="sidebarsHiddenToggleState">Off</span></button>
         <button id="videoCalibrationGuideToggle" class="warning" onclick="setState('video_calibration_guide',!Boolean(currentState.video_calibration_guide))">Calibration Guide: <span id="videoCalibrationGuideToggleState">Off</span></button>
@@ -976,7 +976,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
             <input id="schoolId" type="hidden">
             <h2>School Identity</h2>
             <div class="setup-grid">
-              <label>CSRN School ID<input id="schoolCsrnId" readonly placeholder="Assigned automatically"></label><label>Official School Name<input id="schoolOfficialName"></label>
+              <label>School ID<input id="schoolCsrnId" readonly placeholder="Assigned automatically"></label><label>Official School Name<input id="schoolOfficialName"></label>
               <label>Broadcast Name<input id="schoolBroadcastName"></label><label>Short Name<input id="schoolShortName"></label><label>Preferred Scorebug Name<input id="schoolScorebugName"></label><label>Abbreviation<input id="schoolAbbreviation" maxlength="6" placeholder="e.g. MTP" title="Used for typed yard lines (MTP 23) and in the play register"></label>
               <label>Nickname<input id="schoolNickname"></label><label>City<input id="schoolCity"></label><label>County<input id="schoolCounty"></label><label class="check-row"><input id="schoolActive" type="checkbox" checked> Active school</label><label>Pronunciation Guide<input id="schoolPronunciation"></label><label>State<input id="schoolState" value="MS" maxlength="2"></label><label>MHSAA Classification<input id="schoolClassification"></label><label>MHSAA Region<input id="schoolRegion"></label><label>District<input id="schoolDistrict"></label><label>MHSAA Record ID<input id="schoolMhsaaId"></label><label>Verification Status<select id="schoolVerification"><option value="unverified">Unverified</option><option value="candidate">Candidate</option><option value="reviewed">Reviewed</option><option value="verified">Verified</option></select></label>
               <label>Primary Color
@@ -1205,7 +1205,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
                     <label class="check-row"><input id="playerStarter" type="checkbox"> Starter</label>
                   </div>
                   <section id="playerHighlightsPanel" class="player-highlights-panel">
-                    <div class="player-highlights-heading"><div><h3>Player Highlights</h3><p>Upload game clips here. CSRN automatically links them to this player and makes them available in Control Center.</p></div><button type="button" onclick="openPlayerHighlightsInAssets()">Advanced Asset View</button></div>
+                    <div class="player-highlights-heading"><div><h3>Player Highlights</h3><p>Upload game clips here. The app automatically links them to this player and makes them available in Control Center.</p></div><button type="button" onclick="openPlayerHighlightsInAssets()">Advanced Asset View</button></div>
                     <div class="player-highlight-create">
                       <label>Highlight Name<input id="playerHighlightName" placeholder="Example: Week 4 · 72-yard touchdown"></label>
                       <label>Usage Rights<select id="playerHighlightRights"><option selected>Owned</option><option>Licensed</option><option>Permission Granted</option><option>Public Domain</option></select></label>
@@ -6893,8 +6893,8 @@ function renderDragonFlySchoolInfo(data) {
       const warning = protectedFields.has(field)
         ? '<em>Protected competition field ? manual choice only</em>'
         : differs
-          ? '<em>DragonFly differs from CSRN</em>'
-          : '<em>Matches CSRN</em>';
+          ? '<em>DragonFly differs from this record</em>'
+          : '<em>Matches this record</em>';
 
       let visual = '';
 
@@ -6917,7 +6917,7 @@ function renderDragonFlySchoolInfo(data) {
           <strong>${escapeHtml(fieldLabels[field] || field)}</strong>
           <div class="enrichment-summary-grid">
             <div>
-              <strong>Current CSRN</strong>
+              <strong>Current</strong>
               <span>${escapeHtml(currentFieldValue || 'Not set')}</span>
             </div>
             <div>
@@ -6954,10 +6954,10 @@ function renderDragonFlySchoolInfo(data) {
       <div class="branding-candidate-group">
         <div class="branding-logo-candidate">
           <img src="${escapeHtml(csrnLogo)}"
-               alt="Current CSRN logo"
+               alt="Current logo"
                onerror="this.style.display='none'">
           <div>
-            <strong>Current CSRN</strong>
+            <strong>Current</strong>
             <small>${escapeHtml(csrnLogo || 'No current logo')}</small>
           </div>
         </div>
@@ -7008,7 +7008,7 @@ function renderDragonFlySchoolInfo(data) {
       <strong>School Address</strong>
       <div class="enrichment-summary-grid">
         <div>
-          <strong>Current CSRN</strong>
+          <strong>Current</strong>
           <span>${escapeHtml(
             addressText(currentAddress) || 'Not set'
           )}</span>
@@ -7493,7 +7493,7 @@ function renderResearchEnrichment(data){
  const fields=data.fields||{};const labels={venue_name:'Football Venue / Stadium',school_address:'Address',mascot:'Mascot',named_colors:'Named School Colors'};
  const cards=Object.entries(fields).filter(([,rows])=>Array.isArray(rows)&&rows.length).map(([field,rows])=>`<section class="research-field-card"><h4>${escapeHtml(labels[field]||field)}</h4>${rows.slice(0,5).map((row,idx)=>{const sources=Array.isArray(row.sources)?row.sources:[];return `<div class="research-candidate ${idx===0?'top':''}"><div><strong>${escapeHtml(formatResearchValue(field,row.value))}</strong><span>${escapeHtml(row.confidence||'review')} · score ${escapeHtml(String(row.score||0))} · ${escapeHtml(String(row.corroborations||1))} source match${Number(row.corroborations||1)===1?'':'es'}</span></div><button type="button" onclick='applyResearchCandidate(${JSON.stringify(field)},${JSON.stringify(row.value)})'>Apply</button><details><summary>Sources (${sources.length})</summary>${sources.map(s=>`<div class="section-note"><strong>${escapeHtml(s.type||'source')}</strong> · ${escapeHtml(s.url||'')}<br>${escapeHtml(s.evidence||'')}</div>`).join('')}</details></div>`}).join('')}</section>`).join('');
  const resultRows=Array.isArray(data.search_results)?data.search_results:[];const rejectedRows=Array.isArray(data.rejected_external)?data.rejected_external:[];
- host.innerHTML=`<div class="research-heading"><strong>Search-Assisted Research</strong><p class="section-note">Verified-corpus first: CSRN discovers the official school site, follows athletics/sports links, builds a school-verified source set, then uses external search only for missing fields. External pages must prove they belong to this school before any address, venue, mascot or color is admitted.</p></div>${cards||'<div class="section-note">No additional structured candidates were found.</div>'}<details><summary>Research sources (${resultRows.length})</summary>${resultRows.map(x=>`<div class="section-note">${escapeHtml(x.source_type||'source')} · ${escapeHtml(x.title||'')} · ${escapeHtml(x.url||'')}</div>`).join('')}</details>${rejectedRows.length?`<details><summary>Rejected unrelated sources (${data.rejected_external_count||rejectedRows.length})</summary>${rejectedRows.map(x=>`<div class="section-note">${escapeHtml(x.reason||'identity rejected')} · ${escapeHtml(x.title||'')} · ${escapeHtml(x.url||'')}</div>`).join('')}</details>`:''}`;
+ host.innerHTML=`<div class="research-heading"><strong>Search-Assisted Research</strong><p class="section-note">Verified-corpus first: the app discovers the official school site, follows athletics/sports links, builds a school-verified source set, then uses external search only for missing fields. External pages must prove they belong to this school before any address, venue, mascot or color is admitted.</p></div>${cards||'<div class="section-note">No additional structured candidates were found.</div>'}<details><summary>Research sources (${resultRows.length})</summary>${resultRows.map(x=>`<div class="section-note">${escapeHtml(x.source_type||'source')} · ${escapeHtml(x.title||'')} · ${escapeHtml(x.url||'')}</div>`).join('')}</details>${rejectedRows.length?`<details><summary>Rejected unrelated sources (${data.rejected_external_count||rejectedRows.length})</summary>${rejectedRows.map(x=>`<div class="section-note">${escapeHtml(x.reason||'identity rejected')} · ${escapeHtml(x.title||'')} · ${escapeHtml(x.url||'')}</div>`).join('')}</details>`:''}`;
 }
 async function researchCurrentSchool(){
  const status=document.getElementById('autoEnrichmentStatus'),host=document.getElementById('researchEnrichmentResults');status.textContent='Researching venue, address, mascot, colors and school identity across corroborating web sources…';if(host)host.innerHTML='';
