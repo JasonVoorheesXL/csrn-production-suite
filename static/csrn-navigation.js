@@ -45,7 +45,6 @@
       ['games', 'Game Manager'],
       ['schools', 'School Database'],
       ['rosters', 'Rosters'],
-      ['broadcasters', 'Personnel'],
     ]],
     ['Production', [
       ['graphics', 'Graphics'],

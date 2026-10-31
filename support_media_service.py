@@ -183,16 +183,6 @@ class SupportMediaService:
         resized.save(buffer, format=save_format, **save_kwargs)
         return buffer.getvalue()
 
-    @classmethod
-    def shrink_headshot_bytes(cls, payload: bytes, extension: str) -> bytes | None:
-        """The roster-headshot downscale for any other headshot upload
-        (personnel, audit round 4). None when the bytes aren't an image."""
-        try:
-            image = Image.open(io.BytesIO(payload))
-            image.load()
-        except Exception:
-            return None
-        return cls._downscale_for_storage(image, extension, payload)
 
     def upload_headshot(
         self,

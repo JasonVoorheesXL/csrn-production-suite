@@ -265,15 +265,6 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
         <button type="button" onclick="clearGamePregameStorylines()">Clear Storylines</button>
       </div>
 
-      <h2>Broadcast Crew</h2>
-      <div class="setup-grid">
-        <label>Play-by-Play<select id="crewPlayByPlay"></select></label>
-        <label>Color Analyst<select id="crewColorAnalyst"></select></label>
-        <label>Sideline Reporter<select id="crewSidelineReporter"></select></label>
-        <label>Statistician<select id="crewStatistician"></select></label>
-        <label>Producer<select id="crewProducer"></select></label>
-      </div>
-
       <button id="saveBroadcastButton" class="primary wide" onclick="createBroadcast()">Create Broadcast</button><button id="cancelEditBroadcastButton" class="wide hidden" onclick="cancelGameEdit()">Cancel Edit</button>
     </section>
 
@@ -1027,7 +1018,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
               <input id="rosterId" type="hidden">
               <h2>Roster Setup</h2>
               <div class="setup-grid">
-                <label>School<select id="rosterSchool" onchange="renderRosterStaffList()"></select></label>
+                <label>School<select id="rosterSchool"></select></label>
                 <label>Sport<select id="rosterSport"><option>Football</option><option>Canadian Football</option><option>Basketball</option><option>Baseball</option><option>Softball</option><option>Soccer</option><option>Volleyball</option><option>Other</option></select></label>
                 <label>Season<input id="rosterSeason" inputmode="numeric"></label>
                 <label>Level<select id="rosterLevel"><option selected>Varsity</option><option>JV</option><option>Middle School</option><option>JUCO</option><option>College</option><option>Other</option></select></label>
@@ -1050,29 +1041,6 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
                 </div>
                 <div id="dragonflyRosterStatus" class="status">Ready.</div>
                 <div id="dragonflyRosterResults" class="auto-enrichment-results"></div>
-              </section>
-              <section id="rosterStaffPanel" class="auto-enrichment-card">
-                <div class="module-heading-row">
-                  <div>
-                    <strong>Coaching &amp; Admin Staff</strong>
-                    <p class="section-note">Tied to this roster's school. Managed here instead of the Personnel page, which now focuses on broadcast crew.</p>
-                  </div>
-                  <div class="editor-actions">
-                    <button type="button" class="primary" onclick="newRosterStaffMember()">Add Staff Member</button>
-                  </div>
-                </div>
-                <div id="rosterStaffList" class="roster-player-list"></div>
-                <div id="rosterStaffEditor" class="player-editor hidden">
-                  <input id="rosterStaffId" type="hidden">
-                  <h3>Staff Record</h3>
-                  <label>Full Name<input id="rosterStaffName" oninput="suggestRosterStaffPronunciation()"></label>
-                  <label>Category<select id="rosterStaffCategory" onchange="populateRosterStaffRoleOptions()"><option value="Coach">Coach</option><option value="Administrator">Administrator</option></select></label>
-                  <label>Title / Role<select id="rosterStaffPrimaryRole"></select></label>
-                  <label>Pronunciation<input id="rosterStaffPronunciation"></label>
-                  <label>Status<select id="rosterStaffStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
-                  <div class="editor-actions"><button class="primary" onclick="saveRosterStaffMember()">Save</button><button class="danger" onclick="deleteRosterStaffMember()">Delete</button><button onclick="closeRosterStaffEditor()">Cancel</button></div>
-                  <div id="rosterStaffMessage" class="status"></div>
-                </div>
               </section>
               <div id="rosterMessage" class="status"></div>
               <div class="roster-player-header"><div><h2>Players</h2><p id="rosterCounts" class="section-note"></p></div><div class="editor-actions"><button type="button" onclick="generateMissingRosterPronunciations()">Generate Missing Pronunciations</button><button class="primary" onclick="newRosterPlayer()">Add Player</button></div></div>
@@ -1125,80 +1093,6 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
       </section>
     </section>
 
-    <section id="broadcastersModule" class="hidden">
-      <section class="panel settings-panel">
-        <div class="module-heading-row">
-          <div>
-            <h1>Personnel Engine</h1>
-            <p class="section-note">Manage coaches, broadcast talent, administrators, officials, interview guests, and production staff.</p>
-          </div>
-          <button class="primary" onclick="newBroadcaster()">Add Person</button>
-        </div>
-
-        
-
-        <div class="school-layout">
-          <aside class="school-list-panel">
-            <input id="broadcasterSearch" placeholder="Search staff" oninput="renderBroadcasterList()">
-            <div id="broadcasterList" class="school-list"></div>
-          </aside>
-
-          <div class="school-editor">
-            <input id="broadcasterId" type="hidden">
-            <h2>Personnel Profile</h2>
-            <div class="setup-grid">
-              <label>Full Name<input id="staffName"></label>
-              <label>Preferred Display Name<input id="staffPreferred"></label>
-              <label>Category<select id="staffCategory" onchange="populatePersonnelRoleOptions()"><option>Coach</option><option>Broadcast Talent</option><option>Administrator</option><option>Official</option><option>Interview Guest</option><option>Production Staff</option><option>Other</option></select></label>
-              <label>Role / Primary Assignment
-                <select id="staffPrimaryRole"></select>
-              </label>
-              <label>Organization<input id="staffOrganization" placeholder="School or organization"></label>
-              <label>School / Team<select id="staffSchool"><option value="">None / Independent</option></select></label>
-              <label>Status<select id="staffStatus"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
-              <label class="span-2">Pronunciation Guide<input id="staffPronunciation" placeholder="MY-kul CAMP-bull" oninput="personnelPronunciationEdited=true"><small class="field-help">Automatic suggestions are approximate. Use hyphens between syllables and CAPITALS for emphasis; edit and verify when confirmed.</small></label>
-              <label class="span-2">Biography / Notes<textarea id="staffBio" rows="4"></textarea></label>
-              <label class="span-2">Headshot<div class="headshot-upload-row"><input id="staffHeadshot" placeholder="Local uploaded path or advanced URL"><label class="file-button compact">Upload Headshot<input type="file" accept="image/png,image/jpeg,image/webp" onchange="uploadPersonnelHeadshot(this.files[0])"></label></div></label>
-              <label class="check-row"><input id="staffPronunciationVerified" type="checkbox"> Pronunciation verified</label>
-              <label class="checkbox-label">
-                <input id="staffProducer" type="checkbox">
-                Also serves as Producer
-              </label>
-            </div>
-
-            <h2>Social Media</h2>
-            <div class="setup-grid">
-              <label>Facebook
-                <div class="social-field"><input id="staffFacebook" data-platform="facebook"><button type="button" onclick="openSocial('staffFacebook')">Open</button></div>
-                <small id="staffFacebookStatus" class="social-status"></small>
-              </label>
-              <label>X
-                <div class="social-field"><input id="staffX" data-platform="x"><button type="button" onclick="openSocial('staffX')">Open</button></div>
-                <small id="staffXStatus" class="social-status"></small>
-              </label>
-              <label>Instagram
-                <div class="social-field"><input id="staffInstagram" data-platform="instagram"><button type="button" onclick="openSocial('staffInstagram')">Open</button></div>
-                <small id="staffInstagramStatus" class="social-status"></small>
-              </label>
-              <label>YouTube
-                <div class="social-field"><input id="staffYoutube" data-platform="youtube"><button type="button" onclick="openSocial('staffYoutube')">Open</button></div>
-                <small id="staffYoutubeStatus" class="social-status"></small>
-              </label>
-              <label>Website
-                <div class="social-field"><input id="staffWebsite" data-platform="website"><button type="button" onclick="openSocial('staffWebsite')">Open</button></div>
-                <small id="staffWebsiteStatus" class="social-status"></small>
-              </label>
-            </div>
-
-            <div class="editor-actions">
-              <button class="primary" onclick="saveBroadcaster()">Save Person</button>
-              <button class="danger" onclick="deleteBroadcaster()">Delete Person</button>
-            </div>
-            <div id="broadcasterMessage" class="status"></div>
-          </div>
-        </div>
-      </section>
-    </section>
 
     
 
@@ -1266,21 +1160,6 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
               </div>
             </article>
 
-            <article class="graphics-library-item is-available retired-tool" data-graphic-search="personnel coach interview official administrator broadcast talent on the call">
-              <div class="graphics-item-heading"><div><span class="graphics-status available">Available</span><h2>Personnel Identification Master</h2><p>Coaches, talent, administrators, officials, and interview guests.</p></div><button onclick="openGraphicsAsset('personnelAsset', this)">Open</button></div>
-              <div id="personnelAsset" class="graphics-asset-panel hidden">
-                <div class="graphics-workspace player-graphics-workspace">
-                  <div class="graphics-editor"><div class="setup-grid">
-                    <label>Person<select id="personnelGraphicPerson" onchange="renderPersonnelGraphicPreview()"></select></label>
-                    <label>Graphic Type<select id="personnelGraphicType" onchange="renderPersonnelGraphicPreview()"><option value="coach_id">Coach ID</option><option value="coachs_corner">Coach's Corner</option><option value="interview_guest">Interview</option><option value="broadcast_talent">Broadcast Talent</option><option value="official_id">Official ID</option><option value="administrator">Administrator</option></select></label>
-                    <label>Display Duration<select id="personnelGraphicDuration"><option value="0">Persistent</option><option value="5">5 seconds</option><option value="8">8 seconds</option><option value="12">12 seconds</option></select></label>
-                    <label>Sponsor Profile<select id="personnelSponsorProfile" class="sponsor-profile-select" onchange="applySponsorProfile('personnelSponsorProfile','personnelSponsorName','personnelSponsorLogo','personnelSponsorLead')"><option value="">Manual / None</option></select></label><label>Sponsor Lead-in<select id="personnelSponsorLead" onchange="renderPersonnelGraphicPreview()"><option value="">None</option><option>Sponsored by:</option><option>Presented by:</option><option>Brought to you by:</option></select></label>
-                    <label>Sponsor Name<input id="personnelSponsorName" oninput="renderPersonnelGraphicPreview()"></label><label>Sponsor Logo Path / URL<input id="personnelSponsorLogo" oninput="renderPersonnelGraphicPreview()"></label>
-                  </div><div class="button-row graphics-actions"><button class="success" onclick="showPersonnelGraphic()">Show / Update</button><button onclick="hidePersonnelGraphic()">Hide</button><button class="danger" onclick="clearPersonnelGraphic()">Clear</button></div><div id="personnelGraphicStatus" class="status">Personnel graphic is ready.</div></div>
-                  <div class="graphics-preview-card"><h2>Personnel Preview</h2><div id="personnelPreviewSponsor" class="personnel-preview-sponsor hidden"><img id="personnelPreviewSponsorLogo"><div><small id="personnelPreviewSponsorLead"></small><strong id="personnelPreviewSponsorName"></strong></div></div><div id="personnelGraphicPreview" class="personnel-graphic-preview"><div class="personnel-preview-photo"><img id="personnelPreviewPhoto" src="/static/logo-placeholder.svg"></div><div class="personnel-preview-copy"><div id="personnelPreviewEyebrow" class="pgp-eyebrow">COACH</div><div id="personnelPreviewName" class="pgp-name">SELECT A PERSON</div><div id="personnelPreviewPreferred" class="pgp-preferred"></div><div id="personnelPreviewTitle" class="pgp-details"></div><div id="personnelPreviewOrganization" class="pgp-details"></div></div></div></div>
-                </div>
-              </div>
-            </article>
 
             <article class="graphics-library-item is-planned retired-tool" data-graphic-search="interview guest dedicated layout coaches corner"><div class="graphics-item-heading"><div><span class="graphics-status planned">Planned</span><h2>Interview Layout</h2><p>Dedicated non-game and Coach's Corner interview presentation.</p></div></div></article>
           </div>
@@ -2095,7 +1974,7 @@ let appInitialized = false;
 function requestedModuleFromLocation() {
   const raw = new URLSearchParams(window.location.search).get('module') || 'command';
   const requested = raw === 'readiness' ? 'diagnostics' : raw;
-  const allowed = new Set(['pregame','command','statistician','statistics','packages','games','schools','rosters','broadcasters','graphics','assets','sponsors','obs','settings','diagnostics']);
+  const allowed = new Set(['pregame','command','statistician','statistics','packages','games','schools','rosters','graphics','assets','sponsors','obs','settings','diagnostics']);
   return allowed.has(requested) ? requested : 'command';
 }
 
@@ -2118,7 +1997,6 @@ async function initializeAuthenticatedApp() {
   await loadConfig();
   await loadSessionContext();
   await loadRulesetOptions();
-  await loadBroadcasters();
   await loadGameManager();
   await populatePlannedBroadcasts();
   moveSetupPanelToGameManager();
@@ -2907,14 +2785,7 @@ async function createBroadcast() {
     home_pregame_region_record: readPlanningRecord('home','Region'),
     visitor_pregame_record: readPlanningRecord('visitor','Overall'),
     visitor_pregame_region_record: readPlanningRecord('visitor','Region'),
-    primary_record_source: planningRecordSourceHint(),
-    crew: {
-      play_by_play: document.getElementById('crewPlayByPlay').value,
-      color_analyst: document.getElementById('crewColorAnalyst').value,
-      sideline_reporter: document.getElementById('crewSidelineReporter').value,
-      statistician: document.getElementById('crewStatistician').value,
-      producer: document.getElementById('crewProducer').value
-    }
+    primary_record_source: planningRecordSourceHint()
     };
     const createResult=editingBroadcastId?await api(`/api/broadcasts/${encodeURIComponent(editingBroadcastId)}`,broadcastPayload,'PUT'):await api('/api/create-broadcast',broadcastPayload);
     const savedBroadcastId=createResult?.broadcast?.broadcast_id||editingBroadcastId;
@@ -4456,11 +4327,9 @@ function newRoster(){
   if(dfApply) dfApply.disabled=true;
 
   closePlayerEditor();
-  closeRosterStaffEditor();
-  renderRosterStaffList();
   renderRosterList();
 }
-function openRoster(id){currentRoster=rosters.find(r=>r.id===id);if(!currentRoster)return;dragonflyRosterSchoolCode='';document.getElementById('rosterEmpty').classList.add('hidden');document.getElementById('rosterWorkspace').classList.remove('hidden');document.getElementById('rosterId').value=currentRoster.id;document.getElementById('rosterSchool').value=currentRoster.school_id;document.getElementById('rosterSport').value=currentRoster.sport;document.getElementById('rosterSeason').value=currentRoster.season;document.getElementById('rosterLevel').value=currentRoster.level;document.getElementById('rosterDivision').value=currentRoster.division;document.getElementById('rosterCounts').textContent=`${currentRoster.active_count} active · ${currentRoster.inactive_count} inactive · ${currentRoster.player_count} total`;populatePositionOptions();renderRosterPlayers();renderRosterList();closePlayerEditor();closeRosterStaffEditor();renderRosterStaffList()}
+function openRoster(id){currentRoster=rosters.find(r=>r.id===id);if(!currentRoster)return;dragonflyRosterSchoolCode='';document.getElementById('rosterEmpty').classList.add('hidden');document.getElementById('rosterWorkspace').classList.remove('hidden');document.getElementById('rosterId').value=currentRoster.id;document.getElementById('rosterSchool').value=currentRoster.school_id;document.getElementById('rosterSport').value=currentRoster.sport;document.getElementById('rosterSeason').value=currentRoster.season;document.getElementById('rosterLevel').value=currentRoster.level;document.getElementById('rosterDivision').value=currentRoster.division;document.getElementById('rosterCounts').textContent=`${currentRoster.active_count} active · ${currentRoster.inactive_count} inactive · ${currentRoster.player_count} total`;populatePositionOptions();renderRosterPlayers();renderRosterList();closePlayerEditor()}
 async function saveRosterSetup(){const payload={school_id:document.getElementById('rosterSchool').value,sport:document.getElementById('rosterSport').value,season:document.getElementById('rosterSeason').value.trim(),level:document.getElementById('rosterLevel').value,division:document.getElementById('rosterDivision').value};try{const id=document.getElementById('rosterId').value;const result=id?await api(`/api/rosters/${encodeURIComponent(id)}`,payload,'PUT'):await api('/api/rosters',payload);document.getElementById('rosterMessage').textContent='Roster saved.';await loadRosters();openRoster(result.id)}catch(e){document.getElementById('rosterMessage').textContent=e.message==='ROSTER_ALREADY_EXISTS'?'That roster already exists.':e.message}}
 async function deleteRoster(){if(!currentRoster||!confirm('Delete this roster and all player records?'))return;await api(`/api/rosters/${encodeURIComponent(currentRoster.id)}`,null,'DELETE');currentRoster=null;document.getElementById('rosterWorkspace').classList.add('hidden');document.getElementById('rosterEmpty').classList.remove('hidden');await loadRosters()}
 function identityMonogramData(name){const initials=String(name||'').trim().split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase().replace(/[^A-Z0-9]/g,'')||'TEAM';return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><rect width="160" height="160" rx="22" fill="#242b35"/><text x="80" y="99" text-anchor="middle" font-family="Arial,sans-serif" font-size="${initials.length>2?48:64}" font-weight="900" fill="#fff">${initials}</text></svg>`)}`}
@@ -4471,96 +4340,6 @@ function rosterHeadshotDisplayUrl(value){
   return `${source}${source.includes('?')?'&':'?'}v=${rosterHeadshotRevision}`;
 }
 function renderRosterPlayers(){const list=document.getElementById('rosterPlayerList');const players=(currentRoster&&currentRoster.players)||[];const school=(schools||[]).find(s=>s.id===currentRoster?.school_id)||{};const teamLogo=school.primary_logo||school.approved_round_logo_path||school.logo_path||school.logo||'';list.innerHTML=players.length?players.slice().sort((a,b)=>(Number(a.number)||999)-(Number(b.number)||999)).map(p=>{const missing=!String(p.headshot||'').trim();const source=p.headshot?rosterHeadshotDisplayUrl(p.headshot):(teamLogo||'/static/player-silhouette.svg');const fallback=teamLogo?'team logo shown':'neutral silhouette shown';return `<button class="roster-player-row ${p.status==='inactive'?'inactive':''}" onclick="editRosterPlayer('${escapeHtml(p.id)}')"><img class="roster-player-thumb" src="${escapeHtml(source)}" alt="${missing?'Player identity fallback':'Player headshot'}" onerror="this.onerror=null;this.src='/static/player-silhouette.svg'"><span class="player-number">${escapeHtml(p.number||'—')}</span><span><strong>${escapeHtml(p.preferred_name||`${p.first_name} ${p.last_name}`.trim())}</strong><small>${escapeHtml(p.position||'Position not set')} · ${escapeHtml(p.grade||'Class not set')}</small>${missing?`<small class="missing-headshot">Headshot missing · ${fallback}</small>`:''}</span><em>${p.status==='inactive'?'Inactive':'Active'}</em></button>`}).join(''):'<div class="muted">No players added.</div>'}
-// Coaching & Admin Staff, tied to this roster's school -- moved here from
-// the main Personnel page (which now stays focused on broadcast crew) so
-// each team's staff lives alongside its roster instead of clogging up the
-// shared personnel list. Reuses the same /api/broadcasters records and
-// endpoints as the Personnel page; renderBroadcasterList() there filters
-// Coach/Administrator out of its own list so they aren't shown twice.
-const ROSTER_STAFF_CATEGORIES=['Coach','Administrator'];
-let rosterStaffPronunciationEdited=false;
-function currentRosterStaffSchoolId(){return document.getElementById('rosterSchool')?.value||''}
-function rosterStaffForSchool(){const schoolId=currentRosterStaffSchoolId();if(!schoolId)return[];return (broadcasters||[]).filter(p=>p.school_id===schoolId&&ROSTER_STAFF_CATEGORIES.includes(p.category||''))}
-function renderRosterStaffList(){
-  const list=document.getElementById('rosterStaffList');if(!list)return;
-  const schoolId=currentRosterStaffSchoolId();
-  const addButton=document.querySelector('#rosterStaffPanel .editor-actions button[onclick="newRosterStaffMember()"]');
-  if(addButton)addButton.disabled=!schoolId;
-  if(!schoolId){list.innerHTML='<div class="muted">Select a school above to manage its coaching and admin staff.</div>';return}
-  const staff=rosterStaffForSchool().slice().sort((a,b)=>(a.full_name||a.name||'').localeCompare(b.full_name||b.name||''));
-  list.innerHTML=staff.length?staff.map(p=>
-    `<button class="roster-player-row ${p.status==='inactive'?'inactive':''}" onclick="editRosterStaffMember('${escapeHtml(p.id)}')"><span><strong>${escapeHtml(p.full_name||p.name||'')}</strong><small>${escapeHtml(p.category||'')} · ${escapeHtml(p.role||p.primary_role||'')}</small></span><em>${p.status==='inactive'?'Inactive':'Active'}</em></button>`
-  ).join(''):'<div class="muted">No coaching or admin staff added for this school yet.</div>';
-}
-function populateRosterStaffRoleOptions(selected){
-  const category=document.getElementById('rosterStaffCategory')?.value||'Coach';
-  const el=document.getElementById('rosterStaffPrimaryRole');if(!el)return;
-  const choices=PERSONNEL_ROLE_OPTIONS[category]||PERSONNEL_ROLE_OPTIONS.Other;
-  const desired=selected||el.value||choices[0];
-  const options=choices.includes(desired)?choices:[...choices,desired];
-  el.innerHTML=options.map(v=>`<option${v===desired?' selected':''}>${escapeHtml(v)}</option>`).join('');
-}
-function suggestRosterStaffPronunciation(){
-  if(rosterStaffPronunciationEdited)return;
-  const name=(document.getElementById('rosterStaffName')?.value||'').trim();
-  if(name)document.getElementById('rosterStaffPronunciation').value=simplePronunciation(name);
-}
-function newRosterStaffMember(){
-  const schoolId=currentRosterStaffSchoolId();
-  if(!schoolId){alert('Select (and save) a school for this roster first.');return}
-  document.getElementById('rosterStaffId').value='';
-  document.getElementById('rosterStaffName').value='';
-  document.getElementById('rosterStaffCategory').value='Coach';
-  populateRosterStaffRoleOptions();
-  document.getElementById('rosterStaffPronunciation').value='';
-  document.getElementById('rosterStaffStatus').value='active';
-  document.getElementById('rosterStaffMessage').textContent='Creating a new staff record.';
-  rosterStaffPronunciationEdited=false;
-  document.getElementById('rosterStaffEditor').classList.remove('hidden');
-  document.getElementById('rosterStaffEditor').scrollIntoView({behavior:'smooth',block:'nearest'});
-}
-function editRosterStaffMember(id){
-  const person=(broadcasters||[]).find(p=>p.id===id);if(!person)return;
-  document.getElementById('rosterStaffId').value=person.id;
-  document.getElementById('rosterStaffName').value=person.full_name||person.name||'';
-  document.getElementById('rosterStaffCategory').value=ROSTER_STAFF_CATEGORIES.includes(person.category)?person.category:'Coach';
-  populateRosterStaffRoleOptions(person.role||person.primary_role||'');
-  document.getElementById('rosterStaffPronunciation').value=person.pronunciation||'';
-  document.getElementById('rosterStaffStatus').value=person.status||'active';
-  document.getElementById('rosterStaffMessage').textContent='';
-  rosterStaffPronunciationEdited=!!person.pronunciation;
-  document.getElementById('rosterStaffEditor').classList.remove('hidden');
-  document.getElementById('rosterStaffEditor').scrollIntoView({behavior:'smooth',block:'nearest'});
-}
-function closeRosterStaffEditor(){document.getElementById('rosterStaffEditor').classList.add('hidden')}
-async function saveRosterStaffMember(){
-  const name=document.getElementById('rosterStaffName').value.trim();
-  if(!name){document.getElementById('rosterStaffMessage').textContent='Name is required.';return}
-  const schoolId=currentRosterStaffSchoolId();
-  const role=document.getElementById('rosterStaffPrimaryRole').value;
-  const payload={
-    full_name:name,name,category:document.getElementById('rosterStaffCategory').value,
-    role,primary_role:role,title:role,school_id:schoolId,
-    status:document.getElementById('rosterStaffStatus').value,
-    pronunciation:document.getElementById('rosterStaffPronunciation').value.trim(),
-  };
-  const id=document.getElementById('rosterStaffId').value;
-  try{
-    await (id?api(`/api/broadcasters/${id}`,payload,'PUT'):api('/api/broadcasters',payload));
-  }catch(e){document.getElementById('rosterStaffMessage').textContent=e.data?.message||e.message||'Save failed.';return}
-  document.getElementById('rosterStaffMessage').textContent='Staff record saved.';
-  await loadBroadcasters();
-  renderRosterStaffList();
-  closeRosterStaffEditor();
-}
-async function deleteRosterStaffMember(){
-  const id=document.getElementById('rosterStaffId').value;if(!id)return;
-  if(!confirm('Delete this staff member?'))return;
-  await api(`/api/broadcasters/${id}`,{},'DELETE');
-  await loadBroadcasters();
-  renderRosterStaffList();
-  closeRosterStaffEditor();
-}
 function newRosterPlayer(){if(!currentRoster){alert('Save the roster first.');return}currentPlayer=null;pronunciationEdited=false;document.getElementById('playerEditor').classList.remove('hidden');['playerId','playerNumber','playerFirst','playerLast','playerPreferred','playerWeight','playerHeadshot','playerPronunciation'].forEach(id=>document.getElementById(id).value='');document.getElementById('playerPosition').value='Athlete';document.getElementById('playerSecondaryPosition').value='';document.getElementById('playerGrade').value='';document.getElementById('playerHeightFeet').value='';document.getElementById('playerHeightInches').value='';document.getElementById('playerStatus').value='active';document.getElementById('playerCaptain').checked=false;document.getElementById('playerStarter').checked=false;document.getElementById('playerPronunciationVerified').checked=false;document.getElementById('playerMessage').textContent='';renderRosterPlayerHighlights();document.getElementById('playerEditor').scrollIntoView({behavior:'smooth',block:'nearest'});setTimeout(()=>document.getElementById('playerNumber').focus(),350)}
 function ensureSelectValue(select,value,fallback=""){
   if(!select)return;
@@ -5277,15 +5056,6 @@ let configDirty = false;
 let currentConfig = null;
 
 
-async function uploadPersonnelHeadshot(file){if(!file)return;const id=document.getElementById('broadcasterId').value;if(!id){document.getElementById('broadcasterMessage').textContent='Save the person before uploading a headshot.';return}const fd=new FormData();fd.append('file',file);const r=await fetch(`/api/personnel/${encodeURIComponent(id)}/headshot`,{method:'POST',body:fd});const j=await r.json();if(!r.ok)throw new Error(j.error||'Upload failed');document.getElementById('staffHeadshot').value=j.path;document.getElementById('broadcasterMessage').textContent='Headshot uploaded.';await loadBroadcasters()}
-function populatePersonnelSchools(){const el=document.getElementById('staffSchool');if(!el)return;const old=el.value;el.innerHTML='<option value="">None / Independent</option>'+schools.map(s=>`<option value="${escapeHtml(s.id)}">${escapeHtml(s.broadcast_name||s.official_name||s.name)}</option>`).join('');el.value=old}
-function personnelEyebrow(){const type=document.getElementById('personnelGraphicType')?.value;return ({coach_id:'COACH',coachs_corner:"COACH'S CORNER",broadcast_talent:'ON THE CALL',interview_guest:'INTERVIEW',official_id:'OFFICIAL',administrator:'ADMINISTRATION'})[type]||'PERSONNEL'}
-function renderPersonnelGraphicPreview(){const id=document.getElementById('personnelGraphicPerson')?.value;const p=(broadcasters||[]).find(x=>x.id===id)||{};document.getElementById('personnelPreviewEyebrow').textContent=personnelEyebrow();document.getElementById('personnelPreviewName').textContent=p.full_name||p.name||'SELECT A PERSON';document.getElementById('personnelPreviewPreferred').textContent=p.preferred_name&&p.preferred_name!==(p.full_name||p.name)?`“${p.preferred_name}”`:'';document.getElementById('personnelPreviewTitle').textContent=p.role||p.primary_role||'';document.getElementById('personnelPreviewOrganization').textContent=p.organization||'';const pp=document.getElementById('personnelPreviewPhoto');pp.onerror=()=>{pp.onerror=null;pp.src='/static/logo-placeholder.svg'};pp.src=p.headshot||'/static/logo-placeholder.svg';const sponsor=document.getElementById('personnelSponsorName')?.value.trim()||'';const box=document.getElementById('personnelPreviewSponsor');box.classList.toggle('hidden',!sponsor);document.getElementById('personnelPreviewSponsorLead').textContent=document.getElementById('personnelSponsorLead')?.value||'Sponsored by:';document.getElementById('personnelPreviewSponsorName').textContent=sponsor;const logo=document.getElementById('personnelPreviewSponsorLogo');const src=document.getElementById('personnelSponsorLogo')?.value.trim()||'';logo.style.display=src?'block':'none';if(src)logo.src=src}
-function loadPersonnelGraphics(){const el=document.getElementById('personnelGraphicPerson');if(!el)return;const active=(broadcasters||[]).filter(p=>p.status!=='inactive');el.innerHTML=active.length?active.map(p=>`<option value="${escapeHtml(p.id)}">${escapeHtml(p.full_name||p.name)} · ${escapeHtml(p.title||p.role||p.primary_role||'')}</option>`).join(''):'<option value="">No active personnel</option>';renderPersonnelGraphicPreview()}
-function personnelGraphicPayload(action){return {action,personnel_id:document.getElementById('personnelGraphicPerson').value,graphic_type:document.getElementById('personnelGraphicType').value,eyebrow:personnelEyebrow(),duration:Number(document.getElementById('personnelGraphicDuration').value||0),sponsor_id:document.getElementById('personnelSponsorProfile').value,sponsor_lead_in:document.getElementById('personnelSponsorLead').value,sponsor_name:document.getElementById('personnelSponsorName').value.trim(),sponsor_logo:document.getElementById('personnelSponsorLogo').value.trim()}}
-async function showPersonnelGraphic(){const r=await api('/api/graphics/personnel',personnelGraphicPayload('show'));document.getElementById('personnelGraphicStatus').textContent=r.sponsor_warning?'Personnel graphic is on air without the expired or inactive sponsor.':'Personnel graphic is on air.';if(r.sponsor_warning){document.getElementById('personnelSponsorProfile').value='';document.getElementById('personnelSponsorName').value='';document.getElementById('personnelSponsorLogo').value='';document.getElementById('personnelSponsorLead').value='';renderPersonnelGraphicPreview()}}
-async function hidePersonnelGraphic(){await api('/api/graphics/personnel',{action:'hide'});document.getElementById('personnelGraphicStatus').textContent='Personnel graphic hidden.'}
-async function clearPersonnelGraphic(){await api('/api/graphics/personnel',{action:'clear'});document.getElementById('personnelGraphicStatus').textContent='Personnel graphic cleared.'}
 function toggleGraphicsCategory(button){const category=button.closest('.graphics-category');if(!category)return;category.classList.toggle('collapsed');const b=button.querySelector('b');if(b)b.textContent=category.classList.contains('collapsed')?'+':'−'}
 function openGraphicsAsset(id,button){const panel=document.getElementById(id);if(!panel)return;const shouldOpen=panel.classList.contains('hidden');document.querySelectorAll('.graphics-asset-panel').forEach(x=>x.classList.add('hidden'));document.querySelectorAll('.graphics-item-heading > button').forEach(x=>x.textContent='Open');if(shouldOpen){panel.classList.remove('hidden');if(button)button.textContent='Close';panel.scrollIntoView({behavior:'smooth',block:'nearest'})}}
 function filterGraphicsLibrary(){const q=(document.getElementById('graphicsLibrarySearch')?.value||'').trim().toLowerCase();let visible=0;document.querySelectorAll('.graphics-library-item').forEach(item=>{const match=!q||(item.dataset.graphicSearch||item.textContent).toLowerCase().includes(q);item.classList.toggle('hidden',!match);if(match)visible++});document.querySelectorAll('.graphics-category').forEach(cat=>{const matches=[...cat.querySelectorAll('.graphics-library-item')].some(x=>!x.classList.contains('hidden'));cat.classList.toggle('search-hidden',!matches);if(q&&matches){cat.classList.remove('collapsed');const b=cat.querySelector('.graphics-category-header b');if(b)b.textContent='−'}});document.getElementById('graphicsLibraryEmpty')?.classList.toggle('hidden',visible>0)}
@@ -5335,8 +5105,8 @@ function populateSponsorAssetSelector(){const sel=document.getElementById('spons
 async function linkSponsorAsset(assetId){const sponsorId=document.getElementById('sponsorId').value;if(!sponsorId){document.getElementById('sponsorMessage').textContent='Save the sponsor before linking an existing asset.';return}const data=await api(`/api/sponsors/${encodeURIComponent(sponsorId)}/asset`,{asset_id:assetId},'PUT');document.getElementById('sponsorLogoUrl').value=data.sponsor?.logo_url||'';document.getElementById('sponsorMessage').textContent=assetId?'Existing Asset Manager logo linked.':'Logo asset unlinked.';await loadSponsors();renderSponsorPreview()}
 function renderSponsorPreview(){const box=document.getElementById('sponsorPreview');if(!box)return;const url=document.getElementById('sponsorLogoUrl')?.value.trim()||'';box.innerHTML=url?`<img src="${escapeHtml(url)}" onerror="this.parentElement.textContent='Preview unavailable'">`:'No logo attached.'}
 function closeSponsorEditor(){document.getElementById('sponsorEditor').classList.add('hidden');selectedSponsor=null}
-function populateSponsorGraphicSelectors(){const active=sponsorRecords.filter(s=>(s.effective_status||s.status)==='Active'&&s.active!==false);document.querySelectorAll('.sponsor-profile-select').forEach(sel=>{const stateId=sel.id==='pgSponsorProfile'?(currentState.player_graphic?.sponsor_id||''):(currentState.personnel_graphic?.sponsor_id||'');const desired=sel.value||stateId;sel.innerHTML='<option value="">Manual / None</option>'+active.map(s=>`<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('');const valid=active.some(s=>s.id===desired);sel.value=valid?desired:'';if(desired&&!valid){if(sel.id==='pgSponsorProfile'){document.getElementById('pgSponsorName').value='';document.getElementById('pgSponsorLogo').value='';document.getElementById('pgSponsorLead').value='';renderPlayerGraphicPreview()}else{document.getElementById('personnelSponsorName').value='';document.getElementById('personnelSponsorLogo').value='';document.getElementById('personnelSponsorLead').value='';renderPersonnelGraphicPreview()}}});}
-function applySponsorProfile(selectId,nameId,logoId,leadId){const id=document.getElementById(selectId)?.value;const s=sponsorRecords.find(x=>x.id===id);if(!s){document.getElementById(nameId).value='';document.getElementById(logoId).value='';document.getElementById(leadId).value='';if(selectId==='pgSponsorProfile')renderPlayerGraphicPreview();else renderPersonnelGraphicPreview();return}document.getElementById(nameId).value=s.name||'';document.getElementById(logoId).value=s.logo_url||'';const lead=(s.lead_ins||[])[0]||'Presented by:';document.getElementById(leadId).value=lead;if(selectId==='pgSponsorProfile')renderPlayerGraphicPreview();else renderPersonnelGraphicPreview()}
+function populateSponsorGraphicSelectors(){const active=sponsorRecords.filter(s=>(s.effective_status||s.status)==='Active'&&s.active!==false);document.querySelectorAll('.sponsor-profile-select').forEach(sel=>{const stateId=sel.id==='pgSponsorProfile'?(currentState.player_graphic?.sponsor_id||''):(currentState.personnel_graphic?.sponsor_id||'');const desired=sel.value||stateId;sel.innerHTML='<option value="">Manual / None</option>'+active.map(s=>`<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('');const valid=active.some(s=>s.id===desired);sel.value=valid?desired:'';if(desired&&!valid){if(sel.id==='pgSponsorProfile'){document.getElementById('pgSponsorName').value='';document.getElementById('pgSponsorLogo').value='';document.getElementById('pgSponsorLead').value='';renderPlayerGraphicPreview()}}});}
+function applySponsorProfile(selectId,nameId,logoId,leadId){const id=document.getElementById(selectId)?.value;const s=sponsorRecords.find(x=>x.id===id);if(!s){document.getElementById(nameId).value='';document.getElementById(logoId).value='';document.getElementById(leadId).value='';if(selectId==='pgSponsorProfile')renderPlayerGraphicPreview();return}document.getElementById(nameId).value=s.name||'';document.getElementById(logoId).value=s.logo_url||'';const lead=(s.lead_ins||[])[0]||'Presented by:';document.getElementById(leadId).value=lead;if(selectId==='pgSponsorProfile')renderPlayerGraphicPreview()}
 
 // Pages reached by a tab light the menu item of the page that holds the tab.
 const MODULE_MENU_PARENT = {statistics: 'statistician', assets: 'sponsors'};
@@ -5350,7 +5120,6 @@ function showModule(module) {
   document.getElementById('gamesModule').classList.toggle('hidden', module !== 'games');
   document.getElementById('schoolsModule').classList.toggle('hidden', module !== 'schools');
   document.getElementById('rostersModule').classList.toggle('hidden', module !== 'rosters');
-  document.getElementById('broadcastersModule').classList.toggle('hidden', module !== 'broadcasters');
   document.getElementById('graphicsModule').classList.toggle('hidden', module !== 'graphics');
   document.getElementById('assetsModule').classList.toggle('hidden', module !== 'assets');
   document.getElementById('sponsorsModule').classList.toggle('hidden', module !== 'sponsors');
@@ -5367,7 +5136,6 @@ function showModule(module) {
   if (module === 'command') { document.getElementById('setupPanel').classList.add('hidden'); populatePlannedBroadcasts(); }
   if (module === 'schools') loadSchools();
   if (module === 'rosters') loadRosters();
-  if (module === 'broadcasters') {loadBroadcasters().then(()=>{populatePersonnelSchools();loadPersonnelGraphics()});}
   if (module === 'graphics') {loadGraphicsModule();Promise.all([loadSponsors(),loadAssets()]).then(()=>populateProgramVisualControls()).catch(()=>{});}
   if (module === 'assets') loadAssets();
   if (module === 'sponsors') loadSponsors();
@@ -5925,7 +5693,7 @@ function packageRecordArray(value, keys=[]){
   return [];
 }
 async function loadPackages(){
-  const [packages,broadcasts,rosterData,personnel,sponsors]=await Promise.all([api('/api/packages'),api('/api/broadcasts'),api('/api/rosters'),api('/api/broadcasters'),api('/api/sponsors')]);
+  const [packages,broadcasts,rosterData,personnel,sponsors]=await Promise.all([api('/api/packages'),api('/api/broadcasts'),api('/api/rosters'),Promise.resolve([]),api('/api/sponsors')]);
   packageRecords=packageRecordArray(packages,['packages','items','records']);
   packageBroadcasts=packageRecordArray(broadcasts,['broadcasts','items','records']);
   rosters=packageRecordArray(rosterData,['rosters','items','records']);
@@ -5936,7 +5704,7 @@ async function loadPackages(){
 function populatePackageOptions(){
   document.getElementById('packageBroadcast').innerHTML='<option value="">Select a broadcast</option>'+packageBroadcasts.map(b=>`<option value="${escapeHtml(b.broadcast_id)}">${escapeHtml(b.date||'Undated')} · ${escapeHtml(b.visitor_team)} @ ${escapeHtml(b.home_team)}</option>`).join('');
   document.getElementById('packageRosters').innerHTML=(rosters||[]).map(r=>`<option value="${escapeHtml(r.id)}">${escapeHtml(r.school_name||r.school_id)} · ${escapeHtml(r.season||'')} ${escapeHtml(r.level||'')} ${escapeHtml(r.sport||'')}</option>`).join('');
-  document.getElementById('packagePersonnel').innerHTML=(broadcasters||[]).filter(p=>p.status!=='inactive').map(p=>`<option value="${escapeHtml(p.id)}">${escapeHtml(p.full_name||p.name)} · ${escapeHtml(p.role||p.primary_role||'')}</option>`).join('');renderPackagePersonnelChecklist();
+  document.getElementById('packagePersonnel').innerHTML=[].filter(p=>p.status!=='inactive').map(p=>`<option value="${escapeHtml(p.id)}">${escapeHtml(p.full_name||p.name)} · ${escapeHtml(p.role||p.primary_role||'')}</option>`).join('');renderPackagePersonnelChecklist();
   document.getElementById('packageSponsors').innerHTML=(sponsorRecords||[]).filter(s=>(s.effective_status||s.status)==='Active'&&s.active!==false).map(s=>`<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('');
 }
 
@@ -7088,172 +6856,6 @@ document.querySelectorAll('input[data-platform]').forEach(input => {
   input.addEventListener('blur', () => validateSocialField(input.id).catch(() => {}));
 });
 
-let broadcasters = [];
-let selectedBroadcaster = null;
-
-let personnelPronunciationEdited=false;
-function suggestPersonnelPronunciation(){
-  if(personnelPronunciationEdited)return;
-  const name=(document.getElementById('staffName')?.value||'').trim();
-  if(name)document.getElementById('staffPronunciation').value=simplePronunciation(name);
-}
-document.addEventListener('DOMContentLoaded',()=>{const n=document.getElementById('staffName');if(n)n.addEventListener('blur',suggestPersonnelPronunciation)});
-async function loadBroadcasters() {
-  broadcasters = await api('/api/broadcasters');
-  renderBroadcasterList();
-  populateCrewDropdowns();
-  if (!selectedBroadcaster && broadcasters.length) {
-    editBroadcaster(broadcasters[0].id);
-  }
-}
-
-const PERSONNEL_ROLE_OPTIONS={
-  'Coach':['Head Coach','Assistant Coach','Offensive Coordinator','Defensive Coordinator','Special Teams Coordinator','Position Coach','Other'],
-  'Broadcast Talent':['Play-by-Play','Color Analyst','Sideline Reporter','Studio Host','Statistician','Other'],
-  'Administrator':['Athletic Director','Principal','Superintendent','Other'],
-  'Official':['Referee','Umpire','Line Judge','Head Linesman','Field Judge','Side Judge','Back Judge','Official','Other'],
-  'Interview Guest':['Interview Guest','Guest Analyst','Community Guest','Other'],
-  'Production Staff':['Producer','Camera Operator','Technical Director','Audio Engineer','Graphics Operator','Other'],
-  'Other':['Other']
-};
-function populatePersonnelRoleOptions(selected){const category=document.getElementById('staffCategory')?.value||'Other';const el=document.getElementById('staffPrimaryRole');if(!el)return;const choices=PERSONNEL_ROLE_OPTIONS[category]||PERSONNEL_ROLE_OPTIONS.Other;const desired=selected||el.value||choices[0];if(!choices.includes(desired))choices.push(desired);el.innerHTML=choices.map(v=>`<option${v===desired?' selected':''}>${escapeHtml(v)}</option>`).join('')}
-
-function displayRole(person) { return `${person.role || person.primary_role || 'Other'}${person.producer ? ' / Producer' : ''}`; }
-
-function renderBroadcasterList() {
-  const term = (document.getElementById('broadcasterSearch').value || '').toLowerCase();
-  // Coach/Administrator staff now live on the Roster page (tied to their
-  // school's roster) instead of here -- keeps this list focused on the
-  // people actually working the broadcast. Existing Coach/Administrator
-  // records still exist underneath (on-air graphics like Coach ID still
-  // pull from the full `broadcasters` array), they're just not browsed
-  // from this list any more.
-  const filtered = broadcasters.filter(person =>
-    !ROSTER_STAFF_CATEGORIES.includes(person.category||'') &&
-    `${person.full_name||person.name} ${person.preferred_name||''} ${person.role||person.primary_role||''} ${person.category||''}`.toLowerCase().includes(term)
-  );
-  document.getElementById('broadcasterList').innerHTML = filtered.map(person =>
-    `<button class="school-list-item ${selectedBroadcaster && selectedBroadcaster.id === person.id ? 'selected' : ''}" onclick="editBroadcaster('${person.id}')">` +
-    `<strong>${person.full_name||person.name}</strong><span>${displayRole(person)}</span></button>`
-  ).join('') || '<div class="empty-state">No staff members found.</div>';
-}
-
-function emptyBroadcaster() {
-  return {
-    id:'', name:'', full_name:'', preferred_name:'', category:'Broadcast Talent', primary_role:'Play-by-Play', role:'Play-by-Play', title:'Play-by-Play', organization:'', school_id:'', status:'active', pronunciation:'', pronunciation_verified:false, bio:'', headshot:'', producer:false,
-    social:{facebook:'',x:'',instagram:'',youtube:'',website:''}
-  };
-}
-
-function populateBroadcasterForm(person) {
-  clearSocialValidation(document.getElementById('broadcastersModule'));
-  selectedBroadcaster = person;
-  document.getElementById('broadcasterId').value = person.id || '';
-  document.getElementById('staffName').value = person.full_name || person.name || '';
-  personnelPronunciationEdited=!!person.pronunciation;
-  document.getElementById('staffPreferred').value = person.preferred_name || '';
-  document.getElementById('staffCategory').value = person.category || 'Other';
-  populatePersonnelRoleOptions(person.role || person.primary_role || 'Other');
-  document.getElementById('staffOrganization').value = person.organization || '';
-  document.getElementById('staffSchool').value = person.school_id || '';
-  document.getElementById('staffStatus').value = person.status || 'active';
-  document.getElementById('staffPronunciation').value = person.pronunciation || '';
-  document.getElementById('staffPronunciationVerified').checked = !!person.pronunciation_verified;
-  document.getElementById('staffBio').value = person.bio || '';
-  document.getElementById('staffHeadshot').value = person.headshot || '';
-  document.getElementById('staffProducer').checked = !!person.producer;
-  const social = person.social || {};
-  document.getElementById('staffFacebook').value = social.facebook || '';
-  document.getElementById('staffX').value = social.x || '';
-  document.getElementById('staffInstagram').value = social.instagram || '';
-  document.getElementById('staffYoutube').value = social.youtube || '';
-  document.getElementById('staffWebsite').value = social.website || '';
-  validateAllSocialFields(document.getElementById('broadcastersModule')).catch(() => {});
-  renderBroadcasterList();
-  populatePersonnelSchools();
-  loadPersonnelGraphics();
-}
-
-function newBroadcaster() {
-  populateBroadcasterForm(emptyBroadcaster());
-  personnelPronunciationEdited=false;
-  document.getElementById('broadcasterMessage').textContent = 'Creating a new staff record.';
-  const field=document.getElementById('staffName'); field.scrollIntoView({behavior:'smooth',block:'center'}); setTimeout(()=>field.focus(),350);
-}
-
-function editBroadcaster(id) {
-  const person = broadcasters.find(p => p.id === id);
-  if (person) populateBroadcasterForm(person);
-}
-
-function collectBroadcaster() {
-  return {
-    full_name: document.getElementById('staffName').value.trim(), name: document.getElementById('staffName').value.trim(),
-    preferred_name: document.getElementById('staffPreferred').value.trim(), category: document.getElementById('staffCategory').value,
-    role: document.getElementById('staffPrimaryRole').value, primary_role: document.getElementById('staffPrimaryRole').value,
-    title: document.getElementById('staffPrimaryRole').value, organization: document.getElementById('staffOrganization').value.trim(),
-    school_id: document.getElementById('staffSchool').value, status: document.getElementById('staffStatus').value,
-    pronunciation: document.getElementById('staffPronunciation').value.trim(), pronunciation_verified: document.getElementById('staffPronunciationVerified').checked,
-    bio: document.getElementById('staffBio').value.trim(), headshot: document.getElementById('staffHeadshot').value.trim(),
-    producer: document.getElementById('staffProducer').checked,
-    social: {
-      facebook: document.getElementById('staffFacebook').value.trim(),
-      x: document.getElementById('staffX').value.trim(),
-      instagram: document.getElementById('staffInstagram').value.trim(),
-      youtube: document.getElementById('staffYoutube').value.trim(),
-      website: document.getElementById('staffWebsite').value.trim()
-    }
-  };
-}
-
-async function saveBroadcaster() {
-  const valid = await validateAllSocialFields(document.getElementById('broadcastersModule'));
-  if (!valid) return;
-  const payload = collectBroadcaster();
-  if (!payload.name) {
-    document.getElementById('broadcasterMessage').textContent = 'Name is required.';
-    return;
-  }
-  const id = document.getElementById('broadcasterId').value;
-  const saved = id
-    ? await api(`/api/broadcasters/${id}`, payload, 'PUT')
-    : await api('/api/broadcasters', payload);
-  selectedBroadcaster = saved;
-  document.getElementById('broadcasterMessage').textContent = 'Staff profile saved.';
-  await loadBroadcasters();
-  editBroadcaster(saved.id);
-}
-
-async function deleteBroadcaster() {
-  const id = document.getElementById('broadcasterId').value;
-  if (!id) return;
-  if (!confirm('Delete this staff member?')) return;
-  await api(`/api/broadcasters/${id}`, {}, 'DELETE');
-  selectedBroadcaster = null;
-  populateBroadcasterForm(emptyBroadcaster());
-  await loadBroadcasters();
-}
-
-function fillCrewSelect(selectId, people, selectedValue = '') {
-  const select = document.getElementById(selectId);
-  if (!select) return;
-  select.innerHTML = '<option value="">Not Assigned</option>' +
-    people.map(person => `<option value="${person.id}">${person.name}</option>`).join('');
-  if (selectedValue) select.value = selectedValue;
-}
-
-function populateCrewDropdowns() {
-  const crewCategories = new Set(['Broadcast Talent','Production Staff','Other']);
-  const available = broadcasters.filter(p =>
-    String(p.status || 'active').toLowerCase() === 'active' &&
-    crewCategories.has(String(p.category || 'Other'))
-  );
-  fillCrewSelect('crewPlayByPlay', available);
-  fillCrewSelect('crewColorAnalyst', available);
-  fillCrewSelect('crewSidelineReporter', available);
-  fillCrewSelect('crewStatistician', available);
-  fillCrewSelect('crewProducer', available);
-}
 function yesNo(value) {
   return value ? 'YES' : 'NO';
 }

@@ -17,15 +17,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_phase_4_manifest_contains_all_service_boundaries() -> None:
-    assert len(SERVICE_BOUNDARIES) == 27
-    assert len({module for module, _ in SERVICE_BOUNDARIES}) == 27
-    assert len({class_name for _, class_name in SERVICE_BOUNDARIES}) == 27
+    assert len(SERVICE_BOUNDARIES) == 26
+    assert len({module for module, _ in SERVICE_BOUNDARIES}) == 26
+    assert len({class_name for _, class_name in SERVICE_BOUNDARIES}) == 26
 
 
 def test_phase_4_architecture_audit_passes() -> None:
     result = audit_phase_4(ROOT)
     assert result.ok, "\n".join(result.errors)
-    assert result.services_checked == 27
+    assert result.services_checked == 26
     assert result.app_lines > 1000
 
 
@@ -102,6 +102,6 @@ def test_architecture_audit_cli_succeeds() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert '"ok": true' in result.stdout
-    assert '"services_checked": 27' in result.stdout
+    assert '"services_checked": 26' in result.stdout
 
 

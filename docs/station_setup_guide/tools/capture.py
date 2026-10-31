@@ -162,8 +162,6 @@ def walk(page: Page, shots: Shots, logo: Path) -> None:
     shots.take("schools", "School Database")
     module(page, "rosters")
     shots.take("rosters", "Rosters")
-    module(page, "broadcasters")
-    shots.take("personnel", "Personnel")
     module(page, "sponsors")
     shots.take("sponsors", "Sponsors")
     module(page, "assets")

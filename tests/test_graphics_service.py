@@ -140,19 +140,6 @@ def school() -> dict:
     }
 
 
-def person() -> dict:
-    return {
-        "id": "jordan",
-        "full_name": "Jordan Smith",
-        "preferred_name": "Jordan",
-        "title": "Color Analyst",
-        "role": "Color Analyst",
-        "organization": "CSRN",
-        "school_id": "caledonia",
-        "headshot": "/personnel-headshots/jordan.png",
-    }
-
-
 def base_state() -> dict:
     return {
         "lower_third": copy.deepcopy(DEFAULTS["lower_third"]),
@@ -179,7 +166,6 @@ def service(*, now: float = 1000.0, sponsors=None, assets=None) -> GraphicsServi
         default_state=lambda: copy.deepcopy(DEFAULTS),
         load_rosters=lambda: [roster()],
         load_schools=lambda: [school()],
-        load_personnel=lambda: [person()],
         build_identity=lambda record, sport: {
             "logo": "/school-logos/caledonia.png",
             "primary_color": "#B5121B",
@@ -560,48 +546,6 @@ def test_player_clear_restores_default_graphic() -> None:
     state["player_graphic"]["player_id"] = "12-jason"
     result = service().update_player(state, {"action": "clear"})
     assert result.data["graphic"] == DEFAULTS["player_graphic"]
-
-
-def test_personnel_show_requires_resolved_personnel() -> None:
-    result = service().update_personnel(
-        base_state(),
-        {"action": "show", "personnel_id": "missing"},
-    )
-    assert result.code == "PERSONNEL_REQUIRED"
-
-
-def test_personnel_show_enriches_identity_and_sponsor() -> None:
-    result = service().update_personnel(
-        base_state(),
-        {
-            "action": "show",
-            "personnel_id": "jordan",
-            "duration": 30,
-            "sponsor_id": "sponsor-1",
-        },
-    )
-    graphic = result.data["graphic"]
-    assert graphic["visible"] is True
-    assert graphic["personnel_id"] == "jordan"
-    assert graphic["display_name"] == "Jordan"
-    assert graphic["organization"] == "CSRN"
-    assert graphic["logo"] == "/school-logos/caledonia.png"
-    assert graphic["accent"] == "#B5121B"
-    assert graphic["expires_at"] == 1030
-    assert graphic["sponsor_name"] == "Sponsor Name"
-
-
-def test_personnel_hide_and_clear_contracts() -> None:
-    state = base_state()
-    state["personnel_graphic"].update(
-        {"personnel_id": "jordan", "visible": True, "expires_at": 1100}
-    )
-    hidden = service().update_personnel(state, {"action": "hide"})
-    assert hidden.data["graphic"]["visible"] is False
-    assert hidden.data["graphic"]["expires_at"] == 0
-
-    cleared = service().update_personnel(state, {"action": "clear"})
-    assert cleared.data["graphic"] == DEFAULTS["personnel_graphic"]
 
 
 def test_automation_player_skips_incomplete_requests() -> None:

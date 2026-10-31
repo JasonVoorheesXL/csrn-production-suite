@@ -50,7 +50,6 @@ def build_service(
         data_dir=data,
         config_file=paths["config"],
         schools_file=paths["schools"],
-        broadcasters_file=paths["broadcasters"],
         rosters_file=paths["rosters"],
         venues_file=paths["venues"],
         logos_file=paths["logos"],
@@ -72,7 +71,7 @@ def test_diagnostics_reports_required_paths(tmp_path: Path) -> None:
     result = service.diagnostics()
     checks = result.data["diagnostics"]["checks"]
     assert result.ok
-    assert len(checks) == 12
+    assert len(checks) == 11
     assert {row["name"] for row in checks} >= {
         "Configuration",
         "School database",
@@ -102,7 +101,7 @@ def test_diagnostics_marks_file_backed_engines_healthy(tmp_path: Path) -> None:
         for row in service.diagnostics().data["diagnostics"]["engines"]
     }
     assert engines["Roster Engine"] == "Healthy"
-    assert engines["Personnel Engine"] == "Healthy"
+    assert "Personnel Engine" not in engines
     assert engines["Asset Manager"] == "Healthy"
     assert engines["Sponsor Engine"] == "Healthy"
     assert engines["Broadcast Package Engine"] == "Healthy"

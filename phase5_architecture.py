@@ -44,7 +44,6 @@ EXPECTED_BLUEPRINTS = {
     # kept out of the authed-only deployment_routes blueprint.
     "licensing_public_routes",
     "page_routes",
-    "personnel_routes",
     # The halftime/pregame/delay overlay (pregame_universal_overlay.html) --
     # added after this allowlist was last updated.
     "pregame_presentation",
@@ -102,7 +101,6 @@ PUBLIC_ENDPOINTS = {
     "onboarding_routes.list_guides",
     "page_routes.control_panel",
     "page_routes.overlay",
-    "personnel_routes.personnel_headshot_file",
     # The halftime/pregame/delay overlay: OBS has no operator login session,
     # same reasoning as every other overlay-facing endpoint in this set.
     "pregame_presentation.overlay",

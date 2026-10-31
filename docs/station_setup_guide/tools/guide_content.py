@@ -36,7 +36,7 @@ def menu(*path: str) -> str:
 COVER_LEDE = (
     "You've installed the Production Suite. This guide takes your station from the first launch to its "
     "first live broadcast: your station's name and logo, the sports you cover, schools and rosters, your "
-    "crew and sponsors, OBS, and the routine for every game night."
+    "sponsors, OBS, and the routine for every game night."
 )
 COVER_META = (
     f"Every screenshot was captured from a brand-new install (Production Suite {_VERSION}) set up as a "
@@ -49,7 +49,7 @@ COVER_META = (
 SECTIONS_INDEX = [
     ("1", "First Launch: the Setup Wizard and Your PIN", ""),
     ("2", "Your Station in Settings", ""),
-    ("3", "Schools, Rosters and Crew", ""),
+    ("3", "Schools and Rosters", ""),
     ("4", "Sponsors, Media and Graphics", ""),
     ("5", "Connecting OBS", ""),
     ("6", "Your First Game", ""),
@@ -71,7 +71,7 @@ INTRO = [
           "never move, so the same button is always in the same place on game night:"),
     ("table", ["Menu group", "What's in it"], [
         [ui("Game Day"), "Pre-Game Setup, Command Center, Statistician, OBS Manager"],
-        [ui("Setup"), "Game Manager, School Database, Rosters, Personnel"],
+        [ui("Setup"), "Game Manager, School Database, Rosters"],
         [ui("Production"), "Graphics, Sponsors (with the Media Library tab)"],
         [ui("Publishing"), "Social Publishing"],
         [ui("System"), "Settings, System Check"],
@@ -155,7 +155,7 @@ BODY = [
     ("p", f"The <b>OBS</b> section of Settings is covered in step 5. Click {ui('Save Configuration', 'primary')} when you're done."),
 
     # 3 ---------------------------------------------------------------------
-    ("section", "3", "Schools, Rosters and Crew",
+    ("section", "3", "Schools and Rosters",
      "The app names teams, shows logos and identifies players from what you enter here, so set up your "
      "own school first and add opponents as the schedule comes."),
     ("h2", "School Database"),
@@ -166,15 +166,12 @@ BODY = [
     ("h2", "Rosters"),
     ("fig", "rosters", f"{menu('Setup', 'Rosters')}: one roster per team, per season, per level"),
     ("p", f"Click {ui('Create Roster', 'primary')}, choose the school, sport, season and level, then add players "
-          "with their jersey numbers and positions. Jersey numbers are what the statistician types during "
-          "the game, so they must match the uniforms."),
+          "with their jersey numbers, positions, classes and how to say their names. Jersey numbers are what "
+          "the statistician types during the game, so they must match the uniforms. The pronunciation prints "
+          "on the roster sheets (Print on the Rosters page, and the broadcaster print sheet for each game)."),
     ("callout", "tip", "HEADSHOTS",
      "Add a headshot to a player and it appears on the player graphics, such as the touchdown graphic. "
      "Photos straight from a camera are fine: the app shrinks them on upload, so they stay small."),
-    ("h2", "Personnel"),
-    ("fig", "personnel", f"{menu('Setup', 'Personnel')}: your broadcast crew, coaches and officials"),
-    ("p", "Add your announcers, producer and statistician, plus coaches you interview. Each person can have a "
-          "role and a headshot."),
 
     # 4 ---------------------------------------------------------------------
     ("section", "4", "Sponsors, Media and Graphics",

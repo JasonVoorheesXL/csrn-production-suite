@@ -15,7 +15,6 @@ SERVICE_BOUNDARIES: tuple[tuple[str, str], ...] = (
     ("sponsor_service", "SponsorService"),
     ("venue_service", "VenueService"),
     ("broadcast_service", "BroadcastService"),
-    ("personnel_service", "PersonnelService"),
     ("asset_service", "AssetService"),
     ("graphics_service", "GraphicsService"),
     ("logo_service", "LogoService"),

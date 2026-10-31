@@ -14,7 +14,6 @@ MIGRATED_PATHS = {
     "/api/obs/program-visual-mode",
     "/api/graphics/lower-third",
     "/api/graphics/player",
-    "/api/graphics/personnel",
 }
 
 

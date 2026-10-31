@@ -47,7 +47,6 @@ from broadcaster_print_service import BroadcasterPrintService
 from social_media_preview_service import SocialMediaPreviewService
 from maxpreps_export_service import MaxPrepsExportService
 from pregame_presentation import _presentation_settings as _pregame_presentation_settings
-from personnel_service import PersonnelService
 from asset_service import AssetService
 from graphics_service import GraphicsService
 from logo_service import LogoService
@@ -114,10 +113,6 @@ from routes.association_routes import (
     create_association_blueprint,
 )
 from routes.mhsaa_division_routes import create_mhsaa_division_blueprint
-from routes.personnel_routes import (
-    PersonnelRoutesDependencies,
-    create_personnel_blueprint,
-)
 from routes.roster_routes import (
     RosterRoutesDependencies,
     create_roster_blueprint,
@@ -569,10 +564,8 @@ def _install_onboarding_gate(flask_app: Any) -> None:
 
     flask_app.before_request(_gate)
 SCHOOLS_FILE = DATA_DIR / "Schools" / "schools.json"
-BROADCASTERS_FILE = DATA_DIR / "Settings" / "broadcasters.json"
 ROSTERS_FILE = DATA_DIR / "Rosters" / "rosters.json"
 HEADSHOTS_DIR = DATA_DIR / "Rosters" / "Headshots"
-PERSONNEL_HEADSHOTS_DIR = DATA_DIR / "Personnel" / "Headshots"
 ASSETS_FILE = DATA_DIR / "Assets" / "assets.json"
 ASSET_UPLOAD_DIR = DATA_DIR / "Assets" / "Files"
 SPONSORS_FILE = DATA_DIR / "Sponsors" / "sponsors.json"
@@ -968,11 +961,10 @@ LOCKOUT_SECONDS = 60
 
 
 def ensure_data_architecture() -> None:
-    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Personnel", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings", "Rehearsals", "Releases", "Themes", "Social", "Recaps"):
+    for name in ("Schools", "Venues", "Logos", "Sources", "Imports", "Broadcasts", "Rosters", "Assets", "Sponsors", "Statistics", "Logs", "Backups", "Settings", "Rehearsals", "Releases", "Themes", "Social", "Recaps"):
         (DATA_DIR / name).mkdir(parents=True, exist_ok=True)
     ASSOCIATION_PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
-    PERSONNEL_HEADSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     ASSET_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     SPONSOR_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     SOCIAL_CARDS_DIR.mkdir(parents=True, exist_ok=True)
@@ -1426,7 +1418,8 @@ def get_broadcast_package_service() -> BroadcastPackageService:
             save_packages=save_packages,
             load_broadcasts=load_broadcasts,
             load_rosters=load_rosters,
-            load_personnel=load_broadcasters,
+            # Personnel was removed (2026-10-31); packages are retired too.
+            load_personnel=lambda: [],
             load_sponsors=load_sponsors,
             load_config=load_config,
             sponsor_contract_state=sponsor_contract_state,
@@ -1459,7 +1452,6 @@ def get_diagnostics_service() -> DiagnosticsService:
             data_dir=DATA_DIR,
             config_file=CONFIG_FILE,
             schools_file=SCHOOLS_FILE,
-            broadcasters_file=BROADCASTERS_FILE,
             rosters_file=ROSTERS_FILE,
             venues_file=VENUES_FILE,
             logos_file=LOGOS_FILE,
@@ -2182,7 +2174,6 @@ def get_broadcaster_print_service() -> BroadcasterPrintService:
             load_rosters=load_rosters,
             load_packages=load_packages,
             get_school_logo_file=lambda school_id, filename: DATA_DIR / "Logos" / normalize_school_id(school_id) / filename,
-            load_personnel=load_broadcasters,
         )
 
     return BROADCASTER_PRINT_SERVICE
@@ -2553,68 +2544,6 @@ def broadcast_identity(school: dict[str, Any] | None, sport: str) -> dict[str, A
 
 
 
-PERSONNEL_CATEGORIES = ("Coach", "Broadcast Talent", "Administrator", "Official", "Interview Guest", "Production Staff", "Other")
-STAFF_ROLES = (
-    "Head Coach", "Assistant Coach", "Offensive Coordinator", "Defensive Coordinator", "Special Teams Coordinator",
-    "Play-by-Play", "Color Analyst", "Sideline Reporter", "Statistician", "Studio Host",
-    "Athletic Director", "Principal", "Superintendent", "Official", "Interview Guest",
-    "Camera Operator", "Technical Director", "Audio Engineer", "Graphics Operator", "Producer", "Other",
-)
-
-def normalize_staff_id(value: str) -> str:
-    cleaned = "".join(ch.lower() if ch.isalnum() else "-" for ch in value.strip())
-    while "--" in cleaned:
-        cleaned = cleaned.replace("--", "-")
-    return cleaned.strip("-") or "staff-member"
-
-def normalize_personnel_headshot_url(value: str) -> str:
-    raw = str(value or "").strip().replace("\\", "/")
-    if not raw:
-        return ""
-    filename = Path(raw).name
-    if raw.startswith("/data/Personnel/Headshots/") or raw.startswith("data/Personnel/Headshots/"):
-        return f"/personnel-headshots/{filename}"
-    return raw
-
-def migrate_broadcaster_record(item: dict[str, Any]) -> dict[str, Any]:
-    full_name = str(item.get("full_name") or item.get("name") or "").strip()
-    role = str(item.get("role") or item.get("primary_role") or "Other")
-    if role not in STAFF_ROLES:
-        role = "Other"
-    category = str(item.get("category") or ("Broadcast Talent" if role in {"Play-by-Play","Color Analyst","Sideline Reporter","Studio Host","Statistician"} else "Production Staff"))
-    if category not in PERSONNEL_CATEGORIES:
-        category = "Other"
-    return {
-        "id": item.get("id") or normalize_staff_id(full_name or "personnel-member"),
-        "full_name": full_name, "name": full_name, "preferred_name": str(item.get("preferred_name", "")).strip(),
-        "pronunciation": str(item.get("pronunciation", "")).strip(), "pronunciation_verified": bool(item.get("pronunciation_verified", False)),
-        "category": category, "role": role, "primary_role": role, "title": str(item.get("title") or role).strip(),
-        "organization": str(item.get("organization", "")).strip(), "school_id": str(item.get("school_id", "")).strip(),
-        "bio": str(item.get("bio", "")).strip(), "headshot": normalize_personnel_headshot_url(item.get("headshot", "")),
-        "status": "inactive" if str(item.get("status", "active")).lower()=="inactive" else "active",
-        "producer": bool(item.get("producer", False)),
-        "social": item.get("social") or {"facebook":"","x":"","instagram":"","youtube":"","website":""},
-    }
-
-
-def load_broadcasters() -> list[dict[str, Any]]:
-    ensure_data_architecture()
-    if not BROADCASTERS_FILE.exists():
-        BROADCASTERS_FILE.write_text(json.dumps([], indent=2), encoding="utf-8")
-    try:
-        data = json.loads(BROADCASTERS_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        data = []
-    items = data if isinstance(data, list) else []
-    migrated = [migrate_broadcaster_record(item) for item in items]
-    if migrated != items:
-        save_broadcasters(migrated)
-    return migrated
-
-def save_broadcasters(items: list[dict[str, Any]]) -> None:
-    ensure_data_architecture()
-    BROADCASTERS_FILE.write_text(json.dumps(items, indent=2), encoding="utf-8")
-
 def normalize_social_url(
     platform: str,
     value: str,
@@ -2628,19 +2557,6 @@ def normalize_social_block(
     return ConfigurationService.normalize_social_block(block)
 
 
-PERSONNEL_SERVICE: PersonnelService | None = None
-
-
-def get_personnel_service() -> PersonnelService:
-    global PERSONNEL_SERVICE
-
-    if PERSONNEL_SERVICE is None:
-        PERSONNEL_SERVICE = PersonnelService(
-            load_personnel=load_broadcasters,
-            save_personnel=save_broadcasters,
-        )
-
-    return PERSONNEL_SERVICE
 
 
 GRAPHICS_SERVICE: GraphicsService | None = None
@@ -2654,13 +2570,9 @@ def get_graphics_service() -> GraphicsService:
             default_state=lambda: copy.deepcopy(DEFAULT_STATE),
             load_rosters=load_rosters,
             load_schools=load_schools,
-            load_personnel=load_broadcasters,
             build_identity=broadcast_identity,
             apply_sponsor=apply_sponsor_to_graphic,
             load_assets=load_assets,
-            organization_logo=lambda: identity_service.branding_logo(
-                load_config().get("organization", {})
-            ),
         )
 
     return GRAPHICS_SERVICE
@@ -3064,16 +2976,6 @@ ASSET_ROUTES_BLUEPRINT = create_asset_blueprint(
 APPLICATION_BLUEPRINTS.append(ASSET_ROUTES_BLUEPRINT)
 
 
-PERSONNEL_ROUTES_BLUEPRINT = create_personnel_blueprint(
-    PersonnelRoutesDependencies(
-        require_auth=require_auth,
-        get_personnel_service=get_personnel_service,
-        get_headshots_dir=lambda: PERSONNEL_HEADSHOTS_DIR,
-        normalize_personnel_id=PersonnelService.normalize_id,
-        shrink_headshot=SupportMediaService.shrink_headshot_bytes,
-    )
-)
-APPLICATION_BLUEPRINTS.append(PERSONNEL_ROUTES_BLUEPRINT)
 
 ROSTER_ROUTES_BLUEPRINT = create_roster_blueprint(
     RosterRoutesDependencies(

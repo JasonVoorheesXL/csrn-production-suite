@@ -22,7 +22,7 @@ GUIDES: tuple[dict[str, str], ...] = (
         "sport": "",
         "file": "station-setup-guide.pdf",
         "summary": "Install, first-run setup, your station's name and logo, schools, rosters, "
-        "crew, sponsors, OBS and your first game.",
+        "sponsors, OBS and your first game.",
     },
     {
         "id": "obs-setup",

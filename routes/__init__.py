@@ -23,10 +23,6 @@ from routes.live_game_routes import LiveGameRoutesDependencies, create_live_game
 from routes.logo_routes import LogoRoutesDependencies, create_logo_blueprint
 from routes.obs_routes import OBSRoutesDependencies, create_obs_blueprint
 from routes.page_routes import PageRoutesDependencies, create_page_blueprint
-from routes.personnel_routes import (
-    PersonnelRoutesDependencies,
-    create_personnel_blueprint,
-)
 from routes.roster_routes import RosterRoutesDependencies, create_roster_blueprint
 from routes.school_routes import SchoolRoutesDependencies, create_school_blueprint
 from routes.security_upgrade_routes import (
@@ -50,7 +46,6 @@ __all__ = [
     "LogoRoutesDependencies",
     "OBSRoutesDependencies",
     "PageRoutesDependencies",
-    "PersonnelRoutesDependencies",
     "RosterRoutesDependencies",
     "SchoolRoutesDependencies",
     "SecurityUpgradeRoutesDependencies",
@@ -69,7 +64,6 @@ __all__ = [
     "create_logo_blueprint",
     "create_obs_blueprint",
     "create_page_blueprint",
-    "create_personnel_blueprint",
     "create_roster_blueprint",
     "create_school_blueprint",
     "create_security_upgrade_blueprint",
