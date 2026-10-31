@@ -5,7 +5,7 @@ import threading
 from time import perf_counter
 from typing import Any, Callable
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 
 from live_command_service import command_id_from, current_revision
 from runtime_diagnostics_service import (
@@ -258,14 +258,70 @@ def create_live_game_blueprint(
     def statistics_report():
         return jsonify(build_statistics_payload())
 
+    # The overlay polls this twice per page (stat bar every 6 s, Collegiate
+    # rails every 5 s). Each build deep-copies the whole game, so by halftime
+    # of the 2026-10-30 game it shipped 346 KB per call and the server slowed
+    # to 1 s+ responses while the player-leader rails sat on "Awaiting Stats".
+    # Build once per committed state revision instead; the max age only
+    # covers roster/headshot edits, which don't bump the revision.
+    overlay_statistics_lock = threading.Lock()
+    overlay_statistics_cache: dict[str, Any] = {}
+    overlay_statistics_max_age = 30.0
+
+    def overlay_statistics_key() -> tuple[str, Any] | None:
+        if dependencies.peek_state is None:
+            return None
+        try:
+            return dependencies.peek_state(
+                lambda state: (str(state.get("broadcast_id", "") or ""), current_revision(state))
+            )
+        except Exception:
+            return None
+
     @routes.get("/api/statistics/overlay-state")
     def statistics_overlay_state():
         # Read-only, unauthenticated: the OBS overlay (Collegiate Tech's
         # rotating stat rails and player-leader cards) has no operator login
         # session, so it cannot call the authenticated /api/statistics above.
-        # Same payload, public, matching the existing /api/state and
+        # Same payload minus play_register (no overlay reads it; it was ~97%
+        # of the bytes), public, matching the existing /api/state and
         # /api/captions/overlay-state pattern.
-        return jsonify(build_statistics_payload())
+        started = perf_counter()
+        key = overlay_statistics_key()
+        with overlay_statistics_lock:
+            entry = overlay_statistics_cache.get("entry")
+            cache_hit = bool(
+                key is not None
+                and entry
+                and entry["key"] == key
+                and perf_counter() - entry["built_at"] < overlay_statistics_max_age
+            )
+            if not cache_hit:
+                payload = {
+                    name: value
+                    for name, value in build_statistics_payload().items()
+                    if name != "play_register"
+                }
+                entry = {
+                    "key": key,
+                    "built_at": perf_counter(),
+                    "body": jsonify(payload).get_data(),
+                    "player_count": safe_count(payload.get("players")),
+                }
+                if key is not None:
+                    overlay_statistics_cache["entry"] = entry
+        get_runtime_diagnostics().record(
+            "SERVER_STATISTICS_OVERLAY",
+            route="/api/statistics/overlay-state",
+            method=request.method,
+            http_status=200,
+            duration_ms=round((perf_counter() - started) * 1000, 2),
+            cache_hit=cache_hit,
+            broadcast_id=key[0] if key else "",
+            player_count=entry["player_count"],
+            bytes=len(entry["body"]),
+        )
+        return current_app.response_class(entry["body"], mimetype="application/json")
 
     @routes.get("/api/play-register")
     @dependencies.require_auth
