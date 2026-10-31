@@ -84,6 +84,46 @@ one switch, with `video_mode` as the single source of truth:
   rect out of both layers while the real window is showing (never for the
   calibration guide, never while a Player/Sponsor/Highlight graphic is up).
 
+### Backdrop-filter compatibility guard (2026-10-23)
+
+The card node has all three classes `.bl-scorebug.bl-collegiate.bl-collegiate-tech`;
+the existing mask already targets that node. Its descendant chain is
+`.bl-college-main-display` > `.bl-college-stage` > `.bl-college-video-window`.
+The main-display mask covers its descendants as a group, and the engine's
+`.bl-college-stage-video-active` rules already remove the stage background,
+inset shadow, field art and `::after` sheen. No additional stage mask is needed.
+
+`patchVideoWindowHole()` now also sets `backdrop-filter` and
+`-webkit-backdrop-filter` to `none` inline on the Collegiate Tech card while
+a real, non-guide window is present with measurable geometry. It removes
+both overrides together with the masks when the window disappears, becomes
+the calibration guide, is replaced by Player/Sponsor/Highlight content, or
+the card has zero viewport size. Both existing render paths call this patch.
+Team rails keep their own blur. The conditional override preserves the
+full-card glass outside real-window mode, avoiding a permanent redistribution
+of that effect to panels. The pinned engine JS/CSS, DOM order and z-index
+values are unchanged.
+
+Verification used a separate portable OBS 32.2.2 instance with its own test
+scene/profile/config, whose browser source reported Chromium 127.0.6533.120.
+Before **and** after the guard, PNG captures had alpha zero throughout the
+sampled window interior (20 px inset) for Collegiate Tech and Digital Neon,
+all four sports, sidebars visible and hidden. Player/Sponsor/Highlight and
+calibration captures remained opaque in the sampled interior. Thus the
+reported dimming was **not reproduced** in this isolated scene, and this
+change is a compatibility safeguard, not proof that backdrop-filter caused
+the report. Desktop Chromium 151 also produced a transparent window before
+the guard. CSS cannot sample a camera composited separately by OBS; residual
+browser-source alpha can dim that camera, but CSS cannot directly blur it.
+
+`tests/test_video_mode_support.py` includes an opt-in real Chromium check
+using the actual engine markup/styles and runtime patch. Set
+`CSRN_PLAYWRIGHT_MODULE` to an installed Playwright module path, optionally
+`CSRN_BROWSER_TEST_NODE` to the Node executable, then run that test file.
+It checks all 16 theme/sport/sidebar combinations, scaled mask geometry,
+stage transparency, preserved rails/DOM/z-index, and restoration on the same
+wrapper for calibration, video off and each Program Visual graphic.
+
 ### OBS setup for a camera behind the overlay
 
 1. Settings > OBS: WebSocket Enabled = Yes, Controlled Commands = Enabled,

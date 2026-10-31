@@ -4,16 +4,21 @@ on Collegiate Tech this round: a per-theme, operator-toggleable transparent
 shows through cleanly. CSRN never ingests video -- see app.py's DEFAULT_
 STATE comment for the full boundary statement.
 
-Text-assertion style tests matching this repo's existing convention for
-templates/static content (test_t1_collegiate_baseball_structural_parity.py,
-the gate test files, ...) rather than a browser/DOM harness -- there is no
-such harness in this project (see the P5 operator UI's own manual browser
-smoke test discipline for how runtime behavior actually gets verified).
+Source assertions follow this repo's static-content convention. An opt-in
+Chromium check additionally exercises the real engine markup and computed
+styles: set CSRN_PLAYWRIGHT_MODULE to an installed Playwright module path
+(and CSRN_BROWSER_TEST_NODE if Node is not on PATH). No browser dependency
+is added to the production application.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+import os
+import shutil
+import subprocess
+
+import pytest
 
 import app
 from game_operations_service import GameOperationsService
@@ -165,6 +170,120 @@ def test_calibration_guide_measurement_lives_in_the_unpinned_runtime_not_the_fro
     assert "getBoundingClientRect()" in _fn(RUNTIME_JS, "function patchVideoWindowGuide(root, runtime) {")
     assert "patchVideoWindowGuide(scoreLayout(), runtime);" in RUNTIME_JS
     assert "patchVideoWindowGuide(scoreTarget, runtime);" in RUNTIME_JS
+
+
+def test_hole_disables_and_restores_both_wrapper_backdrop_filter_properties() -> None:
+    body = _fn(RUNTIME_JS, "function patchVideoWindowHole(root) {")
+    for prop in ("backdrop-filter", "-webkit-backdrop-filter"):
+        assert f'layer.style.setProperty("{prop}", "none");' in body
+        assert f'layer.style.removeProperty("{prop}");' in body
+    assert 'layer.matches(".bl-collegiate-tech")' in body
+    assert "patchVideoWindowHole(scoreLayout());" in RUNTIME_JS
+    assert "patchVideoWindowHole(scoreTarget);" in RUNTIME_JS
+
+
+def test_video_hole_computed_styles_and_restoration_in_chromium() -> None:
+    module = os.environ.get("CSRN_PLAYWRIGHT_MODULE")
+    if not module:
+        pytest.skip("Set CSRN_PLAYWRIGHT_MODULE to run computed-style browser coverage")
+    node = os.environ.get("CSRN_BROWSER_TEST_NODE") or shutil.which("node")
+    assert node, "Chromium coverage requested but Node is unavailable"
+    script = r'''
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const {chromium} = require(process.env.CSRN_PLAYWRIGHT_MODULE);
+(async () => {
+  const browser = await chromium.launch({headless:true});
+  try {
+    const page = await browser.newPage({viewport:{width:1920,height:1080}});
+    await page.setContent('<style>html,body{margin:0;background:transparent}</style><div id="layout"></div>');
+    const read = name => fs.readFileSync(path.join(process.cwd(),'static',name),'utf8');
+    for (const name of ['csrn-broadcast-layout-engine.css','csrn-production-theme-runtime.css','csrn-collegiate-neon.css']) {
+      await page.addStyleTag({content:read(name)});
+    }
+    await page.addScriptTag({content:read('csrn-broadcast-layout-engine.js')});
+    const source = read('csrn-production-theme-runtime.js').replace(/\r\n/g,'\n');
+    const start = source.indexOf('const VIDEO_WINDOW_MASK_PROPERTIES');
+    const end = source.indexOf('\n}\n',start)+3;
+    assert(start >= 0 && end > start);
+    await page.addScriptTag({content:source.slice(start,end)});
+    const cases = await page.evaluate(() => {
+      const check = (condition,message) => {if(!condition) throw Error(message)};
+      const root = document.querySelector('#layout');
+      const engine = window.CSRNBroadcastLayoutEngine;
+      let count = 0;
+      for (const theme of ['collegiate_traditional','digital_neon']) {
+        for (const sport of ['football','basketball','baseball','softball']) {
+          for (const hidden of [false,true]) {
+            const state={videoWindowActive:true,sidebarsHidden:hidden};
+            const render = (target,value,mode='clash') => engine.renderPackage(target,theme,sport,value,{activeComponents:['scorebug'],videoMode:mode});
+            render(root,state);
+            const card=root.querySelector('.bl-collegiate-tech');
+            const normalBlur=getComputedStyle(card).backdropFilter;
+            const nodes=[...root.querySelectorAll('*')];
+            const layers=nodes.map(node=>getComputedStyle(node).zIndex);
+            root.style.transform='scale(.75)';
+            patchVideoWindowHole(root);
+            const win=root.querySelector('.bl-college-video-window');
+            const stage=win.parentElement;
+            const main=stage.parentElement;
+            check(main.matches('.bl-college-main-display') && main.parentElement===card,'Actual ancestor chain changed');
+            check(getComputedStyle(card).backdropFilter==='none','Wrapper blur remains over the window');
+            check(card.style.getPropertyValue('backdrop-filter')==='none','Missing inline override');
+            check(getComputedStyle(stage).backgroundColor==='rgba(0, 0, 0, 0)' && getComputedStyle(stage).backgroundImage==='none','Stage still paints a background');
+            check(getComputedStyle(stage.querySelector('.bl-college-stage-field')).display==='none','Field art still covers the window');
+            for(const layer of [card,main]) {
+              check(getComputedStyle(layer).maskImage!=='none','Missing ancestor mask');
+              const sizes=layer.style.maskSize.split(',')[1].trim().split(' ').map(parseFloat);
+              const rect=win.getBoundingClientRect();
+              check(Math.abs(sizes[0]-rect.width/.75)<.1 && Math.abs(sizes[1]-rect.height/.75)<.1,'Mask does not follow scaled geometry');
+            }
+            check(nodes.every((node,i)=>node===root.querySelectorAll('*')[i] && getComputedStyle(node).zIndex===layers[i]),'Patch changed DOM or stacking order');
+            for(const rail of root.querySelectorAll('.bl-college-team')) {
+              check(!rail.contains(win),'Blur panel contains the window');
+              check(getComputedStyle(rail).backdropFilter.includes('blur('),'Rail lost its glass blur');
+            }
+            // Exercise cleanup on the SAME wrapper, so a fresh render cannot
+            // hide a stale inline blur override or mask.
+            win.classList.add('bl-college-video-window-guide');
+            patchVideoWindowHole(root);
+            const restored=()=> {
+              check(card.style.getPropertyValue('backdrop-filter')==='' && card.style.getPropertyValue('-webkit-backdrop-filter')==='','Blur override was not removed');
+              check(getComputedStyle(card).backdropFilter===normalBlur,'Theme blur was not restored');
+              for(const layer of [card,main]) check(getComputedStyle(layer).maskImage==='none','Stale mask covers the guide/graphic');
+            };
+            restored();
+            win.classList.remove('bl-college-video-window-guide');
+            patchVideoWindowHole(root);
+            for(const mode of ['player','sponsor','highlight','off']) {
+              const temp=document.createElement('div');
+              render(temp,{...state,videoWindowActive:mode!=='off'},mode==='off'?'clash':mode);
+              main.querySelector('.bl-college-stage').replaceWith(temp.querySelector('.bl-college-stage'));
+              patchVideoWindowHole(root);
+              check(!root.querySelector('.bl-college-video-window'),'Graphic must replace the window');
+              restored();
+              // Put a real window back on the same card before the next mode.
+              render(temp,state);
+              main.querySelector('.bl-college-stage').replaceWith(temp.querySelector('.bl-college-stage'));
+              patchVideoWindowHole(root);
+            }
+            root.style.transform='';
+            count++;
+          }
+        }
+      }
+      return count;
+    });
+    assert.equal(cases,16);
+    console.log(`Chromium ${browser.version()}: ${cases} theme/sport/sidebar combinations and restoration transitions passed`);
+  } finally {await browser.close()}
+})().catch(error=>{console.error(error);process.exit(1)});
+'''
+    result = subprocess.run(
+        [node, "-e", script], cwd=ROOT, capture_output=True, text=True, timeout=90,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 # --- operator UI ------------------------------------------------------------

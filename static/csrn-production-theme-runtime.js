@@ -3443,6 +3443,11 @@ function patchVideoWindowGuide(root, runtime) {
 // showing, cut its rect out of both ancestors' paint with a CSS mask. The
 // window holds nothing else, and an active Player/Sponsor/Highlight graphic
 // replaces the window (no window -> no mask), so it still renders opaquely.
+// The same scorebug node also carries .bl-collegiate-tech's full-card glass
+// blur. Do not rely on a CEF version's mask/backdrop-filter interaction for
+// transparency: disable that ancestor blur only while punching the hole.
+// Keep the normal full-card glass for idle art, guides and Program Visuals;
+// team panels retain their own blur, outside the window's ancestor chain.
 const VIDEO_WINDOW_MASK_PROPERTIES = [
   "mask-image", "mask-size", "mask-position", "mask-repeat", "mask-composite",
   "-webkit-mask-image", "-webkit-mask-size", "-webkit-mask-position", "-webkit-mask-repeat", "-webkit-mask-composite"
@@ -3454,7 +3459,15 @@ function patchVideoWindowHole(root) {
     const outer = layer.getBoundingClientRect();
     if (!windowEl || !layer.contains(windowEl) || !outer.width || !outer.height) {
       VIDEO_WINDOW_MASK_PROPERTIES.forEach(name => layer.style.removeProperty(name));
+      if (layer.matches(".bl-collegiate-tech")) {
+        layer.style.removeProperty("backdrop-filter");
+        layer.style.removeProperty("-webkit-backdrop-filter");
+      }
       return;
+    }
+    if (layer.matches(".bl-collegiate-tech")) {
+      layer.style.setProperty("backdrop-filter", "none");
+      layer.style.setProperty("-webkit-backdrop-filter", "none");
     }
     // Rects are in viewport px after the overlay's scale; mask geometry is
     // in the layer's own (unscaled) px.
