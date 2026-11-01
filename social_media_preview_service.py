@@ -17,6 +17,8 @@ from playwright.sync_api import sync_playwright
 import postgame_card
 import postgame_story
 import pregame_story
+import reel_render
+import reel_story
 
 
 Record = dict[str, Any]
@@ -1561,3 +1563,53 @@ class SocialMediaPreviewService:
         data["cost_usd"] = result_data.get("cost_usd")
         data["revised"] = revising
         return SocialMediaPreviewResult("OK", data)
+
+    # -- paper-cutout play reels ---------------------------------------------------------
+
+    def reel_plays(self, broadcast_id: str) -> SocialMediaPreviewResult:
+        broadcast = self._find_broadcast(broadcast_id)
+        if broadcast is None:
+            return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
+        facts = self._postgame_facts(broadcast)
+        plays = [{"id": p["id"], "label": p["label"], "kind": p["kind"], "td": p["td"]} for p in reel_story.plays(facts)]
+        return SocialMediaPreviewResult("OK", {"broadcast_id": broadcast_id, "plays": plays})
+
+    def reel_document(self, broadcast_id: str, play_id: str, *, sponsor_id: str = "") -> str | None:
+        broadcast = self._find_broadcast(broadcast_id)
+        if broadcast is None:
+            return None
+        facts = self._postgame_facts(broadcast)
+        play = next((p for p in reel_story.plays(facts) if p["id"] == str(play_id)), None)
+        if play is None:
+            return None
+        sponsor = self._postgame_sponsor(broadcast_id, sponsor_id)
+        station_name, _ = self._station()
+        colors = {}
+        for team in postgame_story.TEAMS:
+            identity = broadcast.get(f"{team}_identity") if isinstance(broadcast.get(f"{team}_identity"), Mapping) else {}
+            colors[team] = {"primary": str(identity.get("primary_color") or ""), "secondary": str(identity.get("secondary_color") or "")}
+        script = reel_story.script(facts, play, broadcast=broadcast, station_name=station_name,
+                                   sponsor_name=str((sponsor or {}).get("name", "") or ""), colors=colors)
+        font = self._data_uri_from_file(self._get_static_dir() / "fonts" / "bangers-regular.woff2")
+        if font:
+            font = "data:font/woff2;base64," + font.split(",", 1)[1]
+        return reel_render.page(script, font)
+
+    def generate_reel(self, broadcast_id: str, play_id: str, *, sponsor_id: str = "") -> SocialMediaPreviewResult:
+        """A short vertical MP4: the play redrawn as a paper-cutout animation."""
+        if self._find_broadcast(broadcast_id) is None:
+            return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
+        document = self.reel_document(broadcast_id, play_id, sponsor_id=sponsor_id)
+        if document is None:
+            return SocialMediaPreviewResult("PLAY_NOT_FOUND")
+        try:
+            video = reel_render.render_mp4(document)
+        except Exception as exc:
+            return SocialMediaPreviewResult("REEL_FAILED", {"message": str(exc)[:300]})
+        safe_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", f"{broadcast_id}-{play_id}").strip("-") or "reel"
+        filename = f"{safe_id}-reel.mp4"
+        try:
+            (self.output_dir / filename).write_bytes(video)
+        except OSError:
+            pass
+        return SocialMediaPreviewResult("OK", {"video": video, "filename": filename})
