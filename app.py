@@ -2200,6 +2200,7 @@ def get_social_media_preview_service() -> SocialMediaPreviewService:
             get_storylines=lambda broadcast_id: _pregame_presentation_settings(broadcast_id).get("storylines", []),
             get_static_dir=lambda: Path(__file__).resolve().parent / "static",
             output_dir=SOCIAL_CARDS_DIR,
+            load_rosters=load_rosters,
         )
 
     return SOCIAL_MEDIA_PREVIEW_SERVICE

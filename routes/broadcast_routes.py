@@ -169,6 +169,41 @@ def create_broadcast_blueprint(
         response.headers["Cache-Control"] = "no-store"
         return response
 
+    @routes.get("/api/broadcasts/<broadcast_id>/postgame-story")
+    @dependencies.require_auth
+    def postgame_story(broadcast_id: str):
+        variant = request.args.get("variant", "0")
+        result = dependencies.get_social_media_preview_service().postgame_story(
+            broadcast_id, variant=int(variant) if variant.isdigit() else 0,
+        )
+        if result.code == "BROADCAST_NOT_FOUND":
+            return jsonify({"error": result.code}), 404
+        if result.code == "NO_GAME_DATA":
+            return jsonify(
+                {"error": result.code, "message": "No plays were recorded for this game, so there is nothing to write about."}
+            ), 409
+        return jsonify(result.data)
+
+    @routes.get("/api/broadcasts/<broadcast_id>/postgame-story.png")
+    @dependencies.require_auth
+    def postgame_story_card(broadcast_id: str):
+        variant = request.args.get("variant", "0")
+        result = dependencies.get_social_media_preview_service().generate_postgame_card(
+            broadcast_id,
+            variant=int(variant) if variant.isdigit() else 0,
+            headline=request.args.get("headline", ""),
+        )
+        if result.code == "BROADCAST_NOT_FOUND":
+            return jsonify({"error": result.code}), 404
+        if result.code == "IMAGE_GENERATION_FAILED":
+            return jsonify(
+                {"error": result.code, "message": result.data.get("message", "Unable to generate the postgame graphic.")}
+            ), 500
+        response = Response(result.data["image"], mimetype="image/png")
+        response.headers["Content-Disposition"] = f'inline; filename="{result.data["filename"]}"'
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
     @routes.get("/api/broadcasts/<broadcast_id>/final-score-preview.png")
     @dependencies.require_auth
     def final_score_preview(broadcast_id: str):

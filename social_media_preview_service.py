@@ -14,6 +14,9 @@ from typing import Any, Callable, Mapping
 from PIL import Image, ImageChops, ImageFilter
 from playwright.sync_api import sync_playwright
 
+import postgame_card
+import postgame_story
+
 
 Record = dict[str, Any]
 ObjectLoader = Callable[[], list[Record]]
@@ -82,6 +85,7 @@ class SocialMediaPreviewService:
         get_static_dir: Callable[[], Path],
         output_dir: Path,
         rng: random.Random | None = None,
+        load_rosters: ObjectLoader | None = None,
     ) -> None:
         self._load_broadcasts = load_broadcasts
         self._load_state = load_state
@@ -98,6 +102,7 @@ class SocialMediaPreviewService:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._rng = rng or random.Random()
+        self._load_rosters = load_rosters
         self._background_cache: dict[str, str] = {}
 
     # -- lookups -----------------------------------------------------
@@ -409,18 +414,21 @@ class SocialMediaPreviewService:
         # mid-broadcast. Such sponsors still appear via the text fallback.
         return "", "dark"
 
-    def _select_sponsors(self) -> list[dict[str, Any]]:
+    def _active_sponsors(self) -> list[dict[str, Any]]:
         try:
             sponsors = self._get_sponsor_service().list_payload().get("sponsors", [])
         except Exception:
             sponsors = []
-        active = [
+        return [
             sponsor
             for sponsor in sponsors
             if sponsor.get("active", True)
             and sponsor.get("effective_status") != "Expired"
             and str(sponsor.get("name", "")).strip()
         ]
+
+    def _select_sponsors(self) -> list[dict[str, Any]]:
+        active = self._active_sponsors()
         if len(active) > MAX_SPONSOR_LOGOS:
             return self._rng.sample(active, MAX_SPONSOR_LOGOS)
         return active
@@ -1170,3 +1178,156 @@ class SocialMediaPreviewService:
                 "sponsor_count": len(sponsors),
             },
         )
+
+    # -- postgame story ----------------------------------------------------------
+
+    POSTGAME_WIDTH = postgame_card.WIDTH
+    POSTGAME_HEIGHT = postgame_card.HEIGHT
+
+    def _roster_lookup(self, broadcast: Mapping[str, Any]) -> Callable[[str], list[Mapping[str, Any]]]:
+        cache: list[list[Record]] = []
+
+        def rosters() -> list[Record]:
+            if not cache:
+                try:
+                    cache.append(list(self._load_rosters() or []) if self._load_rosters else [])
+                except Exception:
+                    cache.append([])
+            return cache[0]
+
+        def lookup(team: str) -> list[Mapping[str, Any]]:
+            school_id = str(broadcast.get(f"{team}_school_id", "") or "").strip()
+            if not school_id:
+                return []
+            return [
+                player
+                for roster in rosters()
+                if str(roster.get("school_id", "") or "") == school_id
+                for player in roster.get("players") or []
+                if isinstance(player, Mapping)
+            ]
+
+        return lookup
+
+    def _postgame_facts(self, broadcast: Mapping[str, Any]) -> dict[str, Any]:
+        state = self._resolve_game_state(broadcast)
+        try:
+            statistics = self._build_statistics(dict(state)) if state else {}
+        except Exception:
+            statistics = {}
+        return postgame_story.build_facts(
+            broadcast=broadcast,
+            state=state or {},
+            statistics=statistics or {},
+            roster_for_team=self._roster_lookup(broadcast),
+        )
+
+    def _postgame_sponsor(self, broadcast_id: str) -> dict[str, Any] | None:
+        """One sponsor per game, the same one every time the story or card is
+        made, so the written credit and the logo on the card always match."""
+        active = sorted(self._active_sponsors(), key=lambda s: str(s.get("name", "")).casefold())
+        if not active:
+            return None
+        return active[sum(ord(ch) for ch in str(broadcast_id)) % len(active)]
+
+    def _station(self) -> tuple[str, str, str]:
+        """(station name, station logo data URI, watch link)."""
+        try:
+            config = self._load_config() or {}
+        except Exception:
+            config = {}
+        organization = dict(config.get("organization") or {})
+        # The station's public pages (Settings > Station Social Media), never the
+        # streaming settings: those hold producer/studio links viewers can't open.
+        social = dict(config.get("social") or {})
+        name = str(organization.get("short_name") or organization.get("name") or "").strip()
+        link = str(social.get("facebook") or social.get("youtube") or "").strip()
+        return name, self._org_logo_uri(organization), link
+
+    def postgame_story(self, broadcast_id: str, variant: int = 0) -> SocialMediaPreviewResult:
+        broadcast = self._find_broadcast(broadcast_id)
+        if broadcast is None:
+            return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
+        facts = self._postgame_facts(broadcast)
+        if not facts["has_plays"]:
+            return SocialMediaPreviewResult("NO_GAME_DATA")
+        sponsor = self._postgame_sponsor(broadcast_id)
+        station_name, _, link = self._station()
+        written = postgame_story.write_story(
+            facts,
+            variant=variant,
+            sponsor_name=str((sponsor or {}).get("name", "") or ""),
+            station_name=station_name,
+            watch_link=link,
+        )
+        return SocialMediaPreviewResult(
+            "OK",
+            {
+                "broadcast_id": broadcast_id,
+                "story": written,
+                "line_score": facts["line_score"],
+                "key_plays": [
+                    f"{postgame_story.quarter_tag(p['quarter'])} {facts['teams'][p['team']]['name']}: "
+                    f"{postgame_story.big_play_line(p)}"
+                    for p in facts["big_plays"]
+                ],
+                "sponsor_name": (sponsor or {}).get("name", ""),
+                "scores_reliable": facts["scores_reliable"],
+                "unnamed_players": [f"{facts['teams'][team]['name']} No. {number}" for team, number in facts["unnamed"]],
+            },
+        )
+
+    @staticmethod
+    def _rasterize(document: str, width: int, height: int) -> bytes:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            try:
+                page = browser.new_page(viewport={"width": width, "height": height})
+                page.set_content(document, wait_until="load")
+                return page.screenshot(type="png")
+            finally:
+                browser.close()
+
+    def postgame_card_document(self, broadcast_id: str, *, variant: int = 0, headline: str = "") -> str | None:
+        broadcast = self._find_broadcast(broadcast_id)
+        if broadcast is None:
+            return None
+        facts = self._postgame_facts(broadcast)
+        sponsor = self._postgame_sponsor(broadcast_id)
+        sponsor_logo = self._sponsor_logo_uri(sponsor)[0] if sponsor else ""
+        station_name, station_logo, _ = self._station()
+        lede = postgame_story.write_story(facts, variant=variant)["paragraphs"][0] if facts["has_plays"] else ""
+        logos = {
+            team: self._team_logo_uri(
+                broadcast.get(f"{team}_identity") if isinstance(broadcast.get(f"{team}_identity"), Mapping) else {},
+                broadcast.get(f"{team}_school_id"),
+            )
+            for team in postgame_story.TEAMS
+        }
+        return postgame_card.render_card_html(
+            facts,
+            headline=headline.strip()[:160] or postgame_story.headline(facts, variant),
+            deck=lede,
+            station_name=station_name,
+            station_logo_uri=station_logo,
+            logos=logos,
+            sponsor_name=str((sponsor or {}).get("name", "") or ""),
+            sponsor_logo_uri=sponsor_logo,
+        )
+
+    def generate_postgame_card(self, broadcast_id: str, *, variant: int = 0, headline: str = "") -> SocialMediaPreviewResult:
+        """The newspaper-style graphic that goes with the postgame story."""
+        document = self.postgame_card_document(broadcast_id, variant=variant, headline=headline)
+        if document is None:
+            return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
+        try:
+            image_bytes = self._rasterize(document, self.POSTGAME_WIDTH, self.POSTGAME_HEIGHT)
+        except Exception as exc:
+            return SocialMediaPreviewResult("IMAGE_GENERATION_FAILED", {"message": str(exc)})
+        safe_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(broadcast_id)).strip("-") or "broadcast"
+        filename = f"{safe_id}-postgame-story.png"
+        try:
+            (self.output_dir / filename).write_bytes(image_bytes)
+        except OSError:
+            pass
+        return SocialMediaPreviewResult("OK", {"image": image_bytes, "filename": filename})
