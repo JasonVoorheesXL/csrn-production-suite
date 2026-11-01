@@ -231,6 +231,7 @@ def create_broadcast_blueprint(
             "AI_KEY_INVALID": "Anthropic did not accept this key.",
             "AI_UNREACHABLE": "Anthropic could not be reached. Check the internet connection.",
             "AI_BUSY": "Anthropic is busy right now. Try again in a minute.",
+            "AI_NO_CREDIT": "Your Anthropic credit is used up. Add credit at console.anthropic.com under Billing.",
             "AI_UNAVAILABLE": "The AI writer is not installed in this copy of the app.",
         }
         if result.ok:

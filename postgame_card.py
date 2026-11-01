@@ -81,7 +81,7 @@ def _line_score_html(facts: Mapping[str, Any]) -> str:
             f'<tbody>{rows}</tbody></table>')
 
 
-def _potg_html(facts: Mapping[str, Any], picks: Any) -> str:
+def _potg_html(facts: Mapping[str, Any], picks: Any, station_name: str = "") -> str:
     """One strip per Player of the Game: 'Player of the Game' for a single
     pick, '<Team> Player of the Game' when each team has one."""
     picks = [picks] if isinstance(picks, Mapping) else list(picks or [])
@@ -89,7 +89,7 @@ def _potg_html(facts: Mapping[str, Any], picks: Any) -> str:
     for potg in picks:
         line = story.standout_line(potg["row"]) if potg.get("row") else ""
         team = facts["teams"][potg["team"]]["name"]
-        tag = f"{team} Player of the Game" if len(picks) > 1 else "Player of the Game"
+        tag = f"{team} Player of the Game" if len(picks) > 1 else f"{station_name} Player of the Game".strip()
         line_html = f'<span class="potg-line">{_nobreak(line)}</span>' if line else ""
         team_html = "" if len(picks) > 1 else f'<span class="potg-team">{_e(team)}</span>'
         rows.append(f'<div class="potg"><span class="potg-tag">{_e(tag)}</span>'
@@ -311,7 +311,7 @@ def render_card_html(
     {home}
   </div>
   {_line_score_html(facts)}
-  {_potg_html(facts, player_of_game)}
+  {_potg_html(facts, player_of_game, station_name)}
   <div class="lower">{lower}</div>
   <div class="foot cond">{sponsor}<div class="station">{station_mark}<span>{_e(station_name)}</span></div></div>
   <script>

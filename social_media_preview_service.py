@@ -34,6 +34,7 @@ AI_FALLBACK_MESSAGES = {
     "AI_KEY_INVALID": "Anthropic did not accept the saved API key, so the app wrote this one itself. Check the key in AI writer settings.",
     "AI_UNREACHABLE": "The AI writer could not be reached (check the internet connection), so the app wrote this one itself.",
     "AI_BUSY": "The AI writer is busy right now, so the app wrote this one itself. Try again in a minute.",
+    "AI_NO_CREDIT": "Your Anthropic credit is used up, so the app wrote this one itself. Add credit at console.anthropic.com under Billing, then try again.",
     "AI_REFUSED": "The AI writer declined this one, so the app wrote it itself.",
     "AI_EMPTY": "The AI writer came back empty, so the app wrote this one itself.",
     "AI_UNAVAILABLE": "The AI writer is not installed in this copy of the app, so the app wrote this one itself.",
@@ -1557,5 +1558,6 @@ class SocialMediaPreviewService:
         data["sources"] = result_data.get("sources", [])
         data["notes"] = result_data.get("notes", [])
         data["search"] = result_data.get("search", {})
+        data["cost_usd"] = result_data.get("cost_usd")
         data["revised"] = revising
         return SocialMediaPreviewResult("OK", data)
