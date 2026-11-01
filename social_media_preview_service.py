@@ -15,6 +15,7 @@ from PIL import Image, ImageChops, ImageFilter
 from playwright.sync_api import sync_playwright
 
 import postgame_card
+import pregame_card
 import postgame_story
 import pregame_story
 import reel_render
@@ -1441,6 +1442,65 @@ class SocialMediaPreviewService:
 
     # -- pregame story and the AI writer -------------------------------------------
 
+    def pregame_card_document(
+        self,
+        broadcast_id: str,
+        *,
+        variant: int = 0,
+        headline: str = "",
+        sponsor_id: str = "",
+        theme: str = postgame_card.DEFAULT_THEME,
+        logo_style: str = postgame_card.DEFAULT_LOGO_STYLE,
+    ) -> str | None:
+        broadcast = self._find_broadcast(broadcast_id)
+        if broadcast is None:
+            return None
+        facts = self._pregame_facts(broadcast)
+        sponsor = self._postgame_sponsor(broadcast_id, sponsor_id)
+        station_name, station_logo = self._station()
+        logos = {
+            team: self._team_logo_uri(
+                broadcast.get(f"{team}_identity") if isinstance(broadcast.get(f"{team}_identity"), Mapping) else {},
+                broadcast.get(f"{team}_school_id"),
+            )
+            for team in postgame_story.TEAMS
+        }
+        return pregame_card.render_card_html(
+            facts,
+            headline=headline.strip()[:160] or pregame_story.headline(facts, variant),
+            station_name=station_name,
+            station_logo_uri=station_logo,
+            logos=logos,
+            sponsor_name=str((sponsor or {}).get("name", "") or ""),
+            sponsor_logo_uri=self._sponsor_logo_uri(sponsor)[0] if sponsor else "",
+            theme=theme,
+            station_logo_style=logo_style,
+            assets=self._theme_assets(theme),
+        )
+
+    def generate_pregame_card(
+        self,
+        broadcast_id: str,
+        *,
+        variant: int = 0,
+        headline: str = "",
+        sponsor_id: str = "",
+        theme: str = postgame_card.DEFAULT_THEME,
+        logo_style: str = postgame_card.DEFAULT_LOGO_STYLE,
+    ) -> SocialMediaPreviewResult:
+        """The Social Publishing pregame graphic. Game Manager keeps its own (generate_preview)."""
+        document = self.pregame_card_document(
+            broadcast_id, variant=variant, headline=headline, sponsor_id=sponsor_id, theme=theme, logo_style=logo_style,
+        )
+        if document is None:
+            return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
+        try:
+            image_bytes = self._rasterize(document, self.POSTGAME_WIDTH, self.POSTGAME_HEIGHT)
+        except Exception as exc:
+            return SocialMediaPreviewResult("IMAGE_GENERATION_FAILED", {"message": str(exc)})
+        safe_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(broadcast_id)).strip("-") or "broadcast"
+        return SocialMediaPreviewResult("OK", {"image": image_bytes, "filename": f"{safe_id}-pregame-story.png"})
+
     def _statistics_for_game(self, game: Mapping[str, Any]) -> dict[str, Any] | None:
         state = self._resolve_game_state(game)
         if not state or not (state.get("events") or state.get("plays")):
@@ -1482,6 +1542,8 @@ class SocialMediaPreviewService:
             facts, variant=variant, sponsor_name=str((sponsor or {}).get("name", "") or ""), station_name=station_name,
         )
         return SocialMediaPreviewResult("OK", {"broadcast_id": broadcast_id, "kind": "pregame", "story": written,
+                                               "themes": [{"id": key, "label": value["label"]} for key, value in postgame_card.THEMES.items()],
+                                               "logo_styles": [{"id": key, "label": label} for key, label in postgame_card.LOGO_STYLES.items()],
                                                **self._sponsor_payload(sponsor, sponsor_id)})
 
     def ai_story(
