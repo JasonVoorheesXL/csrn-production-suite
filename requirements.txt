@@ -59,3 +59,4 @@ clr-loader==0.3.1
 cffi==2.1.1
 pycparser==3.0
 pywin32-ctypes==0.2.3
+anthropic==2.3.0

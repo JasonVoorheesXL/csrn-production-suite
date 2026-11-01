@@ -20,6 +20,7 @@ class BroadcastRoutesDependencies:
     get_broadcaster_print_service: Callable[[], Any]
     get_social_media_preview_service: Callable[[], Any]
     get_maxpreps_export_service: Callable[[], Any]
+    get_ai_writer: Callable[[], Any] = lambda: None
     # The operator's exact active sport context (not base_family-collapsed --
     # Game Manager fully separates football/canadian_football broadcasts,
     # matching the roster/sponsor fix). "" -> list every broadcast.
@@ -186,6 +187,73 @@ def create_broadcast_blueprint(
                 {"error": result.code, "message": "No plays were recorded for this game, so there is nothing to write about."}
             ), 409
         return jsonify(result.data)
+
+    @routes.get("/api/broadcasts/<broadcast_id>/pregame-story")
+    @dependencies.require_auth
+    def pregame_story(broadcast_id: str):
+        variant = request.args.get("variant", "0")
+        result = dependencies.get_social_media_preview_service().pregame_story(
+            broadcast_id,
+            variant=int(variant) if variant.isdigit() else 0,
+            sponsor_id=request.args.get("sponsor", ""),
+        )
+        if result.code == "BROADCAST_NOT_FOUND":
+            return jsonify({"error": result.code}), 404
+        return jsonify(result.data)
+
+    @routes.post("/api/broadcasts/<broadcast_id>/ai-story")
+    @dependencies.require_auth
+    def ai_story(broadcast_id: str):
+        payload = request.get_json(silent=True) or {}
+        result = dependencies.get_social_media_preview_service().ai_story(
+            str(payload.get("kind", "postgame")),
+            broadcast_id,
+            sponsor_id=str(payload.get("sponsor", "") or ""),
+            player_of_game=str(payload.get("player", "") or ""),
+        )
+        if result.code == "BROADCAST_NOT_FOUND":
+            return jsonify({"error": result.code}), 404
+        if result.code == "NO_GAME_DATA":
+            return jsonify(
+                {"error": result.code, "message": "No plays were recorded for this game, so there is nothing to write about."}
+            ), 409
+        return jsonify(result.data)
+
+    def _ai_writer_response(result):
+        messages = {
+            "AI_KEY_FORMAT": "That doesn't look like an Anthropic API key. It starts with sk-ant-.",
+            "AI_NOT_CONFIGURED": "No API key is saved yet.",
+            "AI_KEY_INVALID": "Anthropic did not accept this key.",
+            "AI_UNREACHABLE": "Anthropic could not be reached. Check the internet connection.",
+            "AI_BUSY": "Anthropic is busy right now. Try again in a minute.",
+            "AI_UNAVAILABLE": "The AI writer is not installed in this copy of the app.",
+        }
+        if result.ok:
+            return jsonify(result.data)
+        status = 400 if result.code in {"AI_KEY_FORMAT", "AI_NOT_CONFIGURED"} else 502
+        return jsonify({"error": result.code, "message": messages.get(result.code, "The AI writer test failed.")}), status
+
+    @routes.get("/api/ai-writer")
+    @dependencies.require_auth
+    def ai_writer_status():
+        writer = dependencies.get_ai_writer()
+        return jsonify(writer.status() if writer else {"configured": False})
+
+    @routes.post("/api/ai-writer/key")
+    @dependencies.require_auth
+    def ai_writer_save_key():
+        payload = request.get_json(silent=True) or {}
+        return _ai_writer_response(dependencies.get_ai_writer().set_key(str(payload.get("api_key", "") or "")))
+
+    @routes.delete("/api/ai-writer/key")
+    @dependencies.require_auth
+    def ai_writer_remove_key():
+        return _ai_writer_response(dependencies.get_ai_writer().remove_key())
+
+    @routes.post("/api/ai-writer/test")
+    @dependencies.require_auth
+    def ai_writer_test():
+        return _ai_writer_response(dependencies.get_ai_writer().test())
 
     @routes.get("/api/broadcasts/<broadcast_id>/postgame-story.png")
     @dependencies.require_auth

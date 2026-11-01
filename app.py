@@ -45,6 +45,7 @@ from venue_service import VenueService
 from broadcast_service import BroadcastService
 from broadcaster_print_service import BroadcasterPrintService
 from social_media_preview_service import SocialMediaPreviewService
+from ai_writer import AiWriter
 from maxpreps_export_service import MaxPrepsExportService
 from pregame_presentation import _presentation_settings as _pregame_presentation_settings
 from asset_service import AssetService
@@ -622,6 +623,8 @@ SOCIAL_STATE_FILE = DATA_DIR / "Social" / "social_state.json"
 SOCIAL_CARDS_DIR = DATA_DIR / "Social" / "Cards"
 FACEBOOK_CONNECTION_FILE = DATA_DIR / "Social" / "facebook_connection.json"
 FACEBOOK_CREDENTIAL_FILE = DATA_DIR / "Social" / "facebook_credentials.dat"
+# The station's Anthropic API key for the AI story writer (DPAPI-protected).
+AI_WRITER_CREDENTIAL_FILE = DATA_DIR / "Social" / "ai_writer_credentials.dat"
 RECAP_STATE_FILE = DATA_DIR / "Recaps" / "recaps.json"
 
 APPLICATION_BLUEPRINTS: list[Any] = []
@@ -2201,9 +2204,22 @@ def get_social_media_preview_service() -> SocialMediaPreviewService:
             get_static_dir=lambda: Path(__file__).resolve().parent / "static",
             output_dir=SOCIAL_CARDS_DIR,
             load_rosters=load_rosters,
+            get_ai_writer=get_ai_writer,
         )
 
     return SOCIAL_MEDIA_PREVIEW_SERVICE
+
+
+AI_WRITER: AiWriter | None = None
+
+
+def get_ai_writer() -> AiWriter:
+    global AI_WRITER
+
+    if AI_WRITER is None:
+        AI_WRITER = AiWriter(vault=FacebookCredentialVault(AI_WRITER_CREDENTIAL_FILE))
+
+    return AI_WRITER
 
 
 MAXPREPS_EXPORT_SERVICE: MaxPrepsExportService | None = None
@@ -3426,6 +3442,7 @@ BROADCAST_ROUTES_BLUEPRINT = create_broadcast_blueprint(
         get_broadcast_service=get_broadcast_service,
         get_broadcaster_print_service=get_broadcaster_print_service,
         get_social_media_preview_service=get_social_media_preview_service,
+        get_ai_writer=lambda: get_ai_writer(),
         get_maxpreps_export_service=get_maxpreps_export_service,
         sport_scope=current_exact_sport_scope,
     )
