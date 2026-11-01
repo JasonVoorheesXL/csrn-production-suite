@@ -453,6 +453,46 @@ def standouts(players: list[Mapping[str, Any]], team: str, names: Names) -> list
     return rows[:MAX_STANDOUTS]
 
 
+def player_of_the_game(facts: Mapping[str, Any], choice: str) -> dict[str, Any] | None:
+    row = (facts.get("player_rows") or {}).get(str(choice or ""))
+    pick = next((c for c in facts.get("players") or [] if c["id"] == choice), None)
+    if not row or not pick:
+        return None
+    found = standouts([row], pick["team"], _NamesFromPick(pick))
+    loose = found[0] if found else None
+    if loose is None:
+        loose = _any_line(row, pick)
+    return {"team": pick["team"], "player": {"name": pick["name"], "last": pick["name"].split(" ")[-1],
+                                             "number": pick["number"]}, "row": loose}
+
+
+class _NamesFromPick:
+    def __init__(self, pick: Mapping[str, Any]) -> None:
+        self._pick = pick
+
+    def person(self, team: str, number: Any = "", fallback: Any = "") -> dict[str, str]:
+        name = self._pick["name"]
+        return {"name": name, "last": name.split(" ")[-1], "number": self._pick["number"]}
+
+
+def _any_line(p: Mapping[str, Any], pick: Mapping[str, Any]) -> dict[str, Any] | None:
+    """A Player of the Game below the standout bar still gets their real numbers."""
+    who = {"name": pick["name"], "last": pick["name"].split(" ")[-1], "number": pick["number"]}
+    tds = _int(p.get("touchdowns"))
+    if _int(p.get("rushing_attempts")):
+        return {"player": who, "category": "rushing", "touchdowns": tds,
+                "detail": {"attempts": _int(p.get("rushing_attempts")), "yards": _int(p.get("rushing_yards"))}}
+    if _int(p.get("receptions")):
+        return {"player": who, "category": "receiving", "touchdowns": tds,
+                "detail": {"receptions": _int(p.get("receptions")), "yards": _int(p.get("receiving_yards"))}}
+    if _int(p.get("pass_attempts")):
+        return {"player": who, "category": "passing", "touchdowns": tds,
+                "detail": {"completions": _int(p.get("completions")), "attempts": _int(p.get("pass_attempts")),
+                           "yards": _int(p.get("passing_yards")), "touchdowns": _int(p.get("passing_touchdowns")),
+                           "interceptions": _int(p.get("interceptions_thrown"))}}
+    return None
+
+
 def standout_line(row: Mapping[str, Any]) -> str:
     """Graphic form: '18 car, 157 yds, 3 TD'."""
     d = row["detail"]
@@ -543,6 +583,11 @@ def build_facts(
     else:
         winner = "home" if home_score > visitor_score else "visitor"
         loser = "visitor" if winner == "home" else "home"
+    events = {str(e.get("id", "")): e for e in (state or {}).get("events") or [] if isinstance(e, Mapping)}
+    raw_names = {team: str(broadcast.get(f"{team}_team") or "") for team in TEAMS}
+    every_player = {}
+    for p in players:
+        every_player[(str(p.get("team", "")), str(p.get("number", "") or "").strip())] = p
     return {
         "broadcast_id": str(broadcast.get("broadcast_id", "") or ""),
         "sport": str(broadcast.get("sport", "") or ""),
@@ -557,10 +602,196 @@ def build_facts(
         "scores_reliable": line_score(scores, home_score, visitor_score) is not None,
         "big_plays": big_plays(register, scores, names, winner),
         "standouts": {team: standouts(players, team, names) for team in TEAMS},
+        "timeline": timeline(register, scores, events, names, teams),
+        "penalties": _penalties(register, teams, raw_names),
+        "players": player_choices(players, names, teams),
+        "player_rows": {f"{team}:{number}": row for (team, number), row in every_player.items() if number},
         "has_plays": bool(register or scores),
         # Numbers the story could only call "No. 33": missing from that team's roster.
         "unnamed": sorted(names.unnamed, key=lambda item: (item[0], _int(item[1]))),
     }
+
+
+# -- drives and the game timeline -------------------------------------------------
+
+_KICK_TYPES = {"kickoff", "punt", "kick"}
+_SNAP_TYPES = {"run", "rush", "pass"}
+LONG_PLAY_YARDS = 25
+STOP_ZONE_YARDS = 30
+
+
+def yards_to_goal(spot: Any, direction: Any) -> int | None:
+    """'RIGHT 20' for a team moving right is 20 yards from the goal; for a team
+    moving left it is 80."""
+    text = re.sub(r"\s+", " ", str(spot or "").strip().upper())
+    heading = str(direction or "").strip().upper()
+    if text in ("50", "MIDFIELD"):
+        return 50
+    match = re.fullmatch(r"(LEFT|RIGHT) (GOAL|\d+)", text)
+    if not match or heading not in ("LEFT", "RIGHT"):
+        return None
+    yards = 0 if match.group(2) == "GOAL" else int(match.group(2))
+    return yards if match.group(1) == heading else 100 - yards
+
+
+def _other(team: str) -> str:
+    return "visitor" if team == "home" else "home"
+
+
+def spot_phrase(ytg: int | None, offense: str, teams: Mapping[str, Any]) -> str:
+    """'the Caledonia 35' / 'midfield', from the offense's yards to goal."""
+    if ytg is None or not 0 < ytg < 100:
+        return ""
+    if ytg == 50:
+        return "midfield"
+    if ytg > 50:
+        return f"the {teams[offense]['name']} {100 - ytg}"
+    return f"the {teams[_other(offense)]['name']} {ytg}"
+
+
+def _heading(row: Mapping[str, Any], team: str, events: Mapping[str, Any]) -> Any:
+    event = events.get(str(row.get("event_id", "") or "")) or {}
+    return (event.get("before") or {}).get(f"{team}_direction")
+
+
+def drive_for(index: int, register: list[Mapping[str, Any]], events: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The possession that ended with register[index]: how many snaps, how far
+    from the goal it started, and what gave the team the ball."""
+    row = register[index]
+    team = str(row.get("offense", "") or "")
+    if team not in TEAMS:
+        return None
+    first = index
+    while first > 0:
+        prev = register[first - 1]
+        if prev.get("undone"):
+            first -= 1
+            continue
+        if str(prev.get("offense", "") or "") != team or str(prev.get("play_type", "")).lower() in _KICK_TYPES or prev.get("turnover"):
+            break
+        first -= 1
+    rows = [r for r in register[first:index + 1] if not r.get("undone")]
+    snaps = sum(1 for r in rows if str(r.get("play_type", "")).lower() in _SNAP_TYPES)
+    start = rows[0]
+    began = ""
+    if first > 0:
+        prev = register[first - 1]
+        kind = str(prev.get("play_type", "")).lower()
+        turnover = str(prev.get("turnover_type", "") or "").lower() if prev.get("turnover") else ""
+        began = {"interception": "interception", "fumble_recovery": "fumble recovery", "downs": "fourth-down stop"}.get(
+            turnover, "punt" if kind == "punt" else "kickoff" if kind == "kickoff" else "")
+    return {"plays": snaps, "yards": yards_to_goal(start.get("ball_spot"), _heading(start, team, events)), "began": began}
+
+
+def _penalties(register: list[Mapping[str, Any]], teams: Mapping[str, Any], raw_names: Mapping[str, str]) -> dict[str, dict[str, int]]:
+    counts = {team: {"count": 0, "yards": 0} for team in TEAMS}
+    lookup = {}
+    for team in TEAMS:
+        for name in (teams[team]["name"], raw_names.get(team, "")):
+            if name:
+                lookup[name.casefold()] = team
+    for row in register:
+        if str(row.get("play_type", "")).lower() != "penalty" or row.get("undone"):
+            continue
+        match = re.match(r"Penalty, (.+?), (\d+) yards?", str(row.get("result", "") or ""))
+        team = lookup.get(match.group(1).strip().casefold()) if match else None
+        if team:
+            counts[team]["count"] += 1
+            counts[team]["yards"] += int(match.group(2))
+    return counts
+
+
+def timeline(
+    register: list[Mapping[str, Any]],
+    scores: list[dict[str, Any]],
+    events: Mapping[str, Any],
+    names: Names,
+    teams: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Everything the story walks through, in game order: each score (with its
+    drive), turnovers, fourth-down stops near the goal, and long plays."""
+    by_time = {_int(row.get("created_at")): i for i, row in enumerate(register) if _int(row.get("created_at"))}
+    items: list[dict[str, Any]] = []
+    scoring_rows: set[int] = set()
+    for score in scores:
+        index = by_time.get(score.get("at", 0))
+        drive = None
+        if index is not None:
+            scoring_rows.add(index)
+            if score["kind"] == "field_goal" or (score["kind"] == "touchdown" and score.get("how") in ("run", "pass")):
+                drive = drive_for(index, register, events)
+                if drive and drive["plays"] < 2:
+                    drive = None
+                if drive and score["kind"] == "touchdown" and (drive["yards"] is None or drive["yards"] < (score.get("yards") or 0)):
+                    drive["yards"] = None
+        items.append({"type": "score", "quarter": score["quarter"], "order": score.get("at", 0), "team": score["team"],
+                      "score": score, "drive": drive})
+    for index, row in enumerate(register):
+        if row.get("undone") or index in scoring_rows:
+            continue
+        quarter = quarter_number(row.get("quarter"))
+        order = _int(row.get("created_at"))
+        offense = str(row.get("offense", "") or "")
+        defense = str(row.get("defense", "") or "")
+        play_type = str(row.get("play_type", "")).lower()
+        turnover = str(row.get("turnover_type", "") or "").lower() if row.get("turnover") else ""
+        if turnover in ("interception", "fumble_recovery") and defense in TEAMS:
+            if turnover == "interception":
+                who = names.person(defense, row.get("turnover_player_number"), row.get("turnover_player_name"))
+                victim = names.person(offense, row.get("passer_number") or row.get("player_number"),
+                                      row.get("passer_name") or row.get("player_name")) if offense in TEAMS else None
+            else:
+                who = names.person(defense, row.get("recoverer_number"), row.get("recoverer_name"))
+                victim = names.person(offense, row.get("player_number"), row.get("player_name")) if offense in TEAMS else None
+            if any(s["kind"] == "touchdown" and s["team"] == defense and s["quarter"] == quarter
+                   and s.get("how") in ("interception_return", "fumble_return") for s in scores):
+                continue  # told as the score
+            items.append({"type": turnover, "quarter": quarter, "order": order, "team": defense, "player": who,
+                          "victim": victim if victim and victim.get("name") and not victim.get("unknown") else None,
+                          "yards": _int(row.get("return_yards"))})
+        elif turnover == "downs" and offense in TEAMS:
+            ytg = yards_to_goal(row.get("ball_spot"), _heading(row, offense, events))
+            if ytg is not None and ytg <= STOP_ZONE_YARDS:
+                items.append({"type": "downs", "quarter": quarter, "order": order, "team": defense,
+                              "spot": spot_phrase(ytg, offense, teams), "offense": offense})
+        elif play_type in _SNAP_TYPES and offense in TEAMS and _int(row.get("yards")) >= LONG_PLAY_YARDS:
+            if play_type == "pass":
+                who = names.person(offense, row.get("receiver_number"), row.get("receiver_name"))
+                passer = names.person(offense, row.get("passer_number") or row.get("player_number"),
+                                      row.get("passer_name") or row.get("player_name"))
+            else:
+                who, passer = names.person(offense, row.get("player_number"), row.get("player_name")), None
+            items.append({"type": "pass" if play_type == "pass" else "run", "quarter": quarter, "order": order,
+                          "team": offense, "player": who, "passer": passer, "yards": _int(row.get("yards"))})
+        elif play_type in ("kickoff", "punt") and _int(row.get("return_yards")) >= BIG_RETURN_YARDS:
+            kicking = str(row.get("kicking_team", "") or "")
+            receiving = _other(kicking) if kicking in TEAMS else defense
+            if receiving in TEAMS:
+                items.append({"type": f"{play_type}_return", "quarter": quarter, "order": order, "team": receiving,
+                              "player": names.person(receiving, row.get("returner_number"), row.get("returner_name")),
+                              "yards": _int(row.get("return_yards"))})
+    told = {(s["team"], s["quarter"], s.get("yards"), (s.get("player") or {}).get("name")) for s in scores if s["kind"] == "touchdown"}
+    items = [i for i in items if not (i["type"] in ("run", "pass")
+                                      and (i["team"], i["quarter"], i["yards"], (i.get("player") or {}).get("name")) in told)]
+    items = [i for i in items if i["type"] == "score" or i["type"] == "downs"
+             or ((i.get("player") or {}).get("name") and not (i.get("player") or {}).get("unknown"))]
+    return sorted(items, key=lambda i: (i["quarter"] or 99, i["order"]))
+
+
+def player_choices(players: list[Mapping[str, Any]], names: Names, teams: Mapping[str, Any]) -> list[dict[str, str]]:
+    """Everyone with a recorded stat, for the Player of the Game picker."""
+    choices = []
+    for p in players:
+        team = str(p.get("team", "") or "")
+        number = str(p.get("number", "") or "").strip()
+        if team not in TEAMS or not number:
+            continue
+        who = names.person(team, number, p.get("name"))
+        if not who["name"]:
+            continue
+        choices.append({"id": f"{team}:{number}", "team": team, "number": number, "name": who["name"],
+                        "label": f"{teams[team]['name']} · #{number} {who['name']}"})
+    return sorted(choices, key=lambda c: (c["team"] != "home", _int(c["number"])))
 
 
 # -- the built-in writer ---------------------------------------------------------
@@ -584,6 +815,8 @@ class _Refs:
         self.seen: set[str] = set()
         self.team_names = {key: team["name"] for key, team in facts["teams"].items()}
         people = [p.get(k) for p in facts["big_plays"] for k in ("player", "passer")]
+        people += [i.get(k) for i in facts.get("timeline") or [] for k in ("player", "passer", "victim")]
+        people += [i["score"].get(k) for i in facts.get("timeline") or [] if i["type"] == "score" for k in ("player", "passer")]
         people += [r["player"] for rows in facts["standouts"].values() for r in rows]
         last_names: dict[str, set[str]] = {}
         for person in people:
@@ -676,15 +909,15 @@ def _big_play_sentence(play: Mapping[str, Any], facts: Mapping[str, Any], varian
         passer = ref(play.get("passer"))
         who = ref(play.get("player"))
         if score:
-            return _pick([f"{passer} found {who} for a {yards}-yard touchdown{when_text}{after}.",
-                          f"{who} caught a {yards}-yard touchdown pass from {passer}{when_text}{after}."], variant, "pass", seed)
+            return _pick([f"{passer} found {who} for {_a(yards)} {yards}-yard touchdown{when_text}{after}.",
+                          f"{who} caught {_a(yards)} {yards}-yard touchdown pass from {passer}{when_text}{after}."], variant, "pass", seed)
         return f"{passer} connected with {who} for {yards} yards{when_text}."
     who = ref(play.get("player"))
     if kind == "run":
         if score:
-            return _pick([f"{who} broke a {yards}-yard touchdown run{when_text}{after}.",
-                          f"{who} scored on a {yards}-yard run{when_text}{after}."], variant, "run", seed)
-        return f"{who} had a {yards}-yard run{when_text}."
+            return _pick([f"{who} broke {_a(yards)} {yards}-yard touchdown run{when_text}{after}.",
+                          f"{who} scored on {_a(yards)} {yards}-yard run{when_text}{after}."], variant, "run", seed)
+        return f"{who} had {_a(yards)} {yards}-yard run{when_text}."
     if kind == "interception":
         if score:
             return f"{who} intercepted a pass and returned it {yards} yards for a touchdown{when_text}{after}."
@@ -699,6 +932,159 @@ def _big_play_sentence(play: Mapping[str, Any], facts: Mapping[str, Any], varian
             return f"{who} returned a {what} {yards} yards for a touchdown{when_text}{after}."
         return f"{who} returned a {what} {yards} yards{when_text}."
     return ""
+
+
+def _after(score: Mapping[str, Any], team: str, facts: Mapping[str, Any]) -> str:
+    """', putting West Point ahead 7-0' / ' to make it 21-3' / ' to tie it at 14'."""
+    if not facts.get("scores_reliable"):
+        return ""
+    name = facts["teams"][team]["name"]
+    own = score["home_score"] if team == "home" else score["visitor_score"]
+    other = score["visitor_score"] if team == "home" else score["home_score"]
+    if own > other:
+        return f", putting {name} ahead {score_text(own, other)}" if own - score_points(score) <= other else f", making it {score_text(own, other)}"
+    if own == other:
+        return f", tying it at {own}"
+    return f", cutting the lead to {score_text(own, other)}"
+
+
+def _a(number: int) -> str:
+    """'an 11-play', 'an 8-play', 'a 7-play'."""
+    spoken = str(number)
+    return "an" if spoken.startswith("8") or spoken in ("11", "18") else "a"
+
+
+def _yards_out(yards: int) -> str:
+    return "1 yard out" if yards == 1 else f"{yards} yards out"
+
+
+def _drive_text(drive: Mapping[str, Any] | None) -> str:
+    """'a 7-play, 65-yard drive' (yards only when the start spot is known)."""
+    if not drive:
+        return ""
+    yards = f", {drive['yards']}-yard" if drive.get("yards") else ""
+    return f"{_a(drive['plays'])} {drive['plays']}-play{yards} drive"
+
+
+def _score_sentence(item: Mapping[str, Any], facts: Mapping[str, Any], variant: int, ref: _Refs) -> str:
+    score, drive = item["score"], item.get("drive")
+    team = facts["teams"][item["team"]]["name"]
+    after = _after(score, item["team"], facts)
+    seed = facts["broadcast_id"] + str(item["order"])
+    yards = score.get("yards") or 0
+    drive_text = _drive_text(drive)
+    followed = f" that followed {_a(8) if drive['began'][:1] in 'aeiou' else 'a'} {drive['began']}" if drive and drive.get("began") in ("interception", "fumble recovery", "fourth-down stop") else ""
+    how = score.get("how", "")
+    if score["kind"] == "touchdown" and how == "run" and score.get("player"):
+        who = ref(score["player"])
+        if drive_text:
+            return _pick([f"{who} capped {drive_text}{followed} with {_a(yards)} {yards}-yard touchdown run{after}.",
+                          f"{who} finished {drive_text}{followed} by scoring from {_yards_out(yards)}{after}."], variant, "drive-run", seed)
+        if yards < 20:
+            return f"{who} scored from {_yards_out(yards)}{after}."
+        return _pick([f"{who} scored on {_a(yards)} {yards}-yard run{after}.",
+                      f"{who} broke {_a(yards)} {yards}-yard touchdown run{after}."], variant, "run", seed)
+    if score["kind"] == "touchdown" and how == "pass" and score.get("player"):
+        passer, who = ref(score.get("passer")), ref(score["player"])
+        lead = f"{passer} hit {who} for {_a(yards)} {yards}-yard touchdown" if passer else f"{who} caught {_a(yards)} {yards}-yard touchdown pass"
+        if drive_text:
+            return f"{lead}, capping {drive_text}{followed}{after}."
+        return f"{lead}{after}."
+    if score["kind"] == "touchdown" and how == "interception_return" and score.get("player"):
+        return f"{ref(score['player'])} intercepted a pass and returned it {yards} yards for a touchdown{after}."
+    if score["kind"] == "touchdown" and how in ("kickoff_return", "punt_return") and score.get("player"):
+        return f"{ref(score['player'])} returned a {how.split('_')[0]} {yards} yards for a touchdown{after}."
+    if score["kind"] == "touchdown" and how == "fumble_return" and score.get("player"):
+        return f"{ref(score['player'])} picked up a fumble and scored{after}."
+    team_after = after.replace(f", putting {team} ahead", " to go ahead")
+    if score["kind"] == "touchdown":
+        return f"{team} scored on {_a(yards)} {yards}-yard touchdown{team_after}." if yards else f"{team} scored a touchdown{team_after}."
+    if score["kind"] == "field_goal":
+        kicker = ref(score.get("player")) or team
+        if kicker == team:
+            after = team_after
+        length = f"{_a(score['yards'])} {score['yards']}-yard field goal" if score.get("yards") else "a field goal"
+        if drive_text:
+            return f"{kicker} kicked {length} at the end of {drive_text}{after}."
+        return f"{kicker} kicked {length}{after}."
+    if score["kind"] == "safety":
+        return f"{team} scored a safety{team_after}."
+    return ""
+
+
+def _item_sentence(item: Mapping[str, Any], facts: Mapping[str, Any], variant: int, ref: _Refs) -> str:
+    kind = item["type"]
+    if kind == "score":
+        return _score_sentence(item, facts, variant, ref)
+    yards = item.get("yards") or 0
+    if kind == "interception":
+        victim = f" off {ref(item['victim'])}" if item.get("victim") else ""
+        back = f" and returned it {yards} yards" if yards >= 15 else ""
+        return f"{ref(item['player'])} intercepted a pass{victim}{back}."
+    if kind == "fumble_recovery":
+        return f"{ref(item['player'])} recovered a fumble for {facts['teams'][item['team']]['name']}."
+    if kind == "downs":
+        where = f" at {item['spot']}" if item.get("spot") else ""
+        return f"{facts['teams'][item['team']]['name']}'s defense stopped {facts['teams'][item['offense']]['name']} on downs{where}."
+    if kind == "run":
+        return f"{ref(item['player'])} broke {_a(yards)} {yards}-yard run."
+    if kind == "pass":
+        passer = ref(item.get("passer"))
+        return f"{passer} connected with {ref(item['player'])} for {yards} yards." if passer else f"{ref(item['player'])} caught {_a(yards)} {yards}-yard pass."
+    if kind.endswith("_return"):
+        return f"{ref(item['player'])} returned a {kind.split('_')[0]} {yards} yards."
+    return ""
+
+
+def _quarter_paragraphs(facts: Mapping[str, Any], variant: int, ref: _Refs) -> list[str]:
+    """One paragraph per quarter, every score and turning point in order."""
+    items = facts.get("timeline") or []
+    if not items:
+        return []
+    last = max([4] + [i["quarter"] for i in items if i["quarter"]])
+    paragraphs = []
+    for quarter in range(1, last + 1):
+        sentences = [s for s in (_item_sentence(i, facts, variant, ref) for i in items if i["quarter"] == quarter) if s]
+        scored = any(i["type"] == "score" for i in items if i["quarter"] == quarter)
+        when = "overtime" if quarter > 4 else f"the {_QUARTER_NAMES[quarter]}"
+        if not scored:
+            sentences.append("Neither team scored." if sentences else f"Neither team scored in {when}.")
+        sentences = [s for s in sentences if s]
+        if not sentences:
+            continue
+        first = sentences[0]
+        if not first.startswith("Neither"):
+            sentences[0] = f"In {when}, {first}"
+        paragraphs.append(" ".join(sentences))
+    return paragraphs
+
+
+def _team_stats_paragraph(facts: Mapping[str, Any]) -> str:
+    teams = facts["teams"]
+    order = [facts["winner"], facts["loser"]] if facts["winner"] else ["visitor", "home"]
+    parts = []
+    for key in order:
+        t = teams[key]["totals"]
+        rushing, passing = _int(t.get("rushing_yards")), _int(t.get("passing_yards"))
+        if rushing > 0 and passing > 0:
+            parts.append(f"{teams[key]['name']} ran for {rushing} yards and threw for {passing}")
+        elif rushing > 0 or passing > 0:
+            parts.append(f"{teams[key]['name']} {'ran' if rushing > 0 else 'threw'} for {max(rushing, passing)} yards")
+    text = ("; ".join(parts) + ".") if parts else ""
+    turnovers = [(key, _int(teams[key]["totals"].get("turnovers_gained"))) for key in order]
+    forced = [f"{teams[k]['name']} forced {plural(n, 'turnover')}" for k, n in turnovers if n]
+    if len(forced) == 2 and turnovers[0][1] == turnovers[1][1]:
+        forced = [f"Each team forced {plural(turnovers[0][1], 'turnover')}"]
+    if forced:
+        text += " " + " and ".join(forced) + "."
+    flags = facts.get("penalties") or {}
+    flagged = [(teams[k]["name"], flags[k]["count"], flags[k]["yards"]) for k in order if flags.get(k, {}).get("count")]
+    if flagged:
+        first = f"{flagged[0][0]} was penalized {plural(flagged[0][1], 'time')} for {flagged[0][2]} yards"
+        if len(flagged) > 1:
+            first += f" and {flagged[1][0]} {plural(flagged[1][1], 'time')} for {flagged[1][2]}"
+        text += f" {first}."
+    return text.strip()
 
 
 def scoring_summary_lines(facts: Mapping[str, Any]) -> list[str]:
@@ -798,7 +1184,7 @@ def write_story(
     variant: int = 0,
     sponsor_name: str = "",
     station_name: str = "",
-    watch_link: str = "",
+    player_of_game: str = "",
     include_scoring: bool = True,
 ) -> dict[str, Any]:
     """The built-in writer: a headline and short newspaper paragraphs, built
@@ -836,10 +1222,18 @@ def write_story(
     if flow:
         paragraphs.append(flow)
 
-    top = sorted(sorted(facts["big_plays"], key=lambda p: -p.get("weight", 0))[:3], key=lambda p: (p["quarter"], p.get("order", 0)))
-    sentences = [s for s in (_big_play_sentence(p, facts, variant, ref) for p in top) if s]
-    if sentences:
-        paragraphs.append(" ".join(sentences))
+    paragraphs.extend(_quarter_paragraphs(facts, variant, ref))
+
+    potg = player_of_the_game(facts, player_of_game)
+    if potg:
+        if potg["player"]["name"] in described:
+            potg = {**potg, "row": None}  # the lede already gave his numbers
+        described.add(potg["player"]["name"])
+        label = f"{station_name} Player of the Game" if station_name else "Player of the Game"
+        who = potg["player"]["name"]
+        team_name = facts["teams"][potg["team"]]["name"]
+        feat = f", who {_feat(potg['row'])}" if potg["row"] else ""
+        paragraphs.append(f"{label}: {who} of {team_name}{feat}.")
 
     def team_paragraph(team_key: str, opener: str, limit: int) -> str:
         rows = [r for r in facts["standouts"].get(team_key) or [] if r["player"]["name"] not in described][:limit]
@@ -854,29 +1248,31 @@ def write_story(
 
     if facts["winner"]:
         w, l = teams[facts["winner"]], teams[facts["loser"]]
-        extra = team_paragraph(facts["winner"], _pick([f"For {w['name']}, ", f"Also for {w['name']}, "], variant, "w-open", seed), 2)
+        extra = team_paragraph(facts["winner"], _pick([f"For {w['name']}, ", f"Also for {w['name']}, "], variant, "w-open", seed), 3)
         if extra:
             paragraphs.append(extra)
-        other = team_paragraph(facts["loser"], f"For {l['name']}, ", 2)
+        other = team_paragraph(facts["loser"], f"For {l['name']}, ", 3)
         if other:
             paragraphs.append(other)
         w_yards = _int(w["totals"].get("total_yards"))
         l_yards = _int(l["totals"].get("total_yards"))
+        stats = _team_stats_paragraph(facts)
         if w_yards and l_yards and w_yards > l_yards:
-            rushing = _int(w["totals"].get("rushing_yards"))
-            tail = f", including {rushing} on the ground" if rushing >= 0.6 * w_yards and rushing >= 150 else ""
-            paragraphs.append(f"{w['name']} outgained {l['name']} {w_yards}-{l_yards} in total offense{tail}.")
+            stats = f"{w['name']} outgained {l['name']} {w_yards}-{l_yards} in total offense. " + stats
+        if stats.strip():
+            paragraphs.append(stats.strip())
     else:
         for key in TEAMS:
-            other = team_paragraph(key, f"For {teams[key]['name']}, ", 2)
+            other = team_paragraph(key, f"For {teams[key]['name']}, ", 3)
             if other:
                 paragraphs.append(other)
+        stats = _team_stats_paragraph(facts)
+        if stats:
+            paragraphs.append(stats)
 
     closing = []
     if sponsor_name:
         closing.append(f"{station_name + ' coverage' if station_name else 'Coverage'} is brought to you by {sponsor_name.rstrip('.')}.")
-    if watch_link:
-        closing.append(f"Watch the full game: {watch_link}")
     hashtags = [f"#{tag}Football" for tag in (re.sub(r"[^A-Za-z0-9]", "", t["name"]) for t in teams.values()) if tag]
     hashtags.append("#HighSchoolFootball")
     title = headline(facts, variant)
@@ -890,4 +1286,4 @@ def write_story(
     post = "\n\n".join(blocks + [" ".join(hashtags)])
     return {"headline": title, "paragraphs": paragraphs, "story": story, "closing": closing, "scoring": scoring,
             "hashtags": hashtags, "post_text": post, "word_count": len(story.split()), "writer": "built-in",
-            "variant": variant}
+            "variant": variant, "player_of_game": potg}

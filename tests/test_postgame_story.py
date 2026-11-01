@@ -163,8 +163,7 @@ def test_standouts_never_list_a_negative_yardage_leader() -> None:
 
 
 def test_story_reads_from_the_facts() -> None:
-    out = ps.write_story(facts(), sponsor_name="Main Street Hardware", station_name="WSN",
-                         watch_link="https://facebook.com/wsn")
+    out = ps.write_story(facts(), sponsor_name="Main Street Hardware", station_name="WSN")
     assert out["headline"] in {"West Point beats Caledonia, 21-10", "West Point handles Caledonia, 21-10",
                                "West Point pulls away from Caledonia, 21-10"}
     lede = out["paragraphs"][0]
@@ -177,7 +176,14 @@ def test_story_reads_from_the_facts() -> None:
                "detail": {"interceptions": 1, "sacks": 0, "recoveries": 0}}
     assert ps._feat(defense) == "had an interception"
     assert "SCORING\nQ1 West Point: Kingston Branham 20 run (kick), West Point 7-0" in out["post_text"]
-    assert "WSN coverage is brought to you by Main Street Hardware. Watch the full game: https://facebook.com/wsn" in out["post_text"]
+    assert "WSN coverage is brought to you by Main Street Hardware." in out["post_text"]
+    # Every score, told in its quarter, with the running score.
+    assert "In the first quarter, Branham " in out["story"] and "20-yard" in out["story"] and "putting West Point ahead 7-0." in out["story"]
+    assert "In the fourth quarter, Brody Watrous hit Lang for a 47-yard touchdown, cutting the lead to 14-10." in out["story"]
+    assert "Neither team scored in the third quarter." in out["story"]
+    assert "Michael Brewer Jr. intercepted a pass" in out["story"]
+    assert "West Point outgained Caledonia 360-240 in total offense." in out["story"]
+    assert "Player of the Game" not in out["story"]  # only when one is picked
     assert out["post_text"].endswith("#WestPointFootball #CaledoniaFootball #HighSchoolFootball")
     assert {ps.write_story(facts(), variant=v)["headline"] for v in range(3)} >= {out["headline"]}
     assert len({ps.write_story(facts(), variant=v)["headline"] for v in range(3)}) == 3  # variants rotate wording
@@ -197,8 +203,51 @@ def test_players_missing_from_the_roster_are_listed_and_named_by_team() -> None:
 
 def test_story_leaves_out_running_scores_that_do_not_add_up() -> None:
     out = ps.write_story(facts(broadcast={**BROADCAST, "final_home_score": 28}))
-    assert "to make it" not in out["story"] and "putting" not in out["story"]
+    assert "making it" not in out["story"] and "putting" not in out["story"] and "cutting" not in out["story"]
     assert "West Point 7-0" not in "\n".join(out["scoring"])
+
+
+def test_drives_are_measured_from_where_they_started() -> None:
+    assert ps.yards_to_goal("RIGHT 20", "right") == 20
+    assert ps.yards_to_goal("RIGHT 20", "left") == 80
+    assert ps.yards_to_goal("LEFT GOAL", "left") == 0
+    assert ps.yards_to_goal("50", "left") == 50
+    assert ps.yards_to_goal("RIGHT 20", "") is None
+    events = {f"e{i}": {"before": {"home_direction": "right", "visitor_direction": "left"}} for i in range(6)}
+    register = [
+        {"event_id": "e0", "offense": "home", "play_type": "punt", "ball_spot": "LEFT 30"},
+        {"event_id": "e1", "offense": "home", "play_type": "run", "ball_spot": "LEFT 25"},
+        {"event_id": "e2", "offense": "home", "play_type": "penalty", "ball_spot": "LEFT 35"},
+        {"event_id": "e3", "offense": "home", "play_type": "pass", "ball_spot": "LEFT 30"},
+        {"event_id": "e4", "offense": "home", "play_type": "run", "ball_spot": "RIGHT 40"},
+        {"event_id": "e5", "offense": "home", "play_type": "run", "ball_spot": "RIGHT 12"},
+    ]
+    # Kick rows follow the ball: the punt's offense is the side that received it.
+    assert ps.drive_for(5, register, events) == {"plays": 4, "yards": 75, "began": "punt"}
+    assert ps._drive_text({"plays": 11, "yards": 81}) == "an 11-play, 81-yard drive"
+    assert ps._drive_text({"plays": 8, "yards": None}) == "an 8-play drive"
+
+
+def test_player_of_the_game_only_when_picked() -> None:
+    found = facts()
+    assert {c["id"] for c in found["players"]} >= {"home:2", "visitor:5"}
+    out = ps.write_story(found, station_name="WSN", player_of_game="visitor:1")
+    assert "WSN Player of the Game: Caleb Lang of Caledonia, who caught six passes for 161 yards and a touchdown." in out["story"]
+    assert "Player of the Game" not in ps.write_story(found, player_of_game="home:999")["story"]
+
+
+def test_card_themes_and_station_logo_styles() -> None:
+    for theme in postgame_card.THEMES:
+        document = postgame_card.render_card_html(facts(), headline="x", station_name="WSN", theme=theme,
+                                                  station_logo_uri="data:image/png;base64,AA==",
+                                                  station_logo_style="glass", assets={"art": "data:image/jpeg;base64,AA=="})
+        assert f'class="theme-{theme} logo-glass"' in document
+        assert "__ART__" not in document and "__W__" not in document
+    fallback = postgame_card.render_card_html(facts(), headline="x", station_name="WSN", theme="nope", station_logo_style="nope")
+    assert 'class="theme-news logo-round"' in fallback
+    potg = ps.player_of_the_game(facts(), "home:2")
+    card = postgame_card.render_card_html(facts(), headline="x", station_name="WSN", player_of_game=potg)
+    assert "Player of the Game" in card and "Kingston Branham" in card
 
 
 def test_card_is_the_light_newspaper_look() -> None:
@@ -206,7 +255,7 @@ def test_card_is_the_light_newspaper_look() -> None:
         facts(), headline="West Point beats Caledonia, 21-10", deck="Lede.", station_name="WSN",
         logos={"home": "data:image/png;base64,AA==", "visitor": ""}, sponsor_name="Main Street Hardware",
     )
-    assert "--paper: #f3efe5" in document and "grayscale(1)" in document
+    assert "#f3efe5" in document and "--logo-filter: grayscale(1)" in document and "--station-filter: grayscale(1)" in document
     assert "WSN Sports" in document and "West Point beats Caledonia, 21-10" in document
     assert 'class="line-score"' in document and "Brought to you by" in document
     assert "Key Plays" in document and "Standouts" in document
@@ -261,15 +310,31 @@ def test_card_route_renders_a_real_png(postgame_client) -> None:
     assert Image.open(io.BytesIO(response.data)).size == (1080, 1350)
 
 
-def test_watch_link_is_the_public_page_not_the_producer_link(postgame_client, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_post_has_no_links_and_the_chosen_sponsor(postgame_client, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Links in the post cost reach on a monetized Page, so none go in -- not even the station's own.
     monkeypatch.setattr(app_module, "load_config", lambda: {
         "organization": {"short_name": "WSN"},
         "streaming": {"facebook_live": "https://www.facebook.com/live/producer/v2/?target_id=1"},
         "social": {"facebook": "https://www.facebook.com/wsn"},
     })
-    post = postgame_client.get(f"/api/broadcasts/{BROADCAST_ID}/postgame-story").get_json()["story"]["post_text"]
-    assert "Watch the full game: https://www.facebook.com/wsn" in post
-    assert "producer" not in post
+
+    class Sponsors:
+        def list_payload(self):
+            return {"sponsors": [{"id": "s1", "name": "Alpha Auto", "active": True},
+                                 {"id": "s2", "name": "Bravo Bank", "active": True}]}
+
+    monkeypatch.setattr(app_module, "get_sponsor_service", lambda: Sponsors())
+    data = postgame_client.get(f"/api/broadcasts/{BROADCAST_ID}/postgame-story?sponsor=s2&player=home:2").get_json()
+    post = data["story"]["post_text"]
+    assert "http" not in post and "www." not in post
+    assert "WSN coverage is brought to you by Bravo Bank." in post and data["sponsor_id"] == "s2"
+    assert [s["name"] for s in data["sponsors"]] == ["Alpha Auto", "Bravo Bank"]
+    assert "WSN Player of the Game: Kingston Branham of West Point." in post
+    none = postgame_client.get(f"/api/broadcasts/{BROADCAST_ID}/postgame-story?sponsor=none").get_json()
+    assert "brought to you by" not in none["story"]["post_text"] and none["sponsor_id"] == "none"
+    assert {t["id"] for t in data["themes"]} == {"news", "collegiate", "eightbit", "stadium", "heritage", "neon"}
+    card = postgame_client.get(f"/api/broadcasts/{BROADCAST_ID}/postgame-story.png?theme=stadium&logo=square&sponsor=s1")
+    assert card.status_code == 200 and card.mimetype == "image/png"
 
 
 def test_requires_login() -> None:

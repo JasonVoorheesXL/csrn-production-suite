@@ -174,7 +174,10 @@ def create_broadcast_blueprint(
     def postgame_story(broadcast_id: str):
         variant = request.args.get("variant", "0")
         result = dependencies.get_social_media_preview_service().postgame_story(
-            broadcast_id, variant=int(variant) if variant.isdigit() else 0,
+            broadcast_id,
+            variant=int(variant) if variant.isdigit() else 0,
+            sponsor_id=request.args.get("sponsor", ""),
+            player_of_game=request.args.get("player", ""),
         )
         if result.code == "BROADCAST_NOT_FOUND":
             return jsonify({"error": result.code}), 404
@@ -192,6 +195,10 @@ def create_broadcast_blueprint(
             broadcast_id,
             variant=int(variant) if variant.isdigit() else 0,
             headline=request.args.get("headline", ""),
+            sponsor_id=request.args.get("sponsor", ""),
+            player_of_game=request.args.get("player", ""),
+            theme=request.args.get("theme", ""),
+            logo_style=request.args.get("logo", ""),
         )
         if result.code == "BROADCAST_NOT_FOUND":
             return jsonify({"error": result.code}), 404

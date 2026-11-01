@@ -1222,44 +1222,95 @@ class SocialMediaPreviewService:
             roster_for_team=self._roster_lookup(broadcast),
         )
 
-    def _postgame_sponsor(self, broadcast_id: str) -> dict[str, Any] | None:
-        """One sponsor per game, the same one every time the story or card is
-        made, so the written credit and the logo on the card always match."""
-        active = sorted(self._active_sponsors(), key=lambda s: str(s.get("name", "")).casefold())
-        if not active:
+    def _postgame_sponsor(self, broadcast_id: str, sponsor_id: str = "") -> dict[str, Any] | None:
+        """The sponsor the station picked ("none" for no sponsor). With no pick,
+        one sponsor per game, the same every time, so the written credit and
+        the logo on the card always match."""
+        choice = str(sponsor_id or "").strip()
+        if choice == "none":
             return None
+        active = sorted(self._active_sponsors(), key=lambda s: str(s.get("name", "")).casefold())
+        picked = next((s for s in active if str(s.get("id", "")) == choice), None) if choice else None
+        if picked is not None or not active:
+            return picked
         return active[sum(ord(ch) for ch in str(broadcast_id)) % len(active)]
 
-    def _station(self) -> tuple[str, str, str]:
-        """(station name, station logo data URI, watch link)."""
+    def _station(self) -> tuple[str, str]:
+        """(station name, station logo data URI). No links: on a monetized
+        Facebook Page a link in the post costs reach."""
         try:
             config = self._load_config() or {}
         except Exception:
             config = {}
         organization = dict(config.get("organization") or {})
-        # The station's public pages (Settings > Station Social Media), never the
-        # streaming settings: those hold producer/studio links viewers can't open.
-        social = dict(config.get("social") or {})
         name = str(organization.get("short_name") or organization.get("name") or "").strip()
-        link = str(social.get("facebook") or social.get("youtube") or "").strip()
-        return name, self._org_logo_uri(organization), link
+        return name, self._station_logo_uri(organization)
 
-    def postgame_story(self, broadcast_id: str, variant: int = 0) -> SocialMediaPreviewResult:
+    def _station_logo_uri(self, organization: Mapping[str, Any]) -> str:
+        """Settings saves logo_path first (and logo too); read it the same way."""
+        raw = str(organization.get("logo_path") or organization.get("logo") or "").strip()
+        if raw.startswith("data:"):
+            return raw
+        relative = raw.lstrip("/")
+        if relative.startswith("static/"):
+            uri = self._data_uri_from_file(self._get_static_dir() / relative[len("static/"):])
+            if uri:
+                return uri
+        if relative.startswith("asset-files/"):
+            name = relative[len("asset-files/"):]
+            if name and Path(name).name == name:
+                uri = self._data_uri_from_file(self._get_asset_upload_dir() / name)
+                if uri:
+                    return uri
+        return self._org_logo_uri(organization)
+
+    def _card_art_uri(self, path: Path) -> str:
+        """Theme art scaled to the card and sent as JPEG: the originals run past
+        2 MB, which Chromium will not load as a data URI."""
+        try:
+            with Image.open(path) as image:
+                image = image.convert("RGB")
+                image.thumbnail((self.POSTGAME_WIDTH, self.POSTGAME_HEIGHT * 2))
+                buffer = io.BytesIO()
+                image.save(buffer, format="JPEG", quality=84)
+            return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+        except (OSError, ValueError):
+            return ""
+
+    def _theme_assets(self, theme: str) -> dict[str, str]:
+        assets = {}
+        for key, relative in postgame_card.THEMES[postgame_card.theme_id(theme)]["assets"].items():
+            path = self._get_static_dir() / relative
+            if key == "art":
+                assets[key] = self._card_art_uri(path)
+                continue
+            uri = self._data_uri_from_file(path)
+            if uri and relative.endswith(".woff2"):
+                uri = uri.replace("data:application/octet-stream", "data:font/woff2", 1)
+                if not uri.startswith("data:font/woff2"):
+                    uri = "data:font/woff2;base64," + uri.split(",", 1)[1]
+            assets[key] = uri
+        return assets
+
+    def postgame_story(
+        self, broadcast_id: str, variant: int = 0, *, sponsor_id: str = "", player_of_game: str = "",
+    ) -> SocialMediaPreviewResult:
         broadcast = self._find_broadcast(broadcast_id)
         if broadcast is None:
             return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
         facts = self._postgame_facts(broadcast)
         if not facts["has_plays"]:
             return SocialMediaPreviewResult("NO_GAME_DATA")
-        sponsor = self._postgame_sponsor(broadcast_id)
-        station_name, _, link = self._station()
+        sponsor = self._postgame_sponsor(broadcast_id, sponsor_id)
+        station_name, _ = self._station()
         written = postgame_story.write_story(
             facts,
             variant=variant,
             sponsor_name=str((sponsor or {}).get("name", "") or ""),
             station_name=station_name,
-            watch_link=link,
+            player_of_game=player_of_game,
         )
+        written.pop("player_of_game", None)
         return SocialMediaPreviewResult(
             "OK",
             {
@@ -1271,7 +1322,13 @@ class SocialMediaPreviewService:
                     f"{postgame_story.big_play_line(p)}"
                     for p in facts["big_plays"]
                 ],
+                "sponsor_id": str((sponsor or {}).get("id", "") or ("none" if sponsor_id == "none" else "")),
                 "sponsor_name": (sponsor or {}).get("name", ""),
+                "sponsors": [{"id": str(s.get("id", "")), "name": s.get("name", "")}
+                             for s in sorted(self._active_sponsors(), key=lambda s: str(s.get("name", "")).casefold())],
+                "players": [{"id": c["id"], "label": c["label"]} for c in facts["players"]],
+                "themes": [{"id": key, "label": value["label"]} for key, value in postgame_card.THEMES.items()],
+                "logo_styles": [{"id": key, "label": label} for key, label in postgame_card.LOGO_STYLES.items()],
                 "scores_reliable": facts["scores_reliable"],
                 "unnamed_players": [f"{facts['teams'][team]['name']} No. {number}" for team, number in facts["unnamed"]],
             },
@@ -1284,18 +1341,32 @@ class SocialMediaPreviewService:
             try:
                 page = browser.new_page(viewport={"width": width, "height": height})
                 page.set_content(document, wait_until="load")
+                try:
+                    page.wait_for_function("window.__cardFitted === true", timeout=5000)
+                except Exception:
+                    pass  # an unfitted card is still better than none
                 return page.screenshot(type="png")
             finally:
                 browser.close()
 
-    def postgame_card_document(self, broadcast_id: str, *, variant: int = 0, headline: str = "") -> str | None:
+    def postgame_card_document(
+        self,
+        broadcast_id: str,
+        *,
+        variant: int = 0,
+        headline: str = "",
+        sponsor_id: str = "",
+        player_of_game: str = "",
+        theme: str = postgame_card.DEFAULT_THEME,
+        logo_style: str = postgame_card.DEFAULT_LOGO_STYLE,
+    ) -> str | None:
         broadcast = self._find_broadcast(broadcast_id)
         if broadcast is None:
             return None
         facts = self._postgame_facts(broadcast)
-        sponsor = self._postgame_sponsor(broadcast_id)
+        sponsor = self._postgame_sponsor(broadcast_id, sponsor_id)
         sponsor_logo = self._sponsor_logo_uri(sponsor)[0] if sponsor else ""
-        station_name, station_logo, _ = self._station()
+        station_name, station_logo = self._station()
         lede = postgame_story.write_story(facts, variant=variant)["paragraphs"][0] if facts["has_plays"] else ""
         logos = {
             team: self._team_logo_uri(
@@ -1313,11 +1384,28 @@ class SocialMediaPreviewService:
             logos=logos,
             sponsor_name=str((sponsor or {}).get("name", "") or ""),
             sponsor_logo_uri=sponsor_logo,
+            theme=theme,
+            station_logo_style=logo_style,
+            assets=self._theme_assets(theme),
+            player_of_game=postgame_story.player_of_the_game(facts, player_of_game),
         )
 
-    def generate_postgame_card(self, broadcast_id: str, *, variant: int = 0, headline: str = "") -> SocialMediaPreviewResult:
-        """The newspaper-style graphic that goes with the postgame story."""
-        document = self.postgame_card_document(broadcast_id, variant=variant, headline=headline)
+    def generate_postgame_card(
+        self,
+        broadcast_id: str,
+        *,
+        variant: int = 0,
+        headline: str = "",
+        sponsor_id: str = "",
+        player_of_game: str = "",
+        theme: str = postgame_card.DEFAULT_THEME,
+        logo_style: str = postgame_card.DEFAULT_LOGO_STYLE,
+    ) -> SocialMediaPreviewResult:
+        """The graphic that goes with the postgame story, in the chosen theme."""
+        document = self.postgame_card_document(
+            broadcast_id, variant=variant, headline=headline, sponsor_id=sponsor_id,
+            player_of_game=player_of_game, theme=theme, logo_style=logo_style,
+        )
         if document is None:
             return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
         try:
