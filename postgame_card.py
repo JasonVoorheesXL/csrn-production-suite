@@ -81,14 +81,20 @@ def _line_score_html(facts: Mapping[str, Any]) -> str:
             f'<tbody>{rows}</tbody></table>')
 
 
-def _potg_html(facts: Mapping[str, Any], potg: Mapping[str, Any] | None) -> str:
-    if not potg:
-        return ""
-    line = story.standout_line(potg["row"]) if potg.get("row") else ""
-    team = facts["teams"][potg["team"]]["name"]
-    line_html = f'<span class="potg-line">{_nobreak(line)}</span>' if line else ""
-    return (f'<div class="potg"><span class="potg-tag">Player of the Game</span>'
-            f'<b>{_e(potg["player"]["name"])}</b><span class="potg-team">{_e(team)}</span>{line_html}</div>')
+def _potg_html(facts: Mapping[str, Any], picks: Any) -> str:
+    """One strip per Player of the Game: 'Player of the Game' for a single
+    pick, '<Team> Player of the Game' when each team has one."""
+    picks = [picks] if isinstance(picks, Mapping) else list(picks or [])
+    rows = []
+    for potg in picks:
+        line = story.standout_line(potg["row"]) if potg.get("row") else ""
+        team = facts["teams"][potg["team"]]["name"]
+        tag = f"{team} Player of the Game" if len(picks) > 1 else "Player of the Game"
+        line_html = f'<span class="potg-line">{_nobreak(line)}</span>' if line else ""
+        team_html = "" if len(picks) > 1 else f'<span class="potg-team">{_e(team)}</span>'
+        rows.append(f'<div class="potg"><span class="potg-tag">{_e(tag)}</span>'
+                    f'<b>{_e(potg["player"]["name"])}</b>{team_html}{line_html}</div>')
+    return "".join(rows)
 
 
 def _standouts_html(facts: Mapping[str, Any]) -> str:
@@ -156,7 +162,7 @@ _BASE_CSS = """
   .line-score .ls-team { text-align: left; width: 46%; font-family: var(--head); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; font-size: 24px; }
   .line-score .ls-total { font-weight: 700; border-left: 2px solid var(--rule); }
   .line-score tr.winner td, .line-score tr.winner th { font-weight: 700; color: var(--win, var(--ink)); }
-  .potg { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; margin: 12px 0 0; padding: 10px 16px;
+  .potg { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 0; padding: 8px 16px;
           border: 2px solid var(--rule); background: var(--potg-bg, none); border-radius: var(--art-radius, 0); }
   .potg-tag { font-family: var(--label); font-size: 18px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--accent, var(--soft)); }
   .potg b { font-family: var(--head); font-size: 28px; }
@@ -269,7 +275,7 @@ def render_card_html(
     theme: str = DEFAULT_THEME,
     station_logo_style: str = DEFAULT_LOGO_STYLE,
     assets: Mapping[str, str] | None = None,
-    player_of_game: Mapping[str, Any] | None = None,
+    player_of_game: Any = None,
 ) -> str:
     theme = theme_id(theme)
     station_logo_style = logo_style(station_logo_style)

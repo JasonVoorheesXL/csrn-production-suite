@@ -209,10 +209,15 @@ def create_broadcast_blueprint(
             str(payload.get("kind", "postgame")),
             broadcast_id,
             sponsor_id=str(payload.get("sponsor", "") or ""),
-            player_of_game=str(payload.get("player", "") or ""),
+            player_of_game=",".join(payload["player"]) if isinstance(payload.get("player"), list) else str(payload.get("player", "") or ""),
+            previous=str(payload.get("previous", "") or "")[:20000],
+            notes=[str(n)[:1000] for n in (payload.get("notes") or []) if str(n).strip()][:20],
+            instructions=str(payload.get("instructions", "") or "")[:4000],
         )
         if result.code == "BROADCAST_NOT_FOUND":
             return jsonify({"error": result.code}), 404
+        if result.code.startswith("AI_"):
+            return jsonify({"error": result.code, "message": result.data.get("message", "The AI writer could not revise the story.")}), 502
         if result.code == "NO_GAME_DATA":
             return jsonify(
                 {"error": result.code, "message": "No plays were recorded for this game, so there is nothing to write about."}

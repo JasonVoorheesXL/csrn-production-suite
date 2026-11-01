@@ -340,3 +340,17 @@ def test_post_has_no_links_and_the_chosen_sponsor(postgame_client, monkeypatch: 
 def test_requires_login() -> None:
     with app_module.app.test_client() as client:
         assert client.get(f"/api/broadcasts/{BROADCAST_ID}/postgame-story").status_code == 401
+
+
+def test_a_player_of_the_game_for_each_team() -> None:
+    found = facts()
+    both = ps.write_story(found, station_name="WSN", player_of_game="visitor:1,home:2")["story"]
+    assert "West Point's Player of the Game: Kingston Branham." in both  # the lede already gave his numbers
+    assert "Caledonia's Player of the Game: Caleb Lang, who caught six passes for 161 yards and a touchdown." in both
+    assert both.index("West Point's Player") < both.index("Caledonia's Player")  # home first
+    one = ps.write_story(found, station_name="WSN", player_of_game="visitor:1")["story"]
+    assert "The WSN Player of the Game: Caleb Lang of Caledonia, who caught" in one and "Caledonia's Player" not in one
+    assert [p["player"]["name"] for p in ps.players_of_the_game(found, "home:2,home:8")] == ["Kingston Branham"]
+    card = postgame_card.render_card_html(found, headline="x", station_name="WSN",
+                                          player_of_game=ps.players_of_the_game(found, "home:2,visitor:1"))
+    assert "West Point Player of the Game" in card and "Caledonia Player of the Game" in card

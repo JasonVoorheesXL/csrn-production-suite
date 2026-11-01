@@ -1401,7 +1401,7 @@ class SocialMediaPreviewService:
             theme=theme,
             station_logo_style=logo_style,
             assets=self._theme_assets(theme),
-            player_of_game=postgame_story.player_of_the_game(facts, player_of_game),
+            player_of_game=postgame_story.players_of_the_game(facts, player_of_game),
         )
 
     def generate_postgame_card(
@@ -1480,10 +1480,25 @@ class SocialMediaPreviewService:
         return SocialMediaPreviewResult("OK", {"broadcast_id": broadcast_id, "kind": "pregame", "story": written,
                                                **self._sponsor_payload(sponsor, sponsor_id)})
 
-    def ai_story(self, kind: str, broadcast_id: str, *, sponsor_id: str = "", player_of_game: str = "") -> SocialMediaPreviewResult:
+    def ai_story(
+        self,
+        kind: str,
+        broadcast_id: str,
+        *,
+        sponsor_id: str = "",
+        player_of_game: str = "",
+        previous: str = "",
+        notes: list[str] | None = None,
+        instructions: str = "",
+    ) -> SocialMediaPreviewResult:
         """The AI writer's version of the pregame or postgame story. When it can't
         write one (no key, no internet, a refusal), the built-in story comes back
-        with a note saying why, so there is always something to post."""
+        with a note saying why, so there is always something to post.
+
+        With instructions, the AI revises `previous` (the story as the station
+        has it now) using the station's answers to its notes. A failed revision
+        comes back as an error so the station's text is never replaced."""
+        revising = bool(str(instructions or "").strip())
         kind = "pregame" if kind == "pregame" else "postgame"
         if kind == "pregame":
             builtin = self.pregame_story(broadcast_id, sponsor_id=sponsor_id)
@@ -1509,9 +1524,18 @@ class SocialMediaPreviewService:
         writer = self._get_ai_writer() if self._get_ai_writer else None
         if writer is None:
             result_code, result_data = "AI_UNAVAILABLE", {}
+        elif revising:
+            # The app owns the Player of the Game line: the AI never sees or writes it.
+            earlier = "\n\n".join(p for p in str(previous or "").split("\n\n") if "Player of the Game:" not in p)
+            result = writer.revise(kind, sheet, previous=earlier, notes=list(notes or []), instructions=instructions,
+                                   station=station_name, **names)
+            result_code, result_data = result.code, result.data
         else:
             result = writer.write(kind, sheet, station=station_name, **names)
             result_code, result_data = result.code, result.data
+        if result_code != "OK" and revising:
+            return SocialMediaPreviewResult(result_code, {"message": AI_FALLBACK_MESSAGES.get(
+                result_code, AI_FALLBACK_MESSAGES["AI_FAILED"]).split(", so the app")[0] + ". Your story was left as it was."})
         if result_code != "OK":
             data["fallback"] = {"code": result_code, "message": AI_FALLBACK_MESSAGES.get(result_code, AI_FALLBACK_MESSAGES["AI_FAILED"])}
             return SocialMediaPreviewResult("OK", data)
@@ -1531,4 +1555,7 @@ class SocialMediaPreviewService:
                          "post_text": "\n\n".join(b for b in blocks if b), "word_count": len(story_text.split()),
                          "writer": "ai", "model": result_data.get("model", "")}
         data["sources"] = result_data.get("sources", [])
+        data["notes"] = result_data.get("notes", [])
+        data["search"] = result_data.get("search", {})
+        data["revised"] = revising
         return SocialMediaPreviewResult("OK", data)

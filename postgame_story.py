@@ -453,6 +453,18 @@ def standouts(players: list[Mapping[str, Any]], team: str, names: Names) -> list
     return rows[:MAX_STANDOUTS]
 
 
+def players_of_the_game(facts: Mapping[str, Any], choices: Any) -> list[dict[str, Any]]:
+    """Up to one Player of the Game per team, home first. `choices` is
+    "home:2,visitor:1" (or a list of ids); a second pick for the same team is ignored."""
+    ids = choices if isinstance(choices, (list, tuple)) else str(choices or "").split(",")
+    picked: dict[str, dict[str, Any]] = {}
+    for choice in ids:
+        potg = player_of_the_game(facts, str(choice).strip())
+        if potg and potg["team"] not in picked:
+            picked[potg["team"]] = potg
+    return [picked[team] for team in TEAMS if team in picked]
+
+
 def player_of_the_game(facts: Mapping[str, Any], choice: str) -> dict[str, Any] | None:
     row = (facts.get("player_rows") or {}).get(str(choice or ""))
     pick = next((c for c in facts.get("players") or [] if c["id"] == choice), None)
@@ -1017,12 +1029,20 @@ def _item_sentence(item: Mapping[str, Any], facts: Mapping[str, Any], variant: i
     if kind == "score":
         return _score_sentence(item, facts, variant, ref)
     yards = item.get("yards") or 0
+    team = facts["teams"][item["team"]]["name"]
+
+    def whose(person: Mapping[str, Any] | None) -> str:
+        """'Lafayette's Hugh Trost': on a change of possession the reader (and
+        the AI writer) can't tell whose player it was from the name alone."""
+        name = ref(person)
+        return name if name.startswith(f"{team}'s ") else f"{team}'s {name}"
+
     if kind == "interception":
         victim = f" off {ref(item['victim'])}" if item.get("victim") else ""
         back = f" and returned it {yards} yards" if yards >= 15 else ""
-        return f"{ref(item['player'])} intercepted a pass{victim}{back}."
+        return f"{whose(item['player'])} intercepted a pass{victim}{back}."
     if kind == "fumble_recovery":
-        return f"{ref(item['player'])} recovered a fumble for {facts['teams'][item['team']]['name']}."
+        return f"{whose(item['player'])} recovered a fumble."
     if kind == "downs":
         where = f" at {item['spot']}" if item.get("spot") else ""
         return f"{facts['teams'][item['team']]['name']}'s defense stopped {facts['teams'][item['offense']]['name']} on downs{where}."
@@ -1032,7 +1052,7 @@ def _item_sentence(item: Mapping[str, Any], facts: Mapping[str, Any], variant: i
         passer = ref(item.get("passer"))
         return f"{passer} connected with {ref(item['player'])} for {yards} yards." if passer else f"{ref(item['player'])} caught {_a(yards)} {yards}-yard pass."
     if kind.endswith("_return"):
-        return f"{ref(item['player'])} returned a {kind.split('_')[0]} {yards} yards."
+        return f"{whose(item['player'])} returned a {kind.split('_')[0]} {yards} yards."
     return ""
 
 
@@ -1224,16 +1244,19 @@ def write_story(
 
     paragraphs.extend(_quarter_paragraphs(facts, variant, ref))
 
-    potg = player_of_the_game(facts, player_of_game)
-    if potg:
+    picks = players_of_the_game(facts, player_of_game)
+    for potg in picks:
         if potg["player"]["name"] in described:
             potg = {**potg, "row": None}  # the lede already gave his numbers
         described.add(potg["player"]["name"])
-        label = f"{station_name} Player of the Game" if station_name else "Player of the Game"
         who = potg["player"]["name"]
         team_name = facts["teams"][potg["team"]]["name"]
         feat = f", who {_feat(potg['row'])}" if potg["row"] else ""
-        paragraphs.append(f"{label}: {who} of {team_name}{feat}.")
+        if len(picks) > 1:
+            paragraphs.append(f"{team_name}'s Player of the Game: {who}{feat}.")
+        else:
+            label = f"The {station_name} Player of the Game" if station_name else "The Player of the Game"
+            paragraphs.append(f"{label}: {who} of {team_name}{feat}.")
 
     def team_paragraph(team_key: str, opener: str, limit: int) -> str:
         rows = [r for r in facts["standouts"].get(team_key) or [] if r["player"]["name"] not in described][:limit]
@@ -1286,7 +1309,7 @@ def write_story(
     post = "\n\n".join(blocks + [" ".join(hashtags)])
     return {"headline": title, "paragraphs": paragraphs, "story": story, "closing": closing, "scoring": scoring,
             "hashtags": hashtags, "post_text": post, "word_count": len(story.split()), "writer": "built-in",
-            "variant": variant, "player_of_game": potg}
+            "variant": variant}
 
 
 def fact_sheet(facts: Mapping[str, Any], written: Mapping[str, Any]) -> str:
