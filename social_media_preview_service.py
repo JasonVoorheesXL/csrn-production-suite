@@ -1600,6 +1600,7 @@ class SocialMediaPreviewService:
             "sponsors": [{"id": str(s.get("id", "")), "name": s.get("name", "")} for s in sponsors],
             "dances": [{"id": key, "label": label} for key, label in reel_story.DANCES.items()],
             "logo_styles": [{"id": key, "label": label} for key, label in postgame_card.LOGO_STYLES.items()],
+            "themes": [{"id": key, "label": label} for key, label in reel_story.THEMES.items()],
         })
 
     def _reel_sponsor(self, broadcast: Mapping[str, Any], sponsor_id: str) -> dict[str, Any] | None:
@@ -1615,7 +1616,7 @@ class SocialMediaPreviewService:
                 return picked
         return self._rng.choice(active) if active else None
 
-    def reel_document(self, broadcast_id: str, play_id: str, *, sponsor_id: str = "", dance: str = "", logo_style: str = "") -> tuple[str, dict[str, str]] | None:
+    def reel_document(self, broadcast_id: str, play_id: str, *, sponsor_id: str = "", dance: str = "", logo_style: str = "", theme: str = "") -> tuple[str, dict[str, str]] | None:
         broadcast = self._find_broadcast(broadcast_id)
         if broadcast is None:
             return None
@@ -1625,6 +1626,7 @@ class SocialMediaPreviewService:
             return None
         sponsor = self._reel_sponsor(broadcast, sponsor_id)
         chosen_dance = dance if dance in reel_story.DANCES else self._rng.choice(list(reel_story.DANCES))
+        chosen_theme = theme if theme in reel_story.THEMES else self._rng.choice(list(reel_story.THEMES))
         station_name, station_logo = self._station()
         colors = {}
         for team in postgame_story.TEAMS:
@@ -1634,18 +1636,20 @@ class SocialMediaPreviewService:
                                    station_logo=station_logo, logo_style=postgame_card.logo_style(logo_style),
                                    sponsor_name=str((sponsor or {}).get("name", "") or ""),
                                    sponsor_logo=self._sponsor_logo_uri(sponsor)[0] if sponsor else "",
-                                   dance=chosen_dance, colors=colors)
-        font = self._data_uri_from_file(self._get_static_dir() / "fonts" / "bangers-regular.woff2")
+                                   dance=chosen_dance, theme=chosen_theme, colors=colors)
+        font_file = reel_render.THEME_FONTS.get(chosen_theme, "")
+        font = self._data_uri_from_file(self._get_static_dir() / "fonts" / font_file) if font_file else ""
         if font:
             font = "data:font/woff2;base64," + font.split(",", 1)[1]
         return reel_render.page(script, font), {"sponsor": str((sponsor or {}).get("name", "") or ""),
-                                                "dance": reel_story.DANCES[chosen_dance]}
+                                                "dance": reel_story.DANCES[chosen_dance],
+                                                "theme": reel_story.THEMES[chosen_theme]}
 
-    def generate_reel(self, broadcast_id: str, play_id: str, *, sponsor_id: str = "", dance: str = "", logo_style: str = "") -> SocialMediaPreviewResult:
+    def generate_reel(self, broadcast_id: str, play_id: str, *, sponsor_id: str = "", dance: str = "", logo_style: str = "", theme: str = "") -> SocialMediaPreviewResult:
         """A short vertical MP4: the play redrawn as a paper-cutout animation."""
         if self._find_broadcast(broadcast_id) is None:
             return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
-        built = self.reel_document(broadcast_id, play_id, sponsor_id=sponsor_id, dance=dance, logo_style=logo_style)
+        built = self.reel_document(broadcast_id, play_id, sponsor_id=sponsor_id, dance=dance, logo_style=logo_style, theme=theme)
         if built is None:
             return SocialMediaPreviewResult("PLAY_NOT_FOUND")
         document, chosen = built

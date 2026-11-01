@@ -144,3 +144,39 @@ def test_reel_footer_uses_the_station_logo_in_the_chosen_style() -> None:
     assert '"logo_style": "glass"' in document or '"logo_style":"glass"' in document
     assert "stationClip" in document and "stationGlass" in document
 
+
+def _themed_page(theme, home, visitor, team="visitor"):
+    found = facts()
+    play = {**rs.plays(found)[0], "team": team}
+    return reel_render.page(rs.script(found, play, broadcast=BROADCAST, theme=theme, colors={"home": home, "visitor": visitor}))
+
+
+def _uniforms(page, document):
+    errors = []
+    page.on("pageerror", lambda error: errors.append(error.message))
+    page.set_content(document, wait_until="load")
+    page.evaluate("window.reelReady")
+    page.evaluate("window.drawFrame(window.REEL_DURATION * .7)")
+    assert errors == []
+    return page.evaluate("[OFFU, DEFU, TH]")
+
+
+def test_every_theme_draws_and_teams_wear_their_own_colors() -> None:
+    from playwright.sync_api import sync_playwright
+
+    assert set(rs.THEMES) == {"paper", "neon", "chalk", "comic"}
+    caledonia = {"primary": "#810909", "secondary": "#ffffff"}
+    lafayette = {"primary": "#9a1c1f", "secondary": "#ffffff"}
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": 1080, "height": 1920})
+        for theme in rs.THEMES:
+            offense, defense, drawn = _uniforms(browser.new_page(viewport={"width": 1080, "height": 1920}), _themed_page(theme, caledonia, lafayette))
+            assert drawn == theme
+            assert defense == {"main": "#810909", "accent": "#ffffff"}     # home: primary with secondary
+            assert offense == {"main": "#ffffff", "accent": "#9a1c1f"}     # away: secondary with primary
+        # both secondaries are white here, so away stays in its primary rather than clash
+        offense, defense, _ = _uniforms(page, _themed_page("paper", {"primary": "#ffffff", "secondary": "#102a6b"}, {"primary": "#b5121b", "secondary": "#ffffff"}))
+        assert defense["main"] == "#ffffff" and offense == {"main": "#b5121b", "accent": "#ffffff"}
+        browser.close()
+

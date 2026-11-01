@@ -21,6 +21,7 @@ from postgame_story import TEAMS, _int, quarter_phrase, quarter_tag, yards_to_go
 REEL_KINDS = ("run", "pass", "interception", "kickoff_return", "punt_return", "field_goal")
 DANCES = {"shimmy": "Shimmy", "robot": "Robot", "disco": "Disco Point", "moonwalk": "Moonwalk",
           "fistpump": "Fist Pump", "kneeknock": "Knee Knocker", "twirl": "Paper Twirl"}
+THEMES = {"paper": "Paper Cutout", "neon": "Neon", "chalk": "Chalkboard", "comic": "Comic Book"}
 GRADE_NAMES = {"9": "Freshman", "10": "Sophomore", "11": "Junior", "12": "Senior"}
 
 
@@ -160,7 +161,7 @@ def _captions(kind: str, td: bool, yards: int, hero: str, passer: str, team: str
 
 def script(facts: Mapping[str, Any], play: Mapping[str, Any], *, broadcast: Mapping[str, Any],
            station_name: str = "", station_logo: str = "", logo_style: str = "round",
-           sponsor_name: str = "", sponsor_logo: str = "", dance: str = "shimmy",
+           sponsor_name: str = "", sponsor_logo: str = "", dance: str = "shimmy", theme: str = "paper",
            colors: Mapping[str, Mapping[str, str]] | None = None) -> dict[str, Any]:
     """Everything the paper-cutout animation needs for one play."""
     teams = facts["teams"]
@@ -195,8 +196,8 @@ def script(facts: Mapping[str, Any], play: Mapping[str, Any], *, broadcast: Mapp
         },
         "hero": {"name": hero["name"], "number": str(hero.get("number", "") or "")},
         "passer": {"name": passer, "number": str((play.get("passer") or {}).get("number", "") or "")},
-        "offense": {"name": teams[team]["name"], **(colors.get(team) or {})},
-        "defense": {"name": teams[other]["name"], **(colors.get(other) or {})},
+        "offense": {"name": teams[team]["name"], "side": team, **(colors.get(team) or {})},
+        "defense": {"name": teams[other]["name"], "side": other, **(colors.get(other) or {})},
         "captions": _captions(play["kind"], play["td"], play["yards"], hero["name"], passer,
                               teams[team]["name"], teams[other]["name"]),
         "score_after": after,
@@ -206,5 +207,6 @@ def script(facts: Mapping[str, Any], play: Mapping[str, Any], *, broadcast: Mapp
         "sponsor": sponsor_name,
         "sponsor_logo": sponsor_logo,
         "dance": dance if dance in DANCES else "shimmy",
+        "theme": theme if theme in THEMES else "paper",
         "label": "Animated recreation from the official stats",
     }

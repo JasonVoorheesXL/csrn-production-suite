@@ -273,7 +273,7 @@ def create_broadcast_blueprint(
         result = dependencies.get_social_media_preview_service().generate_reel(
             broadcast_id, request.args.get("play", ""),
             sponsor_id=request.args.get("sponsor", ""), dance=request.args.get("dance", ""),
-            logo_style=request.args.get("logo", ""),
+            logo_style=request.args.get("logo", ""), theme=request.args.get("theme", ""),
         )
         if result.code in {"BROADCAST_NOT_FOUND", "PLAY_NOT_FOUND"}:
             return jsonify({"error": result.code}), 404
@@ -282,6 +282,7 @@ def create_broadcast_blueprint(
         response = Response(result.data["video"], mimetype="video/mp4")
         response.headers["X-Reel-Sponsor"] = quote(result.data.get("sponsor", ""))
         response.headers["X-Reel-Dance"] = quote(result.data.get("dance", ""))
+        response.headers["X-Reel-Theme"] = quote(result.data.get("theme", ""))
         response.headers["Content-Disposition"] = f'inline; filename="{result.data["filename"]}"'
         response.headers["Cache-Control"] = "no-store"
         return response
