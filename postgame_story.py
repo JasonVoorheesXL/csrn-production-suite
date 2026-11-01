@@ -1287,3 +1287,40 @@ def write_story(
     return {"headline": title, "paragraphs": paragraphs, "story": story, "closing": closing, "scoring": scoring,
             "hashtags": hashtags, "post_text": post, "word_count": len(story.split()), "writer": "built-in",
             "variant": variant, "player_of_game": potg}
+
+
+def fact_sheet(facts: Mapping[str, Any], written: Mapping[str, Any]) -> str:
+    """What the AI writer gets: the final, the scoring, the app's own game log
+    (drives, turnovers, stops), standouts and team numbers -- nothing more."""
+    teams = facts["teams"]
+    h, v = teams["home"], teams["visitor"]
+    lines = [f"GAME: {v['name']} at {h['name']}" + (f" ({h['mascot']})" if h["mascot"] else ""),
+             f"DATE: {ap_date(facts['date'])}" if facts["date"] else "",
+             f"VENUE: {facts['venue']}" if facts["venue"] else "",
+             f"FINAL: {h['name']} {h['score']}, {v['name']} {v['score']}",
+             f"MASCOTS: {h['name']} {h['mascot'] or '-'}; {v['name']} {v['mascot'] or '-'}"]
+    line = facts.get("line_score")
+    if line:
+        lines.append("LINE SCORE (by quarter): " + "; ".join(
+            f"{teams[key]['name']} {' '.join(str(n) for n in line[key])} = {teams[key]['score']}" for key in ("visitor", "home")))
+    else:
+        lines.append("NOTE: the recorded scoring plays do not add up to the final score, so do not quote running scores.")
+    if written.get("scoring"):
+        lines.append("SCORING SUMMARY (in order):\n" + "\n".join(f"- {s}" for s in written["scoring"]))
+    lines.append("GAME LOG FROM THE STATION'S STATISTICIAN (accurate; rewrite it, keep every number):\n" + "\n".join(
+        written["paragraphs"]))
+    for key in TEAMS:
+        rows = facts["standouts"].get(key) or []
+        if rows:
+            lines.append(f"STANDOUTS, {teams[key]['name']}: " + "; ".join(
+                f"{r['player']['name']} ({standout_line(r)})" for r in rows))
+    for key in TEAMS:
+        t = teams[key]["totals"]
+        flags = (facts.get("penalties") or {}).get(key) or {}
+        lines.append(f"TEAM STATS, {teams[key]['name']}: total {_int(t.get('total_yards'))} yds, rushing {_int(t.get('rushing_yards'))}, "
+                     f"passing {_int(t.get('passing_yards'))}, turnovers forced {_int(t.get('turnovers_gained'))}, "
+                     f"penalties {flags.get('count', 0)} for {flags.get('yards', 0)} yds")
+    if facts.get("unnamed"):
+        lines.append("NOTE: some players are known only by number (not on the roster); refer to them as the app's game log does.")
+    lines.append("NO GAME CLOCK was recorded: say which quarter, never a time.")
+    return "\n".join(line for line in lines if line)

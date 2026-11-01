@@ -16,6 +16,7 @@ from playwright.sync_api import sync_playwright
 
 import postgame_card
 import postgame_story
+import pregame_story
 
 
 Record = dict[str, Any]
@@ -27,6 +28,17 @@ SchoolLogoResolver = Callable[[str, str], Path]
 MAX_SPONSOR_LOGOS = 6  # keeps each chip legible in a single row on a 1080px-wide card
 MAX_HIGHLIGHTS = 5
 MAX_STORYLINES = 5
+
+AI_FALLBACK_MESSAGES = {
+    "AI_NOT_CONFIGURED": "No Anthropic API key is saved, so the app wrote this one itself.",
+    "AI_KEY_INVALID": "Anthropic did not accept the saved API key, so the app wrote this one itself. Check the key in AI writer settings.",
+    "AI_UNREACHABLE": "The AI writer could not be reached (check the internet connection), so the app wrote this one itself.",
+    "AI_BUSY": "The AI writer is busy right now, so the app wrote this one itself. Try again in a minute.",
+    "AI_REFUSED": "The AI writer declined this one, so the app wrote it itself.",
+    "AI_EMPTY": "The AI writer came back empty, so the app wrote this one itself.",
+    "AI_UNAVAILABLE": "The AI writer is not installed in this copy of the app, so the app wrote this one itself.",
+    "AI_FAILED": "The AI writer ran into a problem, so the app wrote this one itself.",
+}
 
 
 @dataclass(frozen=True)
@@ -86,6 +98,7 @@ class SocialMediaPreviewService:
         output_dir: Path,
         rng: random.Random | None = None,
         load_rosters: ObjectLoader | None = None,
+        get_ai_writer: Callable[[], Any] | None = None,
     ) -> None:
         self._load_broadcasts = load_broadcasts
         self._load_state = load_state
@@ -103,6 +116,7 @@ class SocialMediaPreviewService:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._rng = rng or random.Random()
         self._load_rosters = load_rosters
+        self._get_ai_writer = get_ai_writer
         self._background_cache: dict[str, str] = {}
 
     # -- lookups -----------------------------------------------------
@@ -1419,3 +1433,102 @@ class SocialMediaPreviewService:
         except OSError:
             pass
         return SocialMediaPreviewResult("OK", {"image": image_bytes, "filename": filename})
+
+
+    # -- pregame story and the AI writer -------------------------------------------
+
+    def _statistics_for_game(self, game: Mapping[str, Any]) -> dict[str, Any] | None:
+        state = self._resolve_game_state(game)
+        if not state or not (state.get("events") or state.get("plays")):
+            return None
+        try:
+            return self._build_statistics(dict(state))
+        except Exception:
+            return None
+
+    def _pregame_facts(self, broadcast: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            games = [g for g in self._load_broadcasts() or [] if isinstance(g, Mapping)]
+        except Exception:
+            games = []
+        return pregame_story.build_facts(
+            broadcast=broadcast,
+            games=games,
+            storylines=self._storylines(str(broadcast.get("broadcast_id", ""))),
+            statistics_for=self._statistics_for_game,
+            roster_for_team=self._roster_lookup(broadcast),
+        )
+
+    def _sponsor_payload(self, sponsor: Mapping[str, Any] | None, sponsor_id: str) -> dict[str, Any]:
+        return {
+            "sponsor_id": str((sponsor or {}).get("id", "") or ("none" if sponsor_id == "none" else "")),
+            "sponsor_name": (sponsor or {}).get("name", ""),
+            "sponsors": [{"id": str(s.get("id", "")), "name": s.get("name", "")}
+                         for s in sorted(self._active_sponsors(), key=lambda s: str(s.get("name", "")).casefold())],
+        }
+
+    def pregame_story(self, broadcast_id: str, variant: int = 0, *, sponsor_id: str = "") -> SocialMediaPreviewResult:
+        broadcast = self._find_broadcast(broadcast_id)
+        if broadcast is None:
+            return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
+        facts = self._pregame_facts(broadcast)
+        sponsor = self._postgame_sponsor(broadcast_id, sponsor_id)
+        station_name, _ = self._station()
+        written = pregame_story.write_story(
+            facts, variant=variant, sponsor_name=str((sponsor or {}).get("name", "") or ""), station_name=station_name,
+        )
+        return SocialMediaPreviewResult("OK", {"broadcast_id": broadcast_id, "kind": "pregame", "story": written,
+                                               **self._sponsor_payload(sponsor, sponsor_id)})
+
+    def ai_story(self, kind: str, broadcast_id: str, *, sponsor_id: str = "", player_of_game: str = "") -> SocialMediaPreviewResult:
+        """The AI writer's version of the pregame or postgame story. When it can't
+        write one (no key, no internet, a refusal), the built-in story comes back
+        with a note saying why, so there is always something to post."""
+        kind = "pregame" if kind == "pregame" else "postgame"
+        if kind == "pregame":
+            builtin = self.pregame_story(broadcast_id, sponsor_id=sponsor_id)
+        else:
+            builtin = self.postgame_story(broadcast_id, sponsor_id=sponsor_id, player_of_game=player_of_game)
+        if not builtin.ok:
+            return builtin
+        data = dict(builtin.data)
+        data["kind"] = kind
+        broadcast = self._find_broadcast(broadcast_id) or {}
+        station_name, _ = self._station()
+        if kind == "pregame":
+            facts = self._pregame_facts(broadcast)
+            sheet = pregame_story.fact_sheet(facts)
+            home, visitor = facts["teams"]["home"], facts["teams"]["visitor"]
+            # The opponent is the team the station knows least about.
+            opponent = visitor if len(visitor["results"]) <= len(home["results"]) else home
+            names = {"home": home["name"], "visitor": visitor["name"], "opponent": opponent["name"]}
+        else:
+            facts = self._postgame_facts(broadcast)
+            sheet = postgame_story.fact_sheet(facts, postgame_story.write_story(facts))
+            names = {"home": facts["teams"]["home"]["name"], "visitor": facts["teams"]["visitor"]["name"], "opponent": ""}
+        writer = self._get_ai_writer() if self._get_ai_writer else None
+        if writer is None:
+            result_code, result_data = "AI_UNAVAILABLE", {}
+        else:
+            result = writer.write(kind, sheet, station=station_name, **names)
+            result_code, result_data = result.code, result.data
+        if result_code != "OK":
+            data["fallback"] = {"code": result_code, "message": AI_FALLBACK_MESSAGES.get(result_code, AI_FALLBACK_MESSAGES["AI_FAILED"])}
+            return SocialMediaPreviewResult("OK", data)
+        builtin_story = dict(data["story"])
+        paragraphs = [p.strip() for p in result_data["story"].split("\n\n") if p.strip()]
+        # The app, not the AI, adds the Player of the Game line.
+        paragraphs += [p for p in builtin_story.get("paragraphs", []) if "Player of the Game:" in p]
+        story_text = "\n\n".join(paragraphs)
+        headline = result_data["headline"] or builtin_story.get("headline", "")
+        blocks = [headline, story_text]
+        if builtin_story.get("scoring"):
+            blocks.append("SCORING\n" + "\n".join(builtin_story["scoring"]))
+        if builtin_story.get("closing"):
+            blocks.append(" ".join(builtin_story["closing"]))
+        blocks.append(" ".join(builtin_story.get("hashtags") or []))
+        data["story"] = {**builtin_story, "headline": headline, "paragraphs": paragraphs, "story": story_text,
+                         "post_text": "\n\n".join(b for b in blocks if b), "word_count": len(story_text.split()),
+                         "writer": "ai", "model": result_data.get("model", "")}
+        data["sources"] = result_data.get("sources", [])
+        return SocialMediaPreviewResult("OK", data)

@@ -71,6 +71,7 @@ for package in (
     "faster_whisper",
     "sounddevice",
     "tokenizers",
+    "anthropic",  # AI story writer (Social Publishing); imported lazily
 ):
     pkg_datas, pkg_binaries, pkg_hidden = collect_all(package)
     datas += pkg_datas
