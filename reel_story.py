@@ -173,7 +173,6 @@ def script(facts: Mapping[str, Any], play: Mapping[str, Any], *, broadcast: Mapp
     roster = names.roster_player(team, hero.get("number")) if names and hero.get("number") else None
     grade = GRADE_NAMES.get(str((roster or {}).get("grade", "") or "").strip(), "")
     tag = " · ".join(part for part in (f"#{hero['number']}" if hero.get("number") else "", grade) if part)
-    week = str(broadcast.get("week", "") or "").strip()
     matchup = f"{teams['visitor']['name']} at {teams['home']['name']}"
     score = play.get("score")
     after = ""
@@ -188,7 +187,7 @@ def script(facts: Mapping[str, Any], play: Mapping[str, Any], *, broadcast: Mapp
         "geometry": geometry,
         "kicker": play["kind"] == "field_goal",
         "title": {
-            "kicker": " · ".join(part for part in (f"Week {week}" if week else "", matchup) if part).upper(),
+            "kicker": matchup.upper(),
             "name": hero["name"],
             "tag": tag,
             "line": _headline_line(play["kind"], play["td"], play["yards"]),
