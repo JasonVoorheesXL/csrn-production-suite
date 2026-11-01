@@ -115,7 +115,8 @@ def test_pregame_research_points_at_ahsfhs_and_continues_a_paused_turn() -> None
     client = FakeClient([response([found], stop="pause_turn"), response([text_block("Preview\n\nLafayette visits.")])])
     result = writer_with(client).write("pregame", "GAME: Lafayette at Caledonia", station="CSRN",
                                        home="Caledonia", visitor="Lafayette", opponent="Lafayette")
-    assert result.ok and result.data["sources"] == []  # nothing cited in the final turn
+    # Pages found before the pause count too (nothing was cited, so all are listed).
+    assert result.ok and result.data["sources"] == [{"url": "https://www.ahsfhs.org/x", "title": "Series history"}]
     assert len(client.calls) == 2 and client.calls[1]["messages"][1]["role"] == "assistant"
     task = client.calls[0]["messages"][0]["content"]
     assert "ahsfhs.org" in task and "head-to-head history between Caledonia and Lafayette" in task
@@ -248,3 +249,96 @@ def test_ai_routes_need_login() -> None:
     with app_module.app.test_client() as client:
         assert client.get("/api/ai-writer").status_code == 401
         assert client.post(f"/api/broadcasts/{BROADCAST_ID}/ai-story", json={}).status_code == 401
+
+
+# -- notes, revising, the search report, the verified key ---------------------------------
+
+ARTICLE = """Lafayette holds off Caledonia, 28-21
+
+Lafayette ran for 400 yards.
+
+Caledonia kept fighting.
+
+---
+
+Notes:
+
+- No season records or standings: The web search reached its limit.
+- I left out Hugh Trost's 53-yard kickoff return: The game log doesn't say which team
+  he plays for.
+"""
+
+
+def test_notes_are_split_off_the_story() -> None:
+    client = FakeClient([response([text_block(ARTICLE)])])
+    result = writer_with(client).write("postgame", "x", station="S")
+    assert result.data["story"] == "Lafayette ran for 400 yards.\n\nCaledonia kept fighting."
+    assert result.data["notes"] == ["No season records or standings: The web search reached its limit.",
+                                    "I left out Hugh Trost's 53-yard kickoff return: The game log doesn't say which team he plays for."]
+    assert "NOTES FOR THE STATION" in client.calls[0]["system"]
+
+
+def test_revise_replays_the_story_and_notes_then_the_answers() -> None:
+    client = FakeClient([response([text_block("Lafayette holds off Caledonia\n\nRevised story.")])])
+    writer = writer_with(client)
+    assert writer.revise("postgame", "FACTS", previous="Old", instructions="  ", station="S").code == "AI_NOTHING_TO_REVISE"
+    result = writer.revise("postgame", "FACTS", previous="Head\n\nOld story.", notes=["Which team is Trost on?"],
+                           instructions="Hugh Trost plays for Lafayette.", station="S")
+    assert result.ok and result.data["story"] == "Revised story." and result.data["notes"] == []
+    roles = [m["role"] for m in client.calls[0]["messages"]]
+    assert roles == ["user", "assistant", "user"]
+    assert "FACTS" in client.calls[0]["messages"][0]["content"]
+    assert client.calls[0]["messages"][1]["content"] == "Head\n\nOld story.\n\nNOTES FOR THE STATION\n- Which team is Trost on?"
+    assert "Hugh Trost plays for Lafayette." in client.calls[0]["messages"][2]["content"]
+
+
+def test_search_report_explains_an_empty_search() -> None:
+    blocks = [NS(type="server_tool_use", name="web_search"),
+              NS(type="web_search_tool_result", content=NS(type="web_search_tool_result_error", error_code="max_uses_exceeded")),
+              NS(type="server_tool_use", name="web_search"),
+              NS(type="web_search_tool_result", content={"type": "web_search_tool_result_error", "error_code": "unavailable"}),
+              text_block("Head\n\nBody.")]
+    result = writer_with(FakeClient([response(blocks)])).write("postgame", "x", station="S")
+    assert result.data["search"] == {"searches": 2, "results": 0, "errors": ["max_uses_exceeded", "unavailable"]}
+
+
+def test_a_key_is_verified_once_it_works_and_unverified_when_it_changes() -> None:
+    vault = MemoryVault()
+    writer = ai_writer.AiWriter(vault=vault, client_factory=lambda key: FakeClient([response([text_block("H\n\nB.")])]))
+    writer.set_key(KEY)
+    assert writer.status() == {**writer.status(), "configured": True, "verified": False}
+    assert writer.test().ok and writer.status()["verified"] is True
+    writer.set_key(KEY.replace("x", "y"))
+    assert writer.status()["verified"] is False
+    assert writer.write("postgame", "x", station="S").ok and writer.status()["verified"] is True
+
+    class AuthenticationError(Exception):
+        pass
+
+    bad = ai_writer.AiWriter(vault=vault, client_factory=lambda key: FakeClient([], error=AuthenticationError("no")))
+    assert bad.test().code == "AI_KEY_INVALID" and bad.status()["verified"] is False
+
+
+def test_revise_route_keeps_the_story_when_it_fails(story_client, monkeypatch) -> None:
+    monkeypatch.setattr(app_module, "AI_WRITER", ai_writer.AiWriter(vault=MemoryVault()))
+    failed = story_client.post(f"/api/broadcasts/{BROADCAST_ID}/ai-story",
+                               json={"kind": "postgame", "previous": "H\n\nMine.", "instructions": "Fix it"})
+    assert failed.status_code == 502 and "Your story was left as it was." in failed.get_json()["message"]
+    client = FakeClient([response([text_block("New head\n\nNew body.\n\nNOTES FOR THE STATION\n- Check the mascot.")])])
+    monkeypatch.setattr(app_module, "AI_WRITER", writer_with(client))
+    data = story_client.post(f"/api/broadcasts/{BROADCAST_ID}/ai-story", json={
+        "kind": "postgame", "player": "home:2", "instructions": "Commodores is right.", "notes": ["Mascot?"],
+        "previous": "Old head\n\nOld body.\n\nThe WSN Player of the Game: Kingston Branham of West Point.",
+    }).get_json()
+    assert data["revised"] is True and data["notes"] == ["Check the mascot."]
+    assert data["story"]["story"] == "New body.\n\nThe WSN Player of the Game: Kingston Branham of West Point."
+    sent = client.calls[0]["messages"][1]["content"]
+    assert "Player of the Game" not in sent and sent.endswith("NOTES FOR THE STATION\n- Mascot?")
+
+
+def test_game_log_names_the_team_on_returns_and_takeaways() -> None:
+    import postgame_story as ps
+    from tests.test_postgame_story import facts
+
+    story = ps.write_story(facts())["story"]
+    assert "Caledonia's Michael Brewer Jr. intercepted a pass" in story

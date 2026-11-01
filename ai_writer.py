@@ -18,8 +18,11 @@ from typing import Any, Callable
 
 MODEL = "claude-opus-5-5"
 KEY_NAME = "ANTHROPIC_API_KEY"
+# Set once the saved key has worked (a Test or a story); cleared when the key changes.
+VERIFIED_NAME = "ANTHROPIC_API_KEY_VERIFIED"
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
-MAX_SEARCHES = {"pregame": 8, "postgame": 4}
+MAX_SEARCHES = {"pregame": 8, "postgame": 6}
+NOTES_MARKER = "NOTES FOR THE STATION"
 MAX_CONTINUATIONS = 4
 
 SYSTEM_PROMPT = """You write high school football stories for {station}, a local broadcast station that posts them on its Facebook Page.
@@ -31,7 +34,15 @@ Accuracy rules, in order:
 2. You may add context you find with web search (season records, district or region standings, past meetings between the schools, notable results). Only use what a source clearly states, and leave out anything you cannot confirm. If a source disagrees with the fact sheet, the fact sheet wins.
 3. Never invent quotes, injuries, crowd details, weather or anything else not in the fact sheet or a source.
 
-Format: the headline on the first line, then a blank line, then the story in short paragraphs. Plain text only: no markdown, no links or web addresses, no hashtags, no sponsor line, no "Player of the Game" line (the app adds those itself)."""
+Format: the headline on the first line, then a blank line, then the story in short paragraphs. Plain text only: no markdown, no links or web addresses, no hashtags, no sponsor line, no "Player of the Game" line (the app adds those itself).
+
+If there is anything the station should check or answer (a fact you could not confirm, something you left out and why, a question about the data), put it after the story under a line that reads exactly NOTES FOR THE STATION, one note per line starting with "- ". The notes are shown to the station, never posted. Leave the section out when you have nothing to say."""
+
+REVISE_TASK = """Here are the station's answers and corrections to your story and notes:
+
+{instructions}
+
+Rewrite the whole story with these applied. The station's answers are correct; keep everything else accurate to the fact sheet. Use the same format, and list under NOTES FOR THE STATION only what is still open."""
 
 POSTGAME_TASK = """Write the postgame story for this game, about 350 to 450 words. Tell the game in order: every score belongs in the story, with the quarter, and the drives and turning points that matter. Close with each team's standout players and one sentence of team statistics.
 
@@ -67,9 +78,38 @@ def _default_client_factory(api_key: str) -> Any:
 _URL = re.compile(r"(https?://\S+|www\.\S+)", re.I)
 
 
+_NOTES_SPLIT = re.compile(r"\n[ \t]*(?:-{3,}|\*{3,}|_{3,})?[ \t]*\n*[ \t]*(?:#+\s*)?\**\s*(?:NOTES FOR THE STATION|Notes)\s*:?\**[ \t]*\n", re.I)
+
+
+def split_notes(text: str) -> tuple[str, list[str]]:
+    """(story text, notes): the notes never belong in the post."""
+    text = str(text or "").replace("\r\n", "\n")
+    match = _NOTES_SPLIT.search("\n" + text)
+    if not match:
+        return re.sub(r"\n[ \t]*-{3,}[ \t]*$", "", text.rstrip()), []
+    start = match.start() - 1 if match.start() > 0 else 0
+    body, tail = text[:max(start, 0)], text[match.end() - 1:]
+    notes, current = [], ""
+    for line in tail.split("\n"):
+        stripped = line.strip()
+        if re.match(r"^[-*\u2022]\s+", stripped):
+            if current:
+                notes.append(current)
+            current = re.sub(r"^[-*\u2022]\s+", "", stripped)
+        elif stripped and current:
+            current += " " + stripped
+        elif stripped:
+            current = stripped
+    if current:
+        notes.append(current)
+    notes = [re.sub(r"\*\*(.+?)\*\*", r"\1", n).strip() for n in notes if n.strip()]
+    return re.sub(r"\n[ \t]*-{3,}[ \t]*$", "", body.rstrip()), notes
+
+
 def clean_story(text: str) -> tuple[str, str]:
     """Split the model's answer into (headline, story): strip markdown and
     any web address that slipped through (a link costs reach on the Page)."""
+    text, _ = split_notes(text)
     lines = [line.rstrip() for line in str(text or "").replace("\r\n", "\n").split("\n")]
     while lines and not lines[0].strip():
         lines.pop(0)
@@ -102,18 +142,27 @@ class AiWriter:
 
     def status(self) -> dict[str, Any]:
         key = self._vault.get(KEY_NAME)
-        return {"configured": bool(key), "key_hint": f"…{key[-4:]}" if len(key) >= 8 else "", "model": self.model}
+        return {"configured": bool(key), "verified": bool(key) and self._vault.get(VERIFIED_NAME) == "1",
+                "key_hint": f"…{key[-4:]}" if len(key) >= 8 else "", "model": self.model}
 
     def set_key(self, api_key: str) -> AiResult:
         key = str(api_key or "").strip()
         if not re.fullmatch(r"sk-ant-[A-Za-z0-9_\-]{20,}", key):
             return AiResult("AI_KEY_FORMAT")
         self._vault.set(KEY_NAME, key)
+        self._vault.set(VERIFIED_NAME, "")
         return AiResult("OK", self.status())
 
     def remove_key(self) -> AiResult:
         self._vault.set(KEY_NAME, "")
+        self._vault.set(VERIFIED_NAME, "")
         return AiResult("OK", self.status())
+
+    def _mark(self, verified: bool) -> None:
+        try:
+            self._vault.set(VERIFIED_NAME, "1" if verified else "")
+        except Exception:  # noqa: BLE001 -- the flag is a convenience, never a failure
+            pass
 
     def test(self) -> AiResult:
         key = self._vault.get(KEY_NAME)
@@ -122,21 +171,47 @@ class AiWriter:
         try:
             self._client_factory(key).models.retrieve(self.model)
         except Exception as exc:  # noqa: BLE001 -- mapped to a code below
-            return AiResult(self._error_code(exc), {"message": self._error_message(exc)})
+            code = self._error_code(exc)
+            if code == "AI_KEY_INVALID":
+                self._mark(False)
+            return AiResult(code, {"message": self._error_message(exc)})
+        self._mark(True)
         return AiResult("OK", self.status())
 
     # -- writing ---------------------------------------------------------------
 
+    def _first_turn(self, kind: str, fact_sheet: str, home: str, visitor: str, opponent: str) -> str:
+        return (PREGAME_TASK if kind == "pregame" else POSTGAME_TASK).format(
+            facts=fact_sheet, home=home, visitor=visitor, opponent=opponent or visitor)
+
     def write(self, kind: str, fact_sheet: str, *, station: str, home: str = "", visitor: str = "",
               opponent: str = "") -> AiResult:
+        task = self._first_turn(kind, fact_sheet, home, visitor, opponent)
+        return self._run(kind, [{"role": "user", "content": task}], station)
+
+    def revise(self, kind: str, fact_sheet: str, *, previous: str, notes: list[str] | None = None,
+               instructions: str, station: str, home: str = "", visitor: str = "", opponent: str = "") -> AiResult:
+        """Rewrite with the station's answers: the conversation is replayed (the
+        fact sheet, the story as the station has it now, its notes) and the
+        answers go in as the next turn."""
+        if not str(instructions or "").strip():
+            return AiResult("AI_NOTHING_TO_REVISE")
+        task = self._first_turn(kind, fact_sheet, home, visitor, opponent)
+        answer = str(previous or "").strip()
+        if notes:
+            answer += f"\n\n{NOTES_MARKER}\n" + "\n".join(f"- {note}" for note in notes)
+        messages = [{"role": "user", "content": task},
+                    {"role": "assistant", "content": answer},
+                    {"role": "user", "content": REVISE_TASK.format(instructions=str(instructions).strip())}]
+        return self._run(kind, messages, station)
+
+    def _run(self, kind: str, messages: list[dict[str, Any]], station: str) -> AiResult:
         key = self._vault.get(KEY_NAME)
         if not key:
             return AiResult("AI_NOT_CONFIGURED")
-        task = (PREGAME_TASK if kind == "pregame" else POSTGAME_TASK).format(
-            facts=fact_sheet, home=home, visitor=visitor, opponent=opponent or visitor)
         system = SYSTEM_PROMPT.format(station=station or "the station")
         tools = [{"type": "web_search_20260209", "name": "web_search", "max_uses": MAX_SEARCHES.get(kind, 4)}]
-        messages: list[dict[str, Any]] = [{"role": "user", "content": task}]
+        responses: list[Any] = []
         try:
             client = self._client_factory(key)
             response = None
@@ -151,28 +226,55 @@ class AiWriter:
                     betas=[FALLBACK_BETA],
                     extra_body={"fallbacks": "default"},
                 )
+                responses.append(response)
                 if response.stop_reason != "pause_turn":
                     break
                 # A long web search paused the turn: hand it back to continue.
-                messages = [messages[0], {"role": "assistant", "content": response.content}]
+                messages = [*messages, {"role": "assistant", "content": response.content}]
         except Exception as exc:  # noqa: BLE001 -- mapped to a code below
-            return AiResult(self._error_code(exc), {"message": self._error_message(exc)})
+            code = self._error_code(exc)
+            if code == "AI_KEY_INVALID":
+                self._mark(False)
+            return AiResult(code, {"message": self._error_message(exc)})
+        self._mark(True)
         if response is None or response.stop_reason == "refusal":
             return AiResult("AI_REFUSED")
         text = "".join(getattr(block, "text", "") for block in response.content if getattr(block, "type", "") == "text")
+        _, notes = split_notes(text)
         headline, story = clean_story(text)
         if not story:
             return AiResult("AI_EMPTY")
-        return AiResult("OK", {"headline": headline, "story": story, "sources": self._sources(response),
+        return AiResult("OK", {"headline": headline, "story": story, "notes": notes,
+                               "sources": self._sources(responses), "search": self._search_report(responses),
                                "model": getattr(response, "model", self.model), "writer": "ai"})
 
     @staticmethod
-    def _sources(response: Any) -> list[dict[str, str]]:
+    def _search_report(responses: list[Any]) -> dict[str, Any]:
+        """How the web searches went, so an empty search can be explained
+        (the tool reports errors inside a 200 response, not as exceptions)."""
+        searches = results = 0
+        errors: list[str] = []
+        for response in responses:
+            for block in getattr(response, "content", []) or []:
+                kind = getattr(block, "type", "")
+                if kind == "server_tool_use" and getattr(block, "name", "") == "web_search":
+                    searches += 1
+                elif kind == "web_search_tool_result":
+                    content = getattr(block, "content", None)
+                    if isinstance(content, list):
+                        results += len(content)
+                    else:
+                        code = content.get("error_code") if isinstance(content, dict) else getattr(content, "error_code", None)
+                        errors.append(str(code or "unknown"))
+        return {"searches": searches, "results": results, "errors": errors}
+
+    @staticmethod
+    def _sources(responses: list[Any]) -> list[dict[str, str]]:
         """Pages the writer cited, else every page its searches returned --
         shown to the operator for checking, never put in the post."""
         cited: dict[str, str] = {}
         found: dict[str, str] = {}
-        for block in response.content:
+        for block in [b for r in responses for b in (getattr(r, "content", []) or [])]:
             kind = getattr(block, "type", "")
             if kind == "text":
                 for citation in getattr(block, "citations", None) or []:
