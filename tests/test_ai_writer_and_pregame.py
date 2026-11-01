@@ -456,3 +456,30 @@ def test_numbers_are_cleaned_and_replace_what_the_card_shows() -> None:
     assert "Tyler Long" in pregame_card.render_card_html(facts, headline="H", station_name="CSRN")
     assert pregame_card.app_numbers(facts)["home"]["results"][0] == "W 27-8 vs. Columbus"
 
+
+def test_a_completed_game_without_a_saved_final_still_counts_in_the_preview() -> None:
+    import pregame_story
+
+    def game(game_id, date, opponent, **extra):
+        return {"broadcast_id": game_id, "date": date, "status": "completed", "home_school_id": "cal", "home_team": "Caledonia",
+                "visitor_school_id": opponent, "visitor_team": opponent.title(), **extra}
+
+    games = [game("old", "2026-10-23", "west-point", final_home_score=16, final_visitor_score=41),
+             game("skipped-end-game", "2026-10-30", "lafayette"),
+             game("rehearsal", "2026-10-23", "west-point"),
+             game("no-plays", "2026-10-31", "amory"),
+             {**game("planned", "2026-11-01", "pontotoc"), "status": "planned"}]
+    states = {"skipped-end-game": {"home_score": 21, "visitor_score": 28, "plays": [{}]}, "rehearsal": {"home_score": 99, "visitor_score": 0, "plays": [{}]},
+              "planned": {"home_score": 5, "visitor_score": 5, "plays": [{}]}}
+    filled = pregame_story.fill_missing_finals(games, lambda g: states.get(g["broadcast_id"]))
+    by_id = {g["broadcast_id"]: g for g in filled}
+    assert (by_id["skipped-end-game"]["final_home_score"], by_id["skipped-end-game"]["final_visitor_score"]) == (21, 28)
+    assert "final_home_score" not in by_id["rehearsal"] and "final_home_score" not in by_id["no-plays"] and "final_home_score" not in by_id["planned"]
+    next_game = {"broadcast_id": "next", "date": "2026-11-06", "status": "planned", "home_school_id": "nh", "home_team": "New Hope",
+                 "visitor_school_id": "cal", "visitor_team": "Caledonia", "special_designations": ["senior_night", "rivalry"]}
+    facts = pregame_story.build_facts(broadcast=next_game, games=filled)
+    assert [r["opponent"] for r in facts["teams"]["visitor"]["results"]] == ["West-Point", "Lafayette"]
+    story = pregame_story.write_story(facts)["story"]
+    assert "28-21 loss to Lafayette on Oct. 30" in story and "lost two straight" in story
+    assert "It is senior night at New Hope. It is a rivalry game." in story
+

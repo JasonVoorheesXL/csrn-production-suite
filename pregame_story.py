@@ -58,6 +58,28 @@ def _final(game: Mapping[str, Any]) -> tuple[int, int] | None:
     return _int(home), _int(visitor)
 
 
+def fill_missing_finals(games: list[Mapping[str, Any]], state_for: Callable[[Mapping[str, Any]], Mapping[str, Any] | None]) -> list[Mapping[str, Any]]:
+    """A game marked completed without End Game has no final score saved, and would
+    vanish from the preview. Take its score from its recorded plays, unless another
+    game on that date between the same schools already has a final (a rehearsal copy)."""
+    def matchup(game: Mapping[str, Any]) -> tuple[str, frozenset[str]]:
+        return str(game.get("date", "")), frozenset({str(game.get("home_school_id", "")), str(game.get("visitor_school_id", ""))})
+
+    finished = [g for g in games if str(g.get("status", "")).lower() == "completed"]
+    decided = {matchup(g) for g in finished if _final(g)}
+    filled = []
+    for game in games:
+        if game in finished and not _final(game) and matchup(game) not in decided:
+            try:
+                state = state_for(game) or {}
+            except Exception:
+                state = {}
+            if state.get("events") or state.get("plays"):
+                game = {**game, "final_home_score": _int(state.get("home_score")), "final_visitor_score": _int(state.get("visitor_score"))}
+        filled.append(game)
+    return filled
+
+
 def _results_for(school_id: str, games: list[Mapping[str, Any]], before: _dt.date | None) -> list[dict[str, Any]]:
     """This school's finished games the station covered, oldest first."""
     rows = []
@@ -230,11 +252,14 @@ def write_story(facts: Mapping[str, Any], *, variant: int = 0, sponsor_name: str
         level = f" in a Class {h['classification']}, Region {h['region']} game" if h["classification"] else f" in a Region {h['region']} game"
     paragraphs.append(f"{label(h)} hosts {label(v)}{' at ' + when if when else ''}{where}{level}.".replace("  ", " "))
 
-    special = [d for d in facts["designations"] if d.lower() != "homecoming"]
-    if "homecoming" in [d.lower() for d in facts["designations"]]:
-        paragraphs[-1] += f" It is homecoming at {h['name']}."
-    if special:
-        paragraphs[-1] += f" The game is also {', '.join(special)}."
+    for designation in facts["designations"]:
+        name = designation.lower()
+        if name in ("homecoming", "senior night"):
+            paragraphs[-1] += f" It is {name} at {h['name']}."
+        elif name == "rivalry":
+            paragraphs[-1] += " It is a rivalry game."
+        else:
+            paragraphs[-1] += f" The game is also {designation}."
 
     for team in (h, v):
         results = team["results"]
