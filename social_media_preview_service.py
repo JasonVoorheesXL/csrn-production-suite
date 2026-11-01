@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import html
 import io
+import json
 import mimetypes
 import random
 import re
@@ -1442,6 +1443,55 @@ class SocialMediaPreviewService:
 
     # -- pregame story and the AI writer -------------------------------------------
 
+    def _numbers_path(self, broadcast_id: str) -> Path:
+        safe_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(broadcast_id)).strip("-") or "broadcast"
+        return self.output_dir / "pregame-numbers" / f"{safe_id}.json"
+
+    def _load_numbers(self, broadcast_id: str) -> dict[str, Any]:
+        """{'draft': what the AI found, waiting for review; 'reviewed': what the graphic uses}."""
+        try:
+            data = json.loads(self._numbers_path(broadcast_id).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def _save_numbers(self, broadcast_id: str, data: Mapping[str, Any]) -> None:
+        path = self._numbers_path(broadcast_id)
+        if not data.get("draft") and not data.get("reviewed"):
+            path.unlink(missing_ok=True)
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data, indent=1), encoding="utf-8")
+
+    def pregame_numbers(self, broadcast_id: str) -> SocialMediaPreviewResult:
+        """The review box: the numbers waiting (or in use), and what the app has stored to compare."""
+        broadcast = self._find_broadcast(broadcast_id)
+        if broadcast is None:
+            return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
+        facts = self._pregame_facts(broadcast)
+        saved = self._load_numbers(broadcast_id)
+        return SocialMediaPreviewResult("OK", {
+            "numbers": saved.get("draft") or saved.get("reviewed") or pregame_card.clean_numbers({}),
+            "waiting": bool(saved.get("draft")),
+            "in_use": bool(saved.get("reviewed")),
+            "app": pregame_card.app_numbers(facts),
+            "teams": {side: facts["teams"][side]["name"] for side in postgame_story.TEAMS},
+        })
+
+    def save_pregame_numbers(self, broadcast_id: str, numbers: Any) -> SocialMediaPreviewResult:
+        """The station approved these: the graphic uses them from now on."""
+        if self._find_broadcast(broadcast_id) is None:
+            return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
+        cleaned = pregame_card.clean_numbers(numbers)
+        self._save_numbers(broadcast_id, {"reviewed": cleaned if pregame_card.has_numbers(cleaned) else None})
+        return self.pregame_numbers(broadcast_id)
+
+    def clear_pregame_numbers(self, broadcast_id: str) -> SocialMediaPreviewResult:
+        if self._find_broadcast(broadcast_id) is None:
+            return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
+        self._save_numbers(broadcast_id, {})
+        return self.pregame_numbers(broadcast_id)
+
     def pregame_card_document(
         self,
         broadcast_id: str,
@@ -1476,6 +1526,7 @@ class SocialMediaPreviewService:
             theme=theme,
             station_logo_style=logo_style,
             assets=self._theme_assets(theme),
+            numbers=self._load_numbers(broadcast_id).get("reviewed"),
         )
 
     def generate_pregame_card(
@@ -1605,6 +1656,10 @@ class SocialMediaPreviewService:
         if result_code != "OK":
             data["fallback"] = {"code": result_code, "message": AI_FALLBACK_MESSAGES.get(result_code, AI_FALLBACK_MESSAGES["AI_FAILED"])}
             return SocialMediaPreviewResult("OK", data)
+        found = pregame_card.clean_numbers(result_data.get("graphic"))
+        if kind == "pregame" and pregame_card.has_numbers(found):
+            # Waits for the station's review; the graphic keeps what it has until then.
+            self._save_numbers(broadcast_id, {**self._load_numbers(broadcast_id), "draft": found})
         builtin_story = dict(data["story"])
         paragraphs = [p.strip() for p in result_data["story"].split("\n\n") if p.strip()]
         # The app, not the AI, adds the Player of the Game line.

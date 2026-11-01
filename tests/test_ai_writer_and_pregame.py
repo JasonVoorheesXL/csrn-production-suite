@@ -420,3 +420,39 @@ def test_pregame_card_with_nothing_but_the_matchup_stays_a_full_card() -> None:
     html = pregame_card.render_card_html(facts, headline="Preview", station_name="CSRN")
     assert " sparse" in html and 'class="lower' not in html and "from games on" not in html
 
+
+GRAPHIC_JSON = """{"home": {"record": "6-3", "region_record": "3-1", "points_per_game": "28.4", "points_allowed": "not known",
+"results": ["W 27-8 vs. Columbus", "see https://example.com/x", "27-8 no mark"], "players": [{"name": "Sam Rivers", "line": "595 rush yds, 8 TD"}]},
+"visitor": {"record": "bad", "region_record": "", "results": [], "players": []}, "last_meeting": "New Hope won 28-14 in 2025"}"""
+
+
+def test_graphic_data_is_split_out_of_the_story_and_notes() -> None:
+    answer = f"Preview\n\nThe story.\n\nNOTES FOR THE STATION\n- Check the record.\n\nGRAPHIC DATA\n```json\n{GRAPHIC_JSON}\n```"
+    client = FakeClient([response([text_block(answer)])])
+    result = writer_with(client).write("pregame", "facts", station="CSRN", home="New Hope", visitor="Caledonia", opponent="New Hope")
+    assert result.ok and result.data["story"] == "The story." and result.data["notes"] == ["Check the record."]
+    assert result.data["graphic"]["home"]["record"] == "6-3"
+    assert ai_writer.split_graphic_data("Story only")[1] is None
+    assert ai_writer.split_graphic_data("Story\n\nGRAPHIC DATA\n{broken")[0] == "Story"
+
+
+def test_numbers_are_cleaned_and_replace_what_the_card_shows() -> None:
+    import json
+
+    import pregame_card
+
+    numbers = pregame_card.clean_numbers(json.loads(GRAPHIC_JSON))
+    home = numbers["home"]
+    assert home["record"] == "6-3" and home["points_per_game"] == "28.4" and home["points_allowed"] == ""
+    assert home["results"] == ["W 27-8 vs. Columbus"]                      # links and unmarked lines dropped
+    assert numbers["visitor"]["record"] == ""
+    assert pregame_card.clean_numbers({"home": {"players": ["Sam Rivers: 595 rush yds"]}})["home"]["players"] == [{"name": "Sam Rivers", "line": "595 rush yds"}]
+    assert not pregame_card.has_numbers(pregame_card.clean_numbers({}))
+    facts = _pregame_facts_for_card()
+    html = pregame_card.render_card_html(facts, headline="H", station_name="CSRN", numbers=numbers)
+    for expected in ("6-3", "28.4", "Sam Rivers", "New Hope won 28-14 in 2025", "public sources and games on CSRN, reviewed by CSRN"):
+        assert expected in html
+    assert "Tyler Long" not in html and "from games on CSRN.</p>" not in html
+    assert "Tyler Long" in pregame_card.render_card_html(facts, headline="H", station_name="CSRN")
+    assert pregame_card.app_numbers(facts)["home"]["results"][0] == "W 27-8 vs. Columbus"
+

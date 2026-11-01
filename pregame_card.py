@@ -1,12 +1,14 @@
 """Pregame story graphic (1080 x 1350) for Social Publishing, in the same themes
-as the postgame graphic (postgame_card). Built from pregame_story.build_facts,
-so it says only what the app has stored: results, averages and leaders cover the
-games the station broadcast, and the card labels them that way.
+as the postgame graphic (postgame_card). Built from pregame_story.build_facts:
+results, averages and leaders cover the games the station broadcast, and the
+card labels them that way. Numbers the station has reviewed (typed in, or found
+by the AI writer) replace the stored ones, and the label says that too.
 
 Game Manager's pregame graphic is separate and does not use this module.
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Mapping
 
 import postgame_card as card
@@ -65,6 +67,82 @@ def leader_line(pick: Mapping[str, Any]) -> str:
     return f"{yards}, {tds} TD" if tds else yards
 
 
+_NO_LINK = re.compile(r"https?://|www\.", re.I)
+_AVERAGE = re.compile(r"\d{1,3}(\.\d{1,2})?")
+_RESULT = re.compile(r"([WLT])\s+(\S.{2,60})")
+
+
+def _plain(value: Any, limit: int) -> str:
+    text = " ".join(str(value or "").split())
+    return "" if _NO_LINK.search(text) else text[:limit]
+
+
+def clean_numbers(raw: Any) -> dict[str, Any]:
+    """Whatever the AI or the form sent, down to values the card can trust the shape of."""
+    raw = raw if isinstance(raw, Mapping) else {}
+    cleaned: dict[str, Any] = {"last_meeting": _plain(raw.get("last_meeting"), 90)}
+    for side in story.TEAMS:
+        team = raw.get(side) if isinstance(raw.get(side), Mapping) else {}
+        results = [line for line in (_plain(r, 70) for r in team.get("results") or [] if isinstance(r, str)) if _RESULT.fullmatch(line)]
+        players = []
+        for player in team.get("players") or []:
+            if isinstance(player, Mapping):
+                name, line = _plain(player.get("name"), 40), _plain(player.get("line"), 50)
+            elif isinstance(player, str):
+                name, _, line = player.partition(":")
+                name, line = _plain(name, 40), _plain(line, 50)
+            else:
+                continue
+            if name:
+                players.append({"name": name, "line": line})
+        averages = {key: text if _AVERAGE.fullmatch(text := _plain(team.get(key), 6)) else "" for key in ("points_per_game", "points_allowed")}
+        cleaned[side] = {"record": pregame_story.record_text(_plain(team.get("record"), 8)),
+                         "region_record": pregame_story.record_text(_plain(team.get("region_record"), 8)),
+                         **averages, "results": results[:4], "players": players[:3]}
+    return cleaned
+
+
+def has_numbers(numbers: Any) -> bool:
+    if not isinstance(numbers, Mapping):
+        return False
+    return bool(numbers.get("last_meeting")) or any(any((numbers.get(side) or {}).values()) for side in story.TEAMS)
+
+
+def app_numbers(facts: Mapping[str, Any]) -> dict[str, Any]:
+    """What the app itself would show, in the same shape as clean_numbers."""
+    teams = _view(facts, None)["teams"]
+    return {side: {"record": teams[side]["record"], "region_record": teams[side]["region_record"],
+                   "points_per_game": teams[side]["for"], "points_allowed": teams[side]["against"],
+                   "results": [f"{mark} {text}" for mark, text in teams[side]["result_lines"]],
+                   "players": [{"name": name, "line": line} for name, line in teams[side]["player_lines"]]}
+            for side in story.TEAMS}
+
+
+def _view(facts: Mapping[str, Any], numbers: Mapping[str, Any] | None) -> dict[str, Any]:
+    """The numbers the card shows: reviewed ones first, then what the app has stored."""
+    numbers = numbers or {}
+    teams = {}
+    for side in story.TEAMS:
+        team, found = facts["teams"][side], numbers.get(side) or {}
+        scored, allowed = _averages(team)
+        results = [_RESULT.fullmatch(line).groups() for line in found.get("results") or []]
+        players = [(p["name"], p["line"]) for p in found.get("players") or []]
+        teams[side] = {**team, "record": found.get("record") or team["record"],
+                       "region_record": found.get("region_record") or team["region_record"],
+                       "for": found.get("points_per_game") or scored, "against": found.get("points_allowed") or allowed,
+                       "result_lines": results or [_result_line(r) for r in team["results"][-4:]],
+                       "player_lines": players or [(p["player"]["name"], leader_line(p)) for p in team["leaders"]]}
+    view = {**facts, "teams": teams, "last_meeting": numbers.get("last_meeting") or ""}
+    if not view["last_meeting"] and facts["meetings"]:
+        last = facts["meetings"][-1]
+        h, v = facts["teams"]["home"], facts["teams"]["visitor"]
+        winner = h["name"] if last["ours"] > last["theirs"] else v["name"] if last["ours"] < last["theirs"] else ""
+        score = f"{max(last['ours'], last['theirs'])}-{min(last['ours'], last['theirs'])}"
+        when = pregame_story.short_date(last["date"])
+        view["last_meeting"] = (f"{winner} won {score}" if winner else f"Tied {score}") + (f", {when}" if when else "")
+    return view
+
+
 def _result_line(result: Mapping[str, Any]) -> tuple[str, str]:
     ours, theirs = result["ours"], result["theirs"]
     mark = "W" if ours > theirs else "L" if ours < theirs else "T"
@@ -85,26 +163,23 @@ def _level(team: Mapping[str, Any]) -> str:
     return " · ".join(part for part in parts if part)
 
 
-def _tape_html(facts: Mapping[str, Any]) -> tuple[str, bool]:
-    """The side-by-side comparison, and whether it used covered-game numbers."""
+def _tape_html(facts: Mapping[str, Any]) -> str:
+    """The side-by-side comparison."""
     v, h = facts["teams"]["visitor"], facts["teams"]["home"]
-    v_for, v_against = _averages(v)
-    h_for, h_against = _averages(h)
     rows = [("Region record", v["region_record"], h["region_record"]), ("Classification", _level(v), _level(h)),
-            ("Points per game", v_for, h_for), ("Points allowed", v_against, h_against)]
+            ("Points per game", v["for"], h["for"]), ("Points allowed", v["against"], h["against"])]
     cells = "".join(f"<tr><td>{_e(left or '–')}</td><th>{_e(label)}</th><td>{_e(right or '–')}</td></tr>"
                     for label, left, right in rows if left or right)
-    return (f'<table class="tape"><tbody>{cells}</tbody></table>' if cells else ""), bool(v_for or h_for)
+    return f'<table class="tape"><tbody>{cells}</tbody></table>' if cells else ""
 
 
 def _players_html(facts: Mapping[str, Any]) -> str:
     groups = []
     for key in ("visitor", "home"):
         team = facts["teams"][key]
-        if not team["leaders"]:
+        if not team["player_lines"]:
             continue
-        items = "".join(f'<li><b>{_e(pick["player"]["name"])}</b> <span>{card._nobreak(leader_line(pick))}</span></li>'
-                        for pick in team["leaders"])
+        items = "".join(f'<li><b>{_e(name)}</b> <span>{card._nobreak(line)}</span></li>' for name, line in team["player_lines"])
         groups.append(f'<div class="group"><h4>{_e(team["name"])}</h4><ul>{items}</ul></div>')
     return f'<section class="players"><h3>Players to Watch</h3>{"".join(groups)}</section>' if groups else ""
 
@@ -113,9 +188,9 @@ def _results_html(facts: Mapping[str, Any]) -> str:
     groups = []
     for key in ("visitor", "home"):
         team = facts["teams"][key]
-        if not team["results"]:
+        if not team["result_lines"]:
             continue
-        items = "".join("<li><em>{}</em> <span>{}</span></li>".format(*map(_e, _result_line(r))) for r in team["results"][-4:])
+        items = "".join(f"<li><em>{_e(mark)}</em> <span>{_e(text)}</span></li>" for mark, text in team["result_lines"])
         groups.append(f'<div class="group"><h4>{_e(team["name"])}</h4><ul>{items}</ul></div>')
     return f'<section class="results"><h3>Recent Results</h3>{"".join(groups)}</section>' if groups else ""
 
@@ -123,14 +198,8 @@ def _results_html(facts: Mapping[str, Any]) -> str:
 def _extras_html(facts: Mapping[str, Any]) -> str:
     """Their last meeting and the station's storylines, whichever exist."""
     parts = []
-    h, v = facts["teams"]["home"], facts["teams"]["visitor"]
-    if facts["meetings"]:
-        last = facts["meetings"][-1]
-        winner = h["name"] if last["ours"] > last["theirs"] else v["name"] if last["ours"] < last["theirs"] else ""
-        score = f"{max(last['ours'], last['theirs'])}-{min(last['ours'], last['theirs'])}"
-        when = pregame_story.short_date(last["date"])
-        line = f"{winner} won {score}" if winner else f"Tied {score}"
-        parts.append(f'<section class="meeting"><h3>Last Meeting</h3><ul><li>{_e(line)}{" <span>" + _e(when) + "</span>" if when else ""}</li></ul></section>')
+    if facts["last_meeting"]:
+        parts.append(f'<section class="meeting"><h3>Last Meeting</h3><ul><li>{_e(facts["last_meeting"])}</li></ul></section>')
     if facts["storylines"]:
         items = "".join(f"<li>{_e(line)}</li>" for line in facts["storylines"][:2])
         parts.append(f'<section class="storylines"><h3>Storylines</h3><ul>{items}</ul></section>')
@@ -158,11 +227,14 @@ def render_card_html(
     theme: str = card.DEFAULT_THEME,
     station_logo_style: str = card.DEFAULT_LOGO_STYLE,
     assets: Mapping[str, str] | None = None,
+    numbers: Mapping[str, Any] | None = None,
 ) -> str:
     theme = card.theme_id(theme)
     station_logo_style = card.logo_style(station_logo_style)
     assets = dict(assets or {})
     logos = logos or {}
+    researched = has_numbers(numbers)
+    facts = _view(facts, numbers if researched else None)
     teams = facts["teams"]
     dateline = " · ".join(part for part in (story.ap_date(facts.get("date")), facts.get("venue") or "") if part)
     sport = (facts.get("sport") or "Football").strip().title() or "Football"
@@ -174,12 +246,15 @@ def render_card_html(
                 else f"<strong>{_e(sponsor_name)}</strong>")
         sponsor = f'<div class="sponsor"><span>Brought to you by</span>{mark}</div>'
     station_mark = f'<span class="station-logo"><img src="{station_logo_uri}" alt=""></span>' if station_logo_uri else ""
-    tape, averaged = _tape_html(facts)
+    tape = _tape_html(facts)
     left = _players_html(facts) or _results_html(facts)
     right = (_results_html(facts) if _players_html(facts) else "") + _extras_html(facts)
-    covered = bool(averaged or facts["teams"]["home"]["leaders"] or facts["teams"]["visitor"]["leaders"]
-                   or facts["teams"]["home"]["results"] or facts["teams"]["visitor"]["results"])
-    note = f'<p class="note">Averages, leaders and results are from games on {_e(station_name)}.</p>' if covered and station_name else ""
+    covered = any(teams[side]["results"] or teams[side]["leaders"] for side in story.TEAMS)
+    note = ""
+    if researched and station_name:
+        note = f'<p class="note">Season numbers from public sources and games on {_e(station_name)}, reviewed by {_e(station_name)}.</p>'
+    elif covered and station_name:
+        note = f'<p class="note">Averages, leaders and results are from games on {_e(station_name)}.</p>'
     sparse = not (left or right)
     if left and not right:
         right, left = left, ""

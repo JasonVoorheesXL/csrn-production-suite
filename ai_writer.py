@@ -12,6 +12,7 @@ caller can fall back to the built-in writer.
 """
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -45,7 +46,7 @@ REVISE_TASK = """Here are the station's answers and corrections to your story an
 
 {instructions}
 
-Rewrite the whole story with these applied. The station's answers are correct; keep everything else accurate to the fact sheet. Use the same format, and list under NOTES FOR THE STATION only what is still open."""
+Rewrite the whole story with these applied. The station's answers are correct; keep everything else accurate to the fact sheet. Use the same format, and list under NOTES FOR THE STATION only what is still open. If this is a pregame preview, also repeat the GRAPHIC DATA block with any corrections."""
 
 POSTGAME_TASK = """Write the postgame story for this game, about 350 to 450 words. Tell the game in order: every score belongs in the story, with the quarter, and the drives and turning points that matter. Close with each team's standout players and one sentence of team statistics.
 
@@ -59,7 +60,11 @@ PREGAME_TASK = """Write a pregame preview of this game, about 300 to 400 words: 
 Search the web for what the fact sheet doesn't have, especially for {opponent}: their season results and record, their district or region standing, and the head-to-head history between {home} and {visitor}. Try ahsfhs.org first for Mississippi and Alabama schools (it keeps season results and series history), then MaxPreps or the local paper.
 
 FACT SHEET
-{facts}"""
+{facts}
+
+After the story and any notes, add a line that reads exactly GRAPHIC DATA, then one JSON object with what your sources clearly state, for the graphic that goes with the post. The station reviews it before anything is used.
+{{"home": {{"record": "6-3", "region_record": "3-1", "points_per_game": "28.4", "points_allowed": "14.2", "results": ["W 27-8 vs. Columbus"], "players": [{{"name": "First Last", "line": "595 rush yds, 8 TD"}}]}}, "visitor": {{same fields}}, "last_meeting": "New Hope won 28-14 in 2025"}}
+Rules for it: use an empty string or empty list for anything a source does not clearly state, and never estimate or calculate a number. Up to four most recent results (W, L or T first) and three players per team. Report what the source says even when it differs from the record on the fact sheet, and say so in your notes. Values only: no links."""
 
 
 @dataclass(frozen=True)
@@ -107,6 +112,28 @@ def split_notes(text: str) -> tuple[str, list[str]]:
         notes.append(current)
     notes = [re.sub(r"\*\*(.+?)\*\*", r"\1", n).strip() for n in notes if n.strip()]
     return re.sub(r"\n[ \t]*-{3,}[ \t]*$", "", body.rstrip()), notes
+
+
+_GRAPHIC_LINE = re.compile(r"^[ \t]*[#*]*[ \t]*GRAPHIC DATA[ \t]*[*:]*[ \t]*$", re.I | re.M)
+
+
+def split_graphic_data(text: str) -> tuple[str, dict[str, Any] | None]:
+    """(everything else, the GRAPHIC DATA object): the numbers never belong in the post."""
+    text = str(text or "")
+    match = _GRAPHIC_LINE.search(text)
+    if not match:
+        return text, None
+    start, end = text.find("{", match.end()), text.rfind("}")
+    data = None
+    if start != -1 and end > start:
+        try:
+            parsed = json.loads(text[start:end + 1])
+            data = parsed if isinstance(parsed, dict) else None
+        except ValueError:
+            data = None
+    rest = "" if start == -1 or end <= start else text[end + 1:]
+    rest = re.sub(r"^\s*```\s*", "", rest)
+    return (text[:match.start()].rstrip() + ("\n\n" + rest.strip() if rest.strip() else "")), data
 
 
 def clean_story(text: str) -> tuple[str, str]:
@@ -243,13 +270,14 @@ class AiWriter:
         if response is None or response.stop_reason == "refusal":
             return AiResult("AI_REFUSED")
         text = "".join(getattr(block, "text", "") for block in response.content if getattr(block, "type", "") == "text")
+        text, graphic = split_graphic_data(text)
         _, notes = split_notes(text)
         headline, story = clean_story(text)
         if not story:
             return AiResult("AI_EMPTY")
         return AiResult("OK", {"headline": headline, "story": story, "notes": notes, "cost_usd": self._cost(responses),
                                "sources": self._sources(responses), "search": self._search_report(responses),
-                               "model": getattr(response, "model", self.model), "writer": "ai"})
+                               "model": getattr(response, "model", self.model), "writer": "ai", "graphic": graphic})
 
     def _cost(self, responses: list[Any]) -> float | None:
         """What this run cost, from the token counts Anthropic returns (the
