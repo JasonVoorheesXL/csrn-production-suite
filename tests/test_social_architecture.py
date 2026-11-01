@@ -43,9 +43,10 @@ def test_social_manager_has_no_x_credential_controls() -> None:
     source = (ROOT / "templates" / "social_manager.html").read_text(encoding="utf-8")
     assert "CSRN_X_ACCESS_TOKEN" not in source
     assert "No X OAuth" not in source  # wording is rendered as a clear policy without a credential field
-    assert "Assisted-Manual X Package" in source
-    assert "Download X graphic" in source
-    assert "Open X composer" in source
+    # The X package UI went away on 2026-11-01: stations copy the story and the
+    # graphic into X (or Threads, Instagram) themselves.
+    assert "Assisted-Manual X Package" not in source
+    assert "Open X composer" not in source
 
 
 def test_social_asset_resolver_blocks_remote_and_traversal_inputs() -> None:

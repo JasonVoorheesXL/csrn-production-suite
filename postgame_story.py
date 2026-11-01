@@ -801,9 +801,15 @@ def player_choices(players: list[Mapping[str, Any]], names: Names, teams: Mappin
         who = names.person(team, number, p.get("name"))
         if not who["name"]:
             continue
-        choices.append({"id": f"{team}:{number}", "team": team, "number": number, "name": who["name"],
-                        "label": f"{teams[team]['name']} · #{number} {who['name']}"})
-    return sorted(choices, key=lambda c: (c["team"] != "home", _int(c["number"])))
+        impact = (_int(p.get("rushing_yards")) + _int(p.get("passing_yards")) + _int(p.get("receiving_yards"))
+                  + _int(p.get("kickoff_return_yards")) + _int(p.get("punt_return_yards")) + 20 * _int(p.get("touchdowns"))
+                  + 40 * _int(p.get("interceptions")) + 30 * _int(p.get("sacks")) + 30 * _int(p.get("fumble_recoveries"))
+                  + 10 * _int(p.get("field_goals")))
+        choices.append({"id": f"{team}:{number}", "team": team, "number": number, "name": who["name"], "impact": impact,
+                        "label": f"{teams[team]['name']} · #{number} "
+                                 + ("(not on the roster)" if who["name"].startswith("No. ") else who["name"])})
+    # Best performers first, so the likely pick is near the top of the list.
+    return sorted(choices, key=lambda c: (c["team"] != "home", -c["impact"], _int(c["number"])))
 
 
 # -- the built-in writer ---------------------------------------------------------

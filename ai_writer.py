@@ -24,6 +24,9 @@ FALLBACK_BETA = "server-side-fallback-2026-07-01"
 MAX_SEARCHES = {"pregame": 8, "postgame": 6}
 NOTES_MARKER = "NOTES FOR THE STATION"
 MAX_CONTINUATIONS = 4
+# USD per million tokens, and per web search, for the cost note shown after each story.
+PRICES = {"claude-opus-5-5": {"input": 4.0, "output": 20.0, "cache_read": 0.20, "cache_write": 5.0}}
+WEB_SEARCH_PRICE = 0.01
 
 SYSTEM_PROMPT = """You write high school football stories for {station}, a local broadcast station that posts them on its Facebook Page.
 
@@ -244,9 +247,28 @@ class AiWriter:
         headline, story = clean_story(text)
         if not story:
             return AiResult("AI_EMPTY")
-        return AiResult("OK", {"headline": headline, "story": story, "notes": notes,
+        return AiResult("OK", {"headline": headline, "story": story, "notes": notes, "cost_usd": self._cost(responses),
                                "sources": self._sources(responses), "search": self._search_report(responses),
                                "model": getattr(response, "model", self.model), "writer": "ai"})
+
+    def _cost(self, responses: list[Any]) -> float | None:
+        """What this run cost, from the token counts Anthropic returns (the
+        account's balance itself is only shown on console.anthropic.com)."""
+        prices = PRICES.get(self.model)
+        if not prices:
+            return None
+        total = 0.0
+        for response in responses:
+            usage = getattr(response, "usage", None)
+            if usage is None:
+                continue
+            total += (getattr(usage, "input_tokens", 0) or 0) * prices["input"] / 1e6
+            total += (getattr(usage, "output_tokens", 0) or 0) * prices["output"] / 1e6
+            total += (getattr(usage, "cache_read_input_tokens", 0) or 0) * prices["cache_read"] / 1e6
+            total += (getattr(usage, "cache_creation_input_tokens", 0) or 0) * prices["cache_write"] / 1e6
+            server = getattr(usage, "server_tool_use", None)
+            total += (getattr(server, "web_search_requests", 0) or 0) * WEB_SEARCH_PRICE
+        return round(total, 4)
 
     @staticmethod
     def _search_report(responses: list[Any]) -> dict[str, Any]:
@@ -294,6 +316,9 @@ class AiWriter:
     @staticmethod
     def _error_code(exc: Exception) -> str:
         name = type(exc).__name__
+        # Anthropic answers an empty balance with a 400 whose message says so.
+        if "credit balance" in str(getattr(exc, "message", "") or exc).lower():
+            return "AI_NO_CREDIT"
         return {
             "AuthenticationError": "AI_KEY_INVALID",
             "PermissionDeniedError": "AI_KEY_INVALID",

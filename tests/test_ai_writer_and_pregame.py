@@ -342,3 +342,45 @@ def test_game_log_names_the_team_on_returns_and_takeaways() -> None:
 
     story = ps.write_story(facts())["story"]
     assert "Caledonia's Michael Brewer Jr. intercepted a pass" in story
+
+
+def test_out_of_credit_is_its_own_message_and_each_run_reports_its_cost() -> None:
+    class BadRequestError(Exception):
+        message = "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing."
+
+    broke = writer_with(FakeClient([], error=BadRequestError()))
+    assert broke.write("postgame", "x", station="S").code == "AI_NO_CREDIT"
+    usage = NS(input_tokens=10_000, output_tokens=1_500, cache_read_input_tokens=0, cache_creation_input_tokens=0,
+               server_tool_use=NS(web_search_requests=3))
+    reply = response([text_block("H\n\nBody.")])
+    reply.usage = usage
+    result = writer_with(FakeClient([reply])).write("postgame", "x", station="S")
+    assert result.data["cost_usd"] == round(10_000 * 4 / 1e6 + 1_500 * 20 / 1e6 + 3 * 0.01, 4)  # 0.1 -> "about 10¢"
+
+
+def test_no_credit_falls_back_with_a_billing_message(story_client, monkeypatch) -> None:
+    class BadRequestError(Exception):
+        message = "Your credit balance is too low to access the Anthropic API."
+
+    monkeypatch.setattr(app_module, "AI_WRITER", writer_with(FakeClient([], error=BadRequestError())))
+    data = story_client.post(f"/api/broadcasts/{BROADCAST_ID}/ai-story", json={"kind": "postgame"}).get_json()
+    assert data["fallback"]["code"] == "AI_NO_CREDIT" and "console.anthropic.com" in data["fallback"]["message"]
+    assert data["story"]["writer"] == "built-in"
+
+
+def test_player_pickers_list_the_best_performers_first() -> None:
+    from tests.test_postgame_story import facts
+
+    home = [c["name"] for c in facts()["players"] if c["team"] == "home"]
+    assert home[:3] == ["Kingston Branham", "Jaylen Hall", "Marcus Hall"]
+
+
+def test_single_player_of_the_game_strip_names_the_station() -> None:
+    import postgame_card
+    import postgame_story as ps
+    from tests.test_postgame_story import facts
+
+    found = facts()
+    one = postgame_card.render_card_html(found, headline="x", station_name="CSRN",
+                                         player_of_game=ps.players_of_the_game(found, "visitor:1"))
+    assert ">CSRN Player of the Game<" in one
