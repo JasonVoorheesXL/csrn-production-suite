@@ -1566,6 +1566,7 @@ class SocialMediaPreviewService:
             games = [g for g in self._load_broadcasts() or [] if isinstance(g, Mapping)]
         except Exception:
             games = []
+        games = pregame_story.fill_missing_finals(games, self._resolve_game_state)
         return pregame_story.build_facts(
             broadcast=broadcast,
             games=games,
