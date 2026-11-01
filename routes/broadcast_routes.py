@@ -287,6 +287,47 @@ def create_broadcast_blueprint(
         response.headers["Cache-Control"] = "no-store"
         return response
 
+    @routes.get("/api/broadcasts/<broadcast_id>/pregame-numbers")
+    @dependencies.require_auth
+    def pregame_numbers(broadcast_id: str):
+        result = dependencies.get_social_media_preview_service().pregame_numbers(broadcast_id)
+        if result.code == "BROADCAST_NOT_FOUND":
+            return jsonify({"error": result.code}), 404
+        return jsonify(result.data)
+
+    @routes.post("/api/broadcasts/<broadcast_id>/pregame-numbers")
+    @dependencies.require_auth
+    def save_pregame_numbers(broadcast_id: str):
+        payload = request.get_json(silent=True) or {}
+        service = dependencies.get_social_media_preview_service()
+        result = (service.clear_pregame_numbers(broadcast_id) if payload.get("clear")
+                  else service.save_pregame_numbers(broadcast_id, payload.get("numbers")))
+        if result.code == "BROADCAST_NOT_FOUND":
+            return jsonify({"error": result.code}), 404
+        return jsonify(result.data)
+
+    @routes.get("/api/broadcasts/<broadcast_id>/pregame-story.png")
+    @dependencies.require_auth
+    def pregame_story_card(broadcast_id: str):
+        variant = request.args.get("variant", "0")
+        result = dependencies.get_social_media_preview_service().generate_pregame_card(
+            broadcast_id,
+            variant=int(variant) if variant.isdigit() else 0,
+            headline=request.args.get("headline", ""),
+            sponsor_id=request.args.get("sponsor", ""),
+            theme=request.args.get("theme", ""),
+            logo_style=request.args.get("logo", ""),
+        )
+        if result.code == "BROADCAST_NOT_FOUND":
+            return jsonify({"error": result.code}), 404
+        if result.code == "IMAGE_GENERATION_FAILED":
+            return jsonify(
+                {"error": result.code, "message": result.data.get("message", "Unable to generate the pregame graphic.")}
+            ), 500
+        response = Response(result.data["image"], mimetype="image/png")
+        response.headers["Content-Disposition"] = f'inline; filename="{result.data["filename"]}"'
+        return response
+
     @routes.get("/api/broadcasts/<broadcast_id>/postgame-story.png")
     @dependencies.require_auth
     def postgame_story_card(broadcast_id: str):

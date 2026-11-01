@@ -384,3 +384,75 @@ def test_single_player_of_the_game_strip_names_the_station() -> None:
     one = postgame_card.render_card_html(found, headline="x", station_name="CSRN",
                                          player_of_game=ps.players_of_the_game(found, "visitor:1"))
     assert ">CSRN Player of the Game<" in one
+
+
+def _pregame_facts_for_card():
+    results = [{"date": "2026-10-02", "home": True, "ours": 27, "theirs": 8, "opponent": "Columbus", "opponent_id": "c"},
+               {"date": "2026-10-09", "home": False, "ours": 14, "theirs": 21, "opponent": "Pontotoc", "opponent_id": "p"}]
+    team = lambda name, leaders, res: {"name": name, "record": "7-2", "region_record": "3-1", "classification": "5A", "region": "3",
+                                       "results": res, "leaders": leaders, "streak": ("W", 1), "mascot": "", "school_id": name}
+    leader = {"category": "rushing", "player": {"name": "Tyler Long"}, "row": {"rushing_yards": 1595, "rushing_touchdowns": 8}, "games": 2}
+    return {"broadcast_id": "g", "sport": "football", "date": "2026-10-30", "weekday": "Friday", "kickoff": "7 p.m.", "venue": "Cavalier Field",
+            "region_game": True, "designations": ["homecoming"], "meetings": [], "storylines": ["Senior night <tonight>"], "home_id": "h",
+            "teams": {"home": team("Caledonia", [leader], results), "visitor": team("Lafayette", [], [])}}
+
+
+def test_pregame_card_has_the_matchup_details_in_every_theme() -> None:
+    import postgame_card
+    import pregame_card
+
+    assert pregame_card.leader_line({"category": "rushing", "row": {"rushing_yards": 1595, "rushing_touchdowns": 8}}) == "1,595 rush yds, 8 TD"
+    for theme in postgame_card.THEMES:
+        html = pregame_card.render_card_html(_pregame_facts_for_card(), headline="Caledonia hosts Lafayette", station_name="CSRN", theme=theme)
+        assert f'class="theme-{theme} logo-round"' in html
+        for expected in ("Kickoff 7 p.m.", "Region 3 game", "Homecoming", "Region record", "5A · Region 3", "Points per game", "20.5",
+                         "Players to Watch", "Tyler Long", "Recent Results", "27-8 vs. Columbus", "Live on", "from games on CSRN", "Senior night &lt;tonight&gt;"):
+            assert expected in html, (theme, expected)
+
+
+def test_pregame_card_with_nothing_but_the_matchup_stays_a_full_card() -> None:
+    import pregame_card
+
+    facts = _pregame_facts_for_card()
+    for team in facts["teams"].values():
+        team.update(results=[], leaders=[], record="", region_record="", classification="", region="")
+    facts.update(storylines=[], region_game=False, designations=[], kickoff="")
+    html = pregame_card.render_card_html(facts, headline="Preview", station_name="CSRN")
+    assert " sparse" in html and 'class="lower' not in html and "from games on" not in html
+
+
+GRAPHIC_JSON = """{"home": {"record": "6-3", "region_record": "3-1", "points_per_game": "28.4", "points_allowed": "not known",
+"results": ["W 27-8 vs. Columbus", "see https://example.com/x", "27-8 no mark"], "players": [{"name": "Sam Rivers", "line": "595 rush yds, 8 TD"}]},
+"visitor": {"record": "bad", "region_record": "", "results": [], "players": []}, "last_meeting": "New Hope won 28-14 in 2025"}"""
+
+
+def test_graphic_data_is_split_out_of_the_story_and_notes() -> None:
+    answer = f"Preview\n\nThe story.\n\nNOTES FOR THE STATION\n- Check the record.\n\nGRAPHIC DATA\n```json\n{GRAPHIC_JSON}\n```"
+    client = FakeClient([response([text_block(answer)])])
+    result = writer_with(client).write("pregame", "facts", station="CSRN", home="New Hope", visitor="Caledonia", opponent="New Hope")
+    assert result.ok and result.data["story"] == "The story." and result.data["notes"] == ["Check the record."]
+    assert result.data["graphic"]["home"]["record"] == "6-3"
+    assert ai_writer.split_graphic_data("Story only")[1] is None
+    assert ai_writer.split_graphic_data("Story\n\nGRAPHIC DATA\n{broken")[0] == "Story"
+
+
+def test_numbers_are_cleaned_and_replace_what_the_card_shows() -> None:
+    import json
+
+    import pregame_card
+
+    numbers = pregame_card.clean_numbers(json.loads(GRAPHIC_JSON))
+    home = numbers["home"]
+    assert home["record"] == "6-3" and home["points_per_game"] == "28.4" and home["points_allowed"] == ""
+    assert home["results"] == ["W 27-8 vs. Columbus"]                      # links and unmarked lines dropped
+    assert numbers["visitor"]["record"] == ""
+    assert pregame_card.clean_numbers({"home": {"players": ["Sam Rivers: 595 rush yds"]}})["home"]["players"] == [{"name": "Sam Rivers", "line": "595 rush yds"}]
+    assert not pregame_card.has_numbers(pregame_card.clean_numbers({}))
+    facts = _pregame_facts_for_card()
+    html = pregame_card.render_card_html(facts, headline="H", station_name="CSRN", numbers=numbers)
+    for expected in ("6-3", "28.4", "Sam Rivers", "New Hope won 28-14 in 2025", "public sources and games on CSRN, reviewed by CSRN"):
+        assert expected in html
+    assert "Tyler Long" not in html and "from games on CSRN.</p>" not in html
+    assert "Tyler Long" in pregame_card.render_card_html(facts, headline="H", station_name="CSRN")
+    assert pregame_card.app_numbers(facts)["home"]["results"][0] == "W 27-8 vs. Columbus"
+

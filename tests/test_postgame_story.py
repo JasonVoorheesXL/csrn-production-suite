@@ -354,3 +354,25 @@ def test_a_player_of_the_game_for_each_team() -> None:
     card = postgame_card.render_card_html(found, headline="x", station_name="WSN",
                                           player_of_game=ps.players_of_the_game(found, "home:2,visitor:1"))
     assert "West Point Player of the Game" in card and "Caledonia Player of the Game" in card
+
+
+def test_pregame_numbers_wait_for_review_before_the_graphic_uses_them(postgame_client) -> None:
+    url = f"/api/broadcasts/{BROADCAST_ID}/pregame-numbers"
+    service = app_module.get_social_media_preview_service()
+    assert postgame_client.post(url, json={"clear": True}).status_code == 200
+    try:
+        service._save_numbers(BROADCAST_ID, {"draft": {"home": {"record": "9-9"}, "visitor": {}, "last_meeting": ""}})
+        waiting = postgame_client.get(url).get_json()
+        assert waiting["waiting"] and not waiting["in_use"] and waiting["numbers"]["home"]["record"] == "9-9"
+        assert "9-9" not in service.pregame_card_document(BROADCAST_ID)
+        saved = postgame_client.post(url, json={"numbers": {"home": {"record": "9-9"}}}).get_json()
+        assert saved["in_use"] and not saved["waiting"]
+        assert "9-9" in service.pregame_card_document(BROADCAST_ID)
+        cleared = postgame_client.post(url, json={"clear": True}).get_json()
+        assert not cleared["in_use"] and "9-9" not in service.pregame_card_document(BROADCAST_ID)
+    finally:
+        service._save_numbers(BROADCAST_ID, {})
+    assert postgame_client.get("/api/broadcasts/nope/pregame-numbers").status_code == 404
+    png = postgame_client.get(f"/api/broadcasts/{BROADCAST_ID}/pregame-story.png?theme=neon")
+    assert png.status_code == 200 and png.mimetype == "image/png"
+
