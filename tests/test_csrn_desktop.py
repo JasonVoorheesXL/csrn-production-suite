@@ -546,7 +546,7 @@ def test_pick_broadcast_software_returns_the_chosen_path(monkeypatch) -> None:
         create_file_dialog=lambda *a, **k: ("C:\\obs-studio\\bin\\64bit\\obs64.exe",)
     )
     fake_webview = types.SimpleNamespace(
-        windows=[fake_window], OPEN_DIALOG="open"
+        windows=[fake_window], FileDialog=types.SimpleNamespace(OPEN="open")
     )
     monkeypatch.setitem(sys.modules, "webview", fake_webview)
 
@@ -556,7 +556,7 @@ def test_pick_broadcast_software_returns_the_chosen_path(monkeypatch) -> None:
 
 def test_pick_broadcast_software_returns_empty_string_when_cancelled(monkeypatch) -> None:
     fake_window = types.SimpleNamespace(create_file_dialog=lambda *a, **k: None)
-    fake_webview = types.SimpleNamespace(windows=[fake_window], OPEN_DIALOG="open")
+    fake_webview = types.SimpleNamespace(windows=[fake_window], FileDialog=types.SimpleNamespace(OPEN="open"))
     monkeypatch.setitem(sys.modules, "webview", fake_webview)
 
     api = csrn_desktop.DesktopApi()
@@ -568,7 +568,7 @@ def test_pick_broadcast_software_survives_a_dialog_failure(monkeypatch) -> None:
         raise RuntimeError("GUI toolkit not ready")
 
     fake_window = types.SimpleNamespace(create_file_dialog=_boom)
-    fake_webview = types.SimpleNamespace(windows=[fake_window], OPEN_DIALOG="open")
+    fake_webview = types.SimpleNamespace(windows=[fake_window], FileDialog=types.SimpleNamespace(OPEN="open"))
     monkeypatch.setitem(sys.modules, "webview", fake_webview)
 
     api = csrn_desktop.DesktopApi()
@@ -576,7 +576,7 @@ def test_pick_broadcast_software_survives_a_dialog_failure(monkeypatch) -> None:
 
 
 def test_pick_broadcast_software_returns_empty_string_with_no_open_window(monkeypatch) -> None:
-    fake_webview = types.SimpleNamespace(windows=[], OPEN_DIALOG="open")
+    fake_webview = types.SimpleNamespace(windows=[], FileDialog=types.SimpleNamespace(OPEN="open"))
     monkeypatch.setitem(sys.modules, "webview", fake_webview)
 
     api = csrn_desktop.DesktopApi()
@@ -629,7 +629,7 @@ def test_save_reel_always_ends_in_mp4(tmp_path, monkeypatch) -> None:
         seen.update(options)
         return (str(chosen),)
 
-    fake = types.SimpleNamespace(SAVE_DIALOG=30, windows=[types.SimpleNamespace(create_file_dialog=dialog)])
+    fake = types.SimpleNamespace(FileDialog=types.SimpleNamespace(SAVE=30), windows=[types.SimpleNamespace(create_file_dialog=dialog)])
     monkeypatch.setitem(sys.modules, "webview", fake)
     saved = csrn_desktop.DesktopApi().save_reel("a-reel.mp4", base64.b64encode(b"video").decode())
     assert saved == str(chosen) + ".mp4"
