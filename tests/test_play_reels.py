@@ -82,6 +82,7 @@ def test_reel_routes_list_plays_and_return_a_real_vertical_mp4(reel_client) -> N
     assert reel_client.get(f"/api/broadcasts/{BROADCAST_ID}/reel.mp4?play=nope").status_code == 404
     response = reel_client.get(f"/api/broadcasts/{BROADCAST_ID}/reel.mp4?play={play['id']}")
     assert response.status_code == 200 and response.mimetype == "video/mp4"
+    assert response.data.find(b"moov") < response.data.find(b"mdat")   # fast start, as Facebook asks for
     container = av.open(io.BytesIO(response.data))
     stream = container.streams.video[0]
     assert (stream.width, stream.height) == (1080, 1920) and stream.codec_context.name == "h264"
@@ -132,3 +133,14 @@ def test_script_carries_the_dance_and_the_page_knows_every_dance() -> None:
     page = reel_render.page(rs.script(found, play, broadcast=BROADCAST))
     for name in rs.DANCES:
         assert f"{name}: b =>" in page
+
+
+def test_reel_footer_uses_the_station_logo_in_the_chosen_style() -> None:
+    found = facts()
+    script = rs.script(found, rs.plays(found)[0], broadcast=BROADCAST, station_name="WSN",
+                       station_logo="data:image/png;base64,AAAA", logo_style="glass")
+    document = reel_render.page(script)
+    assert "data:image/png;base64,AAAA" in document
+    assert '"logo_style": "glass"' in document or '"logo_style":"glass"' in document
+    assert "stationClip" in document and "stationGlass" in document
+

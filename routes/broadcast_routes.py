@@ -273,6 +273,7 @@ def create_broadcast_blueprint(
         result = dependencies.get_social_media_preview_service().generate_reel(
             broadcast_id, request.args.get("play", ""),
             sponsor_id=request.args.get("sponsor", ""), dance=request.args.get("dance", ""),
+            logo_style=request.args.get("logo", ""),
         )
         if result.code in {"BROADCAST_NOT_FOUND", "PLAY_NOT_FOUND"}:
             return jsonify({"error": result.code}), 404

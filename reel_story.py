@@ -159,7 +159,8 @@ def _captions(kind: str, td: bool, yards: int, hero: str, passer: str, team: str
 
 
 def script(facts: Mapping[str, Any], play: Mapping[str, Any], *, broadcast: Mapping[str, Any],
-           station_name: str = "", sponsor_name: str = "", sponsor_logo: str = "", dance: str = "shimmy",
+           station_name: str = "", station_logo: str = "", logo_style: str = "round",
+           sponsor_name: str = "", sponsor_logo: str = "", dance: str = "shimmy",
            colors: Mapping[str, Mapping[str, str]] | None = None) -> dict[str, Any]:
     """Everything the paper-cutout animation needs for one play."""
     teams = facts["teams"]
@@ -200,6 +201,8 @@ def script(facts: Mapping[str, Any], play: Mapping[str, Any], *, broadcast: Mapp
                               teams[team]["name"], teams[other]["name"]),
         "score_after": after,
         "station": station_name,
+        "station_logo": station_logo,
+        "logo_style": logo_style,
         "sponsor": sponsor_name,
         "sponsor_logo": sponsor_logo,
         "dance": dance if dance in DANCES else "shimmy",
