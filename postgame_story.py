@@ -140,6 +140,9 @@ class Names:
             return first, last  # preferred_name already holds the full name
         return (f"{first} {last}".strip(), last)
 
+    def roster_player(self, team: str, number: Any) -> Mapping[str, Any] | None:
+        return self._by_number(team, number)
+
     def _by_number(self, team: str, number: Any) -> Mapping[str, Any] | None:
         number = str(number or "").strip()
         if not number:
@@ -615,6 +618,9 @@ def build_facts(
         "big_plays": big_plays(register, scores, names, winner),
         "standouts": {team: standouts(players, team, names) for team in TEAMS},
         "timeline": timeline(register, scores, events, names, teams),
+        # For the play reels: where each play was on the field, and the roster behind each name.
+        "events": events,
+        "names": names,
         "penalties": _penalties(register, teams, raw_names),
         "players": player_choices(players, names, teams),
         "player_rows": {f"{team}:{number}": row for (team, number), row in every_player.items() if number},
@@ -737,7 +743,7 @@ def timeline(
                 if drive and score["kind"] == "touchdown" and (drive["yards"] is None or drive["yards"] < (score.get("yards") or 0)):
                     drive["yards"] = None
         items.append({"type": "score", "quarter": score["quarter"], "order": score.get("at", 0), "team": score["team"],
-                      "score": score, "drive": drive})
+                      "score": score, "drive": drive, "row": register[index] if index is not None else None})
     for index, row in enumerate(register):
         if row.get("undone") or index in scoring_rows:
             continue
@@ -760,7 +766,7 @@ def timeline(
                 continue  # told as the score
             items.append({"type": turnover, "quarter": quarter, "order": order, "team": defense, "player": who,
                           "victim": victim if victim and victim.get("name") and not victim.get("unknown") else None,
-                          "yards": _int(row.get("return_yards"))})
+                          "yards": _int(row.get("return_yards")), "row": row})
         elif turnover == "downs" and offense in TEAMS:
             ytg = yards_to_goal(row.get("ball_spot"), _heading(row, offense, events))
             if ytg is not None and ytg <= STOP_ZONE_YARDS:
@@ -774,14 +780,14 @@ def timeline(
             else:
                 who, passer = names.person(offense, row.get("player_number"), row.get("player_name")), None
             items.append({"type": "pass" if play_type == "pass" else "run", "quarter": quarter, "order": order,
-                          "team": offense, "player": who, "passer": passer, "yards": _int(row.get("yards"))})
+                          "team": offense, "player": who, "passer": passer, "yards": _int(row.get("yards")), "row": row})
         elif play_type in ("kickoff", "punt") and _int(row.get("return_yards")) >= BIG_RETURN_YARDS:
             kicking = str(row.get("kicking_team", "") or "")
             receiving = _other(kicking) if kicking in TEAMS else defense
             if receiving in TEAMS:
                 items.append({"type": f"{play_type}_return", "quarter": quarter, "order": order, "team": receiving,
                               "player": names.person(receiving, row.get("returner_number"), row.get("returner_name")),
-                              "yards": _int(row.get("return_yards"))})
+                              "yards": _int(row.get("return_yards")), "row": row})
     told = {(s["team"], s["quarter"], s.get("yards"), (s.get("player") or {}).get("name")) for s in scores if s["kind"] == "touchdown"}
     items = [i for i in items if not (i["type"] in ("run", "pass")
                                       and (i["team"], i["quarter"], i["yards"], (i.get("player") or {}).get("name")) in told)]
