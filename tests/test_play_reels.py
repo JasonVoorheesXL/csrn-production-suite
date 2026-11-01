@@ -42,7 +42,7 @@ def test_script_has_the_title_captions_and_the_recreation_label() -> None:
     broadcast = {**BROADCAST, "week": "9"}
     script = rs.script(found, play, broadcast=broadcast, station_name="WSN", sponsor_name="Main Street Hardware",
                        colors={"home": {"primary": "#0b6b3a"}, "visitor": {"primary": "#b5121b"}})
-    assert script["title"]["kicker"] == "WEEK 9 · CALEDONIA AT WEST POINT"
+    assert script["title"]["kicker"] == "CALEDONIA AT WEST POINT"
     assert script["title"]["name"] == "Jaylen Hall" and script["title"]["line"] == "63-yard touchdown run"
     assert [c["text"] for c in script["captions"]] == ["Hall takes the handoff", "Hall breaks free!", "TOUCHDOWN!"]
     assert script["score_after"] == "Caledonia 3, West Point 14"
