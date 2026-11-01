@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Callable
+from urllib.parse import quote
 
 from flask import Blueprint, Response, jsonify, request
 
@@ -261,25 +262,25 @@ def create_broadcast_blueprint(
     def ai_writer_test():
         return _ai_writer_response(dependencies.get_ai_writer().test())
 
-    @routes.get("/api/broadcasts/<broadcast_id>/reel-plays")
+    @routes.get("/api/reel-plays")
     @dependencies.require_auth
-    def reel_plays(broadcast_id: str):
-        result = dependencies.get_social_media_preview_service().reel_plays(broadcast_id)
-        if result.code == "BROADCAST_NOT_FOUND":
-            return jsonify({"error": result.code}), 404
-        return jsonify(result.data)
+    def season_reel_plays():
+        return jsonify(dependencies.get_social_media_preview_service().season_reel_plays().data)
 
     @routes.get("/api/broadcasts/<broadcast_id>/reel.mp4")
     @dependencies.require_auth
     def play_reel(broadcast_id: str):
         result = dependencies.get_social_media_preview_service().generate_reel(
-            broadcast_id, request.args.get("play", ""), sponsor_id=request.args.get("sponsor", ""),
+            broadcast_id, request.args.get("play", ""),
+            sponsor_id=request.args.get("sponsor", ""), dance=request.args.get("dance", ""),
         )
         if result.code in {"BROADCAST_NOT_FOUND", "PLAY_NOT_FOUND"}:
             return jsonify({"error": result.code}), 404
         if result.code == "REEL_FAILED":
             return jsonify({"error": result.code, "message": result.data.get("message", "The reel could not be made.")}), 500
         response = Response(result.data["video"], mimetype="video/mp4")
+        response.headers["X-Reel-Sponsor"] = quote(result.data.get("sponsor", ""))
+        response.headers["X-Reel-Dance"] = quote(result.data.get("dance", ""))
         response.headers["Content-Disposition"] = f'inline; filename="{result.data["filename"]}"'
         response.headers["Cache-Control"] = "no-store"
         return response

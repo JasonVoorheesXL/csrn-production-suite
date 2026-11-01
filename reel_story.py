@@ -19,6 +19,8 @@ import postgame_story as post
 from postgame_story import TEAMS, _int, quarter_phrase, quarter_tag, yards_to_goal
 
 REEL_KINDS = ("run", "pass", "interception", "kickoff_return", "punt_return", "field_goal")
+DANCES = {"shimmy": "Shimmy", "robot": "Robot", "disco": "Disco Point", "moonwalk": "Moonwalk",
+          "fistpump": "Fist Pump", "kneeknock": "Knee Knocker", "twirl": "Paper Twirl"}
 GRADE_NAMES = {"9": "Freshman", "10": "Sophomore", "11": "Junior", "12": "Senior"}
 
 
@@ -157,7 +159,8 @@ def _captions(kind: str, td: bool, yards: int, hero: str, passer: str, team: str
 
 
 def script(facts: Mapping[str, Any], play: Mapping[str, Any], *, broadcast: Mapping[str, Any],
-           station_name: str = "", sponsor_name: str = "", colors: Mapping[str, Mapping[str, str]] | None = None) -> dict[str, Any]:
+           station_name: str = "", sponsor_name: str = "", sponsor_logo: str = "", dance: str = "shimmy",
+           colors: Mapping[str, Mapping[str, str]] | None = None) -> dict[str, Any]:
     """Everything the paper-cutout animation needs for one play."""
     teams = facts["teams"]
     team, other = play["team"], ("visitor" if play["team"] == "home" else "home")
@@ -198,5 +201,7 @@ def script(facts: Mapping[str, Any], play: Mapping[str, Any], *, broadcast: Mapp
         "score_after": after,
         "station": station_name,
         "sponsor": sponsor_name,
+        "sponsor_logo": sponsor_logo,
+        "dance": dance if dance in DANCES else "shimmy",
         "label": "Animated recreation from the official stats",
     }

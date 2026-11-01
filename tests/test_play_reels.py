@@ -75,8 +75,10 @@ def reel_client(monkeypatch: pytest.MonkeyPatch):
 def test_reel_routes_list_plays_and_return_a_real_vertical_mp4(reel_client) -> None:
     import av
 
-    plays = reel_client.get(f"/api/broadcasts/{BROADCAST_ID}/reel-plays").get_json()["plays"]
-    play = next(p for p in plays if p["kind"] == "run" and p["td"])
+    season = reel_client.get("/api/reel-plays").get_json()
+    assert [g["broadcast_id"] for g in season["games"]] == [BROADCAST_ID]
+    assert {d["id"] for d in season["dances"]} == set(rs.DANCES)
+    play = next(p for p in season["games"][0]["plays"] if p["kind"] == "run" and p["td"])
     assert reel_client.get(f"/api/broadcasts/{BROADCAST_ID}/reel.mp4?play=nope").status_code == 404
     response = reel_client.get(f"/api/broadcasts/{BROADCAST_ID}/reel.mp4?play={play['id']}")
     assert response.status_code == 200 and response.mimetype == "video/mp4"
@@ -88,4 +90,45 @@ def test_reel_routes_list_plays_and_return_a_real_vertical_mp4(reel_client) -> N
 
 def test_reels_need_login() -> None:
     with app_module.app.test_client() as client:
-        assert client.get(f"/api/broadcasts/{BROADCAST_ID}/reel-plays").status_code == 401
+        assert client.get("/api/reel-plays").status_code == 401
+
+
+def _service(monkeypatch, sponsors, rng=None):
+    import random
+    monkeypatch.setattr(app_module, "SOCIAL_MEDIA_PREVIEW_SERVICE", None, raising=False)
+
+    class Sponsors:
+        def __init__(self):
+            self.asked = []
+
+        def list_payload(self, sport=""):
+            self.asked.append(sport)
+            return {"sponsors": [s for s in sponsors if not sport or s.get("sport", "") in ("", sport.casefold())]}
+
+    holder = Sponsors()
+    monkeypatch.setattr(app_module, "get_sponsor_service", lambda: holder)
+    service = app_module.get_social_media_preview_service()
+    service._rng = rng or random.Random(4)
+    return service, holder
+
+
+def test_random_sponsor_comes_from_the_games_sport(monkeypatch) -> None:
+    sponsors = [{"id": "a", "name": "Alpha", "sport": "football", "active": True},
+                {"id": "b", "name": "Bravo", "sport": "basketball", "active": True},
+                {"id": "c", "name": "Charlie", "sport": "", "active": True}]
+    service, holder = _service(monkeypatch, sponsors)
+    picks = {service._reel_sponsor({"sport": "Football"}, "random")["name"] for _ in range(30)}
+    assert picks == {"Alpha", "Charlie"} and holder.asked[-1] == "Football"
+    assert service._reel_sponsor({"sport": "Football"}, "none") is None
+    assert service._reel_sponsor({"sport": "Football"}, "a")["name"] == "Alpha"
+    app_module.SOCIAL_MEDIA_PREVIEW_SERVICE = None
+
+
+def test_script_carries_the_dance_and_the_page_knows_every_dance() -> None:
+    found = facts()
+    play = rs.plays(found)[0]
+    assert rs.script(found, play, broadcast=BROADCAST, dance="robot")["dance"] == "robot"
+    assert rs.script(found, play, broadcast=BROADCAST, dance="nope")["dance"] == "shimmy"
+    page = reel_render.page(rs.script(found, play, broadcast=BROADCAST))
+    for name in rs.DANCES:
+        assert f"{name}: b =>" in page

@@ -431,9 +431,10 @@ class SocialMediaPreviewService:
         # mid-broadcast. Such sponsors still appear via the text fallback.
         return "", "dark"
 
-    def _active_sponsors(self) -> list[dict[str, Any]]:
+    def _active_sponsors(self, sport: str = "") -> list[dict[str, Any]]:
         try:
-            sponsors = self._get_sponsor_service().list_payload().get("sponsors", [])
+            service = self._get_sponsor_service()
+            sponsors = (service.list_payload(sport) if sport else service.list_payload()).get("sponsors", [])
         except Exception:
             sponsors = []
         return [
@@ -1566,15 +1567,54 @@ class SocialMediaPreviewService:
 
     # -- paper-cutout play reels ---------------------------------------------------------
 
-    def reel_plays(self, broadcast_id: str) -> SocialMediaPreviewResult:
-        broadcast = self._find_broadcast(broadcast_id)
-        if broadcast is None:
-            return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
-        facts = self._postgame_facts(broadcast)
-        plays = [{"id": p["id"], "label": p["label"], "kind": p["kind"], "td": p["td"]} for p in reel_story.plays(facts)]
-        return SocialMediaPreviewResult("OK", {"broadcast_id": broadcast_id, "plays": plays})
+    def season_reel_plays(self, sport: str = "football") -> SocialMediaPreviewResult:
+        """Every reel-worthy play of every finished game, newest game first, with
+        the sponsors loaded for the sport and the celebrations to choose from."""
+        try:
+            games = [g for g in self._load_broadcasts() or [] if isinstance(g, Mapping)]
+        except Exception:
+            games = []
+        rows = []
+        for game in games:
+            if game.get("archived") or str(game.get("sport", "") or "").strip().casefold() != sport.casefold():
+                continue
+            if str(game.get("status", "") or "").lower() != "completed":
+                continue
+            facts = self._postgame_facts(game)
+            plays = reel_story.plays(facts)
+            if not plays:
+                continue
+            teams = facts["teams"]
+            rows.append({
+                "broadcast_id": str(game.get("broadcast_id", "")),
+                "date": str(game.get("date", "") or ""),
+                "season": str(game.get("season", "") or ""),
+                "label": f"{game.get('date') or 'No date'} · {teams['visitor']['name']} at {teams['home']['name']}",
+                "plays": [{"id": p["id"], "label": p["label"], "kind": p["kind"], "td": p["td"],
+                           "team": teams[p["team"]]["name"], "player": p["player"]["name"]} for p in plays],
+            })
+        rows.sort(key=lambda row: row["date"], reverse=True)
+        sponsors = sorted(self._active_sponsors(sport), key=lambda s: str(s.get("name", "")).casefold())
+        return SocialMediaPreviewResult("OK", {
+            "games": rows,
+            "sponsors": [{"id": str(s.get("id", "")), "name": s.get("name", "")} for s in sponsors],
+            "dances": [{"id": key, "label": label} for key, label in reel_story.DANCES.items()],
+        })
 
-    def reel_document(self, broadcast_id: str, play_id: str, *, sponsor_id: str = "") -> str | None:
+    def _reel_sponsor(self, broadcast: Mapping[str, Any], sponsor_id: str) -> dict[str, Any] | None:
+        """A named sponsor, none, or by default a random pick among the active
+        sponsors loaded for this game's sport."""
+        choice = str(sponsor_id or "random").strip()
+        if choice == "none":
+            return None
+        active = self._active_sponsors(str(broadcast.get("sport", "") or ""))
+        if choice != "random":
+            picked = next((s for s in active if str(s.get("id", "")) == choice), None)
+            if picked is not None:
+                return picked
+        return self._rng.choice(active) if active else None
+
+    def reel_document(self, broadcast_id: str, play_id: str, *, sponsor_id: str = "", dance: str = "") -> tuple[str, dict[str, str]] | None:
         broadcast = self._find_broadcast(broadcast_id)
         if broadcast is None:
             return None
@@ -1582,26 +1622,31 @@ class SocialMediaPreviewService:
         play = next((p for p in reel_story.plays(facts) if p["id"] == str(play_id)), None)
         if play is None:
             return None
-        sponsor = self._postgame_sponsor(broadcast_id, sponsor_id)
+        sponsor = self._reel_sponsor(broadcast, sponsor_id)
+        chosen_dance = dance if dance in reel_story.DANCES else self._rng.choice(list(reel_story.DANCES))
         station_name, _ = self._station()
         colors = {}
         for team in postgame_story.TEAMS:
             identity = broadcast.get(f"{team}_identity") if isinstance(broadcast.get(f"{team}_identity"), Mapping) else {}
             colors[team] = {"primary": str(identity.get("primary_color") or ""), "secondary": str(identity.get("secondary_color") or "")}
         script = reel_story.script(facts, play, broadcast=broadcast, station_name=station_name,
-                                   sponsor_name=str((sponsor or {}).get("name", "") or ""), colors=colors)
+                                   sponsor_name=str((sponsor or {}).get("name", "") or ""),
+                                   sponsor_logo=self._sponsor_logo_uri(sponsor)[0] if sponsor else "",
+                                   dance=chosen_dance, colors=colors)
         font = self._data_uri_from_file(self._get_static_dir() / "fonts" / "bangers-regular.woff2")
         if font:
             font = "data:font/woff2;base64," + font.split(",", 1)[1]
-        return reel_render.page(script, font)
+        return reel_render.page(script, font), {"sponsor": str((sponsor or {}).get("name", "") or ""),
+                                                "dance": reel_story.DANCES[chosen_dance]}
 
-    def generate_reel(self, broadcast_id: str, play_id: str, *, sponsor_id: str = "") -> SocialMediaPreviewResult:
+    def generate_reel(self, broadcast_id: str, play_id: str, *, sponsor_id: str = "", dance: str = "") -> SocialMediaPreviewResult:
         """A short vertical MP4: the play redrawn as a paper-cutout animation."""
         if self._find_broadcast(broadcast_id) is None:
             return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
-        document = self.reel_document(broadcast_id, play_id, sponsor_id=sponsor_id)
-        if document is None:
+        built = self.reel_document(broadcast_id, play_id, sponsor_id=sponsor_id, dance=dance)
+        if built is None:
             return SocialMediaPreviewResult("PLAY_NOT_FOUND")
+        document, chosen = built
         try:
             video = reel_render.render_mp4(document)
         except Exception as exc:
@@ -1612,4 +1657,4 @@ class SocialMediaPreviewService:
             (self.output_dir / filename).write_bytes(video)
         except OSError:
             pass
-        return SocialMediaPreviewResult("OK", {"video": video, "filename": filename})
+        return SocialMediaPreviewResult("OK", {"video": video, "filename": filename, **chosen})
