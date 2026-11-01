@@ -188,7 +188,7 @@ class DesktopApi:
             if window is None:
                 return ""
             result = window.create_file_dialog(
-                webview.OPEN_DIALOG,
+                webview.FileDialog.OPEN,
                 allow_multiple=False,
                 file_types=("Programs (*.exe)", "All files (*.*)"),
             )
@@ -212,7 +212,7 @@ class DesktopApi:
             if window is None:
                 return ""
             result = window.create_file_dialog(
-                webview.SAVE_DIALOG,
+                webview.FileDialog.SAVE,
                 save_filename=Path(str(suggested_name or "reel")).name,
                 file_types=("MP4 video (*.mp4)",),
             )
