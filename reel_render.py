@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import io
 import json
+import tempfile
 from fractions import Fraction
+from pathlib import Path
 from typing import Any, Callable, Mapping
 
 WIDTH = 1080
@@ -296,7 +298,23 @@ const captionText = text(captionG, 540, 1530, '', 84, '#1b1b1b');
 
 const footerG = document.getElementById('footer');
 if (S.sponsor) { $('polygon', {points: torn(80, 1640, 640, 170, 12), fill: '#fffdf6', filter: 'url(#cut)'}, footerG); text(footerG, 400, 1682, 'BROUGHT TO YOU BY', 28, '#5b4b32', 'plain'); if (S.sponsor_logo) { const img = $('image', {x: 140, y: 1692, width: 520, height: 104, preserveAspectRatio: 'xMidYMid meet'}, footerG); img.setAttributeNS('http://www.w3.org/1999/xlink', 'href', S.sponsor_logo); img.setAttribute('href', S.sponsor_logo); } else text(footerG, 400, 1755, S.sponsor, 46, '#1b1b1b', 'plain'); }
-text(footerG, S.sponsor ? 860 : 540, 1735, S.station || '', 56, '#fbf7e8');
+const markX = S.sponsor ? 860 : 540;
+if (S.station_logo) {
+  const size = 164, left = markX - size / 2, top = 1643, style = S.logo_style;
+  const clip = $('clipPath', {id: 'stationClip'}, footerG);
+  if (style === 'round') $('circle', {cx: markX, cy: top + size / 2, r: size / 2}, clip);
+  else $('rect', {x: left, y: top, width: size, height: size, rx: style === 'glass' ? 26 : 0}, clip);
+  if (style === 'glass') {
+    const sheen = $('linearGradient', {id: 'stationGlass', x1: 0, y1: 0, x2: .6, y2: 1}, footerG);
+    $('stop', {offset: 0, 'stop-color': '#ffffff', 'stop-opacity': .55}, sheen);
+    $('stop', {offset: 1, 'stop-color': '#ffffff', 'stop-opacity': .08}, sheen);
+    $('rect', {x: left, y: top, width: size, height: size, rx: 26, fill: 'url(#stationGlass)', stroke: '#ffffff', 'stroke-opacity': .55, 'stroke-width': 2}, footerG);
+  }
+  const inset = style === 'glass' ? 14 : 0;
+  const mark = $('image', {x: left + inset, y: top + inset, width: size - inset * 2, height: size - inset * 2, 'clip-path': 'url(#stationClip)',
+    preserveAspectRatio: style === 'round' ? 'xMidYMid slice' : 'xMidYMid meet'}, footerG);
+  mark.setAttribute('href', S.station_logo);
+} else text(footerG, markX, 1735, S.station || '', 56, '#fbf7e8');
 text(footerG, 540, 1860, S.label, 30, '#c9d6c2', 'plain');
 
 const overlay = document.getElementById('overlay');
@@ -397,7 +415,9 @@ def render_mp4(document: str, *, launch: Callable[[], Any] | None = None) -> byt
     from PIL import Image
     from playwright.sync_api import sync_playwright
 
-    buffer = io.BytesIO()
+    # Fast start (the index at the front, as Facebook asks for) needs a real file to rewrite.
+    workspace = tempfile.TemporaryDirectory(prefix="csrn-reel-")
+    target = Path(workspace.name) / "reel.mp4"
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True) if launch is None else launch(playwright)
         try:
@@ -406,10 +426,10 @@ def render_mp4(document: str, *, launch: Callable[[], Any] | None = None) -> byt
             page_.wait_for_function("window.drawFrame !== undefined && window.REEL_DURATION > 0")
             page_.evaluate("window.reelReady")
             duration = float(page_.evaluate("window.REEL_DURATION"))
-            container = av.open(buffer, mode="w", format="mp4")
+            container = av.open(str(target), mode="w", format="mp4", options={"movflags": "+faststart"})
             stream = container.add_stream("libx264", rate=VIDEO_FPS)
             stream.width, stream.height, stream.pix_fmt = WIDTH, HEIGHT, "yuv420p"
-            stream.options = {"crf": "21", "preset": "veryfast", "movflags": "+faststart"}
+            stream.options = {"crf": "21", "preset": "veryfast"}
             stream.time_base = Fraction(1, VIDEO_FPS)
             pts = 0
             for index in range(int(duration * DRAW_FPS) + 1):
@@ -426,4 +446,7 @@ def render_mp4(document: str, *, launch: Callable[[], Any] | None = None) -> byt
             container.close()
         finally:
             browser.close()
-    return buffer.getvalue()
+    try:
+        return target.read_bytes()
+    finally:
+        workspace.cleanup()

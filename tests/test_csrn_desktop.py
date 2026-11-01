@@ -614,3 +614,25 @@ def test_installer_launches_the_shell_exe_and_opens_the_lan_ports() -> None:
     assert "localport=5050" in iss and "localport=5051" in iss
     assert "[UninstallRun]" in iss and "delete rule" in iss
     assert "MicrosoftEdgeWebview2Setup.exe" in iss
+
+
+def test_save_reel_always_ends_in_mp4(tmp_path, monkeypatch) -> None:
+    import base64
+    import types
+
+    import csrn_desktop
+
+    chosen = tmp_path / "Caleb Lang 41yd TD"
+    seen = {}
+
+    def dialog(kind, **options):
+        seen.update(options)
+        return (str(chosen),)
+
+    fake = types.SimpleNamespace(SAVE_DIALOG=30, windows=[types.SimpleNamespace(create_file_dialog=dialog)])
+    monkeypatch.setitem(sys.modules, "webview", fake)
+    saved = csrn_desktop.DesktopApi().save_reel("a-reel.mp4", base64.b64encode(b"video").decode())
+    assert saved == str(chosen) + ".mp4"
+    assert (tmp_path / "Caleb Lang 41yd TD.mp4").read_bytes() == b"video"
+    assert seen["file_types"] == ("MP4 video (*.mp4)",) and seen["save_filename"] == "a-reel.mp4"
+

@@ -28,6 +28,7 @@ it and never starts or stops anything.
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import logging
 import socket
@@ -197,6 +198,35 @@ class DesktopApi:
         if not result:
             return ""  # operator cancelled
         return str(result[0])
+
+    def save_reel(self, suggested_name: str, video_base64: str) -> str:
+        """Save a reel with its .mp4 extension whatever the operator types.
+
+        pywebview's built-in download dialog only offers "All files", so a
+        file renamed there lost its extension and Facebook refused it.
+        """
+        try:
+            import webview  # noqa: PLC0415 -- optional GUI dependency, imported late
+
+            window = webview.windows[0] if webview.windows else None
+            if window is None:
+                return ""
+            result = window.create_file_dialog(
+                webview.SAVE_DIALOG,
+                save_filename=Path(str(suggested_name or "reel")).name,
+                file_types=("MP4 video (*.mp4)",),
+            )
+            if not result:
+                return ""  # operator cancelled
+            chosen = result if isinstance(result, str) else result[0]
+            path = Path(str(chosen))
+            if path.suffix.lower() != ".mp4":
+                path = path.with_name(path.name + ".mp4")
+            path.write_bytes(base64.b64decode(video_base64))
+        except Exception as error:  # noqa: BLE001 -- a save failure must never crash the shell
+            _LOGGER.exception("Reel save failed.")
+            raise RuntimeError("Windows would not save the file there.") from error
+        return str(path)
 
 
 def _create_window(webview, api=None):
