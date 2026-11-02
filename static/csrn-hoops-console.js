@@ -23,6 +23,7 @@ let hcToastData = null;
 let hcHideMarks = false;
 let hcDragging = false;
 let hcStarters = { home: [], visitor: [] };
+let hcClockShown = false;
 
 function hcFresh() {
   return { mode: 'idle', team: '', screen: null, points: 2, autoPoints: 2, result: '', shooter: '', shotType: '', targetId: '', fixId: '', ft: null, foulType: 'personal', foulFrom: null, subIn: '', subOut: '', subSide: '', benchCredit: null, afterSub: null, notes: {} };
@@ -810,6 +811,12 @@ function renderHoopsConsole() {
   root.classList.toggle('hidden', !active);
   hcSyncLiveLayout();
   if (!active || hcDragging) return;
+  // A new game loads with the clock hidden, the football default. Basketball shows it
+  // from the start; after the tip the Clock on air switch is the operator's.
+  if (currentState.clock_visible === false && !hcClockShown && !hcEvents().some(e => e.event_type === 'OPENING_TIP')) {
+    hcClockShown = true;
+    clockAction('set', { seconds: Number(currentState.clock_seconds ?? 0), visible: true });
+  }
   // The box score pop-up lives in the Command Center panel, which is hidden here.
   const box = document.getElementById('hoopsBoxScoreModal');
   if (box && box.parentElement !== document.body) document.body.appendChild(box);
