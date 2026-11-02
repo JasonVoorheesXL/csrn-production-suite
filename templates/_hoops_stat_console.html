@@ -1,0 +1,46 @@
+{# Basketball statistician console: tap the court, then the result and the player.
+   Included once in the Statistician module of templates/index.html. Behavior lives
+   in static/csrn-hoops-console.js, which also hides football's statistician panels
+   while a basketball game is active. #}
+<section id="hoopsStatConsole" class="hc hidden">
+  <style id="csrn-hoops-console">
+    .hc{--hc-line:#2e3540;--hc-panel:#1a1f27;--hc-deep:#12161c;--hc-chip:#232933;--hc-muted:#98a2b0;--hc-green:#28b463;--hc-miss:#e8525f;--hc-amber:#e5a321;display:flex;flex-direction:column;gap:10px;color:#f4f6f8;font-weight:600}
+    .hc button{appearance:none;border:1px solid var(--hc-line);background:var(--hc-chip);color:#f4f6f8;border-radius:10px;padding:11px 12px;font:inherit;font-weight:800;cursor:pointer;touch-action:manipulation;min-height:44px}
+    .hc button:hover{border-color:#6b7584}.hc button.on{border-color:#fff;background:#39424f}.hc button:disabled{opacity:.45;cursor:default}
+    .hc-top{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;background:var(--hc-panel);border:1px solid var(--hc-line);border-radius:12px;padding:8px 16px;gap:10px}
+    .hc-team{display:flex;align-items:center;gap:12px;min-width:0}.hc-team.r{justify-content:flex-end;text-align:right}.hc-team b{display:block;font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hc-score{font-size:44px;font-weight:900;min-width:64px;text-align:center;line-height:1}
+    .hc-sub{font-size:13px;color:var(--hc-muted);font-weight:600}.hc-bonus{color:var(--hc-amber);font-weight:800}
+    .hc-mid{display:flex;align-items:center;gap:10px;text-align:center}.hc-clock{font-size:34px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1}.hc-period{font-size:12px;letter-spacing:1px;color:var(--hc-muted);font-weight:800}
+    .hc-main{display:grid;grid-template-columns:224px minmax(0,1fr) 224px;gap:10px;align-items:start}
+    .hc-side{background:var(--hc-panel);border:1px solid var(--hc-line);border-radius:12px;padding:9px;display:flex;flex-direction:column;gap:7px}.hc-side.ask{border:2px solid #fff;padding:8px;box-shadow:0 0 0 3px rgba(255,255,255,.14)}.hc-side.off{opacity:.45}
+    .hc-side h4{margin:0;font-size:13px;letter-spacing:.5px;color:var(--hc-muted);min-height:18px}.hc-side.ask h4{color:#fff}
+    .hc .hc-p{display:grid;grid-template-columns:48px 1fr auto;gap:8px;align-items:center;text-align:left;padding:7px;min-height:62px;width:100%}.hc-p .n{height:46px;border-radius:8px;display:grid;place-items:center;font-size:21px;font-weight:900;color:#fff}.hc-p .nm{font-size:14px;line-height:1.1;display:block;overflow:hidden;text-overflow:ellipsis}.hc-p .pts{font-size:19px;font-weight:900}
+    .hc .hc-p.pick{border-color:#fff;background:#39424f}.hc .hc-p.warn{border-color:var(--hc-amber)}.hc .hc-p.out{opacity:.5}.hc-pips{display:flex;gap:2px;margin-top:4px}.hc-pips i{width:9px;height:9px;border-radius:50%;background:#3b4350}.hc-pips i.f{background:var(--hc-amber)}.hc-pips i.d{background:var(--hc-miss)}
+    .hc-list{display:flex;flex-direction:column;gap:5px;max-height:560px;overflow:auto}.hc-list .hc-p{min-height:44px;grid-template-columns:40px 1fr auto;padding:4px 7px}.hc-list .n{height:34px;font-size:16px}
+    .hc-bench{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}.hc .hc-chip{padding:0;min-height:40px;font-size:14px}.hc .hc-chip.pick{outline:3px solid #fff;outline-offset:1px}
+    .hc-label{font-size:12px;color:var(--hc-muted);letter-spacing:.5px;font-weight:800;text-transform:uppercase}
+    .hc-center{display:flex;flex-direction:column;gap:9px;min-width:0}.hc-card{background:var(--hc-panel);border:1px solid var(--hc-line);border-radius:12px;padding:10px 12px}.hc-card.hot{border:2px solid #fff}
+    .hc-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;font-size:13px;color:var(--hc-muted)}.hc-head strong{color:#fff;font-size:15px}
+    .hc-court{display:block;width:100%;height:auto;max-height:calc(100vh - 362px);min-height:240px;border-radius:8px;touch-action:none;cursor:crosshair;user-select:none}
+    .hc-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.hc-between{justify-content:space-between}.hc-acts{display:grid;grid-template-columns:repeat(8,1fr);gap:7px}
+    .hc-four{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.hc-two{display:grid;grid-template-columns:96px 1fr 1fr;gap:8px;align-items:center;margin-top:7px}
+    .hc .hc-big{font-size:20px;font-weight:900;padding:16px 6px;border-width:2px}.hc .made{background:var(--hc-green);border-color:var(--hc-green)}.hc .plus{background:#1c8a4b;border-color:#1c8a4b}.hc .miss{background:#3a2228;border-color:var(--hc-miss);color:#ffd6da}.hc .foul{background:#3b2f14;border-color:var(--hc-amber);color:#ffe3a6}.hc .sel{outline:3px solid #fff;outline-offset:2px}
+    .hc-tag{display:inline-block;background:#2a3a2f;color:#8fe3ad;border-radius:999px;padding:4px 11px;font-size:13px;font-weight:800}.hc-tag.amber{background:#3b2f14;color:#ffd77f}
+    .hc-toast{display:flex;align-items:center;gap:10px;background:#17301f;border:1px solid var(--hc-green);border-radius:10px;padding:9px 12px}.hc-toast.bad{background:#2c1b1f;border-color:var(--hc-miss)}.hc-toast b{font-size:16px}.hc-grow{flex:1;min-width:0}
+    .hc-feed{display:flex;flex-direction:column;gap:4px}.hc-ev{display:grid;grid-template-columns:52px 1fr auto;gap:8px;align-items:center;padding:3px 3px 3px 10px;background:var(--hc-deep);border-radius:8px;font-size:14px}.hc-ev .t{color:var(--hc-muted);font-size:13px}.hc .hc-ev button{min-height:32px;padding:3px 9px;font-size:12px;background:transparent}
+    .hc-error{color:#ffb3ba;font-weight:800}
+    @media (max-width:1240px){.hc-main{grid-template-columns:176px minmax(0,1fr) 176px}.hc .hc-p{grid-template-columns:40px 1fr auto;gap:6px;padding:5px}.hc-p .n{height:44px;font-size:18px}.hc-p .nm{font-size:13px}.hc-bench{grid-template-columns:repeat(3,1fr)}.hc .hc-chip{min-height:44px}.hc-acts{grid-template-columns:repeat(4,1fr)}.hc-score{font-size:36px;min-width:50px}.hc-team b{font-size:17px}.hc-clock{font-size:28px}.hc .hc-big{font-size:18px;padding:18px 4px}.hc-hideable{display:none}}
+    @media (max-width:760px){.hc-main{grid-template-columns:1fr}.hc-top{grid-template-columns:1fr}.hc-team.r{justify-content:flex-start;text-align:left}}
+  </style>
+  <div id="hcTop" class="hc-top"></div>
+  <div class="hc-main">
+    <aside id="hcVisitorSide" class="hc-side"></aside>
+    <div class="hc-center">
+      <div class="hc-card"><div id="hcCourtHead" class="hc-head"></div><div id="hcCourtWrap"></div></div>
+      <div id="hcToast"></div>
+      <div id="hcPanel"></div>
+      <div id="hcFeed" class="hc-card hc-feed"></div>
+    </div>
+    <aside id="hcHomeSide" class="hc-side"></aside>
+  </div>
+</section>

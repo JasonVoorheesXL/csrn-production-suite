@@ -68,7 +68,9 @@ class HoopsBoxScoreService:
         def line(player_id: str) -> dict[str, int]:
             return box.setdefault(player_id, _empty_line())
 
-        for event in cls._rebuilt_events(state):
+        events = cls._rebuilt_events(state)
+        standing = {e.get("event_id") for e in events}
+        for event in events:
             event_type = event.get("event_type")
             payload = event.get("payload") or {}
 
@@ -119,6 +121,12 @@ class HoopsBoxScoreService:
                 stealer = str(payload.get("stealPlayerId", "")).strip()
                 if stealer:
                     line(stealer)["stl"] += 1
+
+            elif event_type == "PLAY_NOTE" and payload.get("targetEventId") in standing:
+                for field, stat in (("assistId", "ast"), ("blockPlayerId", "blk"), ("turnoverPlayerId", "to")):
+                    player = str(payload.get(field, "")).strip()
+                    if player:
+                        line(player)[stat] += 1
 
         return box
 

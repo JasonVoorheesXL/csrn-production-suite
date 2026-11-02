@@ -1589,6 +1589,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
 
 
     <section id="statisticianModule" class="hidden">
+      {% include "_hoops_stat_console.html" %}
       <section class="panel statistician-console">
         <div class="module-tabs" role="tablist" aria-label="Statistician"><button type="button" role="tab" aria-selected="true" class="active" onclick="showModule('statistician')">Live Entry</button><button type="button" role="tab" aria-selected="false" onclick="showModule('statistics')">Box Score</button></div>
         <div class="section-heading-row"><div><h1>Statistician Console</h1><p class="section-note">Authoritative game-data entry when enabled.</p></div><span id="statisticianAuthorityBadge" class="phase-badge">DISABLED</span></div>
@@ -3903,6 +3904,7 @@ function render() {
     document.getElementById('broadcasterCoinTossPanel')?.classList.add('hidden');
     document.getElementById('broadcasterSpecialPhasePanel')?.classList.add('hidden');
     if (typeof renderHoopsControlPanel === 'function') renderHoopsControlPanel();
+    if (typeof renderHoopsConsole === 'function') renderHoopsConsole();
     return;
   }
 
@@ -7452,6 +7454,7 @@ window.addEventListener('load',loadActiveGraphicsTheme);</script>
 <script src="/static/csrn-pregame-theme-selector.js?v=pregame-theme-r2-collegiate"></script>
 <script src="/static/csrn-diamond-controls.js?v=diamond-p5-r1"></script>
 <script src="/static/csrn-hoops-controls.js?v=hoops-p5-r1"></script>
+<script src="/static/csrn-hoops-console.js?v=hoops-console-r1"></script>
 
 <div id="pregamePresentationModal" class="modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="pregamePresentationTitle">
   <div class="modal-card pregame-presentation-control-card">

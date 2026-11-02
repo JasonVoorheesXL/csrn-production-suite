@@ -136,7 +136,9 @@ def test_ui_covers_every_engine_backed_action_except_the_deliberately_deferred_o
     # bar; targeted correction is a power-user feature for later.
     ui_actions = _ui_action_names()
     deferred = {"correct_foul", "void_event", "correct_event"}
-    assert set(svc.ACTIONS.keys()) - ui_actions == deferred
+    # Run from the statistician console (static/csrn-hoops-console.js) only.
+    console_only = {"play_note", "opening_tip", "set_direction", "end_period"}
+    assert set(svc.ACTIONS.keys()) - ui_actions == deferred | console_only
 
 
 def test_shot_form_matches_apply_shot_payload_shape() -> None:

@@ -74,6 +74,7 @@ HOOPS_CANONICAL_FIELDS: tuple[str, ...] = (
     "tv_timeout",
     "game_end_candidate",
     "official_end_reason",
+    "home_first_half_attacks",
 )
 
 # Ledger bookkeeping -- part of canonical state but excluded from
@@ -164,6 +165,7 @@ def default_state() -> dict[str, Any]:
         "tv_timeout": False,
         "game_end_candidate": None,
         "official_end_reason": None,
+        "home_first_half_attacks": "right",
         "hoops_events": [],
         "last_applied_sequence": 0,
         "last_snapshot_event_id": "",
@@ -396,12 +398,39 @@ class HoopsStateFoundation:
         team = str(payload.get("team", ""))
         if payload.get("made"):
             cls.score_points(state, team, int(payload.get("points", 2)))
+        cls._apply_possession_after(state, payload)
+
+    @classmethod
+    def _apply_possession_after(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> None:
+        """The console says who has the ball next on plays that decide it. The
+        engine still never works that out itself: it records what it is told."""
+        team = str(payload.get("possessionAfter", ""))
+        if team in TEAMS:
+            cls.set_possession(state, team)
+
+    @classmethod
+    def apply_opening_tip(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
+        """payload: {team}. The team that won the tip has the ball; the
+        alternating-possession arrow starts with the other team."""
+        team = str(payload.get("team", ""))
+        if team in TEAMS:
+            cls.set_possession(state, team)
+            cls.set_possession_arrow(hoops, cls.opposite(team))
+
+    @classmethod
+    def apply_direction_set(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
+        """payload: {homeFirstHalfAttacks: "left"|"right"}. Which basket the home
+        team shoots at in the first half; the ends switch at halftime."""
+        direction = str(payload.get("homeFirstHalfAttacks", ""))
+        if direction in ("left", "right"):
+            hoops["home_first_half_attacks"] = direction
 
     @classmethod
     def apply_free_throw(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
         """payload: {team, made: bool, shooterId?, attemptNumber?, ofAttempts?}."""
         if payload.get("made"):
             cls.score_points(state, str(payload.get("team", "")), 1)
+        cls._apply_possession_after(state, payload)
 
     @classmethod
     def apply_rebound(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
@@ -438,6 +467,7 @@ class HoopsStateFoundation:
             threshold = payload.get("foulOutThreshold")
             if threshold is not None and new_count >= int(threshold):
                 cls.disqualify_player(hoops, player_id)
+        cls._apply_possession_after(state, payload)
 
     @classmethod
     def apply_held_ball(cls, state: dict[str, Any], hoops: dict[str, Any], payload: Mapping[str, Any]) -> None:
@@ -629,6 +659,8 @@ class HoopsStateFoundation:
         "LINEUP_SET": "apply_lineup_set",
         "SUBSTITUTION": "apply_substitution",
         "PERIOD_TRANSITION": "apply_period_transition",
+        "OPENING_TIP": "apply_opening_tip",
+        "DIRECTION_SET": "apply_direction_set",
     }
 
     @classmethod
