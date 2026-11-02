@@ -22,6 +22,13 @@ ROOT = Path(__file__).resolve().parents[1]
 RIGHT_WING_THREE = {"spotX": 62.0, "spotY": 40.0}
 
 
+def test_the_console_sees_rosters_made_after_the_page_loaded() -> None:
+    page = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    console = (ROOT / "static" / "csrn-hoops-console.js").read_text(encoding="utf-8")
+    assert "playerGraphicRosters=rosters;" in page
+    assert "hcKeepRostersFresh(active && root.offsetParent !== null);" in console
+
+
 def game() -> dict:
     state = {"sport": "basketball", "ruleset_id": "basketball/us-ms-mhsaa", "hoops": {}}
     state["hoops"] = {}

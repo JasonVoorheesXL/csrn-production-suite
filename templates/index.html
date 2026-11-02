@@ -4295,6 +4295,7 @@ async function applyDragonFlyRoster() {
 
 async function loadRosters(){
   rosters=await api('/api/rosters');
+  playerGraphicRosters=rosters;
   const schools=await api('/api/schools');
   const select=document.getElementById('rosterSchool');
   select.innerHTML='<option value="">Select school...</option>'+schools.map(s=>`<option value="${escapeHtml(s.id)}">${escapeHtml(s.broadcast_name||s.official_name)}</option>`).join('');

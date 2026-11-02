@@ -24,6 +24,8 @@ let hcHideMarks = false;
 let hcDragging = false;
 let hcStarters = { home: [], visitor: [] };
 let hcClockShown = false;
+const HC_ROSTER_RETRY_MS = 5000;
+let hcRosterFetch = { busy: false, at: 0, shown: false };
 
 function hcFresh() {
   return { mode: 'idle', team: '', screen: null, points: 2, autoPoints: 2, result: '', shooter: '', shotType: '', targetId: '', fixId: '', ft: null, foulType: 'personal', foulFrom: null, subIn: '', subOut: '', subSide: '', benchCredit: null, afterSub: null, notes: {} };
@@ -800,6 +802,22 @@ function hcRenderFeed() {
   }).join('') + '</div>';
 }
 
+// Rosters are made on another page, or another device, while this page stays open.
+// Fetch them each time the console opens, and keep checking while a team has none.
+function hcKeepRostersFresh(visible) {
+  const justOpened = visible && !hcRosterFetch.shown;
+  hcRosterFetch.shown = visible;
+  if (!visible || hcRosterFetch.busy) return;
+  const missing = !hoopsRosterPlayers('home').length || !hoopsRosterPlayers('visitor').length;
+  if (!justOpened && !(missing && Date.now() - hcRosterFetch.at >= HC_ROSTER_RETRY_MS)) return;
+  hcRosterFetch.busy = true;
+  hcRosterFetch.at = Date.now();
+  api('/api/rosters').then(list => {
+    hcRosterFetch.busy = false;
+    if (Array.isArray(list)) { playerGraphicRosters = list; renderHoopsConsole(); }
+  }).catch(() => { hcRosterFetch.busy = false; });
+}
+
 function renderHoopsConsole() {
   const root = document.getElementById('hoopsStatConsole');
   if (!root) return;
@@ -810,6 +828,7 @@ function renderHoopsConsole() {
   [...module.children].forEach(child => { if (child !== root) child.classList.toggle('hoops-hidden-for-console', active); });
   root.classList.toggle('hidden', !active);
   hcSyncLiveLayout();
+  hcKeepRostersFresh(active && root.offsetParent !== null);
   if (!active || hcDragging) return;
   // A new game loads with the clock hidden, the football default. Basketball shows it
   // from the start; after the tip the Clock on air switch is the operator's.
