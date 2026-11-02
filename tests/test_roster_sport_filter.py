@@ -11,8 +11,7 @@ INDEX = (Path(__file__).resolve().parents[1] / "templates" / "index.html").read_
 def test_dropdown_sits_on_the_list_and_filters_it() -> None:
     assert 'id="rosterSportFilter" onchange="setRosterSportFilter(this.value)"' in INDEX
     assert "String(r.sport||'').toLowerCase()===sport.toLowerCase()" in INDEX
-    assert "fillRosterSportFilter();
-  renderRosterList();" in INDEX
+    assert "fillRosterSportFilter();\n  renderRosterList();" in INDEX
 
 
 def test_saved_choice_survives_blocked_browser_storage() -> None:
