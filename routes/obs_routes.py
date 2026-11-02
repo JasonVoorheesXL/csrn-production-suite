@@ -5,6 +5,8 @@ from typing import Any, Callable
 
 from flask import Blueprint, jsonify, request, send_file
 
+import reel_audio
+
 
 RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
 
@@ -46,6 +48,14 @@ def create_obs_blueprint(dependencies: OBSRoutesDependencies) -> Blueprint:
         if path is None:
             return jsonify({"error": "AUDIO_NOT_FOUND"}), 404
         return send_file(path, mimetype="audio/mp4")
+
+    @routes.get("/api/broadcasts/<broadcast_id>/replay-audio/<int:play_at>/wave")
+    @dependencies.require_auth
+    def obs_replay_audio_wave(broadcast_id: str, play_at: int):
+        path = dependencies.get_replay_audio_service().clip_file(broadcast_id, play_at)
+        if path is None:
+            return jsonify({"error": "AUDIO_NOT_FOUND"}), 404
+        return jsonify(reel_audio.waveform(path))
 
     @routes.post("/api/obs/test")
     @dependencies.require_auth

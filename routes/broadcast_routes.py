@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any, Callable
 from urllib.parse import quote
@@ -283,7 +284,33 @@ def create_broadcast_blueprint(
         response.headers["X-Reel-Sponsor"] = quote(result.data.get("sponsor", ""))
         response.headers["X-Reel-Dance"] = quote(result.data.get("dance", ""))
         response.headers["X-Reel-Theme"] = quote(result.data.get("theme", ""))
+        response.headers["X-Reel-Seconds"] = str(result.data.get("seconds", 0))
         response.headers["Content-Disposition"] = f'inline; filename="{result.data["filename"]}"'
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @routes.get("/api/broadcasts/<broadcast_id>/reel-call.mp4")
+    @dependencies.require_auth
+    def play_reel_with_call(broadcast_id: str):
+        try:
+            play_at = int(request.args.get("at", ""))
+            start, end, offset = (float(request.args.get(name, "")) for name in ("start", "end", "offset"))
+        except ValueError:
+            return jsonify({"error": "INVALID_CALL", "message": "The call's times could not be read."}), 400
+        if not all(map(math.isfinite, (start, end, offset))):
+            return jsonify({"error": "INVALID_CALL", "message": "The call's times could not be read."}), 400
+        result = dependencies.get_social_media_preview_service().reel_with_call(
+            broadcast_id, request.args.get("play", ""), play_at, start=start, end=end, offset=offset,
+        )
+        if result.code == "CALL_NOT_FOUND":
+            return jsonify({"error": result.code, "message": "This play has no saved call."}), 404
+        if result.code == "REEL_NOT_MADE":
+            return jsonify({"error": result.code, "message": "Make the reel first."}), 409
+        if result.code == "REEL_FAILED":
+            return jsonify({"error": result.code, "message": result.data.get("message", "The call could not be added.")}), 500
+        response = Response(result.data["video"], mimetype="video/mp4")
+        response.headers["Content-Disposition"] = f'inline; filename="{result.data["filename"]}"'
+        response.headers["X-Reel-Call-Seconds"] = str(round(result.data["used"]["end"] - result.data["used"]["start"], 1))
         response.headers["Cache-Control"] = "no-store"
         return response
 
