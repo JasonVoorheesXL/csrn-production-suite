@@ -31,8 +31,9 @@ def test_roster_sport_select_offers_canadian_football() -> None:
 
 def test_new_roster_defaults_and_locks_sport_from_the_active_context() -> None:
     body = _fn("function newRoster(){")
-    assert "sportContext==='canadian_football'?'Canadian Football'" in body
-    assert "sportContext==='football'?'Football':''" in body
+    # Now every sport with a roster option, through the label table, not just the two footballs.
+    assert "const contextRosterSport=rosterSportFromContext();" in body
+    assert "canadian_football:'Canadian Football'" in HTML and "football:'Football'" in HTML
     assert "rosterSportSelect.disabled=Boolean(contextRosterSport);" in body
 
 
