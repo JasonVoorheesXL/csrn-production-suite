@@ -52,6 +52,7 @@ from asset_service import AssetService
 from graphics_service import GraphicsService
 from logo_service import LogoService
 from obs_service import OBSService
+from replay_audio_service import ReplayAudioService
 from configuration_service import ConfigurationService
 from state_service import StateService
 from diagnostics_service import DiagnosticsService
@@ -2205,6 +2206,7 @@ def get_social_media_preview_service() -> SocialMediaPreviewService:
             output_dir=SOCIAL_CARDS_DIR,
             load_rosters=load_rosters,
             get_ai_writer=get_ai_writer,
+            get_replay_audio=get_replay_audio_service,
         )
 
     return SOCIAL_MEDIA_PREVIEW_SERVICE
@@ -2922,6 +2924,19 @@ def update_obs_visual_state(mode: str) -> dict[str, Any]:
         return state
 
 
+REPLAY_AUDIO_SERVICE: ReplayAudioService | None = None
+
+
+def get_replay_audio_service() -> ReplayAudioService:
+    global REPLAY_AUDIO_SERVICE
+    if REPLAY_AUDIO_SERVICE is None:
+        REPLAY_AUDIO_SERVICE = ReplayAudioService(
+            load_config=load_config,
+            output_dir=DATA_DIR / "Social" / "ReplayAudio",
+        )
+    return REPLAY_AUDIO_SERVICE
+
+
 OBS_SERVICE: OBSService | None = None
 
 
@@ -3184,6 +3199,7 @@ OBS_ROUTES_BLUEPRINT = create_obs_blueprint(
     OBSRoutesDependencies(
         require_auth=require_auth,
         get_obs_service=lambda: get_obs_service(),
+        get_replay_audio_service=lambda: get_replay_audio_service(),
     )
 )
 APPLICATION_BLUEPRINTS.append(OBS_ROUTES_BLUEPRINT)
@@ -3486,6 +3502,7 @@ LIVE_GAME_ROUTES_BLUEPRINT = create_live_game_blueprint(
         load_state_for_reporting=lambda: load_state_for_reporting(),
         load_rosters=lambda: load_rosters(),
         peek_state=lambda reader: get_state_service().peek(reader),
+        get_replay_audio_service=lambda: get_replay_audio_service(),
     )
 )
 APPLICATION_BLUEPRINTS.append(LIVE_GAME_ROUTES_BLUEPRINT)

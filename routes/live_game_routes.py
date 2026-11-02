@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import threading
 from time import perf_counter
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from flask import Blueprint, current_app, jsonify, request
 
@@ -41,6 +41,8 @@ class LiveGameRoutesDependencies:
     # the full load() copy. Used for the before/after diagnostics summary on
     # every mutation; falls back to load_state when not provided.
     peek_state: Callable[[Callable[[State], Any]], Any] | None = None
+    # Optional: keeps the announcers' call for big plays (replay_audio_service).
+    get_replay_audio_service: Callable[[], Any] | None = None
 
 
 def create_live_game_blueprint(
@@ -365,6 +367,14 @@ def create_live_game_blueprint(
             return jsonify({"error": result.code}), 400
         return jsonify(result.data["state"])
 
+    def keep_replay_audio(method: str, details: Mapping[str, Any]) -> None:
+        """The play is already saved: nothing here may change its answer."""
+        try:
+            if dependencies.get_replay_audio_service is not None:
+                getattr(dependencies.get_replay_audio_service(), method)(details)
+        except Exception:
+            pass
+
     @routes.post("/api/event-trigger")
     @dependencies.require_auth
     def event_trigger():
@@ -389,6 +399,10 @@ def create_live_game_blueprint(
             log_route(event_type="SERVER_MUTATION", route="/api/event-trigger", action=str(payload.get("event") or "event"), request_id=request_id, payload=payload, status=409, started=started, before=before, after=load_summary_safely(), result=result)
             return jsonify({"error": result.code, **dict(result.data or {})}), 409
         log_route(event_type="SERVER_MUTATION", route="/api/event-trigger", action=str(payload.get("event") or "event"), request_id=request_id, payload=payload, status=200, started=started, before=before, after=load_summary_safely(), result=result)
+        keep_replay_audio(
+            "capture_event",
+            {**dict(result.data.get("trigger") or {}), "broadcast_id": (result.data.get("state") or {}).get("broadcast_id", "")},
+        )
         return jsonify(result.data)
 
     @routes.post("/api/game-correction")
@@ -589,6 +603,7 @@ def create_live_game_blueprint(
             )
             logged = True
             if status == 200:
+                keep_replay_audio("capture_play", result.data.get("play") or {})
                 return response
             return response, status
         except Exception as exc:

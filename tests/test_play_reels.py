@@ -180,3 +180,23 @@ def test_every_theme_draws_and_teams_wear_their_own_colors() -> None:
         assert defense["main"] == "#ffffff" and offense == {"main": "#b5121b", "accent": "#ffffff"}
         browser.close()
 
+
+
+def test_reel_list_marks_only_the_plays_with_a_saved_call(reel_client) -> None:
+    client, service = reel_client if isinstance(reel_client, tuple) else (reel_client, None)
+    games = client.get("/api/reel-plays").get_json()["games"]
+    assert games and all(play["call_at"] == 0 for game in games for play in game["plays"])
+
+
+def test_reel_list_points_at_the_call_saved_for_a_play(reel_client, monkeypatch) -> None:
+    first = rs.plays(facts())[0]
+    assert first["at"]
+
+    class Audio:
+        def clips(self, broadcast_id):
+            return {first["at"]: {"play_at": first["at"]}}
+
+    monkeypatch.setattr(app_module, "REPLAY_AUDIO_SERVICE", Audio(), raising=False)
+    plays = reel_client.get("/api/reel-plays").get_json()["games"][0]["plays"]
+    assert [p["call_at"] for p in plays if p["id"] == first["id"]] == [first["at"]]
+    assert sum(1 for p in plays if p["call_at"]) == sum(1 for p in rs.plays(facts()) if p["at"] == first["at"])
