@@ -132,12 +132,6 @@ async function hcSend(action, payload) {
 function hcLastEventId() { const events = hcEvents(); return events.length ? events[events.length - 1].event_id : ''; }
 function hcDone(toast) { hc = hcFresh(); hcToastData = toast || hcToastData; render(); }
 
-function hcSavedShotText(p) {
-  const zone = p.zone ? HC_ZONE_NAMES[p.zone] || '' : '';
-  const kind = p.shotType ? p.shotType : (Number(p.points) === 3 ? '3-pointer' : '2-pointer');
-  return { kind, where: zone };
-}
-
 // --- court -------------------------------------------------------------------
 
 function hcBasket(dir) {
@@ -380,7 +374,6 @@ function hcBench(side, id) {
   }
   // A stat for someone the console has on the bench: credit the player and fix the lineup.
   hc.benchCredit = { side, id, mode: hc.mode };
-  hc.resume = hc.mode;
   hc.mode = 'replace';
   render();
 }
@@ -537,9 +530,7 @@ function hcFixShot(eventId) {
   const event = hcEvents().find(e => e.event_id === eventId);
   if (!event) return;
   const p = event.payload || {};
-  const spot = p.spotX == null ? { x: 60, y: 25 } : p.spotX;
   const screen = p.spotX == null ? { x: 60, y: 25 } : (hcAttacks(p.team) === 'right' ? { x: p.spotX, y: p.spotY } : { x: 84 - p.spotX, y: 50 - p.spotY });
-  void spot;
   hc = { ...hcFresh(), mode: 'shot', team: p.team, screen, points: Number(p.points || 2), autoPoints: Number(p.points || 2), shotType: p.shotType || '', fixId: eventId };
   hcToastData = { text: 'Fixing this shot: move the pin, then pick the result and the shooter again.', sub: '' };
   render();
