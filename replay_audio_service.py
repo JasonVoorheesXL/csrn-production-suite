@@ -28,6 +28,10 @@ MICS_AUDIO_STREAM = 1
 SILENCE_PEAK = 0.001
 FILE_WAIT_SECONDS = 20.0
 ENSURE_RUNNING_EVERY_SECONDS = 60.0
+# OBS may remux the saved .mkv to .mp4 and drop the original (Automatically remux
+# to mp4), so either name can be the replay, and the copy can appear after a delete.
+VIDEO_SUFFIXES = (".mkv", ".mp4")
+REMUX_WAIT_SECONDS = 15.0
 
 
 class OBSReplayClient(OBSReadOnlyClient):
@@ -122,6 +126,7 @@ class ReplayAudioService:
         self._worker: threading.Thread | None = None
         self._seen: set[tuple[str, int]] = set()
         self._last_ensure = 0.0
+        self._leftovers: dict[Path, float] = {}
         self._status: dict[str, Any] = {"buffer": "unknown", "saved": 0, "last_clip": None, "problem": "", "checked_at": 0}
 
     # -- called from the live routes: quick, and never raises -----------------------
@@ -252,6 +257,7 @@ class ReplayAudioService:
                 self._queue.task_done()
 
     def process(self, job: Mapping[str, Any]) -> None:
+        self._sweep_videos()
         wait = float(job.get("due", 0)) - self._now()
         if wait > 0:
             self._sleep(wait)
@@ -280,13 +286,35 @@ class ReplayAudioService:
         details = self._extract(video, audio)
         clip = {**details, "play_at": job["play_at"], "label": job["label"], "saved_at": int(saved_at), "broadcast_id": job["broadcast_id"]}
         (folder / f"{job['play_at']}.json").write_text(json.dumps(clip, indent=2), encoding="utf-8")
-        # The video goes only once its audio is safely kept; a failure above leaves it.
-        video.unlink(missing_ok=True)
         with self._lock:
             self._status["saved"] += 1
             self._status["last_clip"] = clip
             self._status["problem"] = "The last saved call has no sound on the mics track." if details.get("silent") else ""
             self._status["checked_at"] = int(self._now())
+        # The video goes only once its audio is safely kept; a failure above leaves it.
+        self._remove_video(video)
+
+    def _remove_video(self, video: Path) -> None:
+        """Remove the replay and any .mp4 copy OBS makes of it. Whatever cannot
+        go yet is tried again before the next job."""
+        deadline = self._now() + self._file_wait + REMUX_WAIT_SECONDS
+        for suffix in VIDEO_SUFFIXES:
+            self._leftovers[video.with_suffix(suffix)] = deadline
+        stop = self._now() + REMUX_WAIT_SECONDS
+        while self._now() < stop and video.with_suffix(".mp4") in self._leftovers:
+            self._sweep_videos()
+            self._sleep(0.5)
+        self._sweep_videos()
+
+    def _sweep_videos(self) -> None:
+        for path, deadline in list(self._leftovers.items()):
+            try:
+                existed = path.exists()
+                path.unlink(missing_ok=True)
+            except OSError:
+                continue  # OBS still has it open
+            if existed or self._now() >= deadline:
+                del self._leftovers[path]
 
     @staticmethod
     def _last_replay(client: Any) -> str:
@@ -301,7 +329,7 @@ class ReplayAudioService:
         while self._now() < deadline:
             current = self._last_replay(client)
             if current and current != before:
-                path = Path(current)
+                path = next((p for p in (Path(current).with_suffix(s) for s in VIDEO_SUFFIXES) if p.is_file()), Path(current))
                 now_size = path.stat().st_size if path.is_file() else -1
                 # OBS is done writing once the file stops growing.
                 if now_size > 0 and now_size == size:

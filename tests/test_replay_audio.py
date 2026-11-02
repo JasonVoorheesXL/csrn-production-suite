@@ -66,8 +66,9 @@ class FakeOBS:
 
 def _service(tmp_path: Path, obs: FakeOBS, *, enabled: bool = True, **kwargs) -> ReplayAudioService:
     config = {"obs": {"websocket_enabled": enabled, "controlled_commands": enabled}}
+    clock = _Clock()
     return ReplayAudioService(load_config=lambda: config, output_dir=tmp_path / "audio", connect=lambda settings: obs,
-                              sleep=lambda seconds: None, save_delay=0, **kwargs)
+                              now=clock.now, sleep=clock.sleep, save_delay=0, **kwargs)
 
 
 JOB = {"job": "save", "broadcast_id": "G1", "play_at": 1000, "label": "Long run", "due": 0}
@@ -242,3 +243,70 @@ def test_panel_routes_need_login_and_serve_the_clip(monkeypatch, tmp_path: Path)
     assert clip.status_code == 200 and clip.mimetype == "audio/mp4" and clip.data
     clip.close()
     assert client.get("/api/broadcasts/G1/replay-audio/9.m4a").status_code == 404
+
+
+class _Clock:
+    def __init__(self):
+        self.at = 1000.0
+
+    def now(self):
+        return self.at
+
+    def sleep(self, seconds):
+        self.at += seconds
+
+
+def test_the_mp4_copy_obs_makes_is_removed_too_and_other_files_are_left(tmp_path: Path) -> None:
+    clock = _Clock()
+    keep = tmp_path / "Replay other game.mp4"
+    keep.write_bytes(b"x")
+
+    def extract(video, audio):
+        # OBS finishes its remux while the audio is being kept.
+        video.with_suffix(".mp4").write_bytes(b"copy")
+        audio.write_bytes(b"a")
+        return {"seconds": 1.0, "peak": 0.5, "silent": False, "mics_only": True}
+
+    config = {"obs": {"websocket_enabled": True, "controlled_commands": True}}
+    service = ReplayAudioService(load_config=lambda: config, output_dir=tmp_path / "audio", connect=lambda s: FakeOBS(tmp_path),
+                                 extract=extract, now=clock.now, sleep=clock.sleep, save_delay=0)
+    service.process(JOB)
+    assert sorted(p.name for p in tmp_path.glob("Replay*")) == [keep.name]
+    assert 1000 in service.clips("G1")
+
+
+def test_a_replay_already_remuxed_to_mp4_is_still_found(tmp_path: Path) -> None:
+    class Remuxed(FakeOBS):
+        def request(self, name, data=None):
+            reply = super().request(name, data)
+            if name == "SaveReplayBuffer":
+                Path(self.last).replace(Path(self.last).with_suffix(".mp4"))
+            return reply
+
+    service = _service(tmp_path, Remuxed(tmp_path))
+    service.process(JOB)
+    assert not list(tmp_path.glob("Replay*"))
+    assert service.clips("G1")[1000]["mics_only"]
+
+
+def test_a_video_obs_still_has_open_does_not_lose_the_call_and_goes_later(tmp_path: Path, monkeypatch) -> None:
+    clock = _Clock()
+    held = {"on": True}
+    real_unlink = Path.unlink
+
+    def unlink(self, missing_ok=False):
+        if held["on"] and self.suffix in (".mkv", ".mp4"):
+            raise PermissionError("in use")
+        return real_unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", unlink)
+    config = {"obs": {"websocket_enabled": True, "controlled_commands": True}}
+    service = ReplayAudioService(load_config=lambda: config, output_dir=tmp_path / "audio", connect=lambda s: FakeOBS(tmp_path),
+                                 now=clock.now, sleep=clock.sleep, save_delay=0)
+    service.process(JOB)
+    assert service.status()["saved"] == 1 and service.clips("G1")
+    assert len(list(tmp_path.glob("Replay*"))) == 1
+    held["on"] = False
+    service._sweep_videos()
+    assert not list(tmp_path.glob("Replay*"))
+
