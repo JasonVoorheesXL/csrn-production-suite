@@ -137,7 +137,7 @@ def test_ui_covers_every_engine_backed_action_except_the_deliberately_deferred_o
     ui_actions = _ui_action_names()
     deferred = {"correct_foul", "void_event", "correct_event"}
     # Run from the statistician console (static/csrn-hoops-console.js) only.
-    console_only = {"play_note", "opening_tip", "set_direction", "end_period"}
+    console_only = {"play_note", "opening_tip", "set_direction", "end_period", "set_display"}
     assert set(svc.ACTIONS.keys()) - ui_actions == deferred | console_only
 
 

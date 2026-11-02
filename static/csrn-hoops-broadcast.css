@@ -1,0 +1,27 @@
+/* Basketball on-air layer (csrn-hoops-broadcast.js). Every rule is scoped to the
+   basketball board or to its own hb- elements, so no other sport is affected. */
+.bl-sport-basketball.hb-on [data-stat="fg"]{font-size:21px !important;overflow:visible !important;text-overflow:clip !important;white-space:nowrap}
+.bl-sport-basketball.hb-on .bl-college-court.hb-has-court{position:relative;padding-left:338px !important}
+.bl-sport-basketball.hb-on .hb-court{position:absolute;left:10px;top:10px;bottom:10px;aspect-ratio:84/50;border-radius:8px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.22)}
+.bl-sport-basketball.hb-on .hb-court svg{display:block;width:100%;height:100%}
+.bl-sport-basketball.hb-on .bl-college-court-meta{display:grid !important;grid-template-columns:1.1fr 2fr .95fr !important}
+.bl-sport-basketball.hb-on .bl-college-court-meta>span:not(.hb-cell):not(:first-child){display:none !important}
+.bl-sport-basketball.hb-on .hb-rail-card{position:absolute;inset:0;z-index:5;display:none;flex-direction:column;background:linear-gradient(180deg,#232a34,#10141b);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:12px;color:#fff;font-family:Inter,Roboto,Arial,sans-serif;text-align:left;overflow:hidden}
+.bl-sport-basketball.hb-on .hb-rail-card.hb-show{display:flex}
+.hb-label{font:800 12px Inter,Roboto,Arial,sans-serif;letter-spacing:2.2px;text-transform:uppercase;color:#aeb8c6;margin-bottom:6px}
+.hb-pl{display:grid;grid-template-columns:40px 1fr auto;gap:8px;align-items:center;padding:7px 2px;border-top:1px solid rgba(255,255,255,.09)}
+.hb-pl b{font:900 21px Inter,Roboto,Arial,sans-serif;text-align:center;color:#8fc4ff}.hb-pl span{font:800 15px Inter,Roboto,Arial,sans-serif;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hb-pl i{font:900 22px Inter,Roboto,Arial,sans-serif;font-style:normal}
+.hb-pips{display:flex;gap:3px;margin-top:3px}.hb-pips u{width:8px;height:8px;border-radius:50%;background:#3a4250;text-decoration:none}.hb-pips u.f{background:#f0b429}.hb-pips u.d{background:#ef5350}
+.hb-hot-title{font:900 26px Inter,Roboto,Arial,sans-serif;margin-top:2px}.hb-hot-line{font:700 15px Inter,Roboto,Arial,sans-serif;color:#cfd6df;margin:2px 0 10px}.hb-hot-court{border-radius:8px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.2)}
+.hb-box{position:fixed;z-index:9000;color:#fff;font-family:Inter,Roboto,Arial,sans-serif;pointer-events:none}
+.hb-screen{position:absolute;inset:0;background:linear-gradient(135deg,#141a22,#0b0e13);padding:22px 26px;display:flex;flex-direction:column;gap:12px;box-sizing:border-box}
+.hb-screen h2{margin:0;font:900 34px Inter,Roboto,Arial,sans-serif;letter-spacing:.5px}.hb-screen h2 small{font:800 15px Inter,Roboto,Arial,sans-serif;letter-spacing:2.5px;color:#aeb8c6;margin-left:12px}
+.hb-versus{display:flex;justify-content:space-between;align-items:center}.hb-versus small{margin:0 !important}
+.hb-chart{display:grid;grid-template-columns:490px 1fr;gap:18px;flex:1;min-height:0}.hb-chart-court{border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.2);height:412px}
+.hb-zones{display:flex;flex-direction:column;gap:8px}
+.hb-z{background:rgba(255,255,255,.06);border-radius:8px;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px}.hb-z b{font:900 26px Inter,Roboto,Arial,sans-serif}.hb-z span{font:800 13px Inter,Roboto,Arial,sans-serif;color:#c3ccd8}
+.hb-row{display:grid;grid-template-columns:1fr 240px 1fr;align-items:center;padding:6px 0;border-top:1px solid rgba(255,255,255,.1);font:900 26px Inter,Roboto,Arial,sans-serif}.hb-row span{font:800 14px Inter,Roboto,Arial,sans-serif;letter-spacing:2px;color:#aeb8c6;text-align:center;text-transform:uppercase}.hb-row b:last-child{text-align:right}
+.hb-leaders{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:auto}
+.hb-alert{position:absolute;left:24px;right:24px;bottom:20px;height:92px;display:flex;align-items:stretch;border-radius:10px;overflow:hidden;box-shadow:0 8px 26px rgba(0,0,0,.55)}
+.hb-alert-num{width:112px;display:grid;place-items:center;font:900 44px Inter,Roboto,Arial,sans-serif}.hb-alert-main{flex:1;background:linear-gradient(90deg,#1b212a,#0f1319);padding:12px 18px}.hb-alert-main b{display:block;font:900 30px Inter,Roboto,Arial,sans-serif;line-height:1.05}.hb-alert-main em{font:700 17px Inter,Roboto,Arial,sans-serif;font-style:normal;color:#cfd6df}
+.hb-alert-tag{background:#f0b429;color:#111;display:grid;place-items:center;align-content:center;padding:0 22px;font:900 19px Inter,Roboto,Arial,sans-serif;letter-spacing:1.5px;text-align:center}

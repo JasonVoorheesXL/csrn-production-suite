@@ -87,6 +87,7 @@ ACTIONS: dict[str, Callable[..., Any]] = {
     "opening_tip": HoopsRulesService.opening_tip,
     "set_direction": HoopsRulesService.set_direction,
     "end_period": HoopsRulesService.end_period,
+    "set_display": HoopsRulesService.set_display,
     "set_value": HoopsRulesService.set_value,
     "correct_foul": HoopsRulesService.correct_event_for_foul,
     "confirm_game_end": HoopsRulesService.confirm_game_end,
@@ -176,6 +177,9 @@ class HoopsGameOperationsService:
             ruleset = HoopsRulesService.active_ruleset(state)
             state["hoops"] = engine_router.default_hoops_state()
             HoopsPeriodService.start_game(state, ruleset)
+            # A basketball board always has a running clock to show; the default
+            # state hides it because most football broadcasts have no game clock.
+            state["clock_visible"] = True
             revision = assign_next_revision(state)
             metadata = command_metadata(
                 incoming, action="initialize_hoops", state_revision=revision

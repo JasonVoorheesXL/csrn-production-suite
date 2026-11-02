@@ -352,6 +352,9 @@ async function hcPick(side, id) {
     case 'turnover':
       if (await hcSend('turnover', hcStamp({ team: side, playerId: id }))) hcDone({ text: `Turnover: ${hcLabel(id)}. Ball to ${hcName(hcOther(side))}.`, sub: '' });
       return;
+    case 'chart_player':
+      if (await hcSend('set_display', { screen: 'shot_chart', team: side, player: id })) { hc = hcFresh(); render(); }
+      return;
     case 'sub_out': return hcFinishSub(side, id);
     case 'sub_in_for': return hcFinishSub(side, hc.subOut, id);
     case 'replace': return hcFinishBenchCredit(side, id);
@@ -507,6 +510,13 @@ async function hcStartGame() {
 async function hcTip(team) {
   if (await hcSend('opening_tip', { team })) hcDone({ text: `${hcName(team)} won the tip. Arrow to ${hcName(hcOther(team))}.`, sub: '' });
 }
+async function hcOnAir(fields) { if (await hcSend('set_display', fields)) render(); }
+function hcOnAirName() {
+  const d = hoopsState().display || {};
+  if (d.screen === 'shot_chart') return `${d.player ? hcLabel(d.player) : hcName(d.team)} shot chart`;
+  if (d.screen === 'comparison') return 'Team comparison';
+  return '';
+}
 async function hcSwapEnds() {
   const base = hoopsState().home_first_half_attacks === 'left' ? 'left' : 'right';
   if (await hcSend('set_direction', { homeFirstHalfAttacks: base === 'left' ? 'right' : 'left' })) hcDone();
@@ -575,6 +585,7 @@ function hcAskTitle(side) {
   if (m === 'foul') return 'WHO FOULED?';
   if (m === 'ft_who') return side === hc.ft.team ? 'WHO IS SHOOTING?' : '';
   if (m === 'steal') return 'WHO STOLE IT?';
+  if (m === 'chart_player') return 'WHOSE SHOT CHART?';
   if (m === 'stolen') return side !== hc.team ? 'STOLEN FROM?' : '';
   if (m === 'turnover') return 'WHO TURNED IT OVER?';
   if (m === 'sub_out') return side === hc.subSide ? 'WHO COMES OUT?' : '';
@@ -637,7 +648,9 @@ function hcRenderHead() {
 
 function hcRenderToast() {
   const el = document.getElementById('hcToast');
-  el.innerHTML = hcToastData ? `<div class="hc-toast ${hcToastData.bad ? 'bad' : ''}"><div class="hc-grow"><b>${escapeHtml(hcToastData.text)}</b>${hcToastData.sub ? `<div class="hc-sub">${escapeHtml(hcToastData.sub)}</div>` : ''}</div><button onclick="hcUndo()">Undo</button></div>` : '';
+  const onAir = hcOnAirName();
+  const onAirBar = onAir ? `<div class="hc-toast" style="border-color:#e5a321;background:#3b2f14;margin-bottom:8px"><div class="hc-grow"><b>On air, covering the camera: ${escapeHtml(onAir)}</b></div><button class="foul" onclick="hcOnAir({screen:''})">Take it down</button></div>` : '';
+  el.innerHTML = onAirBar + (hcToastData ? `<div class="hc-toast ${hcToastData.bad ? 'bad' : ''}"><div class="hc-grow"><b>${escapeHtml(hcToastData.text)}</b>${hcToastData.sub ? `<div class="hc-sub">${escapeHtml(hcToastData.sub)}</div>` : ''}</div><button onclick="hcUndo()">Undo</button></div>` : '');
 }
 
 const HC_ACTIONS = `<div class="hc-acts"><button onclick="hcStartFreeThrows()">Free throw</button><button onclick="hcMode('steal')">Steal</button><button onclick="hcMode('turnover')">Turnover</button><button onclick="hcMode('rebound_any')">Rebound</button><button onclick="hcMode('foul')">Foul</button><button onclick="hcJumpBall()">Jump ball</button><button onclick="hcMode('timeout')">Timeout</button><button onclick="hcMode('more')">More</button></div>`;
@@ -719,6 +732,9 @@ function hcRenderPanel() {
     case 'steal_spot':
       el.innerHTML = `<div class="hc-card hot"><div class="hc-row hc-between"><b>Tap the court where the steal happened.</b><button onclick="hcSkip()">Cancel</button></div></div>`;
       return;
+    case 'chart_player':
+      el.innerHTML = `<div class="hc-card hot"><div class="hc-row hc-between"><b>Tap the player whose shot chart goes on air.</b><button onclick="hcSkip()">Cancel</button></div></div>`;
+      return;
     case 'turnover':
       el.innerHTML = `<div class="hc-card hot"><div class="hc-row hc-between"><b>Tap who turned it over.</b><button onclick="hcSkip()">Cancel</button></div></div>`;
       return;
@@ -726,7 +742,7 @@ function hcRenderPanel() {
       el.innerHTML = `<div class="hc-card hot"><div class="hc-row hc-between"><b>Whose timeout?</b><div class="hc-row"><button onclick="hcTimeout('visitor')">${escapeHtml(hcName('visitor'))}</button><button onclick="hcTimeout('home')">${escapeHtml(hcName('home'))}</button><button onclick="hcSkip()">Cancel</button></div></div></div>`;
       return;
     case 'more':
-      el.innerHTML = `<div class="hc-card hot"><div class="hc-row hc-between" style="margin-bottom:8px"><div class="hc-row"><button onclick="hcEndPeriod()">End the quarter</button><button onclick="hcSwapEnds()">Swap ends</button><button onclick="hcRedo()">Put back last undo</button><button onclick="openHoopsBoxScore()">Box score</button></div><button onclick="hcSkip()">Close</button></div><div class="hc-label" style="margin-bottom:5px">Violation: pick the team charged</div><div class="hc-row">${HC_VIOLATIONS.map(([id, label]) => `<button onclick="hc.violation=['${id}','${label}'];render()" class="${hc.violation?.[0] === id ? 'on' : ''}">${label}</button>`).join('')}</div>${hc.violation ? `<div class="hc-row" style="margin-top:8px"><button onclick="hcViolation('visitor','${hc.violation[0]}','${hc.violation[1]}')">${escapeHtml(hcName('visitor'))}</button><button onclick="hcViolation('home','${hc.violation[0]}','${hc.violation[1]}')">${escapeHtml(hcName('home'))}</button></div>` : ''}</div>`;
+      el.innerHTML = `<div class="hc-card hot"><div class="hc-row hc-between" style="margin-bottom:8px"><div class="hc-row"><button onclick="hcEndPeriod()">End the quarter</button><button onclick="hcSwapEnds()">Swap ends</button><button onclick="hcRedo()">Put back last undo</button><button onclick="openHoopsBoxScore()">Box score</button><button class="${currentState.clock_visible === false ? '' : 'on'}" onclick="toggleClockVisibility()">Clock on air: ${currentState.clock_visible === false ? 'off' : 'on'}</button></div><button onclick="hcSkip()">Close</button></div><div class="hc-label" style="margin-bottom:5px">On air</div><div class="hc-row" style="margin-bottom:8px"><button onclick="hcOnAir({screen:'shot_chart',team:'visitor'})">${escapeHtml(hcName('visitor'))} shot chart</button><button onclick="hcOnAir({screen:'shot_chart',team:'home'})">${escapeHtml(hcName('home'))} shot chart</button><button onclick="hcMode('chart_player')">Player shot chart</button><button onclick="hcOnAir({screen:'comparison'})">Team comparison</button><button class="${(h.display || {}).alerts === false ? '' : 'on'}" onclick="hcOnAir({alerts:${(h.display || {}).alerts === false}})">Foul-trouble alerts: ${(h.display || {}).alerts === false ? 'off' : 'on'}</button></div><div class="hc-label" style="margin-bottom:5px">Violation: pick the team charged</div><div class="hc-row">${HC_VIOLATIONS.map(([id, label]) => `<button onclick="hc.violation=['${id}','${label}'];render()" class="${hc.violation?.[0] === id ? 'on' : ''}">${label}</button>`).join('')}</div>${hc.violation ? `<div class="hc-row" style="margin-top:8px"><button onclick="hcViolation('visitor','${hc.violation[0]}','${hc.violation[1]}')">${escapeHtml(hcName('visitor'))}</button><button onclick="hcViolation('home','${hc.violation[0]}','${hc.violation[1]}')">${escapeHtml(hcName('home'))}</button></div>` : ''}</div>`;
       return;
     case 'sub_out':
       el.innerHTML = `<div class="hc-card hot"><div class="hc-row hc-between"><b>${escapeHtml(hcLabel(hc.subIn))} coming in. Tap who comes out.</b><button onclick="hcSkip()">Cancel</button></div></div>`;

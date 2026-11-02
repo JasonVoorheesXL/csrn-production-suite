@@ -355,6 +355,26 @@ class HoopsRulesService:
         return HoopsResult("OK", state, {"event": event})
 
     @classmethod
+    def set_display(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> HoopsResult:
+        """What the board is showing, not something that happened in the game: payload
+        {screen: "shot_chart"|"comparison"|"", team?, player?} and/or {alerts: bool}.
+        It stays out of the event ledger, so Undo never pulls a screen off the air."""
+        hoops = state.setdefault("hoops", {})
+        display = dict(hoops.get("display") or {})
+        if "screen" in payload:
+            screen = str(payload.get("screen") or "")
+            if screen not in ("", "shot_chart", "comparison"):
+                raise ValueError(f"unknown screen: {screen!r}")
+            team = str(payload.get("team") or "")
+            if screen == "shot_chart" and team not in TEAMS:
+                raise ValueError("a shot chart needs a team")
+            display.update(screen=screen, team=team, player=str(payload.get("player") or ""))
+        if "alerts" in payload:
+            display["alerts"] = bool(payload.get("alerts"))
+        hoops["display"] = display
+        return HoopsResult("OK", state, {})
+
+    @classmethod
     def opening_tip(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> HoopsResult:
         """payload: {team}, the team that won the opening tip."""
         if str(payload.get("team", "")) not in TEAMS:
