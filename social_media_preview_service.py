@@ -104,7 +104,9 @@ class SocialMediaPreviewService:
         rng: random.Random | None = None,
         load_rosters: ObjectLoader | None = None,
         get_ai_writer: Callable[[], Any] | None = None,
+        get_replay_audio: Callable[[], Any] | None = None,
     ) -> None:
+        self._get_replay_audio = get_replay_audio
         self._load_broadcasts = load_broadcasts
         self._load_state = load_state
         self._load_final_state_archive = load_final_state_archive
@@ -1703,13 +1705,15 @@ class SocialMediaPreviewService:
             if not plays:
                 continue
             teams = facts["teams"]
+            calls = self._get_replay_audio().clips(str(game.get("broadcast_id", ""))) if self._get_replay_audio else {}
             rows.append({
                 "broadcast_id": str(game.get("broadcast_id", "")),
                 "date": str(game.get("date", "") or ""),
                 "season": str(game.get("season", "") or ""),
                 "label": f"{game.get('date') or 'No date'} · {teams['visitor']['name']} at {teams['home']['name']}",
                 "plays": [{"id": p["id"], "label": p["label"], "kind": p["kind"], "td": p["td"],
-                           "team": teams[p["team"]]["name"], "player": p["player"]["name"]} for p in plays],
+                           "team": teams[p["team"]]["name"], "player": p["player"]["name"],
+                           "call_at": p["at"] if p["at"] in calls else 0} for p in plays],
             })
         rows.sort(key=lambda row: row["date"], reverse=True)
         sponsors = sorted(self._active_sponsors(sport), key=lambda s: str(s.get("name", "")).casefold())

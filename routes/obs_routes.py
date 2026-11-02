@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 
 
 RouteDecorator = Callable[[Callable[..., Any]], Callable[..., Any]]
@@ -15,6 +15,7 @@ class OBSRoutesDependencies:
 
     require_auth: RouteDecorator
     get_obs_service: Callable[[], Any]
+    get_replay_audio_service: Callable[[], Any] | None = None
 
 
 def create_obs_blueprint(dependencies: OBSRoutesDependencies) -> Blueprint:
@@ -27,6 +28,24 @@ def create_obs_blueprint(dependencies: OBSRoutesDependencies) -> Blueprint:
     def obs_status():
         result = dependencies.get_obs_service().status()
         return jsonify(result.data["status"])
+
+    @routes.get("/api/obs/replay-audio")
+    @dependencies.require_auth
+    def obs_replay_audio_status():
+        return jsonify(dependencies.get_replay_audio_service().status(check=True))
+
+    @routes.post("/api/obs/replay-audio/start")
+    @dependencies.require_auth
+    def obs_replay_audio_start():
+        return jsonify(dependencies.get_replay_audio_service().start_buffer())
+
+    @routes.get("/api/broadcasts/<broadcast_id>/replay-audio/<int:play_at>.m4a")
+    @dependencies.require_auth
+    def obs_replay_audio_clip(broadcast_id: str, play_at: int):
+        path = dependencies.get_replay_audio_service().clip_file(broadcast_id, play_at)
+        if path is None:
+            return jsonify({"error": "AUDIO_NOT_FOUND"}), 404
+        return send_file(path, mimetype="audio/mp4")
 
     @routes.post("/api/obs/test")
     @dependencies.require_auth

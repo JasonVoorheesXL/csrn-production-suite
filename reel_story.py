@@ -104,7 +104,7 @@ def plays(facts: Mapping[str, Any]) -> list[dict[str, Any]]:
             continue
         found.append({"id": f"p{index}", "index": index, "kind": kind, "team": item["team"], "td": td,
                       "yards": yards, "quarter": item["quarter"], "player": player, "passer": passer, "score": score,
-                      "row": item.get("row"), "label": _label(facts, item["team"], kind, td, yards, player, passer, item["quarter"])})
+                      "row": item.get("row"), "at": _int(item.get("order")), "label": _label(facts, item["team"], kind, td, yards, player, passer, item["quarter"])})
     return found
 
 

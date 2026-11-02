@@ -1289,6 +1289,17 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
         </div>
         <div id="obsCommandResult" class="status"></div>
 
+        <h2>Replay Audio for Reels</h2>
+        <p class="section-note">When a big play is recorded, OBS saves its replay buffer and the app keeps the mics audio for that play, then removes the video. The buffer starts on its own at the first play if it is off; a big play on that very first snap is missed.</p>
+        <div class="obs-value-row"><span>Replay buffer</span><strong id="replayAudioBuffer">—</strong></div>
+        <div class="obs-value-row"><span>Calls saved since the app started</span><strong id="replayAudioSaved">—</strong></div>
+        <div class="obs-value-row"><span>Last call</span><strong id="replayAudioLast">—</strong></div>
+        <div id="replayAudioProblem" class="status"></div>
+        <div class="editor-actions">
+          <button onclick="loadReplayAudio()">Check</button>
+          <button class="primary" onclick="startReplayAudio()">Start Replay Buffer</button>
+        </div>
+
         <h2>Program Visual Test</h2>
         <div class="editor-actions">
           <button id="obsGraphicButton" class="primary" disabled onclick="setOBSProgramVisual('graphic')">Use Graphic</button>
@@ -6929,6 +6940,31 @@ function renderOBSStatus(status) {
 async function loadOBSStatus() {
   const status = await api('/api/obs/status');
   renderOBSStatus(status);
+  loadReplayAudio();
+}
+
+function renderReplayAudio(status) {
+  document.getElementById('replayAudioBuffer').textContent = {running: 'Running', off: 'Off'}[status.buffer] || 'Unknown';
+  document.getElementById('replayAudioSaved').textContent = status.saved ?? 0;
+  const last = status.last_clip;
+  document.getElementById('replayAudioLast').textContent = last ? `${last.label} (${Math.round(last.seconds)}s${last.silent ? ', no sound' : ''})` : 'None yet';
+  document.getElementById('replayAudioProblem').textContent = status.problem || '';
+}
+
+async function loadReplayAudio() {
+  try {
+    renderReplayAudio(await api('/api/obs/replay-audio'));
+  } catch (err) {
+    document.getElementById('replayAudioProblem').textContent = err.message || 'Unable to check the replay buffer.';
+  }
+}
+
+async function startReplayAudio() {
+  try {
+    renderReplayAudio(await api('/api/obs/replay-audio/start', {}));
+  } catch (err) {
+    document.getElementById('replayAudioProblem').textContent = err.message || 'Unable to start the replay buffer.';
+  }
 }
 
 async function testOBSConnection() {
