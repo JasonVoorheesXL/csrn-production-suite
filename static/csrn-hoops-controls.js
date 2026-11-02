@@ -44,7 +44,12 @@ async function hoopsAction(action, payload, statusElementId) {
 function hoopsRosterPlayers(side) {
   const schoolId = side === 'home' ? currentState?.home_school_id : currentState?.visitor_school_id;
   if (!schoolId || typeof playerGraphicRosters === 'undefined') return [];
-  const roster = playerGraphicRosters.find(r => r.school_id === schoolId && String(r.sport || '').toLowerCase() === 'basketball');
+  // Boys and girls teams at a school are separate rosters: take the one this game is for.
+  const rosters = playerGraphicRosters.filter(r => r.school_id === schoolId && String(r.sport || '').toLowerCase() === 'basketball');
+  const same = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
+  const roster = rosters.find(r => same(r.division, currentState?.division) && same(r.level, currentState?.level))
+    || rosters.find(r => same(r.division, currentState?.division))
+    || rosters[0];
   const players = (roster?.players || []).filter(p => p.status !== 'inactive');
   return players.slice().sort((a, b) => (Number(a.number) || 999) - (Number(b.number) || 999));
 }

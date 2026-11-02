@@ -25,6 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from hoops_shot_geometry import clean_spot
 from hoops_state_service import HoopsStateFoundation
 
 
@@ -49,8 +50,25 @@ class HoopsEventService:
     def _rebuild_in_place(cls, state: dict[str, Any]) -> None:
         hoops = state.get("hoops") or {}
         rebuilt = HoopsStateFoundation.rebuild(state, hoops.get("hoops_events", []))
+        # The running clock is not in the ledger, so a replay would put it back to
+        # the top of the quarter. Taking back a play must not touch the clock; only
+        # taking back a change of quarter (or a clock correction) moves it.
+        same_period = str(rebuilt.get("period", "")) == str(state.get("period", ""))
+        if same_period and not cls._last_change_was_clock(hoops):
+            for field in ("clock_seconds", "clock_running", "clock_started_at"):
+                if field in state:
+                    rebuilt[field] = state[field]
         state.clear()
         state.update(rebuilt)
+
+    @classmethod
+    def _last_change_was_clock(cls, hoops: Mapping[str, Any]) -> bool:
+        """True when the event just voided or restored is a clock correction."""
+        events = hoops.get("hoops_events", [])
+        changed = hoops.get("_rebuild_target")
+        target = next((e for e in events if e.get("event_id") == changed), None)
+        payload = (target or {}).get("payload") or {}
+        return (target or {}).get("event_type") == "SET_VALUE" and payload.get("field") == "clock_seconds"
 
     @classmethod
     def undo(cls, state: dict[str, Any]) -> HoopsEventResult:
@@ -65,7 +83,9 @@ class HoopsEventService:
         if target.get("event_type") == "GAME_START":
             return HoopsEventResult("CANNOT_UNDO_GAME_START", state, {})
         HoopsStateFoundation.void_event(state.setdefault("hoops", {}), target["event_id"])
+        state["hoops"]["_rebuild_target"] = target["event_id"]
         cls._rebuild_in_place(state)
+        state["hoops"].pop("_rebuild_target", None)
         return HoopsEventResult("OK", state, {"undone_event_id": target["event_id"]})
 
     @classmethod
@@ -81,7 +101,9 @@ class HoopsEventService:
             if event["event_id"] == target["event_id"]:
                 event["voided"] = False
                 break
+        hoops["_rebuild_target"] = target["event_id"]
         cls._rebuild_in_place(state)
+        state["hoops"].pop("_rebuild_target", None)
         return HoopsEventResult("OK", state, {"redone_event_id": target["event_id"]})
 
     @classmethod
@@ -99,7 +121,9 @@ class HoopsEventService:
         found = HoopsStateFoundation.void_event(hoops, event_id)
         if not found:
             return HoopsEventResult("EVENT_NOT_FOUND", state, {})
+        hoops["_rebuild_target"] = event_id
         cls._rebuild_in_place(state)
+        state["hoops"].pop("_rebuild_target", None)
         return HoopsEventResult("OK", state, {"voided_event_id": event_id, "reason": reason})
 
     @classmethod
@@ -124,6 +148,7 @@ class HoopsEventService:
         if original.get("event_type") == "GAME_START":
             return HoopsEventResult("CANNOT_CORRECT_GAME_START", state, {})
         HoopsStateFoundation.void_event(hoops, event_id)
+        replacement_payload = clean_spot(replacement_payload)
         new_event = HoopsStateFoundation.append_event(hoops, original["event_type"], replacement_payload)
         new_event["corrects_event_id"] = event_id
         cls._rebuild_in_place(state)

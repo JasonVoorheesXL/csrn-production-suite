@@ -30,7 +30,8 @@ from typing import Any, Mapping
 
 import ruleset_service
 from hoops_period_service import HoopsPeriodService
-from hoops_state_service import HoopsStateFoundation
+from hoops_shot_geometry import clean_spot
+from hoops_state_service import TEAMS, HoopsStateFoundation
 
 SEVERITIES = ("HARD_ERROR", "SOFT_WARNING", "NEEDS_RULING", "INFO")
 
@@ -226,7 +227,10 @@ class HoopsRulesService:
 
     @classmethod
     def shot(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> HoopsResult:
-        """payload: {team, made, points (2|3), shooterId?, assistId?, andOne?}."""
+        """payload: {team, made, points (2|3), shooterId?, assistId?, andOne?,
+        spotX?, spotY?, shotType?, possessionAfter?}. See hoops_shot_geometry
+        for what a spot means."""
+        payload = clean_spot(payload)
         hoops = state.setdefault("hoops", {})
         HoopsStateFoundation.apply_shot(state, hoops, payload)
         event = HoopsStateFoundation.append_event(hoops, "SHOT", payload)
@@ -252,7 +256,8 @@ class HoopsRulesService:
 
     @classmethod
     def turnover(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> HoopsResult:
-        """payload: {team, playerId?}."""
+        """payload: {team, playerId?, stealPlayerId?, spotX?, spotY?}."""
+        payload = clean_spot(payload)
         hoops = state.setdefault("hoops", {})
         HoopsStateFoundation.apply_turnover(state, hoops, payload)
         event = HoopsStateFoundation.append_event(hoops, "TURNOVER", payload)
@@ -337,6 +342,52 @@ class HoopsRulesService:
         return HoopsResult("OK", state, {"event": event, "possession_arrow": hoops.get("possession_arrow")})
 
     @classmethod
+    def play_note(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> HoopsResult:
+        """Something added to a play that is already saved: payload {targetEventId,
+        assistId?, blockPlayerId?, turnoverPlayerId?, shotType?, tags?, spotX?,
+        spotY?}. Its own event, so Undo takes back the note and leaves the play,
+        and the play keeps its place in the game."""
+        hoops = state.setdefault("hoops", {})
+        target = str(payload.get("targetEventId", ""))
+        if not any(e.get("event_id") == target and not e.get("voided") for e in hoops.get("hoops_events", [])):
+            raise ValueError(f"no play to add this to: {target!r}")
+        event = HoopsStateFoundation.append_event(hoops, "PLAY_NOTE", clean_spot(payload))
+        return HoopsResult("OK", state, {"event": event})
+
+    @classmethod
+    def opening_tip(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> HoopsResult:
+        """payload: {team}, the team that won the opening tip."""
+        if str(payload.get("team", "")) not in TEAMS:
+            raise ValueError("the tip needs a team")
+        hoops = state.setdefault("hoops", {})
+        HoopsStateFoundation.apply_opening_tip(state, hoops, payload)
+        event = HoopsStateFoundation.append_event(hoops, "OPENING_TIP", payload)
+        return HoopsResult("OK", state, {"event": event})
+
+    @classmethod
+    def set_direction(cls, state: dict[str, Any], payload: Mapping[str, Any]) -> HoopsResult:
+        """payload: {homeFirstHalfAttacks: "left"|"right"}."""
+        if str(payload.get("homeFirstHalfAttacks", "")) not in ("left", "right"):
+            raise ValueError("direction must be left or right")
+        hoops = state.setdefault("hoops", {})
+        HoopsStateFoundation.apply_direction_set(state, hoops, payload)
+        event = HoopsStateFoundation.append_event(hoops, "DIRECTION_SET", payload)
+        return HoopsResult("OK", state, {"event": event})
+
+    @classmethod
+    def end_period(cls, state: dict[str, Any], payload: Mapping[str, Any] | None = None) -> HoopsResult:
+        """The operator ends the quarter, whatever the clock reads. The clock goes
+        to 0 through the same audited set-value as any other correction, then the
+        usual end-of-period logic runs: next quarter, overtime or a proposed final."""
+        hoops = state.setdefault("hoops", {})
+        state["clock_running"] = False
+        state["clock_started_at"] = 0
+        set_payload = {"field": "clock_seconds", "value": 0}
+        HoopsStateFoundation.apply_set_value(state, hoops, set_payload)
+        event = HoopsStateFoundation.append_event(hoops, "SET_VALUE", set_payload)
+        return HoopsResult("OK", state, {"event": event, **cls._after_play(state)})
+
+    @classmethod
     def _resolve_foul_payload(
         cls, state: Mapping[str, Any], ruleset: Mapping[str, Any], payload: Mapping[str, Any],
     ) -> tuple[dict[str, Any], list[ValidationMessage]]:
@@ -398,6 +449,7 @@ class HoopsRulesService:
         apply_foul() (bonus + foul-out are derived there, not here); and
         returns a PROPOSED free-throw count as INFO for the caller to act
         on -- this method never records a free throw itself."""
+        payload = clean_spot(payload)
         team = str(payload.get("team", ""))
         ruleset = cls.active_ruleset(state)
         hoops = state.setdefault("hoops", {})
