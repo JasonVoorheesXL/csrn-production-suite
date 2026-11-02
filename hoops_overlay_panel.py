@@ -29,6 +29,7 @@ import time
 from typing import Any, Callable, Iterable, Mapping
 
 from hoops_box_score_service import HoopsBoxScoreService
+from hoops_broadcast_panel import build_broadcast
 
 TEAMS: tuple[str, str] = ("home", "visitor")
 ROSTER_TTL_SECONDS = 30.0
@@ -53,15 +54,15 @@ def roster_lookup(rosters: Iterable[Mapping[str, Any]], state: Mapping[str, Any]
         school_id = _clean(state.get(f"{side}_school_id"))
         if not school_id:
             continue
-        for roster in rosters or []:
-            if _clean(roster.get("school_id")) != school_id:
-                continue
-            if _clean(roster.get("sport")).lower() != "basketball":
-                continue
+        mine = [r for r in rosters or [] if _clean(r.get("school_id")) == school_id and _clean(r.get("sport")).lower() == "basketball"]
+        # Boys and girls teams are separate rosters: use the one this game is for.
+        division = _clean(state.get("division")).lower()
+        same_division = [r for r in mine if division and _clean(r.get("division")).lower() == division]
+        for roster in same_division or mine:
             for player in roster.get("players") or []:
                 pid = _clean(player.get("id"))
                 if pid:
-                    by_side[side][pid] = {"name": _player_label(player), "number": _clean(player.get("number"))}
+                    by_side[side][pid] = {"last": _clean(player.get("last_name")) or _player_label(player), "name": _player_label(player), "number": _clean(player.get("number"))}
     return by_side
 
 
@@ -80,6 +81,7 @@ def build_panel(state: Mapping[str, Any], names: Mapping[str, Mapping[str, Mappi
     players: dict[str, dict[str, Any]] = {}
     totals = {side: {"fgm": 0, "fga": 0, "fg3m": 0, "reb": 0} for side in TEAMS}
     last_basket: dict[str, Any] | None = None
+    assists = {(e.get("payload") or {}).get("targetEventId"): (e.get("payload") or {}).get("assistId") for e in events if e.get("event_type") == "PLAY_NOTE" and (e.get("payload") or {}).get("assistId")}
 
     def line(side: str, player_id: str) -> dict[str, Any]:
         return players.setdefault(f"{side}:{player_id}", {"side": side, "id": player_id, "pts": 0, "reb": 0, "ast": 0})
@@ -101,7 +103,7 @@ def build_panel(state: Mapping[str, Any], names: Mapping[str, Mapping[str, Mappi
                 shooter = _clean(payload.get("shooterId"))
                 if shooter:
                     line(side, shooter)["pts"] += points
-                assist = _clean(payload.get("assistId"))
+                assist = _clean(payload.get("assistId")) or _clean(assists.get(event.get("event_id")))
                 if assist:
                     line(side, assist)["ast"] += 1
                 last_basket = {"team": side, "points": points, "player_id": shooter}
@@ -148,7 +150,7 @@ def build_panel(state: Mapping[str, Any], names: Mapping[str, Mapping[str, Mappi
     if last_basket:
         last = {"team": last_basket["team"], "points": last_basket["points"], **_who(names[last_basket["team"]], last_basket["player_id"])}
 
-    return {"leaders": leaders, "team_stats": team_stats, "last_basket": last, "on_floor": on_floor}
+    return {"leaders": leaders, "team_stats": team_stats, "last_basket": last, "on_floor": on_floor, "broadcast": build_broadcast(state, events, names)}
 
 
 class HoopsOverlayPanelService:
