@@ -19,6 +19,7 @@ import postgame_card
 import pregame_card
 import postgame_story
 import pregame_story
+import reel_audio
 import reel_render
 import reel_story
 
@@ -1785,4 +1786,21 @@ class SocialMediaPreviewService:
             (self.output_dir / filename).write_bytes(video)
         except OSError:
             pass
-        return SocialMediaPreviewResult("OK", {"video": video, "filename": filename, **chosen})
+        return SocialMediaPreviewResult("OK", {"video": video, "filename": filename, "seconds": reel_audio.video_seconds(video), **chosen})
+
+    def reel_with_call(self, broadcast_id: str, play_id: str, play_at: int, *, start: float, end: float, offset: float) -> SocialMediaPreviewResult:
+        """The reel last made for this play, with its saved call on it. The picture
+        is not drawn again, so the theme and celebration stay the ones on screen."""
+        safe_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", f"{broadcast_id}-{play_id}").strip("-") or "reel"
+        filename = f"{safe_id}-reel.mp4"
+        reel = self.output_dir / filename
+        call = self._get_replay_audio().clip_file(broadcast_id, play_at) if self._get_replay_audio else None
+        if call is None:
+            return SocialMediaPreviewResult("CALL_NOT_FOUND")
+        if not reel.is_file():
+            return SocialMediaPreviewResult("REEL_NOT_MADE")
+        try:
+            video, used = reel_audio.add_call(reel.read_bytes(), call, start=start, end=end, offset=offset)
+        except Exception as exc:
+            return SocialMediaPreviewResult("REEL_FAILED", {"message": str(exc)[:300]})
+        return SocialMediaPreviewResult("OK", {"video": video, "filename": filename, "used": used})
