@@ -1009,6 +1009,7 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
         </div>
         <div class="roster-layout">
           <aside class="roster-list-panel">
+            <label class="roster-sport-filter">Show<select id="rosterSportFilter" onchange="setRosterSportFilter(this.value)"></select></label>
             <input id="rosterSearch" placeholder="Search rosters" oninput="renderRosterList()">
             <div id="rosterList" class="school-list"></div>
           </aside>
@@ -4297,10 +4298,18 @@ async function loadRosters(){
   const schools=await api('/api/schools');
   const select=document.getElementById('rosterSchool');
   select.innerHTML='<option value="">Select school...</option>'+schools.map(s=>`<option value="${escapeHtml(s.id)}">${escapeHtml(s.broadcast_name||s.official_name)}</option>`).join('');
+  fillRosterSportFilter();
   renderRosterList();
   if(currentRoster){const fresh=rosters.find(r=>r.id===currentRoster.id);if(fresh) openRoster(fresh.id)}
 }
-function renderRosterList(){const q=(document.getElementById('rosterSearch').value||'').toLowerCase();const list=document.getElementById('rosterList');const filtered=rosters.filter(r=>`${r.school_name} ${r.sport} ${r.season} ${r.level}`.toLowerCase().includes(q));list.innerHTML=filtered.length?filtered.map(r=>`<button class="school-list-item ${currentRoster&&currentRoster.id===r.id?'selected':''}" onclick="openRoster('${escapeHtml(r.id)}')"><strong>${escapeHtml(r.school_name)}</strong><span>${escapeHtml(r.season)} ${escapeHtml(r.level)} ${escapeHtml(r.sport)} · ${r.player_count} players</span></button>`).join(''):'<div class="muted roster-list-empty">No rosters found.</div>'}
+function rosterSportFromContext(){const label=SPORT_FAMILY_LABEL[sportContext]||'';return [...document.getElementById('rosterSport').options].some(o=>o.textContent===label)?label:''}
+function rosterSportFilterValue(){try{return localStorage.getItem('csrn.rosterSportFilter')||''}catch(e){return ''}}
+function setRosterSportFilter(value){try{localStorage.setItem('csrn.rosterSportFilter',value)}catch(e){}renderRosterList()}
+function fillRosterSportFilter(){const select=document.getElementById('rosterSportFilter');const sports=[...new Set([...document.getElementById('rosterSport').options].map(o=>o.textContent).concat(rosters.map(r=>String(r.sport||'')).filter(Boolean)))];const saved=rosterSportFilterValue();const locked=rosterSportFromContext();
+  // With a sport picked at the top of the app the list only has that sport, so say so
+  // here instead of offering choices that would come up empty.
+  select.innerHTML=locked?`<option value="${escapeHtml(locked)}">${escapeHtml(locked)}</option>`:'<option value="">All sports</option>'+sports.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');select.disabled=Boolean(locked);select.title=locked?'Set by the sport picker at the top of the app':'';select.value=locked||(sports.includes(saved)?saved:'')}
+function renderRosterList(){const q=(document.getElementById('rosterSearch').value||'').toLowerCase();const sport=document.getElementById('rosterSportFilter').value;const list=document.getElementById('rosterList');const filtered=rosters.filter(r=>(!sport||String(r.sport||'').toLowerCase()===sport.toLowerCase())&&`${r.school_name} ${r.sport} ${r.season} ${r.level} ${r.division||''}`.toLowerCase().includes(q));list.innerHTML=filtered.length?filtered.map(r=>`<button class="school-list-item ${currentRoster&&currentRoster.id===r.id?'selected':''}" onclick="openRoster('${escapeHtml(r.id)}')"><strong>${escapeHtml(r.school_name)}</strong><span>${escapeHtml(r.season)} ${escapeHtml(r.level)} ${escapeHtml(r.division||'')} ${escapeHtml(r.sport)} · ${r.player_count} players</span></button>`).join(''):`<div class="muted roster-list-empty">${sport&&!q?`No ${escapeHtml(sport)} rosters yet.`:'No rosters found.'}</div>`}
 function newRoster(){
   currentRoster=null;
   currentPlayer=null;
@@ -4316,8 +4325,8 @@ function newRoster(){
   // share a roster pool, so a new roster must be tagged with the
   // operator's exact active context, not left to drift as a free pick.
   const rosterSportSelect=document.getElementById('rosterSport');
-  const contextRosterSport=sportContext==='canadian_football'?'Canadian Football':sportContext==='football'?'Football':'';
-  rosterSportSelect.value=contextRosterSport||'Football';
+  const contextRosterSport=rosterSportFromContext();
+  rosterSportSelect.value=contextRosterSport||document.getElementById('rosterSportFilter').value||'Football';
   rosterSportSelect.disabled=Boolean(contextRosterSport);
   document.getElementById('rosterLevel').value='Varsity';
   document.getElementById('rosterDivision').value='Boys';
