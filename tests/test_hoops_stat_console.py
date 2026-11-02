@@ -209,3 +209,10 @@ def test_console_and_engine_agree_on_the_court() -> None:
     for name in ("rim", "paint", "mid_range", "top_three", "left_wing_three", "right_wing_three", "left_corner_three", "right_corner_three"):
         assert name in js
     assert "rimX: 78.75" in js and "arc: 19.75" in js and "cornerY: 5.25" in js
+
+
+def test_console_turns_the_clock_on_for_a_new_game_only() -> None:
+    js = (ROOT / "static/csrn-hoops-console.js").read_text(encoding="utf-8")
+    assert "currentState.clock_visible === false && !hcClockShown && !hcEvents().some(e => e.event_type === 'OPENING_TIP')" in js
+    assert "clockAction('set', { seconds: Number(currentState.clock_seconds ?? 0), visible: true })" in js
+
