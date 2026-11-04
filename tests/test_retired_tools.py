@@ -21,7 +21,7 @@ def test_menu_marks_theme_manager_packages_and_recaps_retired() -> None:
     for key in ("themes", "packages", "recaps"):
         assert entries[key].rstrip().endswith("true"), key
     for key in ("pregame", "command", "statistician", "obs", "games", "schools",
-                "rosters", "graphics", "sponsors", "social", "settings",
+                "rosters", "graphics", "sponsors", "social_postgame", "social_pregame", "social_reels", "settings",
                 "diagnostics"):
         assert not entries[key].rstrip().endswith("true"), key
     assert "if (retired) link.classList.add('retired-tool');" in NAV

@@ -28,7 +28,9 @@ def test_menu_has_twelve_items_besides_retired_ones() -> None:
         "pregame", "command", "statistician", "obs",
         "games", "schools", "rosters",
         "graphics", "sponsors",
-        "social",
+        "social_postgame",
+        "social_pregame",
+        "social_reels",
         "settings", "diagnostics",
     ]
     assert "['diagnostics', 'System Check']" in NAV

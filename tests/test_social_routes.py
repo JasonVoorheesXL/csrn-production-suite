@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+
+import pytest
 from types import SimpleNamespace
 
 from flask import Flask
@@ -151,6 +153,30 @@ def app_service(tmp_path: Path):
     )
     app.config["FACEBOOK_TEST_SERVICE"] = facebook
     return app, service
+
+
+@pytest.mark.parametrize(
+    "path, heading, kind",
+    [
+        ("/social/postgame", b"<h1>Postgame Story</h1>", None),
+        ("/social/pregame", b"<h1>Pregame Preview</h1>", b'value="pregame" selected'),
+        ("/social/reels", b"<h1>Reels</h1>", None),
+    ],
+)
+def test_each_publishing_screen_opens_on_its_own(tmp_path: Path, path: str, heading: bytes, kind: bytes | None) -> None:
+    app, _ = app_service(tmp_path)
+    response = app.test_client().get(path)
+    assert response.status_code == 200
+    assert heading in response.data
+    if kind:
+        assert kind in response.data
+
+
+def test_facebook_sign_in_can_still_return_to_social(tmp_path: Path) -> None:
+    app, _ = app_service(tmp_path)
+    response = app.test_client().get("/social?facebook=select")
+    assert response.status_code == 200
+    assert b"<h1>Postgame Story</h1>" in response.data
 
 
 def test_manager_page_renders(tmp_path: Path) -> None:
