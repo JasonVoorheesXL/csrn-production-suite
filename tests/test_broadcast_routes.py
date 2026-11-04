@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -290,3 +291,7 @@ def test_delete_broadcast_preserves_success_and_not_found_contracts(
     assert missing.get_json() == {"error": "NOT_FOUND"}
 
 
+def test_the_game_form_clears_a_record_when_its_team_leaves() -> None:
+    page = (Path(__file__).resolve().parents[1] / "templates" / "index.html").read_text(encoding="utf-8")
+    assert "planningNoteSchoolChange(side,select?.value||'');" in page
+    assert "for(const id of ['sport','season'])document.getElementById(id)?.addEventListener('change',refreshPlanningInheritedRecord);" in page
