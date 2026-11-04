@@ -13,14 +13,15 @@ the hero always runs left to right.
 """
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 import postgame_story as post
 from postgame_story import TEAMS, _int, quarter_phrase, quarter_tag, yards_to_goal
 
 REEL_KINDS = ("run", "pass", "interception", "kickoff_return", "punt_return", "field_goal")
 DANCES = {"shimmy": "Shimmy", "robot": "Robot", "disco": "Disco Point", "moonwalk": "Moonwalk",
-          "fistpump": "Fist Pump", "kneeknock": "Knee Knocker", "twirl": "Paper Twirl"}
+          "fistpump": "Fist Pump", "kneeknock": "Knee Knocker", "twirl": "Paper Twirl",
+          "sprinkler": "Sprinkler", "sidestep": "Side Step", "armwave": "Arm Wave", "bigjump": "Big Jump", "hipswing": "Hip Swing"}
 THEMES = {"paper": "Paper Cutout", "neon": "Neon", "chalk": "Chalkboard", "comic": "Comic Book"}
 GRADE_NAMES = {"9": "Freshman", "10": "Sophomore", "11": "Junior", "12": "Senior"}
 
@@ -162,8 +163,14 @@ def _captions(kind: str, td: bool, yards: int, hero: str, passer: str, team: str
 def script(facts: Mapping[str, Any], play: Mapping[str, Any], *, broadcast: Mapping[str, Any],
            station_name: str = "", station_logo: str = "", logo_style: str = "round",
            sponsor_name: str = "", sponsor_logo: str = "", dance: str = "shimmy", theme: str = "paper",
-           colors: Mapping[str, Mapping[str, str]] | None = None) -> dict[str, Any]:
-    """Everything the paper-cutout animation needs for one play."""
+           colors: Mapping[str, Mapping[str, str]] | None = None,
+           head_for: Callable[[str, str], str] | None = None) -> dict[str, Any]:
+    """Everything the paper-cutout animation needs for one play. head_for(team, number)
+    is a featured player's cut-out head, when the operator asked for heads."""
+    def _head(player: Mapping[str, Any], side: str) -> str:
+        number = str(player.get("number", "") or "")
+        return head_for(side, number) if head_for and number else ""
+
     teams = facts["teams"]
     team, other = play["team"], ("visitor" if play["team"] == "home" else "home")
     events = facts.get("events") or {}
@@ -193,8 +200,8 @@ def script(facts: Mapping[str, Any], play: Mapping[str, Any], *, broadcast: Mapp
             "line": _headline_line(play["kind"], play["td"], play["yards"]),
             "when": quarter_phrase(play["quarter"]).capitalize() if play.get("quarter") else "",
         },
-        "hero": {"name": hero["name"], "number": str(hero.get("number", "") or "")},
-        "passer": {"name": passer, "number": str((play.get("passer") or {}).get("number", "") or "")},
+        "hero": {"name": hero["name"], "number": str(hero.get("number", "") or ""), "head": _head(hero, team)},
+        "passer": {"name": passer, "number": str((play.get("passer") or {}).get("number", "") or ""), "head": _head(play.get("passer") or {}, team)},
         "offense": {"name": teams[team]["name"], "side": team, **(colors.get(team) or {})},
         "defense": {"name": teams[other]["name"], "side": other, **(colors.get(other) or {})},
         "captions": _captions(play["kind"], play["td"], play["yards"], hero["name"], passer,

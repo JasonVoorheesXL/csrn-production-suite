@@ -266,7 +266,7 @@ def create_broadcast_blueprint(
     @routes.get("/api/reel-plays")
     @dependencies.require_auth
     def season_reel_plays():
-        return jsonify(dependencies.get_social_media_preview_service().season_reel_plays().data)
+        return jsonify(dependencies.get_social_media_preview_service().season_reel_plays(request.args.get("sport", "football")).data)
 
     @routes.get("/api/broadcasts/<broadcast_id>/reel.mp4")
     @dependencies.require_auth
@@ -275,6 +275,7 @@ def create_broadcast_blueprint(
             broadcast_id, request.args.get("play", ""),
             sponsor_id=request.args.get("sponsor", ""), dance=request.args.get("dance", ""),
             logo_style=request.args.get("logo", ""), theme=request.args.get("theme", ""),
+            heads=request.args.get("heads", ""),
         )
         if result.code in {"BROADCAST_NOT_FOUND", "PLAY_NOT_FOUND"}:
             return jsonify({"error": result.code}), 404

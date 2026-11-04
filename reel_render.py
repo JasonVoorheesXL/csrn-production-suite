@@ -4,7 +4,8 @@ Chromium and encode the frames into a vertical MP4 (1080 x 1920).
 The motion is shared and the theme decides how it is drawn: construction-paper
 cutouts, neon outlines, chalkboard Xs and Os, or a comic book. Everything moves
 "on twos" (12 drawings a second) with a slight boil, like stop-motion. Players
-are generic figures identified only by team colours and numbers.
+are generic figures identified only by team colours and numbers, unless the
+operator asks for heads and a featured player has a reel headshot.
 """
 from __future__ import annotations
 
@@ -21,6 +22,24 @@ DRAW_FPS = 12      # new drawing 12 times a second: the stop-motion feel
 VIDEO_FPS = 24     # each drawing held for two video frames
 # Chalkboard uses the handwriting fonts that ship with Windows.
 THEME_FONTS = {"paper": "bangers-regular.woff2", "neon": "michroma-regular.woff2", "comic": "bangers-regular.woff2"}
+
+# Celebrations: each beat holds one pose for a few drawings, like stop-motion. Our own moves,
+# never another company's dance or its name. dx is pixels, lift is pixels up the screen.
+DANCE_MOVES = r"""{
+  shimmy: b => ({torso: b % 2 ? 7 : -7, armF: b % 2 ? 115 : 65, armB: b % 2 ? -65 : -115, legF: b % 2 ? 6 : -6, legB: b % 2 ? 6 : -6}),
+  robot: b => [{armF: 90, armB: 0, head: 10}, {armF: 0, armB: -90, head: -10}, {armF: 90, armB: -90, head: 0}, {armF: 125, armB: 0, head: 10}][b % 4],
+  disco: b => ({armB: b % 2 ? -125 : -30, armF: 15, torso: b % 2 ? 7 : -7, legF: b % 2 ? 14 : 0, legB: b % 2 ? 0 : -14}),
+  moonwalk: b => ({dx: -b * 27, legF: b % 2 ? 20 : -8, legB: b % 2 ? -8 : 20, armF: b % 2 ? 26 : -18, armB: b % 2 ? -18 : 26, torso: -5}),
+  fistpump: b => ({lift: b % 2 ? -44 : 0, armB: b % 2 ? -125 : -60, armF: 12, legF: b % 2 ? 20 : 0, legB: b % 2 ? -20 : 0}),
+  kneeknock: b => ({legF: b % 2 ? -18 : 10, legB: b % 2 ? 18 : -10, armF: 28, armB: -28, torso: b % 2 ? 3 : -3}),
+  twirl: b => ({flip: [1, .35, -1, -.35][b % 4], armF: 120, armB: -120, lift: b % 4 === 1 || b % 4 === 3 ? -18 : 0}),
+  sprinkler: b => ({armB: -150, armF: [20, 60, 100, 60][b % 4], torso: [-6, -2, 3, -2][b % 4], legF: 8, legB: -8}),
+  sidestep: b => ({dx: [0, 34, 68, 34][b % 4], lift: b % 2 ? -20 : 0, armF: b % 2 ? 70 : -30, armB: b % 2 ? 30 : -70, legF: b % 2 ? 24 : -6, legB: b % 2 ? -6 : -24, torso: b % 2 ? 6 : -6}),
+  armwave: b => ({armF: [150, 110, 70, 110][b % 4], armB: [-70, -110, -150, -110][b % 4], torso: [5, 2, -5, -2][b % 4], lift: b % 2 ? -12 : 0}),
+  bigjump: b => [{lift: 0, armF: 20, armB: -20, legF: 16, legB: -16}, {lift: -90, armF: 165, armB: -165, legF: 34, legB: -34}, {lift: -30, armF: 90, armB: -90}, {lift: 0, armF: 20, armB: -20, legF: 16, legB: -16}][b % 4],
+  hipswing: b => ({torso: [9, 0, -9, 0][b % 4], legF: [14, 0, -14, 0][b % 4], legB: [14, 0, -14, 0][b % 4], armF: [50, 90, 130, 90][b % 4], armB: [-130, -90, -50, -90][b % 4]}),
+}"""
+
 
 PAGE = r"""<!doctype html>
 <html><head><meta charset="utf-8">
@@ -370,6 +389,16 @@ if (kind === 'interception') passer = figure(AWAY, '7', -1);
 if (kind.endsWith('_return')) kicker = figure(AWAY, '18', -1);
 if (kind === 'field_goal') { passer = figure(HOME, '12', 1); }
 const ball = ballShape(actors);
+// A player's own cut-out head, when the operator asked for heads and the player has one. Chalkboard stays Xs and Os.
+function putFace(f, uri) {
+  if (!f || !uri || TH === 'chalk') return;
+  while (f.head.firstChild) f.head.removeChild(f.head.firstChild);
+  f.face = $('g', {}, f.head);
+  const h = 570, w = h * .82;
+  $('image', {href: uri, x: 360 - w / 2, y: -135, width: w, height: h, preserveAspectRatio: 'xMidYMax meet'}, f.face);
+}
+putFace(hero, S.hero.head);
+if (kind === 'pass') putFace(passer, S.passer.head);
 
 // -- motion -----------------------------------------------------------------------
 const ease = p => p < 0 ? 0 : p > 1 ? 1 : p * p * (3 - 2 * p);
@@ -396,6 +425,7 @@ function place(f, x, y, rot, t, running, idx, pose) {
   f.g.setAttribute('transform', `translate(${sx.toFixed(1)} ${y.toFixed(1)}) rotate(${(rot + boil).toFixed(2)}) scale(${scale})`);
   f.inner.setAttribute('transform', `scale(${flip} 1)`);
   f.num.setAttribute('transform', `translate(${f.numX} 0) scale(${flip < 0 ? -1 : 1} 1) translate(${-f.numX} 0)`);
+  if (f.face) f.face.setAttribute('transform', `translate(360 0) scale(${flip < 0 ? -1 : 1} 1) translate(-360 0)`);
   if (f.limbs) f.limbs.setAttribute('display', p.scale > 1 ? 'inline' : 'none');
   const stride = running ? (Math.floor(t * 12) % 2 ? 1 : -1) : 0;
   turn(f.legF, p.legF ?? 20 * stride);
@@ -411,15 +441,7 @@ function stackActors() {   // nearer the camera (lower on the field) draws on to
   actors.appendChild(ball);
 }
 // Celebrations: each beat holds one pose for a few drawings, like stop-motion.
-const DANCES = {
-  shimmy: b => ({torso: b % 2 ? 7 : -7, armF: b % 2 ? 115 : 65, armB: b % 2 ? -65 : -115, legF: b % 2 ? 6 : -6, legB: b % 2 ? 6 : -6}),
-  robot: b => [{armF: 90, armB: 0, head: 10}, {armF: 0, armB: -90, head: -10}, {armF: 90, armB: -90, head: 0}, {armF: 125, armB: 0, head: 10}][b % 4],
-  disco: b => ({armB: b % 2 ? -125 : -30, armF: 15, torso: b % 2 ? 7 : -7, legF: b % 2 ? 14 : 0, legB: b % 2 ? 0 : -14}),
-  moonwalk: b => ({dx: -b * .42, legF: b % 2 ? 20 : -8, legB: b % 2 ? -8 : 20, armF: b % 2 ? 26 : -18, armB: b % 2 ? -18 : 26, torso: -5}),
-  fistpump: b => ({dy: b % 2 ? -44 : 0, armB: b % 2 ? -125 : -60, armF: 12, legF: b % 2 ? 20 : 0, legB: b % 2 ? -20 : 0}),
-  kneeknock: b => ({legF: b % 2 ? -18 : 10, legB: b % 2 ? 18 : -10, armF: 28, armB: -28, torso: b % 2 ? 3 : -3}),
-  twirl: b => ({flip: [1, .35, -1, -.35][b % 4], armF: 120, armB: -120, dy: b % 4 === 1 || b % 4 === 3 ? -18 : 0}),
-};
+const DANCES = __DANCES__;
 function dancePose(t) {
   const name = DANCES[S.dance] ? S.dance : 'shimmy';
   const beat = Math.floor((t - T_FIN - .35) * 3.4);
@@ -583,7 +605,7 @@ window.drawFrame = function (time) {
   const heroRunning = t >= T_RUN || (kind === 'pass' && t > T_AIR - .4) || (kind === 'run' && t > T_AIR);
   const tackled = !S.td && kind !== 'field_goal' && t > T_FIN;
   const carrying = kind !== 'field_goal' && t >= T_RUN && t < T_FIN ? {armF: -68} : {};
-  if (dance) { const dy = dance.dy || 0; place(hero, danceX + (dance.dx || 0), lane(3.55) + dy, 0, t, false, 20, {scale: 1.5, ...dance}); }
+  if (dance) { place(hero, danceX + (dance.dx || 0) / PX, lane(3.55) + (dance.lift || 0), 0, t, false, 20, {scale: 1.5, ...dance}); }
   else place(hero, h.x, h.y, tackled && t < T_FIN + .35 ? -70 : (kind === 'field_goal' && t > T_RUN - .2 && t < T_RUN + .4 ? -18 : 0), t, heroRunning && !tackled && t < T_FIN, 20, carrying);
   // defenders: line up, then chase, dive and fall as the hero goes by
   defense.forEach((f, i) => {
@@ -609,7 +631,7 @@ window.drawFrame = function (time) {
   const racing = (TH === 'neon' || TH === 'comic') && kind !== 'field_goal' && t >= T_RUN && t < T_FIN;
   streaks.forEach((r, i) => { r.setAttribute('opacity', racing ? 1 : 0); if (!racing) return; const long = 170 + noise(i + 70, t) * 240, sx = X(h.x) - camera - 70 - i % 2 * 30; r.setAttribute('x', sx - long); r.setAttribute('width', long); r.setAttribute('y', h.y - 30 - i * 40); });
   floorRing.setAttribute('opacity', TH === 'neon' && dance ? .8 : 0);
-  if (TH === 'neon' && dance) { floorRing.setAttribute('cx', X(danceX + (dance.dx || 0)) - camera); floorRing.setAttribute('cy', lane(3.55)); floorRing.setAttribute('rx', 200 + noise(5, t) * 50); }
+  if (TH === 'neon' && dance) { floorRing.setAttribute('cx', X(danceX) + (dance.dx || 0) - camera); floorRing.setAttribute('cy', lane(3.55)); floorRing.setAttribute('rx', 200 + noise(5, t) * 50); }
   SFX.forEach(fx => { const age = t - fx.at, on = age >= 0 && age < fx.long; fx.g.setAttribute('opacity', on ? 1 : 0); if (on) fx.g.setAttribute('transform', `translate(${fx.x} ${fx.y}) rotate(-7) scale(${(1 + Math.max(0, .2 - age) * 2.4).toFixed(2)})`); });
   // captions by phase
   // the 'action' caption waits for the catch on passes, picks and kicks
@@ -642,7 +664,7 @@ window.reelReady = (document.fonts ? document.fonts.ready : Promise.resolve()).t
 
 def page(script: Mapping[str, Any], font_uri: str = "") -> str:
     data = json.dumps(script).replace("</", "<\\/")
-    return PAGE.replace("__SCRIPT__", data).replace("__FONT__", font_uri)
+    return PAGE.replace("__DANCES__", DANCE_MOVES).replace("__SCRIPT__", data).replace("__FONT__", font_uri)
 
 
 def render_mp4(document: str, *, launch: Callable[[], Any] | None = None) -> bytes:

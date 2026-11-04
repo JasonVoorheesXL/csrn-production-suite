@@ -1069,6 +1069,9 @@ try{if(localStorage.getItem('csrn.showRetiredTools.v1')==='1')document.documentE
   </div>
   <small class="field-help">Preferred: clear portrait PNG, JPG, or WebP. Uploaded files are stored locally and migrate with CSRN.</small>
 </label>
+                    <div class="span-2 reel-head-field">
+                      <div class="reel-head-row"><img id="reelHeadThumb" class="hidden" alt="Reel headshot"><div><b>Reel Headshot</b><small class="field-help">A cut-out head for this player on play reels. Separate from the headshot above, and used only when a reel asks for player heads.</small></div><label class="file-button compact">Choose Photo<input id="reelHeadFile" type="file" accept="image/png,image/jpeg,image/webp" onchange="reelHeadOpen(this.files[0])"></label><button type="button" id="reelHeadRemove" class="hidden" onclick="reelHeadRemove()">Remove</button></div>
+                    </div>
                     <label class="check-row"><input id="playerPronunciationVerified" type="checkbox"> Pronunciation verified</label>
                     <label class="check-row"><input id="playerCaptain" type="checkbox"> Captain</label>
                     <label class="check-row"><input id="playerStarter" type="checkbox"> Starter</label>
@@ -4413,6 +4416,7 @@ function editRosterPlayer(id){
   document.getElementById('playerPronunciation').value=currentPlayer.pronunciation||'';
   document.getElementById('playerPronunciationVerified').checked=!!currentPlayer.pronunciation_verified;
   document.getElementById('playerHeadshot').value=currentPlayer.headshot||'';
+  reelHeadShow();
   document.getElementById('playerCaptain').checked=!!currentPlayer.captain;
   document.getElementById('playerStarter').checked=!!currentPlayer.starter;
   document.getElementById('playerMessage').textContent='';
@@ -7471,6 +7475,7 @@ window.addEventListener('load',loadActiveGraphicsTheme);</script>
 <script src="/static/csrn-diamond-controls.js?v=diamond-p5-r1"></script>
 <script src="/static/csrn-hoops-controls.js?v=hoops-p5-r1"></script>
 <script src="/static/csrn-hoops-console.js?v=hoops-console-r1"></script>
+<script src="/static/csrn-reel-headshot.js?v=reel-headshot-r1"></script>
 
 <div id="pregamePresentationModal" class="modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="pregamePresentationTitle">
   <div class="modal-card pregame-presentation-control-card">
