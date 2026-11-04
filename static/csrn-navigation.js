@@ -53,7 +53,9 @@
       ['packages', 'Broadcast Packages', null, true],
     ]],
     ['Publishing', [
-      ['social', 'Social Publishing', '/social'],
+      ['social_postgame', 'Postgame Story', '/social/postgame'],
+      ['social_pregame', 'Pregame Preview', '/social/pregame'],
+      ['social_reels', 'Reels', '/social/reels'],
       ['recaps', 'Game Recaps', '/recaps', true],
     ]],
     ['System', [

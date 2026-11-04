@@ -55,7 +55,9 @@ def test_x_manual_only_boundary_remains_after_recap_integration() -> None:
 
 def test_command_center_navigation_exposes_social_and_recaps() -> None:
     source = (ROOT / "static" / "csrn-navigation.js").read_text(encoding="utf-8")
-    assert "['social', 'Social Publishing', '/social']" in source
+    assert "['social_postgame', 'Postgame Story', '/social/postgame']" in source
+    assert "['social_pregame', 'Pregame Preview', '/social/pregame']" in source
+    assert "['social_reels', 'Reels', '/social/reels']" in source
     # Retired from the menu in the 2026 audit; Settings > Retired Tools shows it.
     assert "['recaps', 'Game Recaps', '/recaps', true]" in source
 

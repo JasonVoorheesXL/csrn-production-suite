@@ -101,10 +101,26 @@ def create_social_blueprint(dependencies: SocialRoutesDependencies) -> Blueprint
             return _response(result)
         return None
 
+    # Facebook's sign-in returns to /social, so it stays as another door to Postgame.
     @routes.get("/social")
     @dependencies.require_auth
     def social_manager():
-        return render_template("social_manager.html")
+        return render_template("social_manager.html", social_view="postgame")
+
+    @routes.get("/social/postgame")
+    @dependencies.require_auth
+    def social_postgame():
+        return render_template("social_manager.html", social_view="postgame")
+
+    @routes.get("/social/pregame")
+    @dependencies.require_auth
+    def social_pregame():
+        return render_template("social_manager.html", social_view="pregame")
+
+    @routes.get("/social/reels")
+    @dependencies.require_auth
+    def social_reels():
+        return render_template("social_manager.html", social_view="reels")
 
     @routes.get("/api/social/status")
     @dependencies.require_auth
