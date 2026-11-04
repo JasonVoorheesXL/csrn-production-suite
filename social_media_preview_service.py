@@ -20,8 +20,11 @@ import pregame_card
 import postgame_story
 import pregame_story
 import reel_audio
+import hoop_reel_render
+import hoop_reel_story
 import reel_render
 import reel_story
+from hoops_overlay_panel import roster_lookup
 
 
 Record = dict[str, Any]
@@ -104,6 +107,7 @@ class SocialMediaPreviewService:
         output_dir: Path,
         rng: random.Random | None = None,
         load_rosters: ObjectLoader | None = None,
+        get_headshots_dir: Callable[[], Path] | None = None,
         get_ai_writer: Callable[[], Any] | None = None,
         get_replay_audio: Callable[[], Any] | None = None,
     ) -> None:
@@ -124,6 +128,7 @@ class SocialMediaPreviewService:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._rng = rng or random.Random()
         self._load_rosters = load_rosters
+        self._get_headshots_dir = get_headshots_dir
         self._get_ai_writer = get_ai_writer
         self._background_cache: dict[str, str] = {}
 
@@ -1688,14 +1693,77 @@ class SocialMediaPreviewService:
 
     # -- paper-cutout play reels ---------------------------------------------------------
 
+    def _hoops_state(self, broadcast: Mapping[str, Any]) -> dict[str, Any]:
+        """A basketball game's state: its plays live under hoops, not where football's do."""
+        broadcast_id = str(broadcast.get("broadcast_id", ""))
+        has_plays = lambda state: isinstance(state, Mapping) and ((state.get("hoops") or {}).get("hoops_events"))
+        try:
+            live = self._load_state()
+        except Exception:
+            live = {}
+        if isinstance(live, Mapping) and str(live.get("broadcast_id", "")) == broadcast_id and has_plays(live):
+            return dict(live)
+        mirror = self._live_mirror(broadcast, broadcast_id)
+        if has_plays(mirror):
+            return dict(mirror)
+        try:
+            archive = self._load_final_state_archive(broadcast_id)
+        except Exception:
+            archive = None
+        return dict(archive) if has_plays(archive) else {}
+
+    def _hoops_reel_game(self, broadcast: Mapping[str, Any]) -> dict[str, Any]:
+        """The plays of a basketball game, with the rosters' names and the two team names."""
+        state = {**self._hoops_state(broadcast)}
+        for key in ("home_school_id", "visitor_school_id", "division"):
+            state[key] = broadcast.get(key, state.get(key, ""))
+        try:
+            rosters = list(self._load_rosters() or []) if self._load_rosters else []
+        except Exception:
+            rosters = []
+        names = roster_lookup(rosters, state)
+        teams = {side: str(broadcast.get(f"{side}_team", "") or side.capitalize()) for side in hoop_reel_story.TEAMS}
+        players: dict[str, dict[str, Mapping[str, Any]]] = {"home": {}, "visitor": {}}
+        for side in hoop_reel_story.TEAMS:
+            school = str(broadcast.get(f"{side}_school_id", "") or "")
+            for roster in rosters:
+                if str(roster.get("school_id", "") or "") == school and str(roster.get("sport", "")).strip().lower() == "basketball":
+                    for player in roster.get("players") or []:
+                        if str(player.get("id", "")) in names[side]:
+                            players[side][str(player.get("id"))] = player
+        return {"plays": hoop_reel_story.plays(state, names, teams), "names": names, "teams": teams, "players": players}
+
+    def _season_hoops_plays(self, games: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
+        rows = []
+        for game in games:
+            if game.get("archived") or str(game.get("sport", "") or "").strip().casefold() != "basketball":
+                continue
+            found = self._hoops_reel_game(game)
+            if not found["plays"]:
+                continue
+            teams = found["teams"]
+            rows.append({
+                "broadcast_id": str(game.get("broadcast_id", "")),
+                "date": str(game.get("date", "") or ""),
+                "season": str(game.get("season", "") or ""),
+                "label": f"{game.get('date') or 'No date'} · {teams['visitor']} at {teams['home']}",
+                "plays": [{"id": p["id"], "label": p["label"], "kind": p["kind"], "td": False, "team": teams[p["team"]],
+                           "player": p["player"]["name"], "call_at": 0} for p in found["plays"]],
+            })
+        return rows
+
     def season_reel_plays(self, sport: str = "football") -> SocialMediaPreviewResult:
         """Every reel-worthy play of every finished game, newest game first, with
-        the sponsors loaded for the sport and the celebrations to choose from."""
+        the sponsors loaded for the sport and the celebrations to choose from.
+        A basketball game shows up as soon as it has plays."""
         try:
             games = [g for g in self._load_broadcasts() or [] if isinstance(g, Mapping)]
         except Exception:
             games = []
         rows = []
+        if sport.casefold() == "basketball":
+            rows = self._season_hoops_plays(games)
+            games = []
         for game in games:
             if game.get("archived") or str(game.get("sport", "") or "").strip().casefold() != sport.casefold():
                 continue
@@ -1724,6 +1792,7 @@ class SocialMediaPreviewService:
             "dances": [{"id": key, "label": label} for key, label in reel_story.DANCES.items()],
             "logo_styles": [{"id": key, "label": label} for key, label in postgame_card.LOGO_STYLES.items()],
             "themes": [{"id": key, "label": label} for key, label in reel_story.THEMES.items()],
+            "kinds": [{"id": key, "label": label} for key, label in hoop_reel_story.KIND_LABELS.items()] if sport.casefold() == "basketball" else [],
         })
 
     def _reel_sponsor(self, broadcast: Mapping[str, Any], sponsor_id: str) -> dict[str, Any] | None:
@@ -1739,10 +1808,50 @@ class SocialMediaPreviewService:
                 return picked
         return self._rng.choice(active) if active else None
 
-    def reel_document(self, broadcast_id: str, play_id: str, *, sponsor_id: str = "", dance: str = "", logo_style: str = "", theme: str = "") -> tuple[str, dict[str, str]] | None:
+    def _reel_head_uri(self, player: Mapping[str, Any] | None) -> str:
+        """A player's saved cut-out, ready to draw. Empty means a generic figure."""
+        url = str((player or {}).get("reel_headshot", "") or "")
+        return self._data_uri_from_file(self._get_headshots_dir() / Path(url).name) if url and self._get_headshots_dir else ""
+
+    def _football_head(self, facts: Mapping[str, Any]) -> Callable[[str, str], str]:
+        names = facts.get("names")
+        return lambda team, number: self._reel_head_uri(names.roster_player(team, number)) if names else ""
+
+    def _reel_font(self, theme: str) -> str:
+        font_file = reel_render.THEME_FONTS.get(theme, "")
+        font = self._data_uri_from_file(self._get_static_dir() / "fonts" / font_file) if font_file else ""
+        return "data:font/woff2;base64," + font.split(",", 1)[1] if font else ""
+
+    def _hoops_reel_document(self, broadcast: Mapping[str, Any], play_id: str, *, sponsor_id: str, dance: str, logo_style: str, theme: str, heads: str) -> tuple[str, dict[str, str]] | None:
+        found = self._hoops_reel_game(broadcast)
+        play = next((p for p in found["plays"] if p["id"] == str(play_id)), None)
+        if play is None:
+            return None
+        sponsor = self._reel_sponsor(broadcast, sponsor_id)
+        chosen_dance = dance if dance in reel_story.DANCES else self._rng.choice(list(reel_story.DANCES))
+        chosen_theme = theme if theme in reel_story.THEMES else self._rng.choice(list(reel_story.THEMES))
+        station_name, station_logo = self._station()
+        colors = {}
+        for team in hoop_reel_story.TEAMS:
+            identity = broadcast.get(f"{team}_identity") if isinstance(broadcast.get(f"{team}_identity"), Mapping) else {}
+            colors[team] = {"primary": str(identity.get("primary_color") or ""), "secondary": str(identity.get("secondary_color") or "")}
+        head = lambda side, pid: self._reel_head_uri(found["players"][side].get(str(pid)))
+        hero = found["players"][play["team"]].get(play["player"]["id"]) or {}
+        script = hoop_reel_story.script(play, teams=found["teams"], names=found["names"], station_name=station_name, station_logo=station_logo,
+                                        logo_style=postgame_card.logo_style(logo_style), sponsor_name=str((sponsor or {}).get("name", "") or ""),
+                                        sponsor_logo=self._sponsor_logo_uri(sponsor)[0] if sponsor else "", dance=chosen_dance, theme=chosen_theme,
+                                        colors=colors, grade=str(hero.get("grade", "") or ""),
+                                        featured_head=head if heads in ("featured", "team") else None, team_head=head if heads == "team" else None)
+        return hoop_reel_render.page(script, self._reel_font(chosen_theme)), {"sponsor": str((sponsor or {}).get("name", "") or ""),
+                                                                               "dance": reel_story.DANCES[chosen_dance],
+                                                                               "theme": reel_story.THEMES[chosen_theme]}
+
+    def reel_document(self, broadcast_id: str, play_id: str, *, sponsor_id: str = "", dance: str = "", logo_style: str = "", theme: str = "", heads: str = "") -> tuple[str, dict[str, str]] | None:
         broadcast = self._find_broadcast(broadcast_id)
         if broadcast is None:
             return None
+        if str(broadcast.get("sport", "") or "").strip().casefold() == "basketball":
+            return self._hoops_reel_document(broadcast, play_id, sponsor_id=sponsor_id, dance=dance, logo_style=logo_style, theme=theme, heads=heads)
         facts = self._postgame_facts(broadcast)
         play = next((p for p in reel_story.plays(facts) if p["id"] == str(play_id)), None)
         if play is None:
@@ -1759,20 +1868,17 @@ class SocialMediaPreviewService:
                                    station_logo=station_logo, logo_style=postgame_card.logo_style(logo_style),
                                    sponsor_name=str((sponsor or {}).get("name", "") or ""),
                                    sponsor_logo=self._sponsor_logo_uri(sponsor)[0] if sponsor else "",
-                                   dance=chosen_dance, theme=chosen_theme, colors=colors)
-        font_file = reel_render.THEME_FONTS.get(chosen_theme, "")
-        font = self._data_uri_from_file(self._get_static_dir() / "fonts" / font_file) if font_file else ""
-        if font:
-            font = "data:font/woff2;base64," + font.split(",", 1)[1]
-        return reel_render.page(script, font), {"sponsor": str((sponsor or {}).get("name", "") or ""),
+                                   dance=chosen_dance, theme=chosen_theme, colors=colors,
+                                   head_for=self._football_head(facts) if heads in ("featured", "team") else None)
+        return reel_render.page(script, self._reel_font(chosen_theme)), {"sponsor": str((sponsor or {}).get("name", "") or ""),
                                                 "dance": reel_story.DANCES[chosen_dance],
                                                 "theme": reel_story.THEMES[chosen_theme]}
 
-    def generate_reel(self, broadcast_id: str, play_id: str, *, sponsor_id: str = "", dance: str = "", logo_style: str = "", theme: str = "") -> SocialMediaPreviewResult:
+    def generate_reel(self, broadcast_id: str, play_id: str, *, sponsor_id: str = "", dance: str = "", logo_style: str = "", theme: str = "", heads: str = "") -> SocialMediaPreviewResult:
         """A short vertical MP4: the play redrawn as a paper-cutout animation."""
         if self._find_broadcast(broadcast_id) is None:
             return SocialMediaPreviewResult("BROADCAST_NOT_FOUND")
-        built = self.reel_document(broadcast_id, play_id, sponsor_id=sponsor_id, dance=dance, logo_style=logo_style, theme=theme)
+        built = self.reel_document(broadcast_id, play_id, sponsor_id=sponsor_id, dance=dance, logo_style=logo_style, theme=theme, heads=heads)
         if built is None:
             return SocialMediaPreviewResult("PLAY_NOT_FOUND")
         document, chosen = built

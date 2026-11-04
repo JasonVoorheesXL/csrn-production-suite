@@ -2205,6 +2205,7 @@ def get_social_media_preview_service() -> SocialMediaPreviewService:
             get_static_dir=lambda: Path(__file__).resolve().parent / "static",
             output_dir=SOCIAL_CARDS_DIR,
             load_rosters=load_rosters,
+            get_headshots_dir=lambda: HEADSHOTS_DIR,
             get_ai_writer=get_ai_writer,
             get_replay_audio=get_replay_audio_service,
         )

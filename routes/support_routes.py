@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -71,6 +72,47 @@ def create_support_blueprint(
                 "player": result.data["player"],
             }
         )
+
+    def reel_oval() -> dict[str, Any]:
+        return {name: request.form.get(name) for name in ("x", "y", "width", "height", "tolerance") if request.form.get(name) not in (None, "")}
+
+    def reel_problem(result: Any):
+        if result.code in {"HEADSHOT_FILE_REQUIRED", "UNSUPPORTED_IMAGE_TYPE", "INVALID_IMAGE"}:
+            return jsonify({"error": result.code}), 400
+        if result.code in {"ROSTER_NOT_FOUND", "PLAYER_NOT_FOUND"}:
+            return jsonify({"error": result.code}), 404
+        return jsonify({"error": result.code, "message": result.data.get("message", "")}), 500
+
+    @routes.post("/api/reel-headshot/preview")
+    @dependencies.require_auth
+    def preview_reel_headshot():
+        upload = request.files.get("photo")
+        result = dependencies.get_support_media_service().preview_reel_headshot(
+            original_filename=upload.filename if upload else "", raw=upload.read() if upload else None, **reel_oval(),
+        )
+        if result.code != "OK":
+            return reel_problem(result)
+        cut = result.data["cut"]
+        return jsonify({"image": "data:image/png;base64," + base64.b64encode(cut.png).decode("ascii"), "low_resolution": cut.low_resolution})
+
+    @routes.post("/api/rosters/<roster_id>/players/<player_id>/reel-headshot")
+    @dependencies.require_auth
+    def save_reel_headshot(roster_id: str, player_id: str):
+        upload = request.files.get("photo")
+        result = dependencies.get_support_media_service().save_reel_headshot(
+            roster_id, player_id, original_filename=upload.filename if upload else "", raw=upload.read() if upload else None, **reel_oval(),
+        )
+        if result.code != "OK":
+            return reel_problem(result)
+        return jsonify(result.data)
+
+    @routes.delete("/api/rosters/<roster_id>/players/<player_id>/reel-headshot")
+    @dependencies.require_auth
+    def remove_reel_headshot(roster_id: str, player_id: str):
+        result = dependencies.get_support_media_service().remove_reel_headshot(roster_id, player_id)
+        if result.code != "OK":
+            return reel_problem(result)
+        return jsonify(result.data)
 
     @routes.get("/api/connection-info")
     @dependencies.require_auth

@@ -11,6 +11,8 @@ import qrcode
 import qrcode.image.svg
 from PIL import Image, ImageOps
 
+import reel_headshot
+
 
 @dataclass(frozen=True)
 class SupportMediaResult:
@@ -271,6 +273,62 @@ class SupportMediaService:
                 "filename": stored_filename,
             },
         )
+
+    def preview_reel_headshot(self, *, original_filename: Any, raw: bytes | bytearray | None, **oval: Any) -> SupportMediaResult:
+        """The cut-out as it would be saved. Nothing is stored."""
+        filename = str(original_filename or "").strip()
+        if not filename or not raw:
+            return SupportMediaResult("HEADSHOT_FILE_REQUIRED", {})
+        if Path(filename).suffix.lower() not in self.SUPPORTED_HEADSHOT_TYPES:
+            return SupportMediaResult("UNSUPPORTED_IMAGE_TYPE", {})
+        try:
+            cut = reel_headshot.cut_head(bytes(raw), **oval)
+        except (OSError, ValueError):
+            return SupportMediaResult("INVALID_IMAGE", {})
+        return SupportMediaResult("OK", {"cut": cut})
+
+    def _reel_player(self, rosters: list[Any], roster_id: Any, player_id: Any) -> tuple[Any, SupportMediaResult | None]:
+        roster = next((item for item in rosters if str(item.get("id")) == str(roster_id or "")), None)
+        if roster is None:
+            return None, SupportMediaResult("ROSTER_NOT_FOUND", {})
+        player = next((item for item in list(roster.get("players") or []) if str(item.get("id")) == str(player_id or "")), None)
+        if player is None:
+            return None, SupportMediaResult("PLAYER_NOT_FOUND", {})
+        return player, None
+
+    def save_reel_headshot(self, roster_id: Any, player_id: Any, *, original_filename: Any, raw: bytes | bytearray | None, **oval: Any) -> SupportMediaResult:
+        """Cut the head and keep it on the player, apart from the on-air headshot."""
+        preview = self.preview_reel_headshot(original_filename=original_filename, raw=raw, **oval)
+        if preview.code != "OK":
+            return preview
+        rosters = self._load_rosters()
+        player, problem = self._reel_player(rosters, roster_id, player_id)
+        if problem:
+            return problem
+        stored = f"reel__{self.safe_identifier(str(roster_id), 'roster')}__{self.safe_identifier(str(player_id), 'player')}.png"
+        path = self._headshots_dir / stored
+        try:
+            self._headshots_dir.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(preview.data["cut"].png)
+            player["reel_headshot"] = f"/roster-headshots/{stored}"
+            self._save_rosters(rosters)
+        except Exception as exc:
+            return SupportMediaResult("HEADSHOT_STORAGE_FAILED", {"message": str(exc)})
+        return SupportMediaResult("OK", {"reel_headshot": player["reel_headshot"], "player": dict(player)})
+
+    def remove_reel_headshot(self, roster_id: Any, player_id: Any) -> SupportMediaResult:
+        rosters = self._load_rosters()
+        player, problem = self._reel_player(rosters, roster_id, player_id)
+        if problem:
+            return problem
+        stored = Path(str(player.pop("reel_headshot", "") or "")).name
+        try:
+            self._save_rosters(rosters)
+            if stored:
+                (self._headshots_dir / stored).unlink(missing_ok=True)
+        except Exception as exc:
+            return SupportMediaResult("HEADSHOT_STORAGE_FAILED", {"message": str(exc)})
+        return SupportMediaResult("OK", {"reel_headshot": "", "player": dict(player)})
 
     @classmethod
     def _normalize_port(cls, value: Any) -> int:
