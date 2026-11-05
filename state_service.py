@@ -10,6 +10,8 @@ from typing import Any, Callable, Mapping
 from canonical_state_service import CanonicalStateFoundation
 from ticker_policy_service import TickerPolicyService
 from eligibility_service import EligibilityService
+from engine_router import is_diamond_sport, is_hoops_sport
+from event_service import EventService
 from live_command_service import LEDGER_FIELD, compact_recent_commands, current_revision
 from runtime_diagnostics_service import get_runtime_diagnostics
 
@@ -507,6 +509,16 @@ class StateService:
         if runtime["canonical_field_state"].get("goal_to_go"):
             runtime["distance_yards"] = runtime.get("distance")
             runtime["distance"] = "Goal"
+        # Events stay out of this view, so the board gets the count instead of
+        # working it out. Same count the Timeout buttons use: 3 a half, 1 per OT.
+        if not is_hoops_sport(source) and not is_diamond_sport(source):
+            runtime["timeouts_left"] = {
+                "home": EventService.timeouts_remaining(source, "home"),
+                "visitor": EventService.timeouts_remaining(source, "visitor"),
+                "allowance": EventService.TIMEOUTS_PER_OVERTIME
+                if EventService._timeout_period(source.get("quarter")).startswith("OT")
+                else EventService.TIMEOUTS_PER_HALF,
+            }
         runtime["ticker_items"] = TickerPolicyService.build(source)
         runtime["runtime_view_schema"] = "csrn-runtime-state-v1"
         runtime["state_revision"] = current_revision(source)

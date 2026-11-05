@@ -1,0 +1,6 @@
+/* Timeouts left in the Collegiate Tech score boxes (patchCollegiateTimeouts in the runtime). */
+.bl-college-score-chip>span:has(.bl-college-timeouts){display:flex;align-items:center;gap:14px}
+.bl-college-timeouts{display:inline-flex;align-items:center;gap:7px;font-style:normal}
+.bl-college-timeouts i{display:block;width:30px;height:9px;box-sizing:border-box;border:1px solid rgba(255,255,255,.55);border-radius:2px;background:rgba(0,0,0,.35)}
+.bl-college-timeouts i.on{background:#ffd34d;border-color:#ffe9a0;box-shadow:0 0 7px rgba(255,211,77,.65)}
+.bl-college-timeouts small{margin-left:3px;font-size:11px;letter-spacing:.12em;color:#b9cde4}
