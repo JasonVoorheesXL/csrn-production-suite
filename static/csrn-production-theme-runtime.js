@@ -147,7 +147,7 @@ const PACKAGE_ALIASES = Object.freeze({
     tickerKind: "inside",
     css: ["/static/csrn-broadcast-layout-engine.css?v=18.0-neon-r1",
           "/static/csrn-collegiate-timeouts.css?v=1",
-          "/static/csrn-collegiate-field-arrow.css?v=1"],
+          "/static/csrn-collegiate-field.css?v=1"],
     js:  ["/static/csrn-broadcast-layout-engine.js?v=18.0-neon-r1"]
   })
 });
