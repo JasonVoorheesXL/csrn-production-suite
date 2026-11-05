@@ -144,7 +144,7 @@ const PACKAGE_ALIASES = Object.freeze({
     playerSupported: false,
     tickerSelector: ".bl-college-ticker-copy",
     tickerKind: "inside",
-    css: ["/static/csrn-broadcast-layout-engine.css?v=18.0-neon-r1"],
+    css: ["/static/csrn-broadcast-layout-engine.css?v=18.1-timeouts"],
     js:  ["/static/csrn-broadcast-layout-engine.js?v=18.0-neon-r1"]
   })
 });
@@ -1981,6 +1981,34 @@ function patchThemeScoresAndPossession(root, alias, runtime) {
   }
 }
 
+// Timeouts left, Collegiate Tech football only: one bar per timeout next to each
+// team's HOME / VISITOR label. A used timeout's bar goes empty.
+function patchCollegiateTimeouts(root, alias, runtime) {
+  if (alias !== "collegiate_traditional") return;
+  const counts = runtime.timeouts_left;
+  for (const side of ["home", "visitor"]) {
+    const label = root.querySelector(`.bl-college-score-chip.bl-${side} > span`);
+    if (!label) continue;
+    let meter = label.querySelector(".bl-college-timeouts");
+    if (!counts) {
+      meter?.remove();
+      continue;
+    }
+    if (!meter) {
+      meter = document.createElement("em");
+      meter.className = "bl-college-timeouts";
+      label.appendChild(meter);
+    }
+    const left = Number(counts[side]) || 0;
+    const allowance = Number(counts.allowance) || 0;
+    const key = `${left}/${allowance}`;
+    if (meter.dataset.timeouts === key) continue;
+    meter.dataset.timeouts = key;
+    meter.setAttribute("aria-label", `${left} timeouts left`);
+    meter.innerHTML = `${Array.from({length: allowance}, (_, i) => `<i class="${i < left ? "on" : ""}"></i>`).join("")}<small>Timeouts</small>`;
+  }
+}
+
 function patchLiveGameState(runtime = lastRuntimeForClockPatch) {
   if (!runtime || currentAlias === "legacy") return;
   const root = scoreLayout();
@@ -1988,6 +2016,7 @@ function patchLiveGameState(runtime = lastRuntimeForClockPatch) {
 
   applyBoardOverrides(root, currentAlias, runtime);
   patchThemeScoresAndPossession(root, currentAlias, runtime);
+  patchCollegiateTimeouts(root, currentAlias, runtime);
   patchCollegiateRails(root, runtime, collegiateStatisticsCache.data);
 }
 
