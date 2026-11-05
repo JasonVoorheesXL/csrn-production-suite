@@ -53,4 +53,4 @@ def test_the_collegiate_family_draws_the_bars_and_the_cached_files_changed_versi
     assert "if (!isCollegiateFamily(alias)) return;" in runtime
     assert "patchCollegiateTimeouts(root, currentAlias, runtime);" in runtime
     assert runtime.count("/static/csrn-collegiate-timeouts.css?v=1") == 2
-    assert "csrn-production-theme-runtime.js?v=19.7-timeouts" in (ROOT / "templates/overlay.html").read_text(encoding="utf-8")
+    assert "csrn-production-theme-runtime.js?v=19.8-field-arrow" in (ROOT / "templates/overlay.html").read_text(encoding="utf-8")
