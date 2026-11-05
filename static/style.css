@@ -1132,3 +1132,5 @@ button.on-air{background:#7a1018;border-color:#e0313d;color:#fff}
 .clock-set-keypad button{min-height:64px;font-size:2rem;font-weight:900}
 .clock-set-keypad .clock-set-aux{font-size:1.1rem}
 .clock-set-dialog .duplicate-actions{grid-template-columns:1fr;margin-top:12px}
+#statisticianModule .button-row+.button-row{margin-top:10px}
+#periodStatus{margin:10px 0 8px}
