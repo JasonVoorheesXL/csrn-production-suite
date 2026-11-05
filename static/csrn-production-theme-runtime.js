@@ -136,7 +136,8 @@ const PACKAGE_ALIASES = Object.freeze({
     tickerSelector: ".bl-college-ticker-copy",
     tickerKind: "inside",
     css: ["/static/csrn-broadcast-layout-engine.css?v=18.0-neon-r1",
-          "/static/csrn-collegiate-neon.css?v=18.0-neon-r1"],
+          "/static/csrn-collegiate-neon.css?v=18.0-neon-r1",
+          "/static/csrn-collegiate-timeouts.css?v=1"],
     js:  ["/static/csrn-broadcast-layout-engine.js?v=18.0-neon-r1"]
   }),
   collegiate_traditional: Object.freeze({
@@ -144,7 +145,8 @@ const PACKAGE_ALIASES = Object.freeze({
     playerSupported: false,
     tickerSelector: ".bl-college-ticker-copy",
     tickerKind: "inside",
-    css: ["/static/csrn-broadcast-layout-engine.css?v=18.1-timeouts"],
+    css: ["/static/csrn-broadcast-layout-engine.css?v=18.0-neon-r1",
+          "/static/csrn-collegiate-timeouts.css?v=1"],
     js:  ["/static/csrn-broadcast-layout-engine.js?v=18.0-neon-r1"]
   })
 });
@@ -1981,10 +1983,10 @@ function patchThemeScoresAndPossession(root, alias, runtime) {
   }
 }
 
-// Timeouts left, Collegiate Tech football only: one bar per timeout next to each
+// Timeouts left, Collegiate Tech football (the count only comes for football): one bar per timeout next to each
 // team's HOME / VISITOR label. A used timeout's bar goes empty.
 function patchCollegiateTimeouts(root, alias, runtime) {
-  if (alias !== "collegiate_traditional") return;
+  if (!isCollegiateFamily(alias)) return;
   const counts = runtime.timeouts_left;
   for (const side of ["home", "visitor"]) {
     const label = root.querySelector(`.bl-college-score-chip.bl-${side} > span`);

@@ -48,9 +48,9 @@ def test_other_sports_get_no_football_count():
     assert counts(game(sport="Baseball")) is None
 
 
-def test_only_collegiate_tech_draws_the_bars_and_the_cached_files_changed_version():
+def test_the_collegiate_family_draws_the_bars_and_the_cached_files_changed_version():
     runtime = (ROOT / "static/csrn-production-theme-runtime.js").read_text(encoding="utf-8")
-    assert 'if (alias !== "collegiate_traditional") return;' in runtime
+    assert "if (!isCollegiateFamily(alias)) return;" in runtime
     assert "patchCollegiateTimeouts(root, currentAlias, runtime);" in runtime
-    assert "csrn-broadcast-layout-engine.css?v=18.1-timeouts" in runtime
+    assert runtime.count("/static/csrn-collegiate-timeouts.css?v=1") == 2
     assert "csrn-production-theme-runtime.js?v=19.7-timeouts" in (ROOT / "templates/overlay.html").read_text(encoding="utf-8")
