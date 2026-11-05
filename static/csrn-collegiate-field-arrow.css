@@ -1,6 +1,0 @@
-/* Direction arrow on the Collegiate Tech field: three white chevrons, centered on the ball.
-   The shared layout stylesheet is frozen, so this restyles its .bl-college-direction-arrow here. */
-.package-collegiate .bl-college-direction-arrow{top:50%;left:calc(var(--ball-x) + 21px);z-index:3;width:min(112px,calc(100% - var(--ball-x) - 25px));height:40px;background:none;filter:drop-shadow(2px 0 0 #0a0f16) drop-shadow(-2px 0 0 #0a0f16) drop-shadow(0 2px 0 #0a0f16) drop-shadow(0 -2px 0 #0a0f16) drop-shadow(0 3px 5px rgba(0,0,0,.7))}
-.package-collegiate .bl-college-direction-arrow::after{inset:0;width:auto;height:auto;border:0;background:linear-gradient(90deg,rgba(255,255,255,.55),#fff 70%);clip-path:polygon(0 0,16% 0,34% 50%,16% 100%,0 100%,18% 50%,0 0,33% 0,49% 0,67% 50%,49% 100%,33% 100%,51% 50%,33% 0,66% 0,82% 0,100% 50%,82% 100%,66% 100%,84% 50%,66% 0);transform:none}
-.package-collegiate .bl-college-field[data-direction="left"] .bl-college-direction-arrow{left:calc(var(--ball-x) - 21px);width:min(112px,calc(var(--ball-x) - 25px));transform:translate(-100%,-50%) scaleX(-1)}
-.package-collegiate .bl-college-field[data-direction="left"] .bl-college-direction-arrow::after{inset:0;border:0}

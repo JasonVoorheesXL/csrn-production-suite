@@ -1,0 +1,22 @@
+/* The Collegiate Tech field: every marking measured from the goal lines, so the 50 is the 50 and the 35 is the 35.
+   The shared layout stylesheet is frozen, so this restyles its field here. --csrn-ez is the end zone width. */
+.package-collegiate .bl-college-field-grid{background:linear-gradient(90deg,#07381f,#0d4a2a 50%,#07381f)}
+.package-collegiate .bl-college-field-grid::before{content:none}
+/* Mowed stripes, ten yards each, with the five-yard lines on top of them. */
+.package-collegiate .bl-college-five-yard-lines{background:repeating-linear-gradient(90deg,transparent 0 calc(100% / var(--csrn-yl-count,20) - 1px),rgba(255,255,255,.3) calc(100% / var(--csrn-yl-count,20) - 1px) calc(100% / var(--csrn-yl-count,20))),repeating-linear-gradient(90deg,#1a7a42 0 calc(200% / var(--csrn-yl-count,20)),#14683a calc(200% / var(--csrn-yl-count,20)) calc(400% / var(--csrn-yl-count,20)))}
+/* Ten-yard lines, centered on the yard. */
+.package-collegiate .bl-college-field-grid::after{background:repeating-linear-gradient(90deg,rgba(255,255,255,.85) 0 1px,transparent 1px calc(200% / var(--csrn-yl-count,20) - 1px),rgba(255,255,255,.85) calc(200% / var(--csrn-yl-count,20) - 1px) calc(200% / var(--csrn-yl-count,20)));opacity:1}
+/* Goal lines, on the inner edge of each end zone. */
+.package-collegiate .bl-college-endzone.bl-left{box-shadow:inset 0 0 22px rgba(0,0,0,.5),2px 0 0 #fff}
+.package-collegiate .bl-college-endzone.bl-right{box-shadow:inset 0 0 22px rgba(0,0,0,.5),-2px 0 0 #fff}
+/* Each number's column is ten yards wide and centered on its line: the first column starts at the 5. */
+.package-collegiate .bl-college-yard-numbers{left:calc(var(--csrn-ez,5%) + (100% - 2 * var(--csrn-ez,5%)) * .05);right:calc(var(--csrn-ez,5%) + (100% - 2 * var(--csrn-ez,5%)) * .05);top:10px;letter-spacing:.34em;text-indent:.34em}
+/* Short one-yard ticks in two hash rows. */
+.package-collegiate .bl-college-hashmarks{height:7px;opacity:.55}
+.package-collegiate .bl-college-hashmarks.top{top:calc(36% - 3px)}
+.package-collegiate .bl-college-hashmarks.bottom{bottom:calc(36% - 3px)}
+/* Direction arrow: three white chevrons, centered on the ball. */
+.package-collegiate .bl-college-direction-arrow{top:50%;left:calc(var(--ball-x) + 20px);z-index:3;width:min(60px,calc(100% - var(--ball-x) - 24px));height:20px;background:none;filter:drop-shadow(1.5px 0 0 #0a0f16) drop-shadow(-1.5px 0 0 #0a0f16) drop-shadow(0 1.5px 0 #0a0f16) drop-shadow(0 -1.5px 0 #0a0f16) drop-shadow(0 2px 3px rgba(0,0,0,.7))}
+.package-collegiate .bl-college-direction-arrow::after{inset:0;width:auto;height:auto;border:0;background:linear-gradient(90deg,rgba(255,255,255,.55),#fff 70%);clip-path:polygon(0 0,16% 0,34% 50%,16% 100%,0 100%,18% 50%,0 0,33% 0,49% 0,67% 50%,49% 100%,33% 100%,51% 50%,33% 0,66% 0,82% 0,100% 50%,82% 100%,66% 100%,84% 50%,66% 0);transform:none}
+.package-collegiate .bl-college-field[data-direction="left"] .bl-college-direction-arrow{left:calc(var(--ball-x) - 20px);width:min(60px,calc(var(--ball-x) - 24px));transform:translate(-100%,-50%) scaleX(-1)}
+.package-collegiate .bl-college-field[data-direction="left"] .bl-college-direction-arrow::after{inset:0;border:0}
